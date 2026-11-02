@@ -111,8 +111,10 @@ async function eventBody(m: Any, withMeet: boolean) {
   const ids: string[] = (m.attendees || []).length ? m.attendees : must(await db.from("profiles").select("id").eq("is_active", true)).map((p: Any) => p.id);
   const people = ids.length ? must(await db.from("profiles").select("email").in("id", ids)) : [];
   const settings = (must(await db.from("settings").select("data").eq("id", 1).maybeSingle()) || { data: {} }).data || {};
-  const wd: number[] = settings.working_days || [1, 2, 3, 4, 5];
-  const rrule = m.repeat === "Every weekday" ? ["RRULE:FREQ=WEEKLY;BYDAY=" + wd.map((n) => ["SU", "MO", "TU", "WE", "TH", "FR", "SA"][n]).join(",")]
+  const wd: number[] = settings.working_days || [1, 2, 3, 4, 5, 6];
+  const byday = (days: number[]) => "RRULE:FREQ=WEEKLY;BYDAY=" + days.map((n) => ["SU", "MO", "TU", "WE", "TH", "FR", "SA"][n]).join(",");
+  const rrule = m.repeat === "Every weekday" ? [byday(wd)]
+    : m.repeat === "Selected days" && (m.repeat_days || []).length ? [byday(m.repeat_days)]
     : m.repeat === "Every week" ? ["RRULE:FREQ=WEEKLY"] : [];
   const body: Any = {
     summary: m.title,
@@ -203,6 +205,7 @@ function occursOn(m: Any, d: string, workingDays: number[], holidays: string[]) 
   if (!m.meeting_date || d < m.meeting_date) return false;
   if (!m.repeat || m.repeat === "Does not repeat") return d === m.meeting_date;
   if (m.repeat === "Every week") return weekday(d) === weekday(m.meeting_date);
+  if (m.repeat === "Selected days") return (m.repeat_days || []).includes(weekday(d)) && !holidays.includes(d);
   return workingDays.includes(weekday(d)) && !holidays.includes(d);
 }
 
@@ -222,7 +225,7 @@ Deno.serve(async (req) => {
       const result: Any = { synced: 0, failed: 0, joins: 0, checkedIn: 0 };
       for (const l of links) { try { await syncUser(l.user_id); result.synced++; } catch (_) { result.failed++; } }
       const settings = (must(await db.from("settings").select("data").eq("id", 1).maybeSingle()) || { data: {} }).data || {};
-      const wd = settings.working_days || [1, 2, 3, 4, 5], hol = (settings.holidays || []).map((h: Any) => h.date);
+      const wd = settings.working_days || [1, 2, 3, 4, 5, 6], hol = (settings.holidays || []).map((h: Any) => h.date);
       const connected = new Set(links.map((l: Any) => l.user_id));
       const meetings = must(await db.from("meetings").select("*").ilike("link", "%meet.google.com%"));
       for (const m of meetings) {

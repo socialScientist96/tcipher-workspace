@@ -9,7 +9,8 @@ The internal workspace for Tcipher's three verticals, **Development**, **Sales**
 | `admin-users-function.ts` | Lets the admin panel create logins and reset passwords | Supabase › Edge Functions, named `admin-users` |
 | `google-sync-function.ts` | Automatic Google Calendar sync, Meet links and Meet join import | Supabase › Edge Functions, named `google-sync` |
 | `google-sync-schedule.sql` | Runs the Google sync every 10 minutes | Supabase › SQL Editor (after enabling pg_cron and pg_net) |
-| `upgrade-2026-11.sql` | Upgrade for an existing workspace: scrum, Meet joins, holidays/leave, Google sync, dev tasks, notes | Supabase › SQL Editor |
+| `upgrade-2026-11.sql` | Upgrade for an existing workspace: scrum, Meet joins, holidays/leave, Google sync, dev tasks, notes (already run on yours) | Supabase › SQL Editor |
+| `upgrade-2026-11b.sql` | Small follow-up: meetings on selected days, Saturday as a working day | Supabase › SQL Editor |
 | `CHANGELOG.md` | What’s in each version, and what still needs doing to go live | Keep with the files |
 
 All data, logins and files live in Supabase. GitHub only hosts the page.
@@ -68,7 +69,7 @@ Each person then clicks **Connect Google** on their Home page, or in My profile,
 
 ## Morning scrum and attendance
 
-- Create one meeting with type **Morning scrum**, set **Repeats** to **Every weekday**, and paste or generate its Google Meet link. Leave Attendees empty to invite everyone.
+- Create one meeting with type **Morning scrum**, set **Repeats** to **Every working day** (Mon–Sat), or **On selected days** and tick the days, and paste or generate its Google Meet link. Leave Attendees empty to invite everyone.
 - People click **Join morning scrum** on their Home page. This opens Meet, logs the join, and checks them in as **Remote** for the day if they haven’t checked in yet.
 - People who join straight from Google Calendar or Meet are imported automatically every 10 minutes, as long as the scrum’s organiser has connected Google. Every join and re-join is logged, and anyone not yet checked in that day is marked **Remote**. Organisers and admins can also click **Import joins from Google Meet** on the meeting to do it immediately.
 - The **Attendance › Today’s team** view shows who joined the scrum and when.

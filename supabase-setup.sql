@@ -848,7 +848,7 @@ on conflict (name) do nothing;
 insert into public.settings (id, data) values (1, '{
   "company": "Tcipher Technologies",
   "currency": "INR",
-  "working_days": [1,2,3,4,5],
+  "working_days": [1,2,3,4,5,6],
   "leave_types": ["Paid leave","Sick leave","Work from home","Unpaid leave"],
   "annual_leave": 12,
   "counted_leave_types": ["Paid leave","Sick leave"],
@@ -1154,6 +1154,13 @@ begin
     end;
   end loop;
 end $$;
+
+
+-- ---------------------------------------------------------------------
+-- 19. Meetings on chosen days (e.g. Mon–Sat), and Saturday as a working day
+-- ---------------------------------------------------------------------
+alter table public.meetings add column if not exists repeat_days int[] not null default '{}';
+
 
 -- Done. Next: create your own login in Authentication > Users.
 -- The very first person created becomes the admin automatically.

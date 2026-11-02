@@ -1,10 +1,15 @@
 # Tcipher Workspace – changelog
 
-## Live now (first upload)
-Three verticals (Development, Sales, Marketing), admin panel, roles, leads handoff, tasks with review, leave and attendance, logo and brand colours.
+Version 1 (first upload): three verticals, admin panel, roles, leads handoff, tasks with review, leave and attendance, logo and brand colours.
 
-## Ready to go live: version 2026-11 (this folder)
-Needs: run `upgrade-2026-11.sql` once in Supabase, then upload `index.html` to GitHub.
+## Ready to go live: version 2026-11b (this folder)
+Needs: run `upgrade-2026-11b.sql` once in Supabase, then upload `index.html` to GitHub.
+- **Fix:** saving with an optional dropdown left empty (e.g. bug severity on a normal task, service on a deal, channel on a campaign) failed with “null value … violates not-null constraint”. Fixed everywhere. Every module’s create and edit is now tested against the real database rules.
+- **Meetings:** “Repeats › On selected days” with Mon–Sun tick boxes. Google Calendar invites follow the same days.
+- **Saturday is a working day:** the scrum runs Mon–Sat, and leave counts Mon–Sat (change in Company settings).
+
+## Live since 2 Nov 2026: version 2026-11
+(`upgrade-2026-11.sql` run, `index.html` uploaded)
 
 - **Smoother:** no loading flash between pages, every section preloads, the sidebar keeps its scroll position, instant drag-and-drop, single redraw after saving, gentle transitions.
 - **Morning scrum:** a repeating meeting with a **Join morning scrum** button on Home. Joining logs it and checks you in as **Remote**. Attendance is remote-first (Remote, Client site, On-site).

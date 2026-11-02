@@ -232,6 +232,10 @@ a.tkey:hover{background:var(--tint2)}
 .note-card .nb{font-size:13.5px;color:var(--ink2);white-space:pre-wrap;overflow-wrap:anywhere;flex:1}
 .note-card .nm{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12.5px}
 .note-card .nm .grow{flex:1}
+.days{display:flex;gap:6px;flex-wrap:wrap}
+.day{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:8px;padding:7px 12px;font-weight:600;color:var(--ink);cursor:pointer;background:#fff}
+.day:has(input:checked){background:var(--tint);border-color:var(--tint3);color:var(--p-ink)}
+.day input{accent-color:var(--p);width:15px;height:15px}
 .hday{flex:none;width:44px;height:44px;border-radius:10px;background:var(--tint);color:var(--p-ink);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
 .hday b{font-size:16px}
 .hday small{font-size:11px;font-weight:600;text-transform:uppercase;margin-top:2px}
@@ -652,6 +656,11 @@ function fieldInput(f, val, rec){
       const sugg = [...new Set([...(typeof f.o === "function" ? f.o() : (f.o || [])), ...rows(f.from || "").flatMap(r => r[f.k] || [])])];
       return h("span", { style: "display:block", "data-wrap": "1" }, el, h("datalist", { id: listId }, sugg.map(x => h("option", { value: x }))));
     }
+    case "days": {
+      const set = new Set((val && val.length ? val : (typeof f.def === "function" ? f.def() : [])) || []);
+      return h("div", { class: "days", "data-k": f.k, "data-multi": "1" }, [1,2,3,4,5,6,0].map(d =>
+        h("label", { class: "day" }, h("input", { type: "checkbox", value: String(d), checked: set.has(d) }), ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d])));
+    }
     case "refs": {
       const box = h("div", { class: "multi", "data-k": f.k, "data-multi": "1" });
       const set = new Set(val || []);
@@ -707,12 +716,14 @@ function readInput(f, el){
   if (!el) return undefined;
   if (f.t === "bool") return el.querySelector ? el.querySelector("input").checked : el.checked;
   if (f.t === "users" || f.t === "refs") return [...el.querySelectorAll("input:checked")].map(i => i.value);
+  if (f.t === "days") return [...el.querySelectorAll("input:checked")].map(i => +i.value).sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7));
   if (f.t === "tags") { const inp = el.matches && el.matches("input") ? el : el.querySelector("input"); return [...new Set(inp.value.split(",").map(x => x.trim().toLowerCase()).filter(Boolean))]; }
   const v = el.value;
   if (f.t === "number" || f.t === "money") return v === "" ? null : +v;
   if (f.t === "int") return v === "" ? null : Math.round(+v);
   if (f.t === "month") return v ? v + "-01" : null;
-  if (["date","time","user","ref","select"].includes(f.t)) return v === "" ? (f.t === "select" && f.req ? v : null) : v;
+  if (f.t === "select") return v;                 // empty dropdown = empty text (the database never takes "null" for these)
+  if (["date","time","user","ref"].includes(f.t)) return v === "" ? null : v;
   return v.trim();
 }
 function display(f, val, rec){
@@ -721,6 +732,7 @@ function display(f, val, rec){
     case "user": return personChip(val, f.none);
     case "users": return (val && val.length) ? h("span", { class: "stack" }, val.slice(0, 6).map(id => avatar(id, "sm"))) : h("span", { class: "muted" }, "–");
     case "tags": return (val && val.length) ? h("span", { style: "display:inline-flex;gap:4px;flex-wrap:wrap" }, val.map(x => h("span", { class: "pill grey" }, x))) : h("span", { class: "muted" }, "–");
+    case "days": return (val && val.length) ? h("span", {}, [1,2,3,4,5,6,0].filter(d => val.includes(d)).map(d => ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d]).join(", ")) : h("span", { class: "muted" }, "–");
     case "refs": return (val && val.length) ? h("span", {}, val.map(id => refLabel(f.ref, id) || "(hidden)").join(", ")) : h("span", { class: "muted" }, "–");
     case "textarea": return val ? h("span", {}, renderRich(val)) : h("span", { class: "muted" }, "–");
     case "ref": { const l = refLabel(f.ref, val); return l ? h("span", {}, l) : h("span", { class: "muted" }, "–"); }
@@ -762,7 +774,10 @@ function dueTag(date, done){
 const PRIORITY = ["Critical","High","Medium","Low"];
 const PRANK = { Critical: 0, High: 1, Medium: 2, Low: 3 };
 const TASK_STATUS = ["To do","In progress","In review","Done"];
-const REPEATS = ["Does not repeat", "Every weekday", "Every week"];
+const REPEATS = [["Does not repeat", "Does not repeat"], ["Every weekday", "Every working day"], ["Selected days", "On selected days"], ["Every week", "Every week (same day)"]];
+const DAY_NAMES = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const dayList = ds => [1,2,3,4,5,6,0].filter(d => (ds || []).includes(d)).map(d => DAY_NAMES[d]).join(", ");
+const repeatText = m => m.repeat === "Selected days" ? dayList(m.repeat_days) : m.repeat === "Every weekday" ? "Every working day" : m.repeat;
 const COMPONENTS = ["Android app","iOS app","Web app","Backend / API","Admin panel","Website","Database","Infrastructure / DevOps","Design system"];
 const LABEL_SUGGESTIONS = {
   Development: ["frontend","backend","api","android","ios","flutter","react","database","performance","security","ui","tech-debt","hotfix"],
@@ -785,7 +800,7 @@ const sortByPrioDue = (a, b) => (PRANK[a.priority] ?? 9) - (PRANK[b.priority] ??
 
 function workingDays(start, end, half){
   if (!start || !end || end < start) return 0;
-  const wd = S.settings.working_days || [1,2,3,4,5];
+  const wd = S.settings.working_days || [1,2,3,4,5,6];
   const hol = new Set((S.settings.holidays || []).map(x => x.date));
   let n = 0, d = start;
   for (let i = 0; i < 400 && d <= end; i++){ const w = parseD(d).getDay(); if (wd.includes(w) && !hol.has(d)) n++; d = addDays(d, 1); }
@@ -1026,6 +1041,7 @@ const MOD = {
       { k: "title", l: "Title", t: "text", req: true, full: true },
       { k: "kind", l: "Type", t: "select", o: ["Morning scrum","Internal","Client call","Sprint review","Interview","One-on-one","Sales demo"], req: true, def: "Internal", filter: true },
       { k: "repeat", l: "Repeats", t: "select", o: REPEATS, req: true, def: "Does not repeat" },
+      { k: "repeat_days", l: "On these days", t: "days", full: true, def: () => (S.settings.working_days || [1,2,3,4,5,6]).slice(), show: r => r.repeat === "Selected days" },
       { k: "meeting_date", l: "Date (first day, if it repeats)", t: "date", req: true, def: () => today() },
       { k: "start_time", l: "Start time", t: "time", def: "10:00" },
       { k: "duration_min", l: "Duration (minutes)", t: "int", def: 30, min: 5 },
@@ -1038,7 +1054,7 @@ const MOD = {
       { k: "notes", l: "Notes / minutes", t: "textarea", full: true },
       { k: "action_items", l: "Action items", t: "textarea", full: true, ph: "One per line, with owner" }
     ],
-    cols: [{ k: "meeting_date", l: "When", get: r => (r.repeat && r.repeat !== "Does not repeat" ? r.repeat + (r.start_time ? ", " + fmtTimeOfDay(r.start_time) : "") : fmtDate(r.meeting_date) + (r.start_time ? ", " + fmtTimeOfDay(r.start_time) : "")) },
+    cols: [{ k: "meeting_date", l: "When", get: r => (r.repeat && r.repeat !== "Does not repeat" ? repeatText(r) + (r.start_time ? ", " + fmtTimeOfDay(r.start_time) : "") : fmtDate(r.meeting_date) + (r.start_time ? ", " + fmtTimeOfDay(r.start_time) : "")) },
       "title", "kind", { k: "attendees", l: "Attendees", render: v => (v && v.length) ? h("span", { class: "stack" }, v.slice(0, 6).map(id => avatar(id, "sm"))) : h("span", {}, "Everyone") },
       { k: "joined", l: "Joined today", get: r => occursOn(r, today()) ? String(new Set(joinsFor(r.id, today()).map(j => j.user_id || j.display_name)).size) : "–" },
       { k: "join", l: "", render: (v, r) => (occursOn(r, today()) || r.meeting_date >= today()) ? (joinButton(r, today(), true) || h("span", { class: "muted" }, "No link")) : h("span", { class: "muted" }, "") }],
@@ -1063,7 +1079,7 @@ const MOD = {
     },
     detail: (rec, box) => box.append(joinsSection(rec)),
     after: async (rec, prev, extra) => {
-      if (!prev) notify(rec.attendees, "Meeting: " + rec.title, (rec.repeat && rec.repeat !== "Does not repeat" ? rec.repeat + " from " : "") + fmtDate(rec.meeting_date) + (rec.start_time ? " at " + fmtTimeOfDay(rec.start_time) : ""), "meetings", rec.id);
+      if (!prev) notify(rec.attendees, "Meeting: " + rec.title, (rec.repeat && rec.repeat !== "Does not repeat" ? repeatText(rec) + " from " : "") + fmtDate(rec.meeting_date) + (rec.start_time ? " at " + fmtTimeOfDay(rec.start_time) : ""), "meetings", rec.id);
       const keepInSync = rec.google_event_id && rec.google_owner === S.me.id;
       if (googleOn() && googleConnected() && ((extra && extra._google) || keepInSync)){
         try { const saved = await syncMeetingToGoogle(rec); toast(keepInSync ? "Google Calendar updated. Attendees were notified." : saved && saved.link ? "Added to Google Calendar with a Meet link. Invites sent." : "Added to Google Calendar."); rerender(); }
@@ -2682,8 +2698,9 @@ function occursOn(m, d){
   if (rep === "Does not repeat") return d === m.meeting_date;
   const wd = parseD(d).getDay();
   if (rep === "Every week") return wd === parseD(m.meeting_date).getDay();
-  const working = S.settings.working_days || [1,2,3,4,5];
   const hol = (S.settings.holidays || []).some(x => x.date === d);
+  if (rep === "Selected days") return (m.repeat_days || []).includes(wd) && !hol;
+  const working = S.settings.working_days || [1,2,3,4,5,6];
   return working.includes(wd) && !hol;
 }
 // all occurrences between two dates (inclusive), as [date, meeting]
@@ -3310,7 +3327,7 @@ function renderAdminSettings(el){
   const company = h("input", { class: "in", value: s.company || "", maxlength: "80" });
   const currency = h("select", { class: "in" }, ["INR","USD","EUR","GBP","AED","AUD","CAD","SGD"].map(c => h("option", { value: c }, c)));
   currency.value = s.currency || "INR";
-  const days = [[1,"Mon"],[2,"Tue"],[3,"Wed"],[4,"Thu"],[5,"Fri"],[6,"Sat"],[0,"Sun"]].map(([n, l]) => { const c = h("input", { type: "checkbox", value: String(n), checked: (s.working_days || [1,2,3,4,5]).includes(n) }); return [c, h("label", { class: "chk", style: "min-height:30px" }, c, l)]; });
+  const days = [[1,"Mon"],[2,"Tue"],[3,"Wed"],[4,"Thu"],[5,"Fri"],[6,"Sat"],[0,"Sun"]].map(([n, l]) => { const c = h("input", { type: "checkbox", value: String(n), checked: (s.working_days || [1,2,3,4,5,6]).includes(n) }); return [c, h("label", { class: "chk", style: "min-height:30px" }, c, l)]; });
   const types = h("input", { class: "in", value: (s.leave_types || ["Paid leave","Sick leave","Work from home","Unpaid leave"]).join(", ") });
   const annual = h("input", { class: "in", type: "number", min: "0", value: String(s.annual_leave ?? 12) });
   const curY = today().slice(0, 4);
