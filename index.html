@@ -43,7 +43,13 @@ a{color:var(--p)}
 
 /* ---------- shell ---------- */
 .shell{display:grid;grid-template-columns:252px minmax(0,1fr);min-height:100vh}
-.side{background:var(--p-deep);color:#E9E8FF;position:sticky;top:0;height:100vh;overflow-y:auto;display:flex;flex-direction:column;padding:18px 12px 14px}
+.side{background:var(--p-deep);color:#E9E8FF;position:sticky;top:0;height:100vh;height:100dvh;overflow:hidden;display:flex;flex-direction:column;padding:18px 12px 14px}
+/* logo stays at the top and your name at the bottom; only the links scroll */
+.side .brand{flex:none}
+.side .nav{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;margin:0 -12px;padding:0 12px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.25) transparent}
+.side .nav::-webkit-scrollbar{width:6px}
+.side .nav::-webkit-scrollbar-thumb{background:rgba(255,255,255,.22);border-radius:3px}
+.side .foot{flex:none}
 .side .brand{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:6px 10px 20px;text-decoration:none}
 .side .brand-logo{height:30px;width:auto;display:block}
 .side .brand-tag{font-size:11.5px;font-weight:600;letter-spacing:.02em;color:#AEB0E8;padding-left:2px}
@@ -4404,7 +4410,8 @@ function renderShell(){
     NAV.flatMap(([, i]) => i).map(([r]) => { const b = badgeInfo(r); return [b.due, b.fresh, b.bang ? 1 : 0]; })]);
   if (key === shellKey && side.children.length) return;
   shellKey = key;
-  const keepScroll = side.scrollTop;
+  const oldNav = side.querySelector(".nav");
+  const keepScroll = oldNav ? oldNav.scrollTop : 0;
   side.replaceChildren(
     h("a", { class: "brand", href: "#dashboard", "aria-label": (S.settings.company || "Tcipher") + " workspace home" }, h("img", { src: LOGO_WHITE, alt: "Tcipher", class: "brand-logo" }), h("span", { class: "brand-tag" }, "Workspace")));
   const nav = h("nav", { class: "nav", "aria-label": "Main" });
@@ -4423,7 +4430,7 @@ function renderShell(){
     h("button", { type: "button", class: "who", style: "background:none;border:0;text-align:left;padding:0;cursor:pointer", onclick: openMyProfile, title: "My profile" },
       h("b", {}, S.me.full_name), h("span", {}, S.me.is_admin ? "Admin, all verticals" : [S.me.vertical, refLabel("roles", S.me.role_id)].filter(Boolean).join(" · ") || "Employee")),
     h("button", { type: "button", onclick: () => sb.auth.signOut() }, "Sign out")));
-  side.scrollTop = keepScroll;
+  nav.scrollTop = keepScroll;
 
 }
 
