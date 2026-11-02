@@ -243,6 +243,22 @@ a.tkey:hover{background:var(--tint2)}
 @media (max-width:600px){.diff{grid-template-columns:1fr;margin-left:0}}
 .linkbtn{background:none;border:0;color:var(--p);font-weight:600;cursor:pointer;padding:0;font:inherit;font-size:12.5px}
 .section > .seg{margin-bottom:8px}
+.tcal{min-width:900px;table-layout:fixed}
+.tcal th,.tcal td{vertical-align:top;padding:8px;border-right:1px solid var(--line)}
+.tcal th:last-child,.tcal td:last-child{border-right:0}
+.tcal th.who,.tcal td.who{width:190px;position:sticky;left:0;background:#fff;z-index:1}
+.tcal th.today,.tcal td.today{background:#FAFAFF}
+.tcal th.today{color:var(--p)}
+.tev{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;border-radius:7px;padding:5px 7px;margin-bottom:5px;font-size:12.5px;cursor:pointer;border-left:3px solid transparent}
+.tev .tt{font-weight:700;white-space:nowrap}
+.tev .ti{flex:1 1 100%;min-width:0;overflow-wrap:anywhere}
+.tev .btn{min-height:24px;padding:1px 8px;font-size:12px}
+.tev.google{background:#E8F0FE;border-left-color:#1A56C4;color:#16336B}
+.tev.workspace{background:var(--tint);border-left-color:var(--p);color:var(--p-ink)}
+.tev.leave{background:var(--warn-t);border-left-color:var(--warn);color:var(--warn);cursor:default;font-weight:600}
+.tev.past{opacity:.55}
+.tev.live{box-shadow:0 0 0 2px var(--ok) inset}
+.tcal .free{color:var(--ink3);font-size:12px;padding:4px 2px}
 .hday{flex:none;width:44px;height:44px;border-radius:10px;background:var(--tint);color:var(--p-ink);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
 .hday b{font-size:16px}
 .hday small{font-size:11px;font-weight:600;text-transform:uppercase;margin-top:2px}
@@ -3195,6 +3211,133 @@ function notesBoard(el, A){
   draw();
 }
 /* ---------------------------------------------------------------------
+   Team calendar: everyone's day, side by side
+   --------------------------------------------------------------------- */
+function mondayOf(d){ const dt = parseD(d); const back = (dt.getDay() + 6) % 7; return addDays(d, -back); }
+function personDay(p, day){
+  const items = [];
+  const linked = new Set(rows("meetings").map(m => m.google_event_id).filter(Boolean));
+  const email = String(p.email || "").toLowerCase();
+  for (const [d, m] of occurrences(day, day, m => invited(m, p.id))){
+    const st = m.start_time ? new Date(d + "T" + String(m.start_time).slice(0, 5) + ":00").toISOString() : null;
+    items.push({ t: st, end: st ? new Date(new Date(st).getTime() + (m.duration_min || 30) * 60000).toISOString() : null, title: m.title, link: meetUrl(m), src: "workspace", meeting: m, day: d });
+  }
+  const seen = new Set();
+  for (const e of rows("calendar_events")){
+    if (!(e.user_id === p.id || (e.attendee_emails || []).includes(email))) continue;
+    if (!e.start_date || e.start_date > day || (e.end_date || e.start_date) < day) continue;
+    if ([...linked].some(id => e.google_event_id === id || e.google_event_id.startsWith(id + "_"))) continue;
+    const k = (e.ical_uid || e.google_event_id) + "|" + (e.starts_at || e.start_date);
+    if (seen.has(k)) continue; seen.add(k);
+    items.push({ t: e.starts_at, end: e.ends_at, allDay: e.all_day, title: e.title, link: e.meet_link || null, src: "google", event: e, day });
+  }
+  const lv = rows("leave_requests").find(r => r.user_id === p.id && r.status === "Approved" && r.start_date <= day && r.end_date >= day);
+  items.sort((a, b) => (a.allDay ? "" : (a.t || "9")).localeCompare(b.allDay ? "" : (b.t || "9")));
+  return { items, leave: lv };
+}
+function busyNow(p){
+  const now = Date.now();
+  return personDay(p, today()).items.find(it => it.t && it.end && new Date(it.t).getTime() <= now && new Date(it.end).getTime() > now) || null;
+}
+function eventDialog(it){
+  const e = it.event || {};
+  const people = [...new Set((e.attendee_emails || []))].map(em => { const p = activePeople().find(x => String(x.email).toLowerCase() === em); return p ? p.full_name : em; });
+  openDialog(it.title || "Event", [
+    h("div", { class: "related" },
+      h("div", { class: "ri" }, h("span", {}, "When"), h("b", {}, fmtDate(it.day, true) + (it.allDay ? ", all day" : it.t ? ", " + fmtTime(it.t) + (it.end ? " – " + fmtTime(it.end) : "") : ""))),
+      e.organizer_email ? h("div", { class: "ri" }, h("span", {}, "Organiser"), h("span", {}, (activePeople().find(x => String(x.email).toLowerCase() === e.organizer_email) || {}).full_name || e.organizer_email)) : null,
+      people.length ? h("div", { class: "ri" }, h("span", {}, "Guests"), h("span", { style: "text-align:right" }, people.join(", "))) : null,
+      e.location ? h("div", { class: "ri" }, h("span", {}, "Where"), h("span", {}, e.location)) : null)
+  ], [h("span", { class: "sp" }),
+    e.html_link ? h("a", { class: "btn", href: e.html_link, target: "_blank", rel: "noopener" }, "Open in Google Calendar") : null,
+    it.link ? h("button", { type: "button", class: "btn pri", onclick: () => { closeDlg(); joinAgendaItem({ ...it, source: "google", start: it.t }); } }, "Join Google Meet") : null,
+    h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Close")], true);
+}
+async function renderTeamCalendar(el){
+  await ensure(["meetings","calendar_events","google_links","leave_requests","meeting_joins"]);
+  if (S.route !== "team-calendar") return;
+  if (!S.ui.tcal) S.ui.tcal = { week: mondayOf(today()), vert: S.me.vertical || "", view: "week" };
+  const u = S.ui.tcal;
+  const working = S.settings.working_days || [1,2,3,4,5,6];
+  const days = [];
+  if (u.view === "day") days.push(u.day || today());
+  else for (let i = 0; i < 7; i++){ const d = addDays(u.week, i); if (working.includes(parseD(d).getDay()) || d === today()) days.push(d); }
+  const label = u.view === "day" ? parseD(days[0]).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" }) : "Week of " + fmtDate(u.week, true);
+  const shift = n => { if (u.view === "day") u.day = addDays(u.day || today(), n); else u.week = addDays(u.week, 7 * n); rerender(); };
+  el.append(h("div", { class: "ph" }, h("div", {}, h("h1", {}, "Team calendar"), h("p", {}, label + ". Everyone’s Google meetings, workspace meetings and leave.")),
+    h("div", { class: "acts" }, h("button", { type: "button", class: "btn", onclick: () => shift(-1) }, "‹"), h("button", { type: "button", class: "btn", onclick: () => { u.week = mondayOf(today()); u.day = today(); rerender(); } }, "Today"), h("button", { type: "button", class: "btn", onclick: () => shift(1) }, "›"))));
+  const vsel = h("select", { class: "in", "aria-label": "Vertical" }, h("option", { value: "" }, "Everyone"), VERTICALS.map(v => h("option", { value: v }, v)));
+  vsel.value = u.vert; vsel.addEventListener("change", () => { u.vert = vsel.value; rerender(); });
+  el.append(h("div", { class: "tb" }, vsel, segmented([["week","Week"], ["day","Day"]], u.view, v => { u.view = v; if (v === "day" && !u.day) u.day = today(); rerender(); }),
+    googleOn() ? (googleConnected() ? h("span", { class: "muted", style: "font-size:13px" }, rows("google_links").length + " of " + activePeople().length + " people connected")
+      : h("button", { type: "button", class: "btn soft", onclick: () => connectGoogle() }, "Connect my Google Calendar"))
+      : h("span", { class: "muted", style: "font-size:13px" }, "Google Calendar isn’t set up yet, so this shows workspace meetings and leave.")));
+
+  const people = activePeople().filter(p => !u.vert || p.vertical === u.vert).sort((a, b) => (a.id === S.me.id ? -1 : b.id === S.me.id ? 1 : 0) || String(a.vertical || "").localeCompare(String(b.vertical || "")) || a.full_name.localeCompare(b.full_name));
+  const table = h("table", { class: "tcal" });
+  table.append(h("thead", {}, h("tr", {}, h("th", { class: "who" }, "Person"), days.map(d => h("th", { class: d === today() ? "today" : null }, parseD(d).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }))))));
+  const tb = h("tbody");
+  for (const p of people){
+    const link = rows("google_links").find(l => l.user_id === p.id);
+    const busy = busyNow(p);
+    const tr = h("tr", {}, h("td", { class: "who" },
+      h("span", { class: "person" }, avatar(p.id, "sm"), h("span", {}, h("b", {}, p.full_name), h("br"), h("small", { class: "muted" }, p.vertical || (p.is_admin ? "Admin" : "")))),
+      h("div", { style: "margin-top:4px;display:flex;gap:4px;flex-wrap:wrap" }, busy ? pill("In a meeting", "warn") : null,
+        googleOn() ? (link ? (link.last_error ? h("span", { class: "pill bad", title: link.last_error }, "Sync problem") : null) : h("span", { class: "pill grey" }, "Google not connected")) : null)));
+    for (const d of days){
+      const { items, leave } = personDay(p, d);
+      const td = h("td", { class: d === today() ? "today" : null });
+      if (leave) td.append(h("div", { class: "tev leave" }, leave.type === "Work from home" ? "Working from home" : "On leave"));
+      for (const it of items){
+        const past = it.end && new Date(it.end).getTime() < Date.now();
+        const live = it.t && it.end && new Date(it.t).getTime() <= Date.now() && new Date(it.end).getTime() > Date.now();
+        const card = h("div", { class: "tev " + it.src + (past ? " past" : "") + (live ? " live" : ""), role: "button", tabindex: "0",
+          onclick: () => it.meeting ? openRecord("meetings", it.meeting.id) : eventDialog(it) },
+          h("span", { class: "tt" }, it.allDay ? "All day" : it.t ? fmtTime(it.t) : ""), h("span", { class: "ti" }, it.title),
+          it.link && !past ? h("button", { type: "button", class: "btn sm " + (live ? "pri" : "soft"), onclick: ev => { ev.stopPropagation(); it.meeting ? joinMeeting(it.meeting, it.day) : joinAgendaItem({ ...it, source: "google", start: it.t }); } }, "Join") : null);
+        td.append(card);
+      }
+      if (!leave && !items.length) td.append(h("div", { class: "free" }, "Free"));
+      tr.append(td);
+    }
+    tb.append(tr);
+  }
+  table.append(tb);
+  el.append(h("div", { class: "tablewrap" }, table));
+  el.append(h("div", { class: "legend", style: "margin-top:10px" }, h("span", {}, h("span", { class: "tev google", style: "display:inline-block;padding:1px 8px" }, "Google Calendar")), h("span", {}, h("span", { class: "tev workspace", style: "display:inline-block;padding:1px 8px" }, "Workspace meeting")), h("span", {}, h("span", { class: "tev leave", style: "display:inline-block;padding:1px 8px" }, "Leave"))));
+}
+
+/* ---------------------------------------------------------------------
+   Admin panel › Google: who's connected, and reminders
+   --------------------------------------------------------------------- */
+async function renderAdminGoogle(el){
+  adminHeader(el, "Google connections", "Who has connected Google Calendar, when they last synced, and reminders for everyone else.");
+  await ensure(["google_links"]);
+  if (S.route !== "admin-google") return;
+  if (!googleOn()){ el.append(h("div", { class: "panel", style: "background:var(--warn-t);border-color:transparent" }, h("b", {}, "Google isn’t set up yet. "), "Finish the Google Cloud and Supabase steps in the README, then add the Client ID to index.html. People can connect after that.")); }
+  const people = activePeople();
+  const links = rows("google_links");
+  const missing = people.filter(p => !links.some(l => l.user_id === p.id));
+  el.append(statStrip([["Connected", links.filter(l => people.some(p => p.id === l.user_id)).length + " of " + people.length, "var(--ok)"], ["Not connected", missing.length, missing.length ? "var(--warn)" : null], ["Sync problems", links.filter(l => l.last_error).length, "var(--bad)"]]));
+  const remind = async (ids) => {
+    if (!ids.length) return;
+    await notify(ids, "Please connect your Google Calendar", "Click here and approve once. Your meetings will then show in the workspace with Join buttons.", "connect-google", null);
+    toast("Reminder sent to " + ids.length + (ids.length === 1 ? " person." : " people."));
+  };
+  const tb = h("tbody");
+  for (const p of people.sort((a, b) => a.full_name.localeCompare(b.full_name))){
+    const l = links.find(x => x.user_id === p.id);
+    tb.append(h("tr", {}, h("td", {}, personChip(p.id)), h("td", {}, p.vertical || "–"),
+      h("td", {}, l ? (l.last_error ? pill("Problem", "bad") : pill("Connected", "ok")) : pill("Not connected", "grey")),
+      h("td", {}, l ? l.google_email : h("span", { class: "muted" }, "–")),
+      h("td", {}, l && l.last_sync_at ? fmtAgo(l.last_sync_at) : h("span", { class: "muted" }, "–")),
+      h("td", { style: "font-size:13px;color:var(--bad)" }, l && l.last_error ? l.last_error : ""),
+      h("td", { class: "num" }, (!l || l.last_error) && p.id !== S.me.id ? h("button", { type: "button", class: "btn sm soft", onclick: () => remind([p.id]) }, "Remind") : null)));
+  }
+  el.append(h("div", { class: "tb" }, h("button", { type: "button", class: "btn pri", disabled: !missing.length || !googleOn(), onclick: () => remind(missing.filter(p => p.id !== S.me.id).map(p => p.id)) }, "Remind everyone not connected (" + missing.filter(p => p.id !== S.me.id).length + ")")));
+  el.append(h("div", { class: "tablewrap" }, h("table", {}, h("thead", {}, h("tr", {}, ["Person","Vertical","Status","Google account","Last synced","Problem",""].map(x => h("th", {}, x)))), tb)));
+}
+/* ---------------------------------------------------------------------
    Admin panel
    --------------------------------------------------------------------- */
 async function callAdmin(body){
@@ -3210,7 +3353,7 @@ async function callAdmin(body){
 }
 
 function adminHeader(el, title, desc, actions){
-  const tabs = [["admin-users","Users"], ["admin-roles","Roles & permissions"], ["admin-tasks","Task rules"], ["admin-settings","Company settings"], ["admin-activity","Activity log"]];
+  const tabs = [["admin-users","Users"], ["admin-roles","Roles & permissions"], ["admin-tasks","Task rules"], ["admin-google","Google"], ["admin-settings","Company settings"], ["admin-activity","Activity log"]];
   el.append(h("div", { class: "ph" }, h("div", {}, h("h1", {}, title), h("p", {}, desc)), actions ? h("div", { class: "acts" }, actions) : null));
   el.append(h("div", { class: "tb" }, h("div", { class: "seg", role: "tablist" }, tabs.map(([r, l]) => h("button", { type: "button", "aria-pressed": String(S.route === r), onclick: () => go(r) }, l)))));
 }
@@ -3492,7 +3635,7 @@ async function renderAdminActivity(el){
    Navigation
    --------------------------------------------------------------------- */
 const NAV = [
-  ["", [["dashboard","Home"], ["overview","Company overview"], ["tasks","Tasks"], ["notes","Notes"], ["calendar","Calendar"]]],
+  ["", [["dashboard","Home"], ["overview","Company overview"], ["tasks","Tasks"], ["notes","Notes"], ["calendar","Calendar"], ["team-calendar","Team calendar"]]],
   ["Development", [["dev","Dev dashboard"], ["projects","Projects"], ["sprints","Sprints"], ["releases","Releases"], ["tickets","Support tickets"]]],
   ["Sales", [["sales","Sales dashboard"], ["deals","Pipeline"], ["leads","Leads"], ["clients","Clients"], ["contacts","Contacts"], ["activities","Activities"], ["proposals","Proposals"], ["targets","Targets"]]],
   ["Marketing", [["marketing","Marketing dashboard"], ["leads","Leads"], ["campaigns","Campaigns"], ["content","Content calendar"], ["seo_keywords","SEO keywords"], ["social_stats","Social media"]]],
@@ -3500,7 +3643,7 @@ const NAV = [
   ["Admin", [["admin-users","Admin panel"]]]
 ];
 function canSee(route){
-  if (["dashboard","calendar","people","attendance","tasks","holidays"].includes(route)) return true;
+  if (["dashboard","calendar","team-calendar","people","attendance","tasks","holidays"].includes(route)) return true;
   if (route === "overview") return isAdmin();
   if (route === "dev") return isAdmin() || S.me.vertical === "Development" || lvl("projects") >= 1;
   if (route === "sales") return isAdmin() || S.me.vertical === "Sales" || lvl("sales") >= 1;
@@ -3582,6 +3725,8 @@ async function rerender(){
     else if (route === "marketing") await renderMarketingHub(page);
     else if (route === "admin-settings") renderAdminSettings(page);
     else if (route === "admin-tasks") renderAdminTaskRules(page);
+    else if (route === "admin-google") await renderAdminGoogle(page);
+    else if (route === "team-calendar") await renderTeamCalendar(page);
     else if (route === "holidays") renderHolidays(page);
     else if (route === "admin-activity") await renderAdminActivity(page);
     else if (MOD[route]) await renderModule(route, page);
@@ -3617,6 +3762,7 @@ function drawNotifications(){
     list.append(h("button", { type: "button", class: "nitem" + (n.is_read ? "" : " unread"), onclick: async () => {
       p.hidden = true;
       if (!n.is_read) { try { await sb.from("notifications").update({ is_read: true }).eq("id", n.id); n.is_read = true; renderShell(); } catch (e) {} }
+      if (n.tbl === "connect-google") { if (googleConnected()) toast("Google is already connected."); else connectGoogle(); return; }
       const key = Object.keys(MOD).find(k => MOD[k].table === n.tbl);
       if (key && n.entity_id) openRecord(key, n.entity_id);
     } }, h("b", {}, n.title), n.body ? h("span", {}, n.body) : null, h("span", {}, fmtAgo(n.created_at))));

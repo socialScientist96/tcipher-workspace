@@ -12,6 +12,7 @@ The internal workspace for Tcipher's three verticals, **Development**, **Sales**
 | `upgrade-2026-11.sql` | Upgrade for an existing workspace: scrum, Meet joins, holidays/leave, Google sync, dev tasks, notes (already run on yours) | Supabase › SQL Editor |
 | `upgrade-2026-11b.sql` | Small follow-up: meetings on selected days, Saturday as a working day (already run on yours) | Supabase › SQL Editor |
 | `upgrade-2026-11c.sql` | Task rules, archive instead of delete, permanent task history | Supabase › SQL Editor |
+| `upgrade-2026-11d.sql` | Team calendar: everyone sees each other’s Google events | Supabase › SQL Editor |
 | `CHANGELOG.md` | What’s in each version, and what still needs doing to go live | Keep with the files |
 
 All data, logins and files live in Supabase. GitHub only hosts the page.
@@ -66,7 +67,7 @@ Everyone connects Google once, using either a tcipher.com or a personal Gmail ac
 **C. The page**
 Paste the Client ID into `GOOGLE_CLIENT_ID` in `index.html` and upload it to GitHub. Only the Client ID goes in the page. The Client secret stays in Supabase secrets.
 
-Each person then clicks **Connect Google** on their Home page, or in My profile, and approves once.
+Each person then clicks **Connect Google** on their Home page, or in My profile, and approves once. In **Admin panel › Google** you can see who’s connected and send reminders. Everyone’s meetings appear on the **Team calendar**.
 
 ## Morning scrum and attendance
 

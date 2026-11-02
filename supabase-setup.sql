@@ -1304,5 +1304,17 @@ set data = data || jsonb_build_object(
   'owners_can_update_status', coalesce(data->'owners_can_update_status', 'true'::jsonb))
 where id = 1;
 
+
+-- ---------------------------------------------------------------------
+-- 21. Team calendar: everyone at Tcipher sees each other's synced Google events
+--     (title, time, Meet link) and who has connected Google.
+-- ---------------------------------------------------------------------
+drop policy if exists ws_select on public.calendar_events;
+create policy ws_select on public.calendar_events for select to authenticated
+  using (public.is_active_user());
+drop policy if exists ws_select on public.google_links;
+create policy ws_select on public.google_links for select to authenticated
+  using (public.is_active_user());
+
 -- Done. Next: create your own login in Authentication > Users.
 -- The very first person created becomes the admin automatically.

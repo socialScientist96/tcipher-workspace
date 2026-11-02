@@ -2,8 +2,12 @@
 
 Version 1 (first upload): three verticals, admin panel, roles, leads handoff, tasks with review, leave and attendance, logo and brand colours.
 
-## Ready to go live: version 2026-11c (this folder)
-Needs: run `upgrade-2026-11c.sql` once in Supabase, upload `index.html` to GitHub, then choose handlers in Admin panel › Task rules.
+## Ready to go live: version 2026-11d (this folder)
+Needs: run `upgrade-2026-11d.sql` once in Supabase, then upload `index.html` to GitHub.
+- **Team calendar:** everyone’s Google meetings, workspace meetings and leave, by person and day (week or day view, filter by vertical). Full details for everyone, a Join button on every Meet, and “In a meeting”, “Not connected” and “Sync problem” markers.
+- **Admin panel › Google:** who’s connected, their Google account, last sync and any problems. Remind one person or everyone; the reminder notification opens Connect Google in one click.
+
+## Version 2026-11c (uploaded 2 Nov 2026; run `upgrade-2026-11c.sql` if not done)
 - **Task rules (Admin panel › Task rules):** choose task handlers per vertical. Handlers edit everything and archive. People on a task (owner, collaborators, reviewer) can update its status, checklist, blocked flag and code links; there’s a switch to turn this off, and reviewers can always approve or send back. Everyone else creates tasks, views, comments and attaches files. All of this is enforced by the database.
 - **No deleting tasks:** handlers archive instead. Archived tasks leave the boards, appear under Tasks › Archived, and can be restored.
 - **Complete, permanent history** for every task: every field (with before/after for the description), checklist steps, labels, dependencies, comments, files, archive and restore. Nobody can edit or delete it. Comments on tasks can only be removed by an admin, and that’s recorded too. Changes to the task rules appear in the activity log.
