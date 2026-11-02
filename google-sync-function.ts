@@ -75,6 +75,14 @@ async function g(token: string, url: string, init: RequestInit = {}) {
 
 /* ---------------- calendar sync ---------------- */
 async function syncUser(userId: string) {
+  try { return await syncUserInner(userId); }
+  catch (e) {
+    const msg = String((e as Error)?.message || e);
+    await db.from("google_links").update({ last_error: "Sync failed: " + msg.slice(0, 300) }).eq("user_id", userId);
+    throw e;
+  }
+}
+async function syncUserInner(userId: string) {
   const token = await accessFor(userId);
   const fromDay = addDays(today(), -7), toDay = addDays(today(), 45);
   const timeMin = new Date(fromDay + "T00:00:00+05:30").toISOString();
@@ -249,11 +257,14 @@ Deno.serve(async (req) => {
       const info = await g(tok.access_token, "https://openidconnect.googleapis.com/v1/userinfo");
       const existing = must(await db.from("google_tokens").select("refresh_token").eq("user_id", me.id).maybeSingle());
       const refresh = tok.refresh_token || (existing && existing.refresh_token);
+      const granted = String(tok.scope || "");
+      if (!granted.includes("calendar.events")) return json({ error: "Calendar access wasn’t allowed. Click Connect Google again and tick the box for Google Calendar on Google’s permissions screen." }, 400);
       if (!refresh) return json({ error: "Google didn’t give permanent access. Remove “Tcipher Workspace” at myaccount.google.com/permissions, then click Connect Google again." }, 400);
       must(await db.from("google_tokens").upsert({ user_id: me.id, refresh_token: refresh, scopes: tok.scope || "", updated_at: new Date().toISOString() }));
       must(await db.from("google_links").upsert({ user_id: me.id, google_email: info.email || "", connected_at: new Date().toISOString(), last_error: "" }));
-      const n = await syncUser(me.id).catch(() => 0);
-      return json({ ok: true, email: info.email || "", events: n });
+      let n = 0, warning = "";
+      try { n = await syncUser(me.id); } catch (e) { warning = String((e as Error)?.message || e); }
+      return json({ ok: true, email: info.email || "", events: n, warning, scopes: tok.scope || "" });
     }
     if (action === "disconnect") {
       const row = must(await db.from("google_tokens").select("refresh_token").eq("user_id", me.id).maybeSingle());

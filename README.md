@@ -13,6 +13,8 @@ The internal workspace for Tcipher's three verticals, **Development**, **Sales**
 | `upgrade-2026-11b.sql` | Small follow-up: meetings on selected days, Saturday as a working day (already run on yours) | Supabase › SQL Editor |
 | `upgrade-2026-11c.sql` | Task rules, archive instead of delete, permanent task history | Supabase › SQL Editor |
 | `upgrade-2026-11d.sql` | Team calendar: everyone sees each other’s Google events | Supabase › SQL Editor |
+| `upgrade-2026-11g.sql` | Sales and Marketing CRM: lead numbers, Instagram pipeline, form answers, call outcomes, history | Supabase › SQL Editor |
+| `lead-capture-function.ts` | Optional: website forms post leads straight into the workspace | Supabase › Edge Functions, named `lead-capture` |
 | `CHANGELOG.md` | What’s in each version, and what still needs doing to go live | Keep with the files |
 
 All data, logins and files live in Supabase. GitHub only hosts the page.
@@ -75,6 +77,49 @@ Each person then clicks **Connect Google** on their Home page, or in My profile,
 - People click **Join morning scrum** on their Home page. This opens Meet, logs the join, and checks them in as **Remote** for the day if they haven’t checked in yet.
 - People who join straight from Google Calendar or Meet are imported automatically every 10 minutes, as long as the scrum’s organiser has connected Google. Every join and re-join is logged, and anyone not yet checked in that day is marked **Remote**. Organisers and admins can also click **Import joins from Google Meet** on the meeting to do it immediately.
 - The **Attendance › Today’s team** view shows who joined the scrum and when.
+
+## Sales and Marketing CRM
+
+- **Leads** and **Instagram leads** (Sales and Marketing menus). Every lead gets a number like **LD-0042**, plus lead type, priority, tags, alternate phone, address, zone, next follow-up and “last contacted”. Lead types and zones are set in **Admin panel › Company settings**.
+- **Instagram leads** have their own stages: Lead › Called › Picked up › Qualified › Demo booked › Demo done › Follow up › Closed, Unqualified or Ghosted. Website form answers (any number of questions, page URL, UTM tags) show on the lead.
+- **Inside a lead or deal:** Call, WhatsApp, Email and SMS buttons (they open your phone, WhatsApp or email and log it); a communication log with call outcomes and duration; linked tasks with **+ Follow-up**; comments typed Info, Action needed or Escalation (escalations notify the heads); and a permanent **History**.
+- **Deals** have a Meeting stage, plus **Mark won**, **Mark lost** (asks why) and **Reopen**.
+- **Duplicates:** a new lead or deal with the same email or phone as an existing one gets a warning first.
+- **Analytics** (Sales and Marketing menus): leads, Instagram and deals funnels with conversion between stages; leads by source, type, priority, owner and zone; win rate, won value and average deal.
+
+## CSV import and export
+
+Leads, Instagram leads, Pipeline (deals), Clients, Contacts, Activities, Proposals, Campaigns, Content calendar, SEO keywords and Social media each have **Import CSV** and **Export CSV** at the top.
+
+1. **Import CSV** › choose the file (from Excel or Google Sheets: File › Download › CSV).
+2. Columns are matched to fields automatically (for example “Mobile Number” goes to Phone, and “Deal Value” goes to Budget). Change any match, or choose “Don’t import”.
+3. Choose what happens to rows that match something already here (same email or phone; or the same name for clients, campaigns and keywords): **Skip**, **Update** or **Add anyway**.
+4. Check the preview, then click **Import**. Rows with problems are listed with the reason, and you can download them to fix and re-import.
+
+It understands Indian formats: dates as 15/11/2026, 2026-11-15 or 15 Nov 2026; amounts as ₹1,50,000, 1.5L, 2.5 lakh, 50k or 1 cr; people by name or email; options in any capitals. For leads, columns that don’t match a field are kept on the lead as extra answers. **Download a template** gives the right column names.
+
+## Website forms (optional): send tcipher.com form submissions straight into Leads
+
+1. **Supabase › Edge Functions › Deploy a new function › Via Editor**, name it `lead-capture`, paste `lead-capture-function.ts`, and deploy. Then turn off **Verify JWT** in its Settings.
+2. **Edge Functions › Secrets:** add `LEAD_CAPTURE_KEY` = `kZ8LihOc1t_SWiZsF2dTh1QB7k-T0HpB` (or your own random text).
+3. On the website form, send the submission like this:
+
+```js
+fetch("https://pfdnziybqaumnofjknsj.supabase.co/functions/v1/lead-capture", {
+  method: "POST",
+  headers: { "Content-Type": "application/json", "x-api-key": "kZ8LihOc1t_SWiZsF2dTh1QB7k-T0HpB" },
+  body: JSON.stringify({
+    name: "Priya Sharma", email: "priya@shop.in", phone: "+91 98765 43210",
+    pipeline: "Instagram",                       // or "General"
+    page_url: location.href,
+    utm: { source: "instagram", medium: "paid", campaign: "ai_guide" },
+    form: { name: "ai_design_guide", title: "AI Design Skills guide",
+            fields: [ { key: "ai_website", label: "Is your website AI-generated?", value: "Partly" } ] }
+  })
+});
+```
+
+If the same email or phone submits again in the same pipeline, the new answers are added to the existing lead instead of creating a duplicate. Marketing (and Sales, for Instagram) are notified of every new website lead.
 
 ## Task rules (who handles tasks)
 

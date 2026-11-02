@@ -1,5 +1,20 @@
 # Tcipher Workspace – changelog
 
+## Ready to go live: version 2026-11g (this folder)
+Needs: run `upgrade-2026-11g.sql` in Supabase, then upload `index.html`. Optional: deploy `lead-capture-function.ts` for website forms.
+- **Sales and Marketing CRM**, from the old marketing app:
+  - lead numbers, lead type, priority, tags, alternate phone, address, zone, follow-up and last contacted
+  - the **Instagram leads** pipeline (10 stages), with website form answers, page URL and UTM tags
+  - Call, WhatsApp, Email and SMS buttons that log each contact, call outcomes and duration, linked tasks, Info/Action/Escalation comments, and permanent history
+  - deals get a Meeting stage and Mark won / Mark lost / Reopen; duplicate warnings; an Analytics page with funnels and breakdowns
+- **CSV import and export** on 11 Sales and Marketing lists: automatic column matching, Indian dates and amounts, skip/update/add for duplicates, a preview, problem rows you can download, and templates.
+- **Website form endpoint** (`lead-capture`) so tcipher.com forms create or update leads.
+- **Large lists:** every list now loads past 1,000 rows (Supabase’s per-request limit), and big board columns show 60 cards with “Show more”.
+
+## Fix 2026-11f (index.html + google-sync function)
+- Google connections and synced events now load (they were asked to sort by a column those tables don’t have, so “Connected” never showed). Upload `index.html`.
+- The sync function now records every sync failure and shows it in My profile and Admin › Google. Redeploy `google-sync-function.ts`.
+
 Version 1 (first upload): three verticals, admin panel, roles, leads handoff, tasks with review, leave and attendance, logo and brand colours.
 
 ## Ready to go live: version 2026-11e (this folder)

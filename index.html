@@ -261,6 +261,17 @@ a.tkey:hover{background:var(--tint2)}
 .tev.past{opacity:.55}
 .tev.live{box-shadow:0 0 0 2px var(--ok) inset}
 .tcal .free{color:var(--ink3);font-size:12px;padding:4px 2px}
+.dropzone{display:flex;flex-direction:column;align-items:center;gap:4px;border:2px dashed var(--tint3);border-radius:12px;padding:28px 16px;text-align:center;cursor:pointer;background:var(--tint)}
+.dropzone.over{border-color:var(--p);background:var(--tint2)}
+.cbar{display:flex;gap:6px;flex-wrap:wrap}
+.formsub{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.formsub .fh{display:flex;justify-content:space-between;gap:10px;margin-bottom:6px;font-size:13.5px}
+.formsub .fa{display:grid;grid-template-columns:minmax(120px,40%) 1fr;gap:4px 12px;font-size:13.5px}
+.formsub .q{color:var(--ink2)} .formsub .a{font-weight:600;overflow-wrap:anywhere}
+.frow{display:grid;grid-template-columns:110px 1fr auto;gap:10px;align-items:center;padding:5px 0;font-size:13.5px}
+.frow .fbar{height:10px;border-radius:5px;background:var(--tint);overflow:hidden}
+.frow .fbar span{display:block;height:100%;background:var(--p);border-radius:5px}
+.frow .fn{white-space:nowrap;font-size:12.5px}
 .hday{flex:none;width:44px;height:44px;border-radius:10px;background:var(--tint);color:var(--p-ink);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
 .hday b{font-size:16px}
 .hday small{font-size:11px;font-weight:600;text-transform:uppercase;margin-top:2px}
@@ -559,12 +570,18 @@ async function load(t, force){
   if (S.loading[t]) return S.loading[t];
   const p = (async () => {
     try {
-      let q = sb.from(t).select("*");
+      // Supabase returns at most 1,000 rows per request, so read in pages
       const o = ORDER[t] || ["created_at", false];
-      q = q.order(o[0], { ascending: o[1], nullsFirst: false });
-      if (t === "notifications") q = q.eq("user_id", S.me.id);
-      q = q.limit(LIMIT[t] || 5000);
-      S.cache[t] = ok(await q) || [];
+      const max = LIMIT[t] || 50000, PAGE = 1000;
+      let all = [];
+      for (let from = 0; from < max; from += PAGE){
+        let q = sb.from(t).select("*").order(o[0], { ascending: o[1], nullsFirst: false }).order(t === "google_links" ? "user_id" : "id", { ascending: true });
+        if (t === "notifications") q = q.eq("user_id", S.me.id);
+        const chunk = ok(await q.range(from, Math.min(from + PAGE, max) - 1)) || [];
+        all = all.concat(chunk);
+        if (chunk.length < PAGE) break;
+      }
+      S.cache[t] = all;
     } catch (e) {
       console.warn("load " + t, e);
       if (!S.cache[t]) S.cache[t] = [];
@@ -822,7 +839,11 @@ const SERVICES = ["Mobile app","Web app","Website","Backend / API","UI/UX design
 const isAdmin = () => !!(S.me && S.me.is_admin);
 const involved = rec => !!rec && ([rec.assignee_id, rec.reviewer_id, rec.created_by].includes(S.me.id) || (rec.collaborators || []).includes(S.me.id));
 function defaultReviewer(){ const a = rows("profiles").find(p => p.is_admin && p.is_active); return a ? a.id : null; }
-const DEAL_STAGES = ["Lead","Qualified","Proposal sent","Negotiation","Won","Lost"];
+const DEAL_STAGES = ["Lead","Qualified","Meeting","Proposal sent","Negotiation","Won","Lost"];
+const IG_STAGES = ["Lead","Called","Picked up","Qualified","Demo booked","Demo done","Follow up","Closed","Unqualified","Ghosted"];
+const CALL_OUTCOMES = ["Connected","Interested","Call back later","Not interested","No answer","Busy","Switched off","Wrong number"];
+const leadTypes = () => (S.settings.lead_types && S.settings.lead_types.length) ? S.settings.lead_types : ["Client","Vendor","Rider","Customer","Partner"];
+const zones = () => S.settings.zones || [];
 const settingList = (k, d) => () => (S.settings[k] && S.settings[k].length) ? S.settings[k] : d;
 
 const isMine = rec => rec && rec.user_id === S.me.id;
@@ -907,7 +928,7 @@ const MOD = {
   tasks: {
     label: "Tasks", one: "task", table: "tasks", area: "tasks", title: "title",
     desc: "Everyone’s work across Development, Sales and Marketing. Type @ to tag people; the reviewer approves finished work.",
-    needs: ["projects","sprints","releases","notes"], comments: true, files: true, personalCreate: true,
+    needs: ["projects","sprints","releases","notes","leads","deals"], comments: true, files: true, personalCreate: true,
     keyOf: r => taskKey(r),
     searchExtra: r => taskKey(r) + " " + (r.labels || []).join(" ") + " " + (r.branch || ""),
     canEdit: (rec) => !rec || isTaskHandler(rec.vertical) || (workersCanUpdate() && workerOnTask(rec)),
@@ -941,6 +962,8 @@ const MOD = {
       { k: "estimate_hours", l: "Estimate (hours)", t: "number", min: 0 },
       { k: "story_points", l: "Story points", t: "int", min: 0, show: r => r.vertical === "Development" },
 
+      { k: "lead_id", l: "Lead", t: "ref", ref: "leads", none: "No lead", show: r => r.vertical !== "Development" || !!r.lead_id },
+      { k: "deal_id", l: "Deal", t: "ref", ref: "deals", none: "No deal", show: r => r.vertical === "Sales" || !!r.deal_id },
       { k: "_h_people", l: "People", t: "heading" },
       { k: "assignee_id", l: "Owner", t: "user", filter: true, def: () => S.me.id },
       { k: "reviewer_id", l: "Reviewer", t: "user", none: "No review needed", def: defaultReviewer },
@@ -1129,8 +1152,9 @@ const MOD = {
   /* ---------------- Sales ---------------- */
   deals: {
     label: "Sales pipeline", one: "deal", table: "deals", area: "sales", title: "title",
-    desc: "Deals from first conversation to signed contract.", needs: ["clients","contacts","leads"], comments: true, files: true,
+    desc: "Deals from first conversation to signed contract: Lead › Qualified › Meeting › Proposal › Negotiation › Won or Lost.", needs: ["clients","contacts","leads","activities","tasks"], comments: true, files: true, csv: true, commentKinds: true,
     canEdit: (rec, L) => L >= 2 || (rec && rec.owner_id === S.me.id),
+    dupCheck: d => findDuplicate("deals", d),
     fields: [
       { k: "title", l: "Deal name", t: "text", req: true, full: true, ph: "e.g. Food delivery app for XYZ" },
       { k: "client_id", l: "Existing client", t: "ref", ref: "clients", none: "New prospect" },
@@ -1140,20 +1164,26 @@ const MOD = {
       { k: "contact_name", l: "Contact person", t: "text" },
       { k: "email", l: "Email", t: "email" },
       { k: "phone", l: "Phone", t: "phone" },
+      { k: "lead_type", l: "Type", t: "select", o: () => leadTypes(), filter: true },
       { k: "service", l: "Service", t: "select", o: SERVICES, filter: true },
       { k: "value", l: "Deal value", t: "money" },
       { k: "stage", l: "Stage", t: "select", o: DEAL_STAGES, req: true, def: "Lead" },
       { k: "probability", l: "Win probability (%)", t: "int", min: 0 },
+      { k: "priority", l: "Priority", t: "select", o: PRIORITY, req: true, def: "Medium", filter: true },
       { k: "source", l: "Lead source", t: "select", o: [...LEAD_SOURCES, "Existing client"], filter: true },
       { k: "owner_id", l: "Deal owner", t: "user", filter: true, def: () => S.me.id },
       { k: "expected_close", l: "Expected close", t: "date" },
       { k: "next_followup", l: "Next follow-up", t: "date" },
+      { k: "city", l: "City", t: "text" },
+      { k: "zone", l: "Zone", t: "select", o: () => zones(), filter: true, show: () => zones().length > 0 },
+      { k: "tags", l: "Tags", t: "tags", from: "deals", ph: "e.g. hot, referral" , filter: true },
       { k: "lost_reason", l: "Why was it lost?", t: "text", full: true, show: r => r.stage === "Lost" },
-      { k: "notes", l: "Notes", t: "textarea", full: true }
+      { k: "notes", l: "Notes", t: "textarea", full: true, mentions: true }
     ],
-    cols: ["title", { k: "company", l: "Company", get: r => refLabel("clients", r.client_id) || r.company || "–" }, "stage", "value", "owner_id",
-      { k: "next_followup", l: "Follow-up", render: (v, r) => dueTag(v, ["Won","Lost"].includes(r.stage)) || h("span", { class: "muted" }, "–") }, "source"],
-    board: { field: "stage", sum: "value", card: genericCard("title", r => [h("b", {}, money(r.value)), refLabel("clients", r.client_id) || r.company || null, r.next_followup && !["Won","Lost"].includes(r.stage) ? h("span", {}, "Follow up ", dueTag(r.next_followup)) : null], "owner_id") },
+    cols: ["title", { k: "company", l: "Company", get: r => refLabel("clients", r.client_id) || r.company || "–" }, "stage", "value", "priority", "owner_id",
+      { k: "next_followup", l: "Follow-up", render: (v, r) => dueTag(v, ["Won","Lost"].includes(r.stage)) || h("span", { class: "muted" }, "–") },
+      { k: "last_contacted_at", l: "Last contacted", get: r => r.last_contacted_at ? fmtAgo(r.last_contacted_at) : "–" }, "source"],
+    board: { field: "stage", sum: "value", card: genericCard("title", r => [h("b", {}, money(r.value)), refLabel("clients", r.client_id) || r.company || null, pill(r.priority), r.next_followup && !["Won","Lost"].includes(r.stage) ? h("span", {}, "Follow up ", dueTag(r.next_followup)) : null], "owner_id") },
     defaultView: "board",
     sort: (a, b) => String(a.next_followup || "9999").localeCompare(String(b.next_followup || "9999")),
     summary: rs => {
@@ -1169,6 +1199,8 @@ const MOD = {
         ["Follow-ups due", open.filter(r => r.next_followup && r.next_followup <= today()).length, "var(--warn)"]
       ];
     },
+    actions: (rec) => crmActions("deals", rec),
+    detail: (rec, box) => crmDetail("deals", rec, box),
     before: (d, prev) => { if (["Won","Lost"].includes(d.stage) && (!prev || !["Won","Lost"].includes(prev.stage))) d.closed_at = new Date().toISOString(); if (d.stage && !["Won","Lost"].includes(d.stage)) d.closed_at = null; },
     after: (rec, prev) => {
       if (rec.owner_id && (!prev || prev.owner_id !== rec.owner_id)) notify([rec.owner_id], "Deal assigned to you: " + rec.title, money(rec.value), "deals", rec.id);
@@ -1179,6 +1211,7 @@ const MOD = {
   clients: {
     label: "Clients", one: "client", table: "clients", area: "clients", title: "name",
     desc: "Companies you work with or are pitching to.", needs: ["deals","contacts","proposals"], comments: true, files: true,
+    csv: true,
     fields: [
       { k: "name", l: "Company name", t: "text", req: true, full: true },
       { k: "industry", l: "Industry", t: "text", ph: "e.g. Healthcare, E-commerce" },
@@ -1188,7 +1221,10 @@ const MOD = {
       { k: "phone", l: "Phone", t: "phone" },
       { k: "website", l: "Website", t: "url" },
       { k: "city", l: "City", t: "text" },
+      { k: "state", l: "State", t: "text" },
+      { k: "pincode", l: "Pincode", t: "text" },
       { k: "country", l: "Country", t: "text", def: "India" },
+      { k: "zone", l: "Zone", t: "select", o: () => zones(), filter: true, show: () => zones().length > 0 },
       { k: "tax_id", l: "GSTIN / Tax ID", t: "text" },
       { k: "owner_id", l: "Account owner", t: "user", filter: true },
       { k: "notes", l: "Notes", t: "textarea", full: true }
@@ -1212,6 +1248,7 @@ const MOD = {
   contacts: {
     label: "Contacts", one: "contact", table: "contacts", area: "clients", title: "name",
     desc: "The people you deal with at each client and prospect.", needs: ["clients"], comments: true,
+    csv: true,
     fields: [
       { k: "name", l: "Name", t: "text", req: true },
       { k: "client_id", l: "Company", t: "ref", ref: "clients", filter: true },
@@ -1227,85 +1264,41 @@ const MOD = {
     sort: (a, b) => a.name.localeCompare(b.name)
   },
 
-  leads: {
-    label: "Leads", one: "lead", table: "leads", area: "leads", title: "name",
-    desc: "Marketing captures leads and hands them to Sales. Sales turns good ones into deals.",
-    needs: ["campaigns","deals"], comments: true, files: true,
-    canEdit: (rec, L) => L >= 2 || (rec && rec.owner_id === S.me.id),
-    fields: [
-      { k: "name", l: "Person’s name", t: "text", req: true },
-      { k: "company", l: "Company", t: "text" },
-      { k: "email", l: "Email", t: "email" },
-      { k: "phone", l: "Phone / WhatsApp", t: "phone" },
-      { k: "source", l: "Source", t: "select", o: LEAD_SOURCES, req: true, def: "Website", filter: true },
-      { k: "campaign_id", l: "Campaign", t: "ref", ref: "campaigns", none: "No campaign" },
-      { k: "service", l: "Interested in", t: "select", o: SERVICES },
-      { k: "budget", l: "Their budget", t: "money" },
-      { k: "status", l: "Status", t: "select", o: LEAD_STATUS, req: true, def: "New" },
-      { k: "owner_id", l: "Marketing owner", t: "user", def: () => S.me.vertical === "Marketing" ? S.me.id : null, filter: true },
-      { k: "sales_owner_id", l: "Sales owner", t: "user", none: "Not assigned yet" },
-      { k: "notes", l: "Notes", t: "textarea", full: true }
-    ],
-    cols: ["name","company","source","service","status","owner_id","sales_owner_id",{ k: "created_at", l: "Added", get: r => fmtAgo(r.created_at) }],
-    board: { field: "status", card: genericCard("name", r => [r.company || null, pill(r.source, "grey"), r.budget ? money(r.budget, true) : null], "sales_owner_id") },
-    defaultView: "board",
-    sort: (a, b) => String(b.created_at).localeCompare(String(a.created_at)),
-    summary: rs => {
-      const m = today().slice(0, 7);
-      const thisMonth = rs.filter(r => (r.created_at || "").slice(0, 7) === m);
-      const closed = rs.filter(r => ["Converted","Not a fit"].includes(r.status));
-      return [
-        ["New this month", thisMonth.length],
-        ["Waiting for Sales", rs.filter(r => r.status === "Sent to sales").length, "var(--warn)"],
-        ["Converted to deals", rs.filter(r => r.status === "Converted").length, "var(--ok)"],
-        ["Conversion rate", closed.length ? Math.round(rs.filter(r => r.status === "Converted").length / closed.length * 100) + "%" : "–"]
-      ];
-    },
-    detail: (rec, box) => {
-      if (rec.deal_id){
-        const dl = byId("deals", rec.deal_id);
-        box.append(h("div", { class: "section" }, h("h3", {}, "Deal"), dl ? h("button", { type: "button", class: "row", onclick: () => openRecord("deals", dl.id) }, pill(dl.stage), h("span", { class: "x" }, dl.title), h("span", { class: "y" }, money(dl.value))) : h("p", { class: "nothing" }, "Converted to a deal (visible to Sales).")));
-      }
-    },
-    actions: (rec) => {
-      const out = [];
-      if (["New","Contacted","Qualified"].includes(rec.status) && lvl("leads") >= 2)
-        out.push(h("b", { style: "flex:1" }, "Ready for Sales?"), h("button", { type: "button", class: "btn pri", onclick: () => sendLeadToSales(rec) }, "Send to Sales"));
-      if (["Sent to sales","Qualified","Contacted","New"].includes(rec.status) && !rec.deal_id && lvl("sales") >= 2)
-        out.push(...(out.length ? [] : [h("b", { style: "flex:1" }, "Worth pursuing?")]), h("button", { type: "button", class: "btn ok", onclick: () => convertLead(rec) }, "Convert to deal"));
-      return out.length ? out : null;
-    },
-    after: (rec, prev) => {
-      if (rec.sales_owner_id && (!prev || prev.sales_owner_id !== rec.sales_owner_id)) notify([rec.sales_owner_id], "Lead assigned to you: " + rec.name + (rec.company ? " (" + rec.company + ")" : ""), rec.service || "", "leads", rec.id);
-    }
-  },
+  leads: leadModule("General"),
+  ig_leads: leadModule("Instagram"),
 
   activities: {
     label: "Activities", one: "activity", table: "activities", area: "sales", title: "subject",
-    desc: "Every call, email, meeting and WhatsApp with prospects and clients, with the next step.",
-    needs: ["deals","clients","contacts","leads"], comments: true,
+    desc: "Every call, email, WhatsApp, SMS and meeting with leads and clients, with the outcome and the next step.",
+    needs: ["deals","clients","contacts","leads"], comments: true, csv: true,
     canEdit: (rec, L) => L >= 2 || (rec && rec.owner_id === S.me.id),
     fields: [
-      { k: "kind", l: "Type", t: "select", o: ["Call","Email","Meeting","WhatsApp","Demo","LinkedIn message","Note"], req: true, def: "Call", filter: true },
+      { k: "kind", l: "Type", t: "select", o: ["Call","Email","WhatsApp","SMS","Meeting","Demo","LinkedIn message","Note"], req: true, def: "Call", filter: true },
+      { k: "direction", l: "Direction", t: "select", o: ["Outbound","Inbound"], req: true, def: "Outbound" },
       { k: "activity_date", l: "Date", t: "date", req: true, def: () => today() },
       { k: "subject", l: "Subject", t: "text", req: true, full: true, ph: "e.g. Discussed scope and timeline" },
+      { k: "outcome_type", l: "Call outcome", t: "select", o: CALL_OUTCOMES, show: r => r.kind === "Call", filter: true },
+      { k: "duration_min", l: "Call duration (minutes)", t: "int", min: 0, show: r => r.kind === "Call" || r.kind === "Meeting" },
+      { k: "lead_id", l: "Lead", t: "ref", ref: "leads" },
       { k: "deal_id", l: "Deal", t: "ref", ref: "deals", filter: true },
       { k: "client_id", l: "Client", t: "ref", ref: "clients" },
       { k: "contact_id", l: "Contact", t: "ref", ref: "contacts" },
-      { k: "lead_id", l: "Lead", t: "ref", ref: "leads" },
       { k: "owner_id", l: "Done by", t: "user", def: () => S.me.id, filter: true },
       { k: "outcome", l: "What happened", t: "textarea", full: true },
       { k: "next_step", l: "Next step", t: "text" },
       { k: "next_step_date", l: "Next step by", t: "date" }
     ],
-    cols: ["activity_date","kind","subject",{ k: "deal_id", l: "Deal / client", get: r => refLabel("deals", r.deal_id) || refLabel("clients", r.client_id) || refLabel("leads", r.lead_id) || "–" }, "owner_id",
+    cols: ["activity_date","kind","subject",{ k: "outcome_type", l: "Outcome", render: v => v ? pill(v) : h("span", { class: "muted" }, "–") },
+      { k: "deal_id", l: "Lead / deal / client", get: r => refLabel("leads", r.lead_id) || refLabel("deals", r.deal_id) || refLabel("clients", r.client_id) || "–" }, "owner_id",
       { k: "next_step_date", l: "Next step", render: (v, r) => r.next_step ? h("span", {}, r.next_step + " ", dueTag(v) || "") : h("span", { class: "muted" }, "–") }],
-    sort: (a, b) => String(b.activity_date).localeCompare(String(a.activity_date)),
+    sort: (a, b) => String(b.activity_date).localeCompare(String(a.activity_date)) || String(b.created_at).localeCompare(String(a.created_at)),
     summary: rs => {
       const wk = addDays(today(), -((new Date().getDay() + 6) % 7));
+      const calls = rs.filter(r => r.activity_date >= wk && r.kind === "Call");
       return [
         ["This week", rs.filter(r => r.activity_date >= wk).length],
-        ["Calls this week", rs.filter(r => r.activity_date >= wk && r.kind === "Call").length],
+        ["Calls this week", calls.length],
+        ["Calls connected", calls.length ? Math.round(calls.filter(c => c.outcome_type === "Connected" || c.outcome_type === "Interested").length / calls.length * 100) + "%" : "–", "var(--ok)"],
         ["Next steps overdue", rs.filter(r => r.next_step_date && r.next_step_date < today()).length, "var(--bad)"]
       ];
     },
@@ -1314,12 +1307,17 @@ const MOD = {
         const dl = byId("deals", rec.deal_id);
         if (dl && dl.next_followup !== rec.next_step_date) { try { await updateRow("deals", dl.id, { next_followup: rec.next_step_date }); } catch (e) {} }
       }
+      if (rec.lead_id && rec.next_step_date){
+        const ld = byId("leads", rec.lead_id);
+        if (ld && ld.next_followup !== rec.next_step_date) { try { await updateRow("leads", ld.id, { next_followup: rec.next_step_date }); } catch (e) {} }
+      }
     }
   },
 
   proposals: {
     label: "Proposals", one: "proposal", table: "proposals", area: "sales", title: "number",
     desc: "Quotes and proposals sent to prospects. Attach the PDF to each one.", needs: ["deals","clients"], comments: true, files: true,
+    csv: true,
     fields: [
       { k: "number", l: "Proposal no.", t: "text", req: true, def: () => nextNumber("QT", "proposals") },
       { k: "title", l: "Title", t: "text", ph: "e.g. Clinic booking app – phase 1" },
@@ -1365,6 +1363,7 @@ const MOD = {
   campaigns: {
     label: "Campaigns", one: "campaign", table: "campaigns", area: "marketing", title: "name",
     desc: "Paid, organic and outreach campaigns with budget, spend and results.", needs: ["leads"], comments: true, files: true,
+    csv: true,
     fields: [
       { k: "name", l: "Campaign name", t: "text", req: true, full: true },
       { k: "channel", l: "Channel", t: "select", o: ["Google Ads","Meta Ads","LinkedIn","Instagram","YouTube","Email","SEO","Content","Events","Cold outreach","Referral program","Other"], filter: true },
@@ -1393,6 +1392,7 @@ const MOD = {
   content: {
     label: "Content calendar", one: "content item", table: "content", area: "marketing", title: "title",
     desc: "Blog posts, social media, newsletters and videos, from idea to published.", needs: ["campaigns"], comments: true, files: true,
+    csv: true,
     fields: [
       { k: "title", l: "Title / topic", t: "text", req: true, full: true },
       { k: "channel", l: "Channel", t: "select", o: ["LinkedIn","Instagram","Facebook","X (Twitter)","YouTube","Blog","Newsletter","Website","Case study","Other"], req: true, def: "LinkedIn", filter: true },
@@ -1413,6 +1413,7 @@ const MOD = {
   seo_keywords: {
     label: "SEO keywords", one: "keyword", table: "seo_keywords", area: "marketing", title: "keyword",
     desc: "Google rankings for the searches that bring you clients. Update positions weekly.", needs: [],
+    csv: true,
     fields: [
       { k: "keyword", l: "Keyword", t: "text", req: true, full: true, ph: "e.g. app development company in Himachal" },
       { k: "target_url", l: "Page that should rank", t: "url" },
@@ -1439,6 +1440,7 @@ const MOD = {
   social_stats: {
     label: "Social media", one: "monthly report", table: "social_stats", area: "marketing", title: "channel",
     desc: "One row per channel per month: followers, reach, engagement and leads.", needs: [],
+    csv: true,
     fields: [
       { k: "channel", l: "Channel", t: "select", o: ["LinkedIn","Instagram","Facebook","X (Twitter)","YouTube","Google Business Profile"], req: true, def: "LinkedIn", filter: true },
       { k: "month", l: "Month", t: "month", req: true, def: () => monthStart() },
@@ -1583,10 +1585,12 @@ async function sendLeadToSales(rec){
 }
 async function convertLead(rec){
   try {
+    const ig = rec.pipeline === "Instagram";
     const deal = await insertRow("deals", { title: (rec.company || rec.name) + (rec.service ? " – " + rec.service : ""), company: rec.company || "", contact_name: rec.name,
-      email: rec.email || "", phone: rec.phone || "", service: rec.service || "", value: rec.budget || null, stage: "Qualified", source: rec.source || "",
+      email: rec.email || "", phone: rec.phone || "", service: rec.service || "", value: rec.budget || null, stage: ig && ["Demo booked","Demo done","Follow up"].includes(rec.status) ? "Meeting" : "Qualified", source: rec.source || "",
+      lead_type: rec.lead_type || "", priority: rec.priority || "Medium", tags: rec.tags || [], city: rec.city || "", zone: rec.zone || "",
       owner_id: rec.sales_owner_id || S.me.id, lead_id: rec.id, next_followup: addDays(today(), 2) });
-    await updateRow("leads", rec.id, { status: "Converted", deal_id: deal.id, sales_owner_id: rec.sales_owner_id || S.me.id });
+    await updateRow("leads", rec.id, { status: ig ? "Closed" : "Converted", deal_id: deal.id, sales_owner_id: rec.sales_owner_id || S.me.id });
     if (rec.owner_id) notify([rec.owner_id], "Your lead became a deal: " + rec.name, deal.title, "leads", rec.id);
     toast("Deal created."); closeDlg(); rerender(); openRecord("deals", deal.id);
   } catch (e) { fail(e, "Couldn’t convert"); }
@@ -1627,6 +1631,7 @@ function uiFor(key){
 function moduleRows(M){
   const u = uiFor(M.key);
   let rs = M.allRowsWhen && M.allRowsWhen(u) ? allRows(M.table) : rows(M.table);
+  if (M.rowFilter) rs = rs.filter(M.rowFilter);
   if (M.personal && u.scope === "mine") rs = rs.filter(r => r.user_id === S.me.id);
   return rs;
 }
@@ -1661,6 +1666,10 @@ async function renderModule(key, el){
 
   // header
   const acts = h("div", { class: "acts" });
+  if (M.csv){
+    if (A.canCreate) acts.append(h("button", { type: "button", class: "btn", onclick: () => openCsvImport(key) }, "Import CSV"));
+    acts.append(h("button", { type: "button", class: "btn", onclick: () => exportCsv(key) }, "Export CSV"));
+  }
   if (A.canCreate) acts.append(h("button", { type: "button", class: "btn pri", onclick: () => openRecord(key, null) }, "+ New " + M.one));
   el.append(h("div", { class: "ph" }, h("div", {}, h("h1", {}, M.label), h("p", {}, M.desc)), acts));
 
@@ -1749,6 +1758,9 @@ function tableView(M, rs, A){
 }
 
 let dragId = null;
+// big columns show 60 cards at first (search or filters narrow them down), with "Show more"
+const BOARD_MORE = {};
+const boardLimit = (M, v) => BOARD_MORE[M.key + "|" + v] || 60;
 function boardView(M, rs, A){
   const f = M.fields.find(x => x.k === M.board.field);
   const wrap = h("div", { class: "boardwrap" }), board = h("div", { class: "board" });
@@ -1758,7 +1770,7 @@ function boardView(M, rs, A){
     const sum = M.board.sum ? items.reduce((s, r) => s + (+r[M.board.sum] || 0), 0) : null;
     const col = h("section", { class: "col", "aria-label": o.l },
       h("div", { class: "colh" }, h("b", {}, o.l), h("span", {}, items.length + (sum ? " · " + money(sum, true) : ""))),
-      h("div", { class: "cards" }, items.length ? items.map(r => {
+      h("div", { class: "cards" }, items.length ? [...items.slice(0, boardLimit(M, o.v)).map(r => {
         const card = (M.board.card || genericCard(M.title, null, null))(r, M);
         const can = access(M, r).canEdit;
         card.setAttribute("draggable", can ? "true" : "false");
@@ -1766,7 +1778,7 @@ function boardView(M, rs, A){
         card.addEventListener("dragstart", e => { if (!can) { e.preventDefault(); return; } dragId = r.id; card.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", r.id); });
         card.addEventListener("dragend", () => { dragId = null; card.classList.remove("dragging"); document.querySelectorAll(".col.drop").forEach(c => c.classList.remove("drop")); });
         return card;
-      }) : h("p", { class: "nothing", style: "text-align:center;padding:16px 4px" }, "Empty")));
+      }), items.length > boardLimit(M, o.v) ? h("button", { type: "button", class: "btn sm ghost", style: "width:100%", onclick: () => { BOARD_MORE[M.key + "|" + o.v] = boardLimit(M, o.v) + 100; rerender(); } }, "Show " + Math.min(100, items.length - boardLimit(M, o.v)) + " more of " + (items.length - boardLimit(M, o.v))) : null] : h("p", { class: "nothing", style: "text-align:center;padding:16px 4px" }, "Empty")));
     col.addEventListener("dragover", e => { if (!dragId) return; e.preventDefault(); col.classList.add("drop"); });
     col.addEventListener("dragleave", e => { if (!col.contains(e.relatedTarget)) col.classList.remove("drop"); });
     col.addEventListener("drop", async e => {
@@ -1922,6 +1934,15 @@ async function openRecord(key, id, preset){
       if (v) { err.textContent = v; err.hidden = false; return; }
       if (M.before) M.before(data, rec);
       if (!rec && M.personal) data.user_id = S.me.id;
+      if (!rec && M.dupCheck && !save.confirmedDup){
+        const dup = M.dupCheck(data);
+        if (dup){
+          err.replaceChildren("Looks like a duplicate of ", h("b", {}, (dup.lead_number ? dup.lead_number + " " : "") + (dup.name || dup.title || "")), " (same email or phone). ",
+            h("button", { type: "button", class: "linkbtn", onclick: () => { closeDlg(); openRecord(key, dup.id); } }, "Open it"), " or ",
+            h("button", { type: "button", class: "linkbtn", onclick: () => { save.confirmedDup = true; save(thenFiles); } }, "create anyway"), ".");
+          err.hidden = false; return;
+        }
+      }
       saveBtns.forEach(b => { b.disabled = true; b.dataset.label = b.textContent; b.textContent = "Saving…"; });
       try {
         const saved = rec ? await updateRow(M.table, rec.id, data) : await insertRow(M.table, data);
@@ -1962,14 +1983,17 @@ function commentsSection(tbl, id){
   const ta = h("textarea", { class: "in", rows: 2, placeholder: "Write a comment… type @ to tag someone", maxlength: "4000" });
   attachMentions(ta);
   const post = h("button", { type: "button", class: "btn pri sm" }, "Post comment");
-  sec.append(list, h("div", { style: "display:flex;flex-direction:column;gap:8px;margin-top:8px;align-items:flex-end" }, ta, post));
+  const withKinds = ["leads","deals"].includes(tbl);
+  let kind = "Info";
+  const kindSeg = withKinds ? segmented([["Info","Info"], ["Action","Action needed"], ["Escalation","Escalation"]], kind, v => { kind = v; }) : null;
+  sec.append(list, h("div", { style: "display:flex;flex-direction:column;gap:8px;margin-top:8px;align-items:flex-end" }, ta, h("div", { style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end" }, kindSeg, post)));
   async function refresh(){
     try {
       const cs = ok(await sb.from("comments").select("*").eq("tbl", tbl).eq("entity_id", id).order("created_at")) || [];
       list.replaceChildren();
       if (!cs.length) list.append(h("p", { class: "nothing" }, "No comments yet."));
       for (const c of cs) list.append(h("div", { class: "cmt" }, avatar(c.author_id, "sm"),
-        h("div", { class: "bd" }, h("div", { class: "hd" }, h("b", {}, pname(c.author_id) || "Someone"), fmtAgo(c.created_at),
+        h("div", { class: "bd" }, h("div", { class: "hd" }, h("b", {}, pname(c.author_id) || "Someone"), c.kind && c.kind !== "Info" ? h("span", { class: "pill " + (c.kind === "Escalation" ? "bad" : "ok"), style: "font-size:11px" }, c.kind === "Action" ? "Action needed" : c.kind) : null, fmtAgo(c.created_at),
           ((c.author_id === S.me.id && tbl !== "tasks") || S.me.is_admin) ? h("button", { type: "button", class: "del", onclick: async () => { try { ok(await sb.from("comments").delete().eq("id", c.id)); refresh(); } catch (e) { fail(e); } } }, " · Delete") : null),
           h("p", {}, renderRich(c.body)))));
     } catch (e) { list.replaceChildren(h("p", { class: "nothing" }, "Comments couldn’t be loaded.")); }
@@ -1979,7 +2003,8 @@ function commentsSection(tbl, id){
     post.disabled = true;
     try {
       const mentioned = mentionIds(body);
-      ok(await sb.from("comments").insert({ tbl, entity_id: id, body, author_id: S.me.id, mentions: mentioned }));
+      ok(await sb.from("comments").insert({ tbl, entity_id: id, body, author_id: S.me.id, mentions: mentioned, ...(withKinds ? { kind } : {}) }));
+      if (withKinds && kind === "Escalation"){ const rec0 = byId(tbl, id) || {}; notify(peopleWith(tbl === "deals" ? "sales" : "leads", 3).map(p => p.id).filter(x => x !== S.me.id), "Escalation on " + (rec0.lead_number ? rec0.lead_number + " " : "") + (rec0.name || rec0.title || ""), body.slice(0, 140), tbl, id); }
       ta.value = "";
       const M = Object.values(MOD).find(m => m.table === tbl);
       const rec = byId(tbl, id) || {};
@@ -3400,8 +3425,16 @@ function badgeInfo(route){
       add(rows("deals").filter(d => d.owner_id === me && d.created_by !== me && isNewer(d.created_at, route)).length, "new for you", "new");
     } break;
     case "leads": if (L("leads")) {
-      add(rows("leads").filter(l => l.status === "Sent to sales" && !l.deal_id && (l.sales_owner_id === me || (!l.sales_owner_id && lvl("sales") >= 2))).length, "waiting for Sales", "due");
-      add(rows("leads").filter(l => l.created_by !== me && isNewer(l.created_at, route)).length, "new", "new");
+      const gl = rows("leads").filter(l => (l.pipeline || "General") === "General");
+      add(gl.filter(l => l.status === "Sent to sales" && !l.deal_id && (l.sales_owner_id === me || (!l.sales_owner_id && lvl("sales") >= 2))).length, "waiting for Sales", "due");
+      add(gl.filter(l => (l.owner_id === me || l.sales_owner_id === me) && l.next_followup && l.next_followup <= t0 && !["Converted","Not a fit"].includes(l.status)).length, "follow-ups due", "due");
+      add(gl.filter(l => l.created_by !== me && isNewer(l.created_at, route)).length, "new", "new");
+    } break;
+    case "ig_leads": if (L("leads")) {
+      const il = rows("leads").filter(l => l.pipeline === "Instagram");
+      add(il.filter(l => l.sales_owner_id === me && l.status === "Lead").length, "to call", "due");
+      add(il.filter(l => l.sales_owner_id === me && l.next_followup && l.next_followup <= t0 && !["Closed","Unqualified","Ghosted"].includes(l.status)).length, "follow-ups due", "due");
+      add(il.filter(l => l.created_by !== me && isNewer(l.created_at, route)).length, "new", "new");
     } break;
     case "clients": case "contacts": { const tb = route; if (L(tb)) add(rows(tb).filter(r => byOthers(r) && isNewer(r.created_at, route)).length, "new", "new"); } break;
     case "activities": if (L("activities")) add(rows("activities").filter(a => a.owner_id === me && a.next_step && a.next_step_date && a.next_step_date <= t0).length, "next steps due", "due"); break;
@@ -3435,6 +3468,607 @@ function navBadge(route){
   if (b.due) return h("span", { class: "cnt due", title: b.why.join(" · ") }, String(b.due > 99 ? "99+" : b.due));
   if (b.fresh) return h("span", { class: "cnt new", title: b.why.join(" · ") }, b.fresh > 99 ? "99+" : b.fresh + " new");
   return null;
+}
+/* ---------------------------------------------------------------------
+   CRM for Marketing and Sales (from the old marketing app)
+   --------------------------------------------------------------------- */
+function leadModule(pipeline){
+  const ig = pipeline === "Instagram";
+  const STAGES = ig ? IG_STAGES : LEAD_STATUS;
+  return {
+    label: ig ? "Instagram leads" : "Leads", one: ig ? "Instagram lead" : "lead", table: "leads", area: "leads", title: "name",
+    desc: ig ? "People from Instagram campaigns and website forms, worked by phone: Lead › Called › Picked up › Qualified › Demo booked › Demo done › Follow up › Closed."
+             : "Marketing captures leads and hands them to Sales. Sales turns good ones into deals.",
+    needs: ["campaigns","deals","activities","tasks"], comments: true, files: true, csv: true, commentKinds: true,
+    pipeline,
+    rowFilter: r => (r.pipeline || "General") === pipeline,
+    keyOf: r => r.lead_number || "",
+    searchExtra: r => [r.lead_number, r.city, r.zone, (r.tags || []).join(" "), ...(r.form_submissions || []).flatMap(s => (s.fields || []).map(f => String(f.value ?? "")))].join(" "),
+    canEdit: (rec, L) => L >= 2 || (rec && (rec.owner_id === S.me.id || rec.sales_owner_id === S.me.id)),
+    dupCheck: d => findDuplicate("leads", d, pipeline),
+    fields: [
+      { k: "name", l: "Person’s name", t: "text", req: true },
+      { k: "company", l: "Company", t: "text" },
+      { k: "email", l: "Email", t: "email" },
+      { k: "phone", l: "Phone / WhatsApp", t: "phone", ph: "+91 98765 43210" },
+      { k: "alt_phone", l: "Alternate phone", t: "phone" },
+      { k: "lead_type", l: "Lead type", t: "select", o: () => leadTypes(), filter: true },
+      { k: "source", l: "Source", t: "select", o: LEAD_SOURCES, req: true, def: ig ? "Instagram" : "Website", filter: true },
+      { k: "campaign_id", l: "Campaign", t: "ref", ref: "campaigns", none: "No campaign" },
+      { k: "status", l: ig ? "Stage" : "Status", t: "select", o: STAGES, req: true, def: ig ? "Lead" : "New" },
+      { k: "priority", l: "Priority", t: "select", o: PRIORITY, req: true, def: "Medium", filter: true },
+      { k: "service", l: "Interested in", t: "select", o: SERVICES },
+      { k: "budget", l: "Their budget / deal value", t: "money" },
+      { k: "next_followup", l: "Next follow-up", t: "date" },
+      { k: "tags", l: "Tags", t: "tags", from: "leads", ph: "e.g. hot, restaurant, returning", filter: true },
+      { k: "owner_id", l: "Marketing owner", t: "user", def: () => S.me.vertical === "Marketing" ? S.me.id : null, filter: true },
+      { k: "sales_owner_id", l: ig ? "Calling rep (Sales)" : "Sales owner", t: "user", none: "Not assigned yet", filter: ig },
+      { k: "_h_addr", l: "Address", t: "heading" },
+      { k: "address", l: "Address", t: "text", full: true },
+      { k: "city", l: "City", t: "text" },
+      { k: "state", l: "State", t: "text" },
+      { k: "pincode", l: "Pincode", t: "text" },
+      { k: "country", l: "Country", t: "text", def: "India" },
+      { k: "zone", l: "Zone", t: "select", o: () => zones(), filter: true, show: () => zones().length > 0 },
+      { k: "lost_reason", l: "Why not?", t: "text", full: true, show: r => ["Not a fit","Unqualified","Ghosted"].includes(r.status) },
+      { k: "notes", l: "Notes", t: "textarea", full: true, mentions: true }
+    ],
+    cols: [{ k: "lead_number", l: "No.", render: v => v ? h("span", { class: "tkey" }, v) : h("span", { class: "muted" }, "–") }, "name", "company", "lead_type", "source", "status", "priority",
+      { k: "next_followup", l: "Follow-up", render: (v, r) => dueTag(v, ["Converted","Not a fit","Closed","Unqualified","Ghosted"].includes(r.status)) || h("span", { class: "muted" }, "–") },
+      ig ? "sales_owner_id" : "owner_id",
+      { k: "last_contacted_at", l: "Last contacted", get: r => r.last_contacted_at ? fmtAgo(r.last_contacted_at) : "Never" }],
+    board: { field: "status", card: r => {
+      const c = genericCard("name", x => [x.company || null, pill(x.source, "grey"), x.budget ? money(x.budget, true) : null, x.next_followup ? dueTag(x.next_followup) : null], ig ? "sales_owner_id" : "owner_id")(r);
+      if (r.lead_number) c.querySelector(".t").prepend(h("span", { class: "tkey" }, r.lead_number), " ");
+      const subs = (r.form_submissions || []).length;
+      if (subs) c.querySelector(".m").prepend(h("span", { class: "pill info", style: "font-size:11.5px" }, subs + " form" + (subs === 1 ? "" : "s")));
+      return c;
+    } },
+    defaultView: "board",
+    sort: (a, b) => (PRANK[a.priority] ?? 9) - (PRANK[b.priority] ?? 9) || String(b.created_at).localeCompare(String(a.created_at)),
+    summary: rs => {
+      const m = today().slice(0, 7);
+      const thisMonth = rs.filter(r => (r.created_at || "").slice(0, 7) === m);
+      if (ig){
+        const reached = rs.filter(r => r.status !== "Lead").length;
+        const demos = rs.filter(r => ["Demo booked","Demo done","Follow up","Closed"].includes(r.status)).length;
+        return [["New this month", thisMonth.length], ["Not called yet", rs.filter(r => r.status === "Lead").length, "var(--warn)"],
+          ["Reached", rs.length ? Math.round(reached / rs.length * 100) + "%" : "–"], ["Demos booked", demos, "var(--ok)"], ["Closed", rs.filter(r => r.status === "Closed").length, "var(--ok)"]];
+      }
+      const closed = rs.filter(r => ["Converted","Not a fit"].includes(r.status));
+      return [
+        ["New this month", thisMonth.length],
+        ["Waiting for Sales", rs.filter(r => r.status === "Sent to sales").length, "var(--warn)"],
+        ["Follow-ups due", rs.filter(r => r.next_followup && r.next_followup <= today() && !["Converted","Not a fit"].includes(r.status)).length, "var(--warn)"],
+        ["Converted to deals", rs.filter(r => r.status === "Converted").length, "var(--ok)"],
+        ["Conversion rate", closed.length ? Math.round(rs.filter(r => r.status === "Converted").length / closed.length * 100) + "%" : "–"]
+      ];
+    },
+    detail: (rec, box) => crmDetail("leads", rec, box),
+    actions: (rec) => crmActions("leads", rec),
+    before: (d, prev) => { if (!prev) d.pipeline = pipeline; },
+    after: (rec, prev) => {
+      if (rec.sales_owner_id && (!prev || prev.sales_owner_id !== rec.sales_owner_id)) notify([rec.sales_owner_id], (ig ? "Instagram lead to call: " : "Lead assigned to you: ") + rec.name + (rec.company ? " (" + rec.company + ")" : ""), [rec.lead_number, rec.service].filter(Boolean).join(" · "), "leads", rec.id);
+    }
+  };
+}
+
+/* ---------- duplicates ---------- */
+const normPhone = p => String(p || "").replace(/\D/g, "").slice(-10);
+function findDuplicate(table, d, pipeline){
+  const em = String(d.email || "").trim().toLowerCase(), ph = normPhone(d.phone);
+  if (!em && ph.length < 8) return null;
+  return allRows(table).find(r => (table !== "leads" || (r.pipeline || "General") === (pipeline || "General")) &&
+    ((em && String(r.email || "").toLowerCase() === em) || (ph.length >= 8 && normPhone(r.phone) === ph))) || null;
+}
+
+/* ---------- contact buttons: open your own app, and log it ---------- */
+function waNumber(p){ let d = String(p || "").replace(/\D/g, ""); if (d.length === 10) d = "91" + d; return d; }
+function contactBar(table, rec){
+  const phone = rec.phone, email = rec.email, first = String(rec.contact_name || rec.name || "").split(" ")[0];
+  const log = kind => logActivity(table, rec, kind);
+  const btn = (label, href, kind, enabled) => h("button", { type: "button", class: "btn sm", disabled: !enabled, title: enabled ? "" : "No " + (kind === "Email" ? "email" : "phone") + " saved",
+    onclick: () => { if (href) window.open(href, "_blank", "noopener"); log(kind); } }, label);
+  return h("div", { class: "cbar" },
+    btn("📞 Call", phone ? "tel:" + String(phone).replace(/\s/g, "") : null, "Call", !!phone),
+    btn("💬 WhatsApp", phone ? "https://wa.me/" + waNumber(phone) + "?text=" + encodeURIComponent("Hi " + first + ", ") : null, "WhatsApp", !!phone),
+    btn("✉️ Email", email ? "mailto:" + email : null, "Email", !!email),
+    btn("SMS", phone ? "sms:" + String(phone).replace(/\s/g, "") : null, "SMS", !!phone),
+    h("button", { type: "button", class: "btn sm soft", onclick: () => log("Note") }, "+ Log activity"));
+}
+function logActivity(table, rec, kind){
+  const preset = { kind, activity_date: today(), owner_id: S.me.id, subject: (kind === "Call" ? "Call with " : kind === "Note" ? "" : kind + " to ") + (kind === "Note" ? "" : (rec.contact_name || rec.name || rec.title || "")) };
+  if (table === "leads") preset.lead_id = rec.id; else { preset.deal_id = rec.id; if (rec.client_id) preset.client_id = rec.client_id; if (rec.contact_id) preset.contact_id = rec.contact_id; }
+  closeDlg(); openRecord("activities", null, preset);
+}
+
+/* ---------- actions bar inside a lead or deal ---------- */
+function crmActions(table, rec){
+  const out = [];
+  if (table === "leads"){
+    const ig = rec.pipeline === "Instagram";
+    if (!ig && ["New","Contacted","Qualified"].includes(rec.status) && lvl("leads") >= 2)
+      out.push(h("b", { style: "flex:1" }, "Ready for Sales?"), h("button", { type: "button", class: "btn pri", onclick: () => sendLeadToSales(rec) }, "Send to Sales"));
+    if (!rec.deal_id && lvl("sales") >= 2 && !["Not a fit","Unqualified","Ghosted","Converted"].includes(rec.status))
+      out.push(...(out.length ? [] : [h("b", { style: "flex:1" }, ig ? "Demo going well?" : "Worth pursuing?")]), h("button", { type: "button", class: "btn ok", onclick: () => convertLead(rec) }, "Convert to deal"));
+    if (rec.lead_number) out.push(h("span", { class: "tkey", style: "margin-left:auto" }, rec.lead_number));
+  } else {
+    if (!["Won","Lost"].includes(rec.stage)){
+      out.push(h("b", { style: "flex:1" }, pill(rec.stage), " ", money(rec.value)),
+        h("button", { type: "button", class: "btn ok", onclick: () => setDealOutcome(rec, "Won") }, "Mark won"),
+        h("button", { type: "button", class: "btn danger", onclick: () => setDealOutcome(rec, "Lost") }, "Mark lost"));
+    } else {
+      out.push(h("b", { style: "flex:1" }, rec.stage === "Won" ? "Won" : "Lost" + (rec.lost_reason ? ": " + rec.lost_reason : ""), rec.closed_at ? h("span", { class: "muted", style: "font-weight:500" }, " · " + fmtDate(rec.closed_at.slice(0, 10), true)) : ""),
+        h("button", { type: "button", class: "btn", onclick: () => setDealOutcome(rec, "reopen") }, "Reopen"));
+    }
+  }
+  return out.length ? out : null;
+}
+async function setDealOutcome(rec, what){
+  let d;
+  if (what === "Lost"){ const why = prompt("Why was it lost? (e.g. price, timing, went with another vendor)"); if (why === null) return; d = { stage: "Lost", lost_reason: why.trim(), closed_at: new Date().toISOString() }; }
+  else if (what === "Won") d = { stage: "Won", probability: 100, closed_at: new Date().toISOString() };
+  else { const to = prompt("Reopen to which stage? " + DEAL_STAGES.filter(s => !["Won","Lost"].includes(s)).join(", "), "Negotiation"); if (to === null) return; const st = DEAL_STAGES.find(s => s.toLowerCase() === to.trim().toLowerCase()) || "Negotiation"; d = { stage: st, closed_at: null }; }
+  try { const saved = await updateRow("deals", rec.id, d); MOD.deals.after(saved, rec); toast(what === "reopen" ? "Reopened." : "Marked " + what.toLowerCase() + "."); closeDlg(); rerender(); }
+  catch (e) { fail(e, "Couldn’t update"); }
+}
+
+/* ---------- sections inside a lead or deal ---------- */
+function crmDetail(table, rec, box){
+  box.append(h("div", { class: "section" }, h("h3", {}, "Contact"), contactBar(table, rec),
+    h("p", { class: "muted", style: "font-size:12.5px;margin:6px 0 0" }, "Opens your phone, WhatsApp or email, and logs it here." + (rec.last_contacted_at ? " Last contacted " + fmtAgo(rec.last_contacted_at) + "." : " Not contacted yet."))));
+  if (table === "leads"){
+    if ((rec.form_submissions || []).length) box.append(formAnswersSection(rec));
+    if (rec.deal_id){
+      const dl = byId("deals", rec.deal_id);
+      box.append(h("div", { class: "section" }, h("h3", {}, "Deal"), dl ? h("button", { type: "button", class: "row", onclick: () => { closeDlg(); openRecord("deals", dl.id); } }, pill(dl.stage), h("span", { class: "x" }, dl.title), h("span", { class: "y" }, money(dl.value))) : h("p", { class: "nothing" }, "Converted to a deal (visible to Sales).")));
+    }
+  } else if (rec.lead_id){
+    const ld = byId("leads", rec.lead_id);
+    if (ld) box.append(h("div", { class: "section" }, h("h3", {}, "Came from lead"), h("button", { type: "button", class: "row", onclick: () => { closeDlg(); openRecord(ld.pipeline === "Instagram" ? "ig_leads" : "leads", ld.id); } }, h("span", { class: "tkey" }, ld.lead_number || ""), h("span", { class: "x" }, ld.name), pill(ld.source, "grey"))));
+    if (ld && (ld.form_submissions || []).length) box.append(formAnswersSection(ld));
+  }
+  box.append(linkedTasksSection(table, rec), linkedActivitiesSection(table, rec), recordHistorySection(table, rec));
+}
+function formAnswersSection(rec){
+  const subs = (rec.form_submissions || []).slice().reverse();
+  return h("div", { class: "section" }, h("h3", {}, "Website forms", h("span", { class: "muted", style: "font-weight:500;font-size:12.5px" }, subs.length + " submission" + (subs.length === 1 ? "" : "s"))),
+    subs.map(s => h("div", { class: "formsub" },
+      h("div", { class: "fh" }, h("b", {}, s.form_title || s.form_name || "Website form"), h("span", { class: "muted" }, s.submitted_at ? new Date(s.submitted_at).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" }) : "")),
+      (s.fields || []).length ? h("div", { class: "fa" }, (s.fields || []).map(f => [h("span", { class: "q" }, f.label || f.key), h("span", { class: "a" }, Array.isArray(f.value) ? f.value.join(", ") : f.value === true ? "Yes" : f.value === false ? "No" : f.value == null || f.value === "" ? "–" : String(f.value))])) : null,
+      s.page_url ? h("div", { class: "muted", style: "font-size:12.5px;margin-top:4px" }, "From ", h("a", { href: s.page_url, target: "_blank", rel: "noopener" }, s.page_url.replace(/^https?:\/\//, "").slice(0, 60))) : null,
+      s.utm && Object.values(s.utm).some(Boolean) ? h("div", { class: "muted", style: "font-size:12.5px" }, "UTM: " + Object.entries(s.utm).filter(([, v]) => v).map(([k, v]) => k + "=" + v).join(" · ")) : null)));
+}
+function linkedTasksSection(table, rec){
+  const key = table === "leads" ? "lead_id" : "deal_id";
+  const ts = rows("tasks").filter(t => t[key] === rec.id).sort((a, b) => String(a.due_date || "9999").localeCompare(String(b.due_date || "9999")));
+  const vert = S.me.vertical && S.me.vertical !== "Development" ? S.me.vertical : (table === "deals" ? "Sales" : "Marketing");
+  const add = (title, type) => { closeDlg(); openRecord("tasks", null, { [key]: rec.id, vertical: vert, type, title, due_date: addDays(today(), 1), assignee_id: S.me.id }); };
+  return h("div", { class: "section" }, h("h3", {}, "Tasks", h("span", {}, h("button", { type: "button", class: "btn sm soft", onclick: () => add("Follow up with " + (rec.contact_name || rec.name || rec.title), "Follow-up") }, "+ Follow-up"), " ",
+      h("button", { type: "button", class: "btn sm ghost", onclick: () => add("", "Follow-up") }, "+ Task"))),
+    ts.length ? ts.map(t => h("button", { type: "button", class: "row", onclick: () => { closeDlg(); openRecord("tasks", t.id); } }, pill(t.status), h("span", { class: "x" }, t.title), h("span", { class: "y" }, (pname(t.assignee_id) || "") + (t.due_date ? " · " : ""), dueTag(t.due_date, t.status === "Done") || "")))
+      : h("p", { class: "nothing" }, "No tasks yet."));
+}
+function linkedActivitiesSection(table, rec){
+  const key = table === "leads" ? "lead_id" : "deal_id";
+  const acts = rows("activities").filter(a => a[key] === rec.id).sort((a, b) => String(b.activity_date).localeCompare(String(a.activity_date)) || String(b.created_at).localeCompare(String(a.created_at)));
+  return h("div", { class: "section" }, h("h3", {}, "Communication log", h("button", { type: "button", class: "btn sm soft", onclick: () => logActivity(table, rec, "Call") }, "+ Log call")),
+    acts.length ? acts.slice(0, 12).map(a => h("button", { type: "button", class: "row", style: "align-items:flex-start", onclick: () => { closeDlg(); openRecord("activities", a.id); } },
+      h("span", { class: "pill grey", style: "min-width:78px;justify-content:center" }, a.kind),
+      h("span", { class: "x", style: "white-space:normal" }, h("b", {}, a.subject), a.outcome_type ? [" ", pill(a.outcome_type)] : null, a.duration_min ? h("span", { class: "muted" }, " · " + a.duration_min + " min") : null,
+        a.outcome ? [h("br"), h("span", { class: "muted", style: "font-size:13px" }, String(a.outcome).slice(0, 140))] : null),
+      h("span", { class: "y" }, fmtDate(a.activity_date) + " · " + (pname(a.owner_id).split(" ")[0] || ""))))
+      : h("p", { class: "nothing" }, "Nothing logged yet. Use the buttons above to call, WhatsApp or email."));
+}
+function recordHistorySection(table, rec){
+  const sec = h("div", { class: "section" }, h("h3", {}, "History", h("span", { class: "muted", style: "font-weight:500;font-size:12.5px" }, "Permanent")));
+  const list = h("div", {}, h("p", { class: "nothing" }, "Loading…")); sec.append(list);
+  const nm = v => pname(v) || "nobody";
+  const say = e => {
+    const o = e.old_value, n = e.new_value;
+    switch (e.field){
+      case "created": return "created it" + (n ? " as " + n : "");
+      case "status": case "stage": return "moved it from " + (o || "–") + " to " + n;
+      case "owner_id": return n ? "made " + nm(n) + " the owner" : "removed the owner";
+      case "sales_owner_id": return n ? "assigned it to " + nm(n) : "unassigned it";
+      case "value": case "budget": return "changed the value from " + (o ? money(o) : "–") + " to " + (n ? money(n) : "–");
+      case "next_followup": return n ? "set the follow-up to " + fmtDate(n, true) : "cleared the follow-up";
+      case "expected_close": return n ? "set expected close to " + fmtDate(n, true) : "cleared expected close";
+      case "deal_id": return n ? "converted it to a deal" : "unlinked the deal";
+      case "form_submitted": return "submitted the form “" + n + "”";
+      case "lost_reason": return n ? "noted why: “" + n + "”" : "cleared the reason";
+      case "pipeline": return "moved it to the " + n + " pipeline";
+      default: return "changed " + e.field.replace(/_/g, " ") + (n ? " to " + n.replace(/[\[\]"]/g, "") : "");
+    }
+  };
+  (async () => {
+    try {
+      const evs = ok(await sb.from("record_events").select("*").eq("tbl", table).eq("entity_id", rec.id).order("at", { ascending: false }).limit(80)) || [];
+      list.replaceChildren();
+      if (!evs.length) list.append(h("p", { class: "nothing" }, "No changes recorded yet."));
+      for (const e of evs) list.append(h("div", { class: "hist" }, avatar(e.actor_id, "sm"), h("span", { class: "x" }, h("b", {}, e.actor_id ? (pname(e.actor_id) || "Someone") : "Website"), " ", say(e)), h("span", { class: "y" }, fmtAgo(e.at))));
+    } catch (e) { list.replaceChildren(h("p", { class: "nothing" }, "History couldn’t be loaded.")); }
+  })();
+  return sec;
+}
+
+/* ---------------------------------------------------------------------
+   Analytics for Sales and Marketing
+   --------------------------------------------------------------------- */
+async function renderCrmAnalytics(el){
+  await ensure(["leads","deals","activities","campaigns"]);
+  if (S.route !== "crm-analytics") return;
+  if (!S.ui.ca) S.ui.ca = { range: "90", owner: "" };
+  const u = S.ui.ca;
+  const since = u.range === "all" ? "" : addDays(today(), -(+u.range));
+  const inRange = r => !since || String(r.created_at || "").slice(0, 10) >= since;
+  const own = (r, k) => !u.owner || r[k] === u.owner;
+  const leads = allRows("leads").filter(r => inRange(r) && (own(r, "owner_id") || own(r, "sales_owner_id")));
+  const general = leads.filter(r => (r.pipeline || "General") === "General"), ig = leads.filter(r => r.pipeline === "Instagram");
+  const deals = allRows("deals").filter(r => inRange(r) && own(r, "owner_id"));
+  const won = deals.filter(d => d.stage === "Won"), lost = deals.filter(d => d.stage === "Lost");
+  const wonVal = won.reduce((s, d) => s + (+d.value || 0), 0);
+
+  const rangeSel = h("select", { class: "in", "aria-label": "Period" }, [["30","Last 30 days"],["90","Last 90 days"],["365","Last 12 months"],["all","All time"]].map(([v, l]) => h("option", { value: v }, l)));
+  rangeSel.value = u.range; rangeSel.addEventListener("change", () => { u.range = rangeSel.value; rerender(); });
+  const ownSel = h("select", { class: "in", "aria-label": "Person" }, h("option", { value: "" }, "Everyone"), activePeople().filter(p => ["Sales","Marketing"].includes(p.vertical) || p.is_admin).map(p => h("option", { value: p.id }, p.full_name)));
+  ownSel.value = u.owner; ownSel.addEventListener("change", () => { u.owner = ownSel.value; rerender(); });
+  el.append(h("div", { class: "ph" }, h("div", {}, h("h1", {}, "Sales & marketing analytics"), h("p", {}, "Funnels, conversion and where leads come from."))), h("div", { class: "tb" }, rangeSel, ownSel));
+
+  const overdue = allRows("tasks").filter(t => (t.lead_id || t.deal_id) && t.status !== "Done" && t.due_date && t.due_date < today()).length;
+  el.append(statStrip([
+    ["Leads", leads.length], ["Deals won", won.length, "var(--ok)"],
+    ["Win rate", won.length + lost.length ? Math.round(won.length / (won.length + lost.length) * 100) + "%" : "–"],
+    ["Won value", money(wonVal, true), "var(--ok)"], ["Average won deal", won.length ? money(wonVal / won.length, true) : "–"],
+    ["Overdue lead/deal tasks", overdue, "var(--bad)"]]));
+
+  const funnel = (title, stages, recs, field, terminalBad) => {
+    const order = stages.filter(s => !terminalBad.includes(s));
+    const idx = s => order.indexOf(s);
+    // a record counts for every stage up to the one it reached
+    const reached = order.map((s, i) => recs.filter(r => idx(r[field]) >= i).length);
+    const box = h("div", { class: "panel" }, h("h2", {}, title));
+    const max = Math.max(1, reached[0] || 0);
+    order.forEach((s, i) => box.append(h("div", { class: "frow" },
+      h("span", { class: "fl" }, s), h("span", { class: "fbar" }, h("span", { style: "width:" + (reached[i] / max * 100) + "%" })),
+      h("span", { class: "fn" }, h("b", {}, String(reached[i])), i ? h("span", { class: "muted" }, " · " + (reached[i - 1] ? Math.round(reached[i] / reached[i - 1] * 100) : 0) + "% of previous") : null))));
+    const dropped = recs.filter(r => terminalBad.includes(r[field])).length;
+    box.append(h("p", { class: "muted", style: "font-size:13px;margin:8px 0 0" }, dropped + " dropped out (" + terminalBad.join(", ") + ")" + (reached[0] ? ", overall " + Math.round((reached[reached.length - 1] || 0) / reached[0] * 100) + "% reached " + order[order.length - 1] : "")));
+    return box;
+  };
+  el.append(h("div", { class: "grid g3", style: "margin-bottom:16px" },
+    funnel("Leads funnel", LEAD_STATUS, general, "status", ["Not a fit"]),
+    funnel("Instagram funnel", IG_STAGES, ig, "status", ["Unqualified","Ghosted"]),
+    funnel("Deals funnel", DEAL_STAGES, deals, "stage", ["Lost"])));
+
+  const by = (recs, key, label) => {
+    const m = {}; for (const r of recs){ const v = (key === "owner" ? pname(r.sales_owner_id || r.owner_id) : r[key]) || "Not set"; m[v] = (m[v] || 0) + 1; }
+    return h("div", { class: "panel" }, h("h2", {}, label), hbars(Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, 10)));
+  };
+  el.append(h("div", { class: "grid g3", style: "margin-bottom:16px" }, by(leads, "source", "Leads by source"), by(leads, "lead_type", "Leads by type"), by(leads, "priority", "Leads by priority")));
+  const wonBy = {}; for (const d of won){ const n = pname(d.owner_id) || "Not set"; wonBy[n] = (wonBy[n] || 0) + (+d.value || 0); }
+  el.append(h("div", { class: "grid g3" }, by(leads, "owner", "Leads by owner"),
+    zones().length ? by(leads, "zone", "Leads by zone") : by(leads, "city", "Leads by city"),
+    h("div", { class: "panel" }, h("h2", {}, "Won value by person"), hbars(Object.entries(wonBy).sort((a, b) => b[1] - a[1]), v => money(v, true), "var(--ok)"))));
+}
+/* ---------------------------------------------------------------------
+   CSV import and export for Marketing and Sales lists
+   --------------------------------------------------------------------- */
+function csvParse(text){
+  text = String(text || "").replace(/^\uFEFF/, "");
+  const first = text.split(/\r?\n/, 1)[0] || "";
+  const delim = [",", ";", "\t"].map(d => [d, first.split(d).length]).sort((a, b) => b[1] - a[1])[0][0];
+  const rowsOut = []; let row = [], cell = "", q = false;
+  for (let i = 0; i < text.length; i++){
+    const c = text[i];
+    if (q){
+      if (c === '"'){ if (text[i + 1] === '"'){ cell += '"'; i++; } else q = false; }
+      else cell += c;
+    } else if (c === '"' && cell === "") q = true;
+    else if (c === delim){ row.push(cell); cell = ""; }
+    else if (c === "\n" || c === "\r"){ if (c === "\r" && text[i + 1] === "\n") i++; row.push(cell); rowsOut.push(row); row = []; cell = ""; }
+    else cell += c;
+  }
+  if (cell !== "" || row.length) { row.push(cell); rowsOut.push(row); }
+  return rowsOut.filter(r => r.some(x => String(x).trim() !== ""));
+}
+function csvCell(v){ const s = v == null ? "" : String(v); return /[",\n\r]/.test(s) || /^\s|\s$/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+function csvString(matrix){ return "\uFEFF" + matrix.map(r => r.map(csvCell).join(",")).join("\r\n"); }
+function downloadText(name, text, type){
+  const blob = new Blob([text], { type: type || "text/csv;charset=utf-8" });
+  const a = h("a", { href: URL.createObjectURL(blob), download: name }); document.body.append(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+
+const CSV_TYPES = ["text","textarea","email","phone","url","select","money","number","int","date","month","time","bool","user","ref","tags"];
+const csvFields = M => M.fields.filter(f => CSV_TYPES.includes(f.t) && !f.auto && !f.virtual && !f.k.startsWith("_"));
+const norm = s => String(s || "").toLowerCase().replace(/[’']/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+const CSV_SYNONYMS = {
+  name: ["full name","person name","contact name","lead name","customer name","name"],
+  email: ["email address","e mail","mail","email id"],
+  phone: ["phone number","mobile","mobile number","contact number","whatsapp","whatsapp number","phone no","contact"],
+  alt_phone: ["alternate phone","alternate number","secondary phone","other phone"],
+  company: ["company name","business","business name","organisation","organization","firm","restaurant","shop"],
+  budget: ["budget","deal value","value","amount","expected value"],
+  value: ["deal value","value","amount","budget"],
+  lead_type: ["lead type","type","category"],
+  status: ["status","stage","lead status","lead stage"],
+  stage: ["stage","status","deal stage"],
+  source: ["source","lead source","channel","utm source"],
+  owner_id: ["owner","assigned to","marketing owner","deal owner","done by","created by"],
+  sales_owner_id: ["sales owner","sales rep","calling rep","rep","assigned rep"],
+  next_followup: ["follow up","follow up date","next follow up","followup","next followup"],
+  city: ["city","town"], state: ["state","province"], pincode: ["pincode","pin code","zip","postal code","zip code"],
+  address: ["address","address line 1","street","location"],
+  tags: ["tags","labels"], notes: ["notes","comments","remarks","message","description"],
+  priority: ["priority"], zone: ["zone","area","region"], service: ["service","interested in","requirement","product"],
+  campaign_id: ["campaign","campaign name","utm campaign"], client_id: ["client","client name","company"],
+  title: ["deal name","title","deal","project"], activity_date: ["date","activity date"], subject: ["subject","summary"],
+  keyword: ["keyword","search term","query"], channel: ["channel","platform"], month: ["month"],
+  publish_date: ["publish date","date","go live"], kind: ["type","activity type"]
+};
+function guessField(header, fields){
+  const hN = norm(header);
+  if (!hN) return null;
+  let f = fields.find(x => norm(x.k) === hN || norm(x.l) === hN);
+  if (f) return f.k;
+  f = fields.find(x => (CSV_SYNONYMS[x.k] || []).some(s => norm(s) === hN));
+  if (f) return f.k;
+  f = fields.find(x => norm(x.l).length > 3 && (hN.includes(norm(x.l)) || norm(x.l).includes(hN)));
+  return f ? f.k : null;
+}
+
+/* ---- turning a cell into a value ---- */
+function parseAmount(v){
+  let s = String(v || "").toLowerCase().replace(/[₹,\s]|rs\.?|inr/g, "");
+  if (!s) return null;
+  let mult = 1;
+  if (/(lakh|lac|l)$/.test(s)){ mult = 100000; s = s.replace(/(lakhs?|lacs?|l)$/, ""); }
+  else if (/(crore|cr)$/.test(s)){ mult = 10000000; s = s.replace(/(crores?|cr)$/, ""); }
+  else if (/k$/.test(s)){ mult = 1000; s = s.replace(/k$/, ""); }
+  const n = parseFloat(s);
+  return isNaN(n) ? NaN : Math.round(n * mult * 100) / 100;
+}
+const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12 };
+function parseDateCell(v){
+  const s = String(v || "").trim(); if (!s) return null;
+  let m;
+  const pad = n => String(n).padStart(2, "0");
+  const ok2 = (y, mo, d) => (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) ? y + "-" + pad(mo) + "-" + pad(d) : NaN;
+  if ((m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/))) return ok2(+m[1], +m[2], +m[3]);
+  if ((m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/))){ let y = +m[3]; if (y < 100) y += 2000; return ok2(y, +m[2], +m[1]); }   // Indian style: day first
+  if ((m = s.match(/^(\d{1,2})[\s-]+([a-z]{3,9})[\s,-]+(\d{2,4})/i))){ let y = +m[3]; if (y < 100) y += 2000; return ok2(y, MONTHS[m[2].toLowerCase().slice(0, 4)] || MONTHS[m[2].toLowerCase().slice(0, 3)], +m[1]); }
+  if ((m = s.match(/^([a-z]{3,9})\s+(\d{1,2}),?\s+(\d{4})/i))) return ok2(+m[3], MONTHS[m[1].toLowerCase().slice(0, 3)], +m[2]);
+  if (/^\d{5}$/.test(s)){ const d = new Date(Date.UTC(1899, 11, 30) + (+s) * 864e5); return d.toISOString().slice(0, 10); }   // Excel date number
+  return NaN;
+}
+function convertCell(f, raw, M){
+  const v = String(raw == null ? "" : raw).trim();
+  if (v === "") return { v: undefined };
+  switch (f.t){
+    case "email": return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v) ? { v: v.toLowerCase() } : { v: v.toLowerCase(), warn: "email looks wrong" };
+    case "money": case "number": { const n = parseAmount(v); return isNaN(n) ? { err: "“" + v + "” isn’t a number" } : { v: n }; }
+    case "int": { const n = parseAmount(v); return isNaN(n) ? { err: "“" + v + "” isn’t a whole number" } : { v: Math.round(n) }; }
+    case "date": { const d = parseDateCell(v); return d === null ? { v: undefined } : (typeof d === "number" && isNaN(d)) ? { err: "“" + v + "” isn’t a date (use DD/MM/YYYY or YYYY-MM-DD)" } : { v: d }; }
+    case "month": { const d = parseDateCell(v.length <= 7 ? v + "-01" : v); return typeof d === "string" ? { v: d.slice(0, 7) } : { err: "“" + v + "” isn’t a month (use YYYY-MM)" }; }
+    case "bool": return { v: /^(y|yes|true|1|done|✓)$/i.test(v) };
+    case "tags": return { v: [...new Set(v.split(/[,;|]/).map(x => x.trim().toLowerCase()).filter(Boolean))] };
+    case "select": {
+      const o = opts(f, {}); const hit = o.find(x => norm(x.v) === norm(v) || norm(x.l) === norm(v));
+      if (hit) return { v: hit.v };
+      const near = o.find(x => norm(x.v).startsWith(norm(v)) || norm(v).startsWith(norm(x.v)));
+      return near ? { v: near.v } : { v: undefined, warn: "“" + v + "” isn’t one of the " + f.l.toLowerCase() + " options, left empty" };
+    }
+    case "user": {
+      const p = activePeople().find(x => norm(x.full_name) === norm(v) || String(x.email).toLowerCase() === v.toLowerCase()) ||
+        (activePeople().filter(x => norm(x.full_name).split(" ")[0] === norm(v).split(" ")[0]).length === 1 ? activePeople().find(x => norm(x.full_name).split(" ")[0] === norm(v).split(" ")[0]) : null);
+      return p ? { v: p.id } : { v: undefined, warn: "no person called “" + v + "”, left empty" };
+    }
+    case "ref": {
+      const r = allRows(f.ref).find(x => norm(REF_LABEL[f.ref](x)) === norm(v) || (x.lead_number && x.lead_number.toLowerCase() === v.toLowerCase()) || (x.name && norm(x.name) === norm(v)) || (x.title && norm(x.title) === norm(v)));
+      return r ? { v: r.id } : { v: undefined, warn: "no " + f.l.toLowerCase() + " called “" + v + "”, left empty" };
+    }
+    default: return { v };
+  }
+}
+function csvDupFinder(key, M){
+  const T = M.table;
+  if (["leads","deals","contacts"].includes(T)) return d => findDuplicate(T, d, M.pipeline);
+  if (T === "clients") return d => d.name ? allRows("clients").find(c => norm(c.name) === norm(d.name)) : null;
+  if (T === "campaigns") return d => d.name ? allRows("campaigns").find(c => norm(c.name) === norm(d.name)) : null;
+  if (T === "seo_keywords") return d => d.keyword ? allRows("seo_keywords").find(c => norm(c.keyword) === norm(d.keyword)) : null;
+  if (T === "social_stats") return d => allRows("social_stats").find(c => c.month === d.month && c.channel === d.channel) || null;
+  return null;
+}
+
+/* ---- the import dialog ---- */
+async function openCsvImport(key){
+  const M = MOD[key];
+  await ensure([M.table, ...(M.needs || [])]);
+  const fields = csvFields(M);
+  const st = { file: "", rows: [], headers: [], map: [], dupMode: "skip", keepExtra: M.table === "leads" };
+  const body = h("div", {});
+  const drop = h("label", { class: "dropzone" },
+    h("input", { type: "file", accept: ".csv,text/csv,text/plain", hidden: true, onchange: e => e.target.files[0] && readFile(e.target.files[0]) }),
+    h("b", {}, "Choose a CSV file"), h("span", { class: "muted" }, " or drop it here. Export from Excel or Google Sheets as “CSV (comma separated)”."));
+  ["dragover","dragenter"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", e => { const f = e.dataTransfer && e.dataTransfer.files[0]; if (f) readFile(f); });
+  const intro = h("div", {},
+    h("p", { style: "margin:0 0 10px" }, "Add many " + M.label.toLowerCase() + " at once. The first row must be column names; they’re matched to fields automatically and you can change any match."),
+    drop,
+    h("p", { class: "muted", style: "font-size:13px;margin:10px 0 0" }, "Not sure of the format? ", h("button", { type: "button", class: "linkbtn", onclick: () => csvTemplate(key) }, "Download a template"), " with the right columns."));
+  body.append(intro);
+
+  async function readFile(file){
+    const text = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result || "")); fr.onerror = () => rej(fr.error); fr.readAsText(file); });
+    const all = csvParse(text);
+    if (all.length < 2){ toast("That file has no rows under the header."); return; }
+    st.file = file.name; st.headers = all[0].map(x => String(x).trim()); st.rows = all.slice(1);
+    const used = new Set();
+    st.map = st.headers.map(hd => { const k = guessField(hd, fields.filter(f => !used.has(f.k))); if (k) used.add(k); return k || ""; });
+    drawMapping();
+  }
+  function drawMapping(){
+    body.replaceChildren();
+    const mapRows = st.headers.map((hd, i) => {
+      const sel = h("select", { class: "in", "aria-label": "Field for " + hd }, h("option", { value: "" }, st.keepExtra ? "Keep as extra answer" : "Don’t import"), fields.map(f => h("option", { value: f.k }, f.l + (f.req ? " *" : ""))));
+      sel.value = st.map[i] || ""; sel.addEventListener("change", () => { st.map[i] = sel.value; drawPreview(); });
+      const sample = st.rows.slice(0, 3).map(r => r[i]).filter(x => x !== undefined && String(x).trim() !== "").join(" · ");
+      return h("tr", {}, h("td", {}, h("b", {}, hd || "(no name)")), h("td", { class: "muted", style: "font-size:12.5px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" }, sample), h("td", {}, sel));
+    });
+    const dupFinder = csvDupFinder(key, M);
+    body.append(h("p", { style: "margin:0 0 8px" }, h("b", {}, st.file), " · " + st.rows.length + " row" + (st.rows.length === 1 ? "" : "s")),
+      h("div", { class: "tablewrap", style: "max-height:300px;overflow:auto" }, h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Column in your file"), h("th", {}, "First values"), h("th", {}, "Import into"))), h("tbody", {}, mapRows))),
+      dupFinder ? h("div", { class: "fl", style: "margin-top:12px" }, "If a row matches something already here (same " + (["leads","deals","contacts"].includes(M.table) ? "email or phone" : "name") + ")",
+        segmented([["skip","Skip it"], ["update","Update it"], ["add","Add anyway"]], st.dupMode, v => { st.dupMode = v; drawPreview(); })) : null,
+      M.table === "leads" ? h("label", { class: "chk", style: "margin-top:10px" }, h("input", { type: "checkbox", checked: st.keepExtra, onchange: e => { st.keepExtra = e.target.checked; drawMapping(); } }), "Keep columns that don’t match a field as extra answers on the lead") : null,
+      h("div", { id: "csvPreview", style: "margin-top:14px" }));
+    drawPreview();
+  }
+  function plan(){
+    const dupFinder = csvDupFinder(key, M);
+    const out = [];
+    st.rows.forEach((r, idx) => {
+      const d = {}, warns = [], errs = [], extra = [];
+      st.headers.forEach((hd, i) => {
+        const k = st.map[i], raw = r[i];
+        if (!k){ if (st.keepExtra && raw != null && String(raw).trim() !== "") extra.push({ key: norm(hd).replace(/ /g, "_").slice(0, 64) || "col_" + i, label: hd || "Column " + (i + 1), value: String(raw).trim() }); return; }
+        const f = fields.find(x => x.k === k);
+        const c = convertCell(f, raw, M);
+        if (c.err) errs.push(f.l + ": " + c.err); if (c.warn) warns.push(f.l + ": " + c.warn);
+        if (c.v !== undefined) d[k] = c.v;
+      });
+      for (const f of fields){
+        if (d[f.k] !== undefined) continue;
+        if (f.def !== undefined){ const dv = typeof f.def === "function" ? f.def() : f.def; if (dv !== undefined && dv !== null && dv !== "") d[f.k] = dv; }
+      }
+      for (const f of fields) if (f.req && (d[f.k] === undefined || d[f.k] === "" || d[f.k] === null) && (!f.show || f.show(d))) errs.push("“" + f.l + "” is missing");
+      if (extra.length) d.form_submissions = [{ form_name: "csv_import", form_title: "Imported from " + st.file, page_url: "", utm: {}, fields: extra, submitted_at: new Date().toISOString() }];
+      const dup = !errs.length && dupFinder ? dupFinder(d) : null;
+      out.push({ line: idx + 2, d, warns, errs, dup });
+    });
+    // duplicates inside the file itself
+    if (dupFinder){
+      const seen = new Map();
+      for (const p of out){ if (p.errs.length) continue; const k = String(p.d.email || "").toLowerCase() || normPhone(p.d.phone) || norm(p.d.name || p.d.keyword || p.d.title || ""); if (!k) continue; if (seen.has(k)) p.inFileDup = seen.get(k); else seen.set(k, p.line); }
+    }
+    return out;
+  }
+  function drawPreview(){
+    const box = body.querySelector("#csvPreview"); if (!box) return;
+    const p = plan();
+    const bad = p.filter(x => x.errs.length), dups = p.filter(x => !x.errs.length && (x.dup || x.inFileDup));
+    const willAdd = p.filter(x => !x.errs.length && !x.dup && !x.inFileDup).length + (st.dupMode === "add" ? dups.length : 0);
+    const willUpd = st.dupMode === "update" ? dups.filter(x => x.dup).length : 0;
+    const willSkip = st.dupMode === "skip" ? dups.length : st.dupMode === "update" ? dups.filter(x => !x.dup).length : 0;
+    const warnN = p.filter(x => x.warns.length).length;
+    const shown = fields.filter(f => st.map.includes(f.k)).slice(0, 6);
+    box.replaceChildren(
+      statStrip([["Will be added", willAdd, "var(--ok)"], ["Will be updated", willUpd], ["Duplicates skipped", willSkip, "var(--warn)"], ["Rows with problems", bad.length, bad.length ? "var(--bad)" : null]]),
+      h("div", { class: "tablewrap", style: "max-height:220px;overflow:auto" }, h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Row"), shown.map(f => h("th", {}, f.l)), h("th", {}, "Check"))),
+        h("tbody", {}, p.slice(0, 8).map(x => h("tr", {}, h("td", { class: "muted" }, String(x.line)), shown.map(f => h("td", {}, x.d[f.k] === undefined ? "–" : textOf(f, x.d[f.k]) || "–")),
+          h("td", {}, x.errs.length ? h("span", { class: "pill bad", title: x.errs.join("; ") }, "Problem") : x.dup ? h("span", { class: "pill warn", title: "Matches " + (x.dup.lead_number || x.dup.name || x.dup.title || "") }, "Duplicate") : x.inFileDup ? h("span", { class: "pill warn" }, "Repeats row " + x.inFileDup) : x.warns.length ? h("span", { class: "pill info", title: x.warns.join("; ") }, "Check") : h("span", { class: "pill ok" }, "OK"))))))),
+      p.length > 8 ? h("p", { class: "muted", style: "font-size:12.5px;margin:4px 0 0" }, "Showing the first 8 of " + p.length + " rows.") : null,
+      bad.length ? h("div", { class: "err", style: "margin-top:8px" }, "Rows with problems won’t be imported: " + bad.slice(0, 4).map(x => "row " + x.line + " (" + x.errs[0] + ")").join(", ") + (bad.length > 4 ? "…" : "")) : null,
+      warnN ? h("p", { class: "muted", style: "font-size:12.5px;margin:6px 0 0" }, warnN + " row" + (warnN === 1 ? " has" : "s have") + " a value we couldn’t match; that cell is left empty. Hover “Check” to see it.") : null);
+    importBtn.textContent = "Import " + (willAdd + willUpd) + " " + (willAdd + willUpd === 1 ? M.one : M.label.toLowerCase());
+    importBtn.disabled = willAdd + willUpd === 0;
+    importBtn.hidden = false;
+  }
+  const importBtn = h("button", { type: "button", class: "btn pri", hidden: true }, "Import");
+  importBtn.addEventListener("click", async () => {
+    const p = plan();
+    const toAdd = p.filter(x => !x.errs.length && (!(x.dup || x.inFileDup) || st.dupMode === "add"));
+    const toUpd = st.dupMode === "update" ? p.filter(x => !x.errs.length && x.dup) : [];
+    const failed = p.filter(x => x.errs.length).map(x => ({ line: x.line, why: x.errs.join("; ") }));
+    importBtn.disabled = true;
+    const bar = h("div", { class: "bar", style: "height:8px;margin-top:10px" }, h("span", { class: "b2", style: "width:0%;background:var(--p)" }));
+    const label = h("p", { class: "muted", style: "font-size:13px;margin:6px 0 0" }, "Importing…");
+    body.append(bar, label);
+    const total = toAdd.length + toUpd.length; let done = 0, added = 0, updated = 0;
+    const tick = () => { bar.firstChild.style.width = (total ? done / total * 100 : 100) + "%"; label.textContent = "Importing… " + done + " of " + total; };
+    for (let i = 0; i < toAdd.length; i += 100){
+      const chunk = toAdd.slice(i, i + 100);
+      const payload = chunk.map(x => { const d = { ...x.d }; if (M.before) M.before(d, null); if (M.personal) d.user_id = S.me.id; return d; });
+      try {
+        const saved = ok(await sb.from(M.table).insert(payload).select());
+        for (const r of saved || []) upsertCache(M.table, r);
+        added += (saved || []).length;
+      } catch (e) {
+        // fall back to one by one, so one bad row doesn't stop the rest
+        for (let j = 0; j < chunk.length; j++){
+          try { const r = await insertRow(M.table, payload[j]); added++; } catch (e2) { failed.push({ line: chunk[j].line, why: friendly(e2) }); }
+        }
+      }
+      done += chunk.length; tick();
+    }
+    for (const x of toUpd){
+      const d = {}; for (const [k, v] of Object.entries(x.d)) if (v !== undefined && v !== "" && !(Array.isArray(v) && !v.length)) d[k] = v;
+      if (d.form_submissions) d.form_submissions = [...(x.dup.form_submissions || []), ...d.form_submissions].slice(-20);
+      try { await updateRow(M.table, x.dup.id, d); updated++; } catch (e) { failed.push({ line: x.line, why: friendly(e) }); }
+      done++; tick();
+    }
+    bar.remove(); label.remove();
+    const skipped = p.length - added - updated - failed.length;
+    body.replaceChildren(h("div", { class: "panel", style: "background:var(--ok-t);border-color:transparent" },
+      h("b", {}, "Import finished. "), added + " added, " + updated + " updated" + (skipped > 0 ? ", " + skipped + " duplicates skipped" : "") + (failed.length ? ", " + failed.length + " not imported." : ".")),
+      failed.length ? h("div", { style: "margin-top:10px" }, h("p", { style: "margin:0 0 6px" }, "Rows not imported:"),
+        h("ul", { style: "margin:0 0 8px;padding-left:20px;font-size:13px" }, failed.slice(0, 10).map(f => h("li", {}, "Row " + f.line + ": " + f.why))),
+        h("button", { type: "button", class: "btn sm", onclick: () => downloadText(M.label.replace(/\s+/g, "-").toLowerCase() + "-problem-rows.csv", csvString([["Row in your file", "Problem", ...st.headers], ...failed.map(f => [f.line, f.why, ...(st.rows[f.line - 2] || [])])])) }, "Download the problem rows")) : null);
+    importBtn.hidden = true; cancelBtn.textContent = "Done";
+    if (added || updated){ logActivityImport(M, added, updated); rerender(); }
+  });
+  const cancelBtn = h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel");
+  openDialog("Import " + M.label.toLowerCase() + " from CSV", [body], [h("span", { class: "sp" }), cancelBtn, importBtn], false);
+}
+function logActivityImport(M, added, updated){
+  try { sb.from("activity_log").insert({ actor_id: S.me.id, tbl: M.table, action: "import", summary: "Imported " + added + " and updated " + updated + " " + M.label.toLowerCase() + " from CSV" }).then(() => {}, () => {}); } catch (e) {}
+}
+
+function csvTemplate(key){
+  const M = MOD[key], fields = csvFields(M);
+  const ex = f => {
+    if (f.t === "select") { const o = opts(f, {}); return o[0] ? o[0].l : ""; }
+    if (f.t === "date") return fmtISOtoIN(addDays(today(), 3));
+    if (f.t === "month") return today().slice(0, 7);
+    if (["money","number"].includes(f.t)) return "250000";
+    if (f.t === "int") return "5";
+    if (f.t === "bool") return "No";
+    if (f.t === "user") return S.me.full_name;
+    if (f.t === "email") return "name@example.com";
+    if (f.t === "phone") return "+91 98765 43210";
+    if (f.t === "tags") return "hot, referral";
+    if (f.t === "ref") { const r = allRows(f.ref)[0]; return r ? REF_LABEL[f.ref](r) : ""; }
+    if (f.k === "name") return "Priya Sharma";
+    if (f.k === "company") return "Sunrise Foods";
+    if (f.k === "city") return "Palampur";
+    return "";
+  };
+  downloadText(M.label.replace(/\s+/g, "-").toLowerCase() + "-template.csv", csvString([fields.map(f => f.l), fields.map(ex)]));
+}
+const fmtISOtoIN = d => d ? d.slice(8, 10) + "/" + d.slice(5, 7) + "/" + d.slice(0, 4) : "";
+function exportCsv(key){
+  const M = MOD[key];
+  let rs = applyFilters(M, moduleRows(M));
+  if (M.sort) rs = rs.slice().sort(M.sort);
+  const fields = csvFields(M);
+  const extraCols = [];
+  if (M.keyOf) extraCols.push(["ID", r => M.keyOf(r)]);
+  if (M.table === "leads") extraCols.push(["Last contacted", r => r.last_contacted_at ? r.last_contacted_at.slice(0, 10) : ""], ["Added", r => String(r.created_at || "").slice(0, 10)],
+    ["Form answers", r => (r.form_submissions || []).map(s => (s.form_title || s.form_name) + ": " + (s.fields || []).map(f => f.label + " = " + (Array.isArray(f.value) ? f.value.join("/") : f.value)).join("; ")).join(" | ")]);
+  const out = [[...extraCols.map(c => c[0]), ...fields.map(f => f.l)]];
+  for (const r of rs) out.push([...extraCols.map(c => c[1](r)), ...fields.map(f => {
+    const v = r[f.k];
+    if (v == null) return "";
+    if (["money","number","int"].includes(f.t)) return String(v);
+    if (f.t === "date") return v;
+    if (f.t === "tags") return (v || []).join(", ");
+    if (f.t === "bool") return v ? "Yes" : "No";
+    return textOf(f, v);
+  })]);
+  downloadText(M.label.replace(/\s+/g, "-").toLowerCase() + "-" + today() + ".csv", csvString(out));
+  toast("Exported " + rs.length + " " + (rs.length === 1 ? M.one : M.label.toLowerCase()) + ".");
 }
 /* ---------------------------------------------------------------------
    Admin panel
@@ -3676,6 +4310,8 @@ function renderAdminSettings(el){
   const days = [[1,"Mon"],[2,"Tue"],[3,"Wed"],[4,"Thu"],[5,"Fri"],[6,"Sat"],[0,"Sun"]].map(([n, l]) => { const c = h("input", { type: "checkbox", value: String(n), checked: (s.working_days || [1,2,3,4,5,6]).includes(n) }); return [c, h("label", { class: "chk", style: "min-height:30px" }, c, l)]; });
   const types = h("input", { class: "in", value: (s.leave_types || ["Paid leave","Sick leave","Work from home","Unpaid leave"]).join(", ") });
   const annual = h("input", { class: "in", type: "number", min: "0", value: String(s.annual_leave ?? 12) });
+  const leadTypesIn = h("input", { class: "in", value: (s.lead_types || ["Client","Vendor","Rider","Customer","Partner"]).join(", ") });
+  const zonesIn = h("input", { class: "in", value: (s.zones || []).join(", "), placeholder: "e.g. Palampur, Dharamshala, Kangra" });
   const curY = today().slice(0, 4);
   const thisYear = h("input", { class: "in", type: "number", min: "0", placeholder: "Same as normal", value: (s.leave_overrides || {})[curY] != null ? String(s.leave_overrides[curY]) : "" });
   const counted = h("input", { class: "in", value: (s.counted_leave_types || ["Paid leave","Sick leave"]).join(", ") });
@@ -3694,7 +4330,8 @@ function renderAdminSettings(el){
     const counted_leave_types = counted.value.split(",").map(x => x.trim()).filter(Boolean);
     const leave_overrides = { ...(s.leave_overrides || {}) };
     if (thisYear.value === "") delete leave_overrides[curY]; else leave_overrides[curY] = Math.max(0, +thisYear.value);
-    const data = { ...s, company: company.value.trim() || "Company", currency: currency.value, working_days: days.filter(([c]) => c.checked).map(([c]) => +c.value), leave_types, annual_leave: +annual.value || 0, leave_overrides, counted_leave_types, holidays };
+    const splitList = v => [...new Set(v.split(",").map(x => x.trim()).filter(Boolean))];
+    const data = { ...s, company: company.value.trim() || "Company", currency: currency.value, working_days: days.filter(([c]) => c.checked).map(([c]) => +c.value), leave_types, annual_leave: +annual.value || 0, leave_overrides, counted_leave_types, holidays, lead_types: splitList(leadTypesIn.value), zones: splitList(zonesIn.value) };
     delete data.leave_quota;
     save.disabled = true;
     try { ok(await sb.from("settings").upsert({ id: 1, data, updated_at: new Date().toISOString() })); S.settings = data; toast("Settings saved."); renderShell(); }
@@ -3705,6 +4342,8 @@ function renderAdminSettings(el){
     h("div", { class: "panel" }, h("h2", {}, "Company"), h("div", { class: "form" }, h("label", { class: "fl full" }, "Company name", company), h("label", { class: "fl" }, "Currency", currency)),
       h("div", { class: "fl", style: "margin-top:12px" }, "Working days", h("div", { style: "display:flex;gap:12px;flex-wrap:wrap" }, days.map(([, l]) => l)))),
     h("div", { class: "panel" }, h("h2", {}, "Leave"), h("div", { class: "form" },
+      h("label", { class: "fl" }, "Lead types (Sales and Marketing)", leadTypesIn, h("span", { class: "hint" }, "Comma separated, e.g. Client, Vendor, Rider, Customer.")),
+      h("label", { class: "fl" }, "Zones (optional)", zonesIn, h("span", { class: "hint" }, "Areas you assign leads and clients to. Leave empty to hide the Zone field.")),
       h("label", { class: "fl" }, "Normal leaves per year", annual, h("span", { class: "hint" }, "Everyone’s balance resets to this on 1 January. Unused days don’t carry over.")),
       h("label", { class: "fl" }, "Allowance for " + curY + " only", thisYear, h("span", { class: "hint" }, "Optional. Overrides the normal number for " + curY + ". Leave empty to use the normal number.")), h("label", { class: "fl" }, "Types that count against it", counted, h("span", { class: "hint" }, "Comma separated. Others, like work from home, don’t reduce the balance.")),
       h("label", { class: "fl full" }, "All leave types (comma separated)", types))),
@@ -3736,8 +4375,8 @@ async function renderAdminActivity(el){
 const NAV = [
   ["", [["dashboard","Home"], ["overview","Company overview"], ["tasks","Tasks"], ["notes","Notes"], ["calendar","Calendar"], ["team-calendar","Team calendar"]]],
   ["Development", [["dev","Dev dashboard"], ["projects","Projects"], ["sprints","Sprints"], ["releases","Releases"], ["tickets","Support tickets"]]],
-  ["Sales", [["sales","Sales dashboard"], ["deals","Pipeline"], ["leads","Leads"], ["clients","Clients"], ["contacts","Contacts"], ["activities","Activities"], ["proposals","Proposals"], ["targets","Targets"]]],
-  ["Marketing", [["marketing","Marketing dashboard"], ["leads","Leads"], ["campaigns","Campaigns"], ["content","Content calendar"], ["seo_keywords","SEO keywords"], ["social_stats","Social media"]]],
+  ["Sales", [["sales","Sales dashboard"], ["deals","Pipeline"], ["leads","Leads"], ["ig_leads","Instagram leads"], ["clients","Clients"], ["contacts","Contacts"], ["activities","Activities"], ["proposals","Proposals"], ["targets","Targets"], ["crm-analytics","Analytics"]]],
+  ["Marketing", [["marketing","Marketing dashboard"], ["leads","Leads"], ["ig_leads","Instagram leads"], ["campaigns","Campaigns"], ["content","Content calendar"], ["seo_keywords","SEO keywords"], ["social_stats","Social media"], ["crm-analytics","Analytics"]]],
   ["Company", [["people","People"], ["leave_requests","Leave"], ["holidays","Holidays"], ["attendance","Attendance"], ["meetings","Meetings"], ["announcements","Announcements"], ["documents","Documents"]]],
   ["Admin", [["admin-users","Admin panel"]]]
 ];
@@ -3748,6 +4387,7 @@ function canSee(route){
   if (route === "sales") return isAdmin() || S.me.vertical === "Sales" || lvl("sales") >= 1;
   if (route === "marketing") return isAdmin() || S.me.vertical === "Marketing" || lvl("marketing") >= 1;
   if (route.startsWith("admin-")) return !!S.me.is_admin;
+  if (route === "crm-analytics") return lvl("sales") >= 1 || lvl("leads") >= 1 || lvl("marketing") >= 1;
   const M = MOD[route]; if (!M) return false;
   return access(M).canView;
 }
@@ -3769,7 +4409,9 @@ function renderShell(){
     h("a", { class: "brand", href: "#dashboard", "aria-label": (S.settings.company || "Tcipher") + " workspace home" }, h("img", { src: LOGO_WHITE, alt: "Tcipher", class: "brand-logo" }), h("span", { class: "brand-tag" }, "Workspace")));
   const nav = h("nav", { class: "nav", "aria-label": "Main" });
   for (const [group, items] of NAV){
-    const visible = items.filter(([r]) => canSee(r) && !(r === "leads" && ((group === "Sales" && !(isAdmin() || lvl("sales") >= 1)) || (group === "Marketing" && !(isAdmin() || lvl("marketing") >= 1)))));
+    // items shared by Sales and Marketing show under your own team only (admins see them under both)
+    const shared = ["leads","ig_leads","crm-analytics"];
+    const visible = items.filter(([r]) => canSee(r) && !(shared.includes(r) && ((group === "Sales" && !(isAdmin() || lvl("sales") >= 1)) || (group === "Marketing" && !(isAdmin() || lvl("marketing") >= 1)))));
     if (!visible.length) continue;
     nav.append(h("div", { class: "nav-group" }, group ? h("h4", {}, group) : null, visible.map(([r, l]) => {
       const badge = navBadge(r);
@@ -3824,6 +4466,7 @@ async function rerender(){
     else if (route === "team-calendar") await renderTeamCalendar(page);
     else if (route === "holidays") renderHolidays(page);
     else if (route === "admin-activity") await renderAdminActivity(page);
+    else if (route === "crm-analytics") await renderCrmAnalytics(page);
     else if (MOD[route]) await renderModule(route, page);
     else page.append(h("div", { class: "panel empty" }, h("b", {}, "Page not found"), h("a", { href: "#dashboard" }, "Go to the dashboard")));
   } catch (e) {
