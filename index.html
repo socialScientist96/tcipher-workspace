@@ -543,7 +543,7 @@ let sb = null, channel = null;
    --------------------------------------------------------------------- */
 const ORDER = {
   profiles: ["full_name", true], roles: ["name", true], targets: ["month", false], social_stats: ["month", false], activities: ["activity_date", false],
-  meetings: ["meeting_date", false], attendance: ["day", false], meeting_joins: ["joined_at", false], notes: ["updated_at", false], tasks: ["created_at", false], time_entries: ["work_date", false],
+  meetings: ["meeting_date", false], attendance: ["day", false], meeting_joins: ["joined_at", false], notes: ["updated_at", false], tasks: ["created_at", false], google_links: ["connected_at", false], calendar_events: ["start_date", true], settings: ["id", true], time_entries: ["work_date", false],
   activity_log: ["at", false], notifications: ["created_at", false], invoices: ["issue_date", false],
   leave_requests: ["start_date", false], expenses: ["spent_on", false]
 };
@@ -2848,7 +2848,10 @@ function connectGoogle(){
       client_id: GOOGLE_CLIENT_ID, scope: G_SCOPES, ux_mode: "popup", prompt: "consent", hint: S.me.email,
       callback: async r => {
         if (r.error) { fail(new Error(r.error_description || r.error), "Google not connected"); resolve(false); return; }
-        try { const res = await callGoogle("connect", { code: r.code }); await refreshGoogleData(); toast("Google connected" + (res.email ? " as " + res.email : "") + ". Your calendar now syncs automatically."); rerender(); resolve(true); }
+        try { const res = await callGoogle("connect", { code: r.code }); await refreshGoogleData();
+          if (res.warning) toast("Google connected" + (res.email ? " as " + res.email : "") + ", but the first sync failed: " + res.warning);
+          else toast("Google connected" + (res.email ? " as " + res.email : "") + ". " + (res.events || 0) + " events synced; it now updates automatically.");
+          rerender(); resolve(true); }
         catch (e) { fail(e, "Google not connected"); resolve(false); }
       },
       error_callback: e => { toast(e && e.type === "popup_failed_to_open" ? "Your browser blocked the Google pop-up. Allow pop-ups for this site and try again." : "Google sign-in was closed before finishing."); resolve(false); }
@@ -2863,8 +2866,8 @@ async function disconnectGoogle(){
 async function syncGoogleNow(quiet){
   if (!googleConnected() || G.syncing) return;
   G.syncing = true;
-  try { await callGoogle("sync"); await refreshGoogleData(); if (!quiet) toast("Google Calendar synced."); rerender(); }
-  catch (e) { if (!quiet) fail(e, "Sync failed"); else console.warn("google sync", e); }
+  try { const r = await callGoogle("sync"); await refreshGoogleData(); if (!quiet) toast("Google Calendar synced: " + ((r && r.events) || 0) + " events from the last 7 days and next 45 days."); rerender(); }
+  catch (e) { await refreshGoogleData().catch(() => {}); if (!quiet) fail(e, "Sync failed"); else console.warn("google sync", e); renderShell(); }
   finally { G.syncing = false; }
 }
 // sync when the workspace opens (if it's been a while) and every 15 minutes while it's open
