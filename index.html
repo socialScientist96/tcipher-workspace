@@ -299,7 +299,25 @@ dialog::backdrop{background:rgba(15,12,45,.45)}
 .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(16px);background:var(--p-deep);color:#fff;padding:10px 16px;border-radius:9px;font-weight:600;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:100;max-width:calc(100vw - 32px)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .loading{padding:40px 0;text-align:center;color:var(--ink3)}
-@media (prefers-reduced-motion: reduce){*{transition:none !important}}
+/* smoothness */
+html{scrollbar-gutter:stable}
+.content > .enter{animation:pageIn .18s ease-out}
+@keyframes pageIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+dialog[open]{animation:dlgIn .16s ease-out}
+dialog[open]::backdrop{animation:fadeIn .16s ease-out}
+@keyframes dlgIn{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.btn,.row,.card,.nav a,.load-row,.pcard,.stat,.iconbtn,tbody tr,.ev,.seg button,.nitem{transition:background-color .14s ease,border-color .14s ease,color .14s ease,box-shadow .14s ease,transform .14s ease}
+.card:hover,.pcard:hover,button.stat:hover{transform:translateY(-1px);box-shadow:var(--shadow)}
+.btn:active,.card:active{transform:translateY(0) scale(.99)}
+.npanel:not([hidden]){animation:dlgIn .14s ease-out}
+.toast{transition:opacity .2s ease,transform .2s ease}
+.loading{display:flex;align-items:center;justify-content:center;gap:10px}
+.spinner{width:16px;height:16px;border-radius:50%;border:2px solid var(--tint2);border-top-color:var(--p);animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.side{scroll-behavior:auto;overscroll-behavior:contain}
+.content{min-height:calc(100vh - 60px)}
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{transition:none !important;animation:none !important}}
 </style>
 </head>
 <body>
@@ -1521,9 +1539,10 @@ function boardView(M, rs, A){
       const prev = byId(M.table, id); if (!prev || prev[f.k] === o.v) return;
       const d = { [f.k]: o.v };
       if (M.before) M.before(d, prev);
-      try { const rec = await updateRow(M.table, id, d); if (M.after) M.after(rec, prev); toast("Moved to " + o.l + "."); }
-      catch (err) { fail(err, "Couldn’t move it"); }
-      rerender();
+      const snapshot = { ...prev };
+      Object.assign(prev, d); rerender();          // move the card straight away
+      try { const rec = await updateRow(M.table, id, d); if (M.after) M.after(rec, snapshot); toast("Moved to " + o.l + "."); }
+      catch (err) { Object.assign(prev, snapshot); fail(err, "Couldn’t move it"); rerender(); }
     });
     board.append(col);
   }
@@ -1657,15 +1676,15 @@ async function openRecord(key, id, preset){
       if (v) { err.textContent = v; err.hidden = false; return; }
       if (M.before) M.before(data, rec);
       if (!rec && M.personal) data.user_id = S.me.id;
-      saveBtns.forEach(b => b.disabled = true);
+      saveBtns.forEach(b => { b.disabled = true; b.dataset.label = b.textContent; b.textContent = "Saving…"; });
       try {
         const saved = rec ? await updateRow(M.table, rec.id, data) : await insertRow(M.table, data);
-        if (M.after) M.after(saved, rec);
+        if (thenFiles) openRecord(key, saved.id); else closeDlg();
         toast(rec ? "Saved." : (M.one[0].toUpperCase() + M.one.slice(1)) + " created.");
         rerender();
-        if (thenFiles) openRecord(key, saved.id); else closeDlg();
+        if (M.after) M.after(saved, rec);
       } catch (e) { err.textContent = "Not saved: " + friendly(e); err.hidden = false; }
-      finally { saveBtns.forEach(b => b.disabled = false); }
+      finally { saveBtns.forEach(b => { b.disabled = false; if (b.dataset.label) b.textContent = b.dataset.label; }); }
     };
     const saveBtns = [];
     if (!rec && M.files) { const b = h("button", { type: "button", class: "btn soft", onclick: () => save(true) }, "Create and attach files"); saveBtns.push(b); foot.push(b); }
@@ -2636,6 +2655,18 @@ function badgeFor(route){
 }
 function renderShell(){
   const side = $("side");
+  const label0 = (NAV.flatMap(([, i]) => i).find(([r]) => r === S.route) || [null, S.route.startsWith("admin-") ? "Admin panel" : ""])[1];
+  $("crumb").textContent = label0 || "";
+  const unread0 = S.notifications.filter(n => !n.is_read).length;
+  const dot0 = $("bell").querySelector(".dot");
+  dot0.hidden = !unread0; dot0.textContent = unread0 > 9 ? "9+" : String(unread0);
+  // rebuild the sidebar only when something in it actually changed
+  const role = byId("roles", S.me.role_id);
+  const key = JSON.stringify([S.route, S.me.full_name, S.me.vertical, S.me.is_admin, role && role.permissions, S.settings.company,
+    NAV.flatMap(([, i]) => i).map(([r]) => badgeFor(r))]);
+  if (key === shellKey && side.children.length) return;
+  shellKey = key;
+  const keepScroll = side.scrollTop;
   side.replaceChildren(
     h("a", { class: "brand", href: "#dashboard", "aria-label": (S.settings.company || "Tcipher") + " workspace home" }, h("img", { src: LOGO_WHITE, alt: "Tcipher", class: "brand-logo" }), h("span", { class: "brand-tag" }, "Workspace")));
   const nav = h("nav", { class: "nav", "aria-label": "Main" });
@@ -2652,11 +2683,8 @@ function renderShell(){
     h("button", { type: "button", class: "who", style: "background:none;border:0;text-align:left;padding:0;cursor:pointer", onclick: openMyProfile, title: "My profile" },
       h("b", {}, S.me.full_name), h("span", {}, S.me.is_admin ? "Admin, all verticals" : [S.me.vertical, refLabel("roles", S.me.role_id)].filter(Boolean).join(" · ") || "Employee")),
     h("button", { type: "button", onclick: () => sb.auth.signOut() }, "Sign out")));
-  const label = (NAV.flatMap(([, i]) => i).find(([r]) => r === S.route) || [null, S.route.startsWith("admin-") ? "Admin panel" : ""])[1];
-  $("crumb").textContent = label || "";
-  const unread = S.notifications.filter(n => !n.is_read).length;
-  const dot = $("bell").querySelector(".dot");
-  dot.hidden = !unread; dot.textContent = unread > 9 ? "9+" : String(unread);
+  side.scrollTop = keepScroll;
+
 }
 
 function go(route){ if (location.hash !== "#" + route) location.hash = route; else rerender(); }
@@ -2671,7 +2699,13 @@ async function rerender(){
   const caret = focused && document.activeElement.selectionStart;
   const sy = window.scrollY;
   const page = h("div", {});
-  if (lastRoute !== route) el.replaceChildren(h("div", { class: "loading" }, "Loading…"));
+  const changingPage = lastRoute !== route;
+  if (changingPage){
+    // only show a loading message if the page takes a noticeable time
+    clearTimeout(loadingT);
+    loadingT = setTimeout(() => { if (seq === renderSeq) el.replaceChildren(h("div", { class: "loading" }, h("span", { class: "spinner", "aria-hidden": "true" }), "Loading…")); }, 250);
+    page.className = "enter";
+  }
   try {
     if (!canSee(route)) page.append(noAccess());
     else if (route === "dashboard") await renderDashboard(page);
@@ -2693,13 +2727,14 @@ async function rerender(){
     page.replaceChildren(h("div", { class: "panel empty" }, h("b", {}, "Something went wrong showing this page"), friendly(e)));
   }
   if (seq !== renderSeq) return;
+  clearTimeout(loadingT);
   el.replaceChildren(page);
   if (lastRoute === route) window.scrollTo(0, sy);
   else window.scrollTo(0, 0);
   lastRoute = route;
   if (focused){ setTimeout(() => { const f = $(focused); if (f) { f.focus(); try { f.setSelectionRange(caret, caret); } catch (e) {} } }, 0); }
 }
-let lastRoute = null;
+let lastRoute = null, loadingT = null, shellKey = "";
 
 /* ---------------------------------------------------------------------
    Notifications
@@ -2745,10 +2780,13 @@ function onChange(payload){
   clearTimeout(liveT);
   liveT = setTimeout(async () => {
     const list = [...pendingTables]; pendingTables.clear();
+    let changed = false;
     for (const x of list){
-      if (x === "settings") { await loadSettings(); continue; }
-      await load(x, true);
+      const before = JSON.stringify(x === "settings" ? S.settings : (S.cache[x] || null));
+      if (x === "settings") await loadSettings(); else await load(x, true);
+      if (JSON.stringify(x === "settings" ? S.settings : (S.cache[x] || null)) !== before) changed = true;
     }
+    if (!changed) return;   // our own save already updated the screen
     if (list.includes("profiles") || list.includes("roles")){
       const me = person(S.me.id);
       if (me) S.me = me;
@@ -2778,6 +2816,7 @@ async function startSession(session){
     document.title = (S.settings.company || "Workspace") + " – Workspace";
     showScreen("app");
     loadNotifications();
+    setTimeout(prefetch, 1200);
     if (!channel){
       channel = sb.channel("ws-live").on("postgres_changes", { event: "*", schema: "public" }, onChange).subscribe();
     }
@@ -2788,7 +2827,14 @@ async function startSession(session){
     $("loginErr").hidden = false; showScreen("login");
   }
 }
+// Quietly load every section this person can open, so switching pages is instant.
+async function prefetch(){
+  const want = new Set(["attendance","leave_requests","meetings","announcements","tasks"]);
+  for (const M of Object.values(MOD)) if (access(M).canView) { want.add(M.table); (M.needs || []).forEach(t => want.add(t)); }
+  for (const t of want){ if (!S.me) return; if (!S.loaded.has(t)) await load(t); }
+}
 function endSession(){
+  shellKey = "";
   if (channel) { sb.removeChannel(channel); channel = null; }
   S.me = null; S.cache = {}; S.loaded = new Set(); S.notifications = [];
   closeDlg(); showScreen("login");
