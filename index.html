@@ -236,6 +236,13 @@ a.tkey:hover{background:var(--tint2)}
 .day{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:8px;padding:7px 12px;font-weight:600;color:var(--ink);cursor:pointer;background:#fff}
 .day:has(input:checked){background:var(--tint);border-color:var(--tint3);color:var(--p-ink)}
 .day input{accent-color:var(--p);width:15px;height:15px}
+.diff{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:2px 0 10px 32px;font-size:13px}
+.diff>div{border-radius:8px;padding:8px 10px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:220px;overflow:auto}
+.diff .was{background:var(--bad-t)} .diff .now{background:var(--ok-t)}
+.diff b{display:block;font-size:12px;margin-bottom:4px}
+@media (max-width:600px){.diff{grid-template-columns:1fr;margin-left:0}}
+.linkbtn{background:none;border:0;color:var(--p);font-weight:600;cursor:pointer;padding:0;font:inherit;font-size:12.5px}
+.section > .seg{margin-bottom:8px}
 .hday{flex:none;width:44px;height:44px;border-radius:10px;background:var(--tint);color:var(--p-ink);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
 .hday b{font-size:16px}
 .hday small{font-size:11px;font-weight:600;text-transform:uppercase;margin-top:2px}
@@ -524,8 +531,9 @@ const ORDER = {
 };
 const LIMIT = { activity_log: 300, notifications: 60, attendance: 3000, meeting_joins: 4000 };
 
-const rows = t => S.cache[t] || [];
-const byId = (t, id) => id ? rows(t).find(r => r.id === id) : null;
+const rows = t => t === "tasks" ? (S.cache.tasks || []).filter(r => !r.archived) : (S.cache[t] || []);
+const allRows = t => S.cache[t] || [];
+const byId = (t, id) => id ? allRows(t).find(r => r.id === id) : null;
 const ok = res => { if (res.error) throw res.error; return res.data; };
 
 async function load(t, force){
@@ -778,6 +786,10 @@ const REPEATS = [["Does not repeat", "Does not repeat"], ["Every weekday", "Ever
 const DAY_NAMES = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const dayList = ds => [1,2,3,4,5,6,0].filter(d => (ds || []).includes(d)).map(d => DAY_NAMES[d]).join(", ");
 const repeatText = m => m.repeat === "Selected days" ? dayList(m.repeat_days) : m.repeat === "Every weekday" ? "Every working day" : m.repeat;
+const TASK_WORK_FIELDS = ["status","blocked","blocked_reason","branch","pr_url"];
+const isTaskHandler = v => isAdmin() || ((S.settings.task_handlers || {})[v] || []).includes(S.me.id);
+const workerOnTask = r => !!r && ([r.assignee_id, r.reviewer_id].includes(S.me.id) || (r.collaborators || []).includes(S.me.id));
+const workersCanUpdate = () => S.settings.owners_can_update_status !== false;
 const COMPONENTS = ["Android app","iOS app","Web app","Backend / API","Admin panel","Website","Database","Infrastructure / DevOps","Design system"];
 const LABEL_SUGGESTIONS = {
   Development: ["frontend","backend","api","android","ios","flutter","react","database","performance","security","ui","tech-debt","hotfix"],
@@ -880,14 +892,17 @@ const MOD = {
     needs: ["projects","sprints","releases","notes"], comments: true, files: true, personalCreate: true,
     keyOf: r => taskKey(r),
     searchExtra: r => taskKey(r) + " " + (r.labels || []).join(" ") + " " + (r.branch || ""),
-    canEdit: (rec, L) => isAdmin() || !rec || [rec.assignee_id, rec.reviewer_id, rec.created_by].includes(S.me.id) || (rec.collaborators || []).includes(S.me.id) || (L >= 2 && rec.vertical === S.me.vertical),
-    canDelete: (rec, L) => isAdmin() || (rec && rec.created_by === S.me.id) || (L >= 3 && rec && rec.vertical === S.me.vertical),
+    canEdit: (rec) => !rec || isTaskHandler(rec.vertical) || (workersCanUpdate() && workerOnTask(rec)),
+    canDelete: () => false,                       // tasks are archived, never deleted
+    fieldEditable: (f, rec) => !rec || isTaskHandler(rec.vertical) || TASK_WORK_FIELDS.includes(f.k),
+    allRowsWhen: u => u.quick === "archived",
     quick: [
       ["all", "All"],
       ["mine", "My tasks", t => t.assignee_id === S.me.id],
       ["tagged", "Tagged me", t => (t.mentions || []).includes(S.me.id)],
       ["review", "I’m reviewing", t => t.reviewer_id === S.me.id && t.status !== "Done"],
-      ["helping", "Helping", t => (t.collaborators || []).includes(S.me.id)]
+      ["helping", "Helping", t => (t.collaborators || []).includes(S.me.id)],
+      ["archived", "Archived", t => t.archived]
     ],
     fields: [
       { k: "title", l: "Title", t: "text", req: true, full: true },
@@ -948,6 +963,10 @@ const MOD = {
           h("button", { type: "button", class: "btn ok", onclick: () => reviewTask(rec, true) }, "Approve"),
           h("button", { type: "button", class: "btn danger", onclick: () => reviewTask(rec, false) }, "Send back"));
       else out.push(h("span", { style: "flex:1", class: "muted" }, h("span", { class: "tkey" }, taskKey(rec)), "  ", rec.vertical, (rec.labels || []).length ? " · " + rec.labels.join(", ") : ""));
+      if (rec.archived) out.unshift(h("div", { style: "flex-basis:100%;font-weight:700;color:var(--warn)" }, "Archived" + (rec.archived_by ? " by " + pname(rec.archived_by) : "") + (rec.archived_at ? ", " + fmtAgo(rec.archived_at) : "") + ". It’s hidden from boards; its history is kept."));
+      else if (!isTaskHandler(rec.vertical) && workerOnTask(rec) && workersCanUpdate()) out.unshift(h("div", { style: "flex-basis:100%;font-size:13px;color:var(--ink2)" }, "You can update the status, checklist, blocked flag and code links. Other details are changed by a task handler."));
+      else if (!isTaskHandler(rec.vertical)) out.unshift(h("div", { style: "flex-basis:100%;font-size:13px;color:var(--ink2)" }, "View only. You can comment and attach files; a task handler makes changes."));
+      if (isTaskHandler(rec.vertical)) out.push(h("button", { type: "button", class: "btn sm " + (rec.archived ? "soft" : "danger"), onclick: () => archiveTask(rec, !rec.archived) }, rec.archived ? "Restore" : "Archive"));
       out.push(h("button", { type: "button", class: "btn sm", onclick: () => copyText(taskKey(rec) + " " + rec.title, "Copied") }, "Copy ID"));
       if (access(MOD.tasks).canCreate) out.push(h("button", { type: "button", class: "btn sm", onclick: () => duplicateTask(rec) }, "Duplicate"));
       return out;
@@ -1589,7 +1608,7 @@ function uiFor(key){
 
 function moduleRows(M){
   const u = uiFor(M.key);
-  let rs = rows(M.table);
+  let rs = M.allRowsWhen && M.allRowsWhen(u) ? allRows(M.table) : rows(M.table);
   if (M.personal && u.scope === "mine") rs = rs.filter(r => r.user_id === S.me.id);
   return rs;
 }
@@ -1652,7 +1671,7 @@ async function renderModule(key, el){
     sel.addEventListener("change", () => { u.filters[f.k] = sel.value; drawBody(); });
     tb.append(sel);
   }
-  if (M.quick) tb.append(segmented(M.quick.map(x => [x[0], x[1]]), u.quick || "all", v => { u.quick = v; drawBody(); }));
+  if (M.quick) tb.append(segmented(M.quick.map(x => [x[0], x[1]]), u.quick || "all", v => { const was = u.quick; u.quick = v; if (M.allRowsWhen && (M.allRowsWhen(u) || M.allRowsWhen({ quick: was }))) rerender(); else drawBody(); }));
   const views = M.views || (M.board ? [["board","Board"], ["list","List"]] : null);
   if (views) tb.append(segmented(views, u.view, v => { u.view = v; drawBody(); }));
   const chip = h("span", {});
@@ -1814,7 +1833,7 @@ async function openRecord(key, id, preset){
     if (f.t === "heading"){ const w = h("div", { class: "full fhead" }, f.l); wraps[f.k] = w; form.append(w); continue; }
     let node;
     const approverField = f.approverOnly;
-    const fieldEditable = editable && !f.auto && (!approverField || A.isApprover);
+    const fieldEditable = editable && !f.auto && (!approverField || A.isApprover) && (!M.fieldEditable || M.fieldEditable(f, rec));
     if (approverField && !rec && !A.isApprover) continue;
     if (f.virtual && (!fieldEditable || (f.when && !f.when(values)))) continue;
     if (fieldEditable){ node = fieldInput(f, values[f.k], values); inputs[f.k] = node; }
@@ -1933,7 +1952,7 @@ function commentsSection(tbl, id){
       if (!cs.length) list.append(h("p", { class: "nothing" }, "No comments yet."));
       for (const c of cs) list.append(h("div", { class: "cmt" }, avatar(c.author_id, "sm"),
         h("div", { class: "bd" }, h("div", { class: "hd" }, h("b", {}, pname(c.author_id) || "Someone"), fmtAgo(c.created_at),
-          (c.author_id === S.me.id || S.me.is_admin) ? h("button", { type: "button", class: "del", onclick: async () => { try { ok(await sb.from("comments").delete().eq("id", c.id)); refresh(); } catch (e) { fail(e); } } }, " · Delete") : null),
+          ((c.author_id === S.me.id && tbl !== "tasks") || S.me.is_admin) ? h("button", { type: "button", class: "del", onclick: async () => { try { ok(await sb.from("comments").delete().eq("id", c.id)); refresh(); } catch (e) { fail(e); } } }, " · Delete") : null),
           h("p", {}, renderRich(c.body)))));
     } catch (e) { list.replaceChildren(h("p", { class: "nothing" }, "Comments couldn’t be loaded.")); }
   }
@@ -3048,40 +3067,84 @@ function codeSection(rec){
       rec.design_url ? h("div", { class: "ri" }, h("span", {}, "Design"), h("a", { href: rec.design_url, target: "_blank", rel: "noopener" }, "Open")) : null));
 }
 function historySection(rec){
-  const sec = h("div", { class: "section" }, h("h3", {}, "History"));
+  const sec = h("div", { class: "section" });
   const list = h("div", {}, h("p", { class: "nothing" }, "Loading…"));
-  sec.append(list);
+  let evs = [], view = "all";
   const nm = v => pname(v) || "nobody";
   const arr = v => { try { const a = JSON.parse(v || "[]"); return Array.isArray(a) ? a : []; } catch (e) { return String(v || "").replace(/[{}"]/g, "").split(",").filter(Boolean); } };
-  const describe = e => {
+  const LABELS = { title: "title", description: "description", vertical: "vertical", type: "type", priority: "priority", component: "component", start_date: "start date", due_date: "due date",
+    estimate_hours: "estimate", story_points: "story points", severity: "severity", environment: "found in", reproducibility: "how often", build_version: "build version", device: "device",
+    steps: "steps to reproduce", expected_result: "expected result", actual_result: "actual result", branch: "branch", pr_url: "merge/pull request link", design_url: "design link",
+    blocked_reason: "blocking reason", project_id: "project", sprint_id: "sprint", release_id: "release" };
+  const quote = t => "“" + (String(t).length > 80 ? String(t).slice(0, 77) + "…" : t) + "”";
+  const kind = e => /^comment_/.test(e.field) ? "comments" : /^file_/.test(e.field) ? "files" : "changes";
+  function describe(e){
+    const o = e.old_value, n = e.new_value;
     switch (e.field){
       case "created": return "created the task";
-      case "status": return "moved it from " + e.old_value + " to " + e.new_value;
-      case "assignee_id": return e.new_value ? "assigned it to " + nm(e.new_value) : "removed the owner";
-      case "reviewer_id": return e.new_value ? "set the reviewer to " + nm(e.new_value) : "removed the reviewer";
-      case "priority": return "changed priority from " + e.old_value + " to " + e.new_value;
-      case "due_date": return e.new_value ? "set the due date to " + fmtDate(e.new_value, true) : "removed the due date";
-      case "sprint_id": return e.new_value ? "moved it to " + (refLabel("sprints", e.new_value) || "a sprint") : "took it out of the sprint";
-      case "release_id": return e.new_value ? "planned it for " + (refLabel("releases", e.new_value) || "a release") : "removed it from the release";
-      case "blocked": return e.new_value === "true" ? "marked it blocked" : "unblocked it";
-      case "title": return "renamed it to “" + e.new_value + "”";
-      case "collaborators": {
-        const o = arr(e.old_value), n = arr(e.new_value);
-        const add = n.filter(x => !o.includes(x)).map(nm), rem = o.filter(x => !n.includes(x)).map(nm);
-        return [add.length ? "added " + add.join(", ") : "", rem.length ? "removed " + rem.join(", ") : ""].filter(Boolean).join(" and ") || "changed collaborators";
+      case "status": return "moved it from " + o + " to " + n;
+      case "assignee_id": return n ? "assigned it to " + nm(n) : "removed the owner";
+      case "reviewer_id": return n ? "set the reviewer to " + nm(n) : "removed the reviewer";
+      case "priority": return "changed priority from " + o + " to " + n;
+      case "due_date": return n ? "set the due date to " + fmtDate(n, true) : "removed the due date";
+      case "start_date": return n ? "set the start date to " + fmtDate(n, true) : "removed the start date";
+      case "project_id": return n ? "moved it to project " + (refLabel("projects", n) || "…") : "removed the project";
+      case "sprint_id": return n ? "moved it to " + (refLabel("sprints", n) || "a sprint") : "took it out of the sprint";
+      case "release_id": return n ? "planned it for " + (refLabel("releases", n) || "a release") : "removed it from the release";
+      case "blocked": return n === "true" ? "marked it blocked" : "unblocked it";
+      case "archived": return n === "true" ? "archived the task" : "restored the task";
+      case "title": return "renamed it from " + quote(o) + " to " + quote(n);
+      case "comment_added": return "commented: " + quote(n);
+      case "comment_removed": return "removed a comment: " + quote(o);
+      case "file_added": return "attached " + n;
+      case "file_removed": return "removed the file " + n;
+      case "collaborators": case "blocked_by": case "labels": {
+        const O = arr(o), N = arr(n), show = x => e.field === "collaborators" ? nm(x) : e.field === "blocked_by" ? (taskKey(byId("tasks", x)) || "a task") : x;
+        const add = N.filter(x => !O.includes(x)).map(show), rem = O.filter(x => !N.includes(x)).map(show);
+        const what = e.field === "collaborators" ? "" : e.field === "labels" ? " label" + (add.length + rem.length > 1 ? "s" : "") : " as a dependency";
+        return [add.length ? "added " + add.join(", ") + what : "", rem.length ? "removed " + rem.join(", ") + what : ""].filter(Boolean).join(" and ") || "changed " + e.field;
       }
-      default: return "changed " + e.field;
+      case "checklist": {
+        const O = arr(o), N = arr(n), parts = [];
+        const key = x => x.text;
+        for (const x of N){ const was = O.find(y => key(y) === key(x)); if (!was) parts.push("added step " + quote(x.text)); else if (!!was.done !== !!x.done) parts.push((x.done ? "ticked " : "unticked ") + quote(x.text)); }
+        for (const y of O) if (!N.find(x => key(x) === key(y))) parts.push("removed step " + quote(y.text));
+        return parts.join(", ") || "updated the checklist";
+      }
+      default:
+        if (e.field === "description" || e.field === "steps" || e.field === "expected_result" || e.field === "actual_result") return "edited the " + (LABELS[e.field] || e.field);
+        return "changed the " + (LABELS[e.field] || e.field) + (o || n ? " from " + (o ? quote(o) : "empty") + " to " + (n ? quote(n) : "empty") : "");
     }
-  };
+  }
+  function draw(){
+    list.replaceChildren();
+    const shown = evs.filter(e => view === "all" || kind(e) === view);
+    if (!shown.length) list.append(h("p", { class: "nothing" }, "Nothing here yet."));
+    for (const e of shown){
+      const long = ["description","steps","expected_result","actual_result"].includes(e.field);
+      const row = h("div", { class: "hist" }, avatar(e.actor_id, "sm"), h("span", { class: "x" }, h("b", {}, pname(e.actor_id) || "Someone"), " ", describe(e)), h("span", { class: "y", title: new Date(e.at).toLocaleString("en-IN") }, fmtAgo(e.at)));
+      list.append(row);
+      if (long){
+        const diff = h("div", { class: "diff", hidden: true }, h("div", { class: "was" }, h("b", {}, "Before"), h("div", {}, e.old_value || "(empty)")), h("div", { class: "now" }, h("b", {}, "After"), h("div", {}, e.new_value || "(empty)")));
+        row.querySelector(".x").append(" ", h("button", { type: "button", class: "linkbtn", onclick: ev => { diff.hidden = !diff.hidden; ev.currentTarget.textContent = diff.hidden ? "Show changes" : "Hide changes"; } }, "Show changes"));
+        list.append(diff);
+      }
+    }
+  }
+  sec.append(h("h3", {}, "History", h("span", { class: "muted", style: "font-weight:500;font-size:12.5px" }, "Permanent: can’t be edited or deleted")),
+    segmented([["all","All"], ["changes","Changes"], ["comments","Comments"], ["files","Files"]], view, v => { view = v; draw(); }), list);
   (async () => {
-    try {
-      const evs = ok(await sb.from("task_events").select("*").eq("task_id", rec.id).order("at", { ascending: false }).limit(40)) || [];
-      list.replaceChildren();
-      if (!evs.length) list.append(h("p", { class: "nothing" }, "No changes recorded yet."));
-      for (const e of evs) list.append(h("div", { class: "hist" }, avatar(e.actor_id, "sm"), h("span", { class: "x" }, h("b", {}, pname(e.actor_id) || "Someone"), " ", describe(e)), h("span", { class: "y" }, fmtAgo(e.at))));
-    } catch (e) { list.replaceChildren(h("p", { class: "nothing" }, "History couldn’t be loaded.")); }
+    try { evs = ok(await sb.from("task_events").select("*").eq("task_id", rec.id).order("at", { ascending: false }).limit(200)) || []; draw(); }
+    catch (e) { list.replaceChildren(h("p", { class: "nothing" }, "History couldn’t be loaded.")); }
   })();
   return sec;
+}
+async function archiveTask(rec, archive){
+  if (archive && !confirm("Archive " + (taskKey(rec) || "this task") + "? It disappears from boards and lists, but you can find it under Tasks › Archived and restore it. Its history is kept.")) return;
+  try {
+    await updateRow("tasks", rec.id, archive ? { archived: true, archived_at: new Date().toISOString(), archived_by: S.me.id } : { archived: false, archived_at: null, archived_by: null });
+    toast(archive ? "Archived." : "Restored."); closeDlg(); rerender();
+  } catch (e) { fail(e, archive ? "Couldn’t archive" : "Couldn’t restore"); }
 }
 function linkedNotesSection(field, rec){
   const ns = rows("notes").filter(n => n[field] === rec.id);
@@ -3147,7 +3210,7 @@ async function callAdmin(body){
 }
 
 function adminHeader(el, title, desc, actions){
-  const tabs = [["admin-users","Users"], ["admin-roles","Roles & permissions"], ["admin-settings","Company settings"], ["admin-activity","Activity log"]];
+  const tabs = [["admin-users","Users"], ["admin-roles","Roles & permissions"], ["admin-tasks","Task rules"], ["admin-settings","Company settings"], ["admin-activity","Activity log"]];
   el.append(h("div", { class: "ph" }, h("div", {}, h("h1", {}, title), h("p", {}, desc)), actions ? h("div", { class: "acts" }, actions) : null));
   el.append(h("div", { class: "tb" }, h("div", { class: "seg", role: "tablist" }, tabs.map(([r, l]) => h("button", { type: "button", "aria-pressed": String(S.route === r), onclick: () => go(r) }, l)))));
 }
@@ -3321,6 +3384,47 @@ function editRole(id){
 }
 async function deleteRoleRow(id){ ok(await sb.from("roles").delete().eq("id", id)); S.cache.roles = rows("roles").filter(r => r.id !== id); await load("profiles", true); }
 
+function renderAdminTaskRules(el){
+  adminHeader(el, "Task rules", "Choose who handles tasks in each vertical. Handlers can change anything on a task and archive it.");
+  const handlers = clone(S.settings.task_handlers || {});
+  const boxes = {};
+  const people = activePeople().filter(p => !p.is_admin);
+  const cols = VERTICALS.map(v => {
+    const list = people.slice().sort((a, b) => ((b.vertical === v) - (a.vertical === v)) || a.full_name.localeCompare(b.full_name));
+    boxes[v] = list.map(p => [p.id, h("input", { type: "checkbox", value: p.id, checked: (handlers[v] || []).includes(p.id) })]);
+    return h("div", { class: "panel" }, h("h2", {}, v),
+      h("p", { class: "muted", style: "margin:-6px 0 10px;font-size:13px" }, "Admins are always handlers."),
+      h("div", { class: "multi", style: "max-height:320px" }, list.map((p, i) => h("label", {}, boxes[v][i][1], p.full_name, p.vertical && p.vertical !== v ? h("span", { class: "muted", style: "font-size:12px" }, " · " + p.vertical) : null))));
+  });
+  const workers = h("input", { type: "checkbox", checked: S.settings.owners_can_update_status !== false });
+  const err = h("p", { class: "err", hidden: true });
+  const save = h("button", { type: "button", class: "btn pri" }, "Save task rules");
+  save.addEventListener("click", async () => {
+    err.hidden = true; save.disabled = true;
+    const next = {}; for (const v of VERTICALS) next[v] = boxes[v].filter(([, cb]) => cb.checked).map(([id]) => id);
+    const data = { ...S.settings, task_handlers: next, owners_can_update_status: workers.checked };
+    try {
+      ok(await sb.from("settings").upsert({ id: 1, data, updated_at: new Date().toISOString() }));
+      for (const v of VERTICALS){
+        const added = next[v].filter(id => !((S.settings.task_handlers || {})[v] || []).includes(id));
+        notify(added, "You’re now a task handler for " + v, "You can edit and archive " + v + " tasks.", "", null);
+      }
+      S.settings = data; toast("Task rules saved."); renderShell(); rerender();
+    } catch (e) { err.textContent = friendly(e); err.hidden = false; }
+    save.disabled = false;
+  });
+  el.append(h("div", { class: "grid g3" }, cols));
+  el.append(h("div", { class: "panel", style: "margin-top:16px" }, h("h2", {}, "Everyone else"),
+    h("div", { class: "related" },
+      h("div", { class: "ri" }, h("span", {}, "Create tasks in their own vertical, view them, comment and attach files"), pill("Always", "ok")),
+      h("div", { class: "ri" }, h("span", {}, "Delete tasks"), pill("Nobody: tasks are archived instead", "grey")),
+      h("div", { class: "ri" }, h("span", {}, "Remove comments on tasks"), pill("Admins only, and it’s recorded", "grey")),
+      h("div", { class: "ri" }, h("span", {}, "Edit or delete task history"), pill("Nobody", "grey"))),
+    h("label", { class: "chk", style: "margin-top:10px" }, workers, "People on a task (owner, collaborators, reviewer) can update its status, checklist, blocked flag and code links"),
+    h("p", { class: "muted", style: "font-size:13px;margin:4px 0 0" }, "Turn this off if only handlers should move tasks. Reviewers can still approve or send back.")));
+  el.append(err, h("div", { style: "margin-top:14px" }, save));
+}
+
 function renderAdminSettings(el){
   adminHeader(el, "Company settings", "Name, currency, working days, leave rules and holidays.");
   const s = clone(S.settings);
@@ -3372,7 +3476,7 @@ async function renderAdminActivity(el){
   await load("activity_log", true);
   if (S.route !== "admin-activity") return;
   el.lastChild.remove();
-  const names = { notes: "Note", clients: "Client", contacts: "Contact", projects: "Project", sprints: "Sprint", tasks: "Task", releases: "Release", tickets: "Ticket", meetings: "Meeting", deals: "Deal", activities: "Sales activity", proposals: "Proposal", targets: "Sales target", leads: "Lead", campaigns: "Campaign", content: "Content", seo_keywords: "SEO keyword", leave_requests: "Leave", announcements: "Announcement", documents: "Document" };
+  const names = { settings: "Settings", notes: "Note", clients: "Client", contacts: "Contact", projects: "Project", sprints: "Sprint", tasks: "Task", releases: "Release", tickets: "Ticket", meetings: "Meeting", deals: "Deal", activities: "Sales activity", proposals: "Proposal", targets: "Sales target", leads: "Lead", campaigns: "Campaign", content: "Content", seo_keywords: "SEO keyword", leave_requests: "Leave", announcements: "Announcement", documents: "Document" };
   const verb = { insert: "created", update: "updated", delete: "deleted" };
   const tb = h("tbody");
   for (const a of rows("activity_log")){
@@ -3477,6 +3581,7 @@ async function rerender(){
     else if (route === "sales") await renderSalesHub(page);
     else if (route === "marketing") await renderMarketingHub(page);
     else if (route === "admin-settings") renderAdminSettings(page);
+    else if (route === "admin-tasks") renderAdminTaskRules(page);
     else if (route === "holidays") renderHolidays(page);
     else if (route === "admin-activity") await renderAdminActivity(page);
     else if (MOD[route]) await renderModule(route, page);

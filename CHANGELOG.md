@@ -2,8 +2,14 @@
 
 Version 1 (first upload): three verticals, admin panel, roles, leads handoff, tasks with review, leave and attendance, logo and brand colours.
 
-## Ready to go live: version 2026-11b (this folder)
-Needs: run `upgrade-2026-11b.sql` once in Supabase, then upload `index.html` to GitHub.
+## Ready to go live: version 2026-11c (this folder)
+Needs: run `upgrade-2026-11c.sql` once in Supabase, upload `index.html` to GitHub, then choose handlers in Admin panel › Task rules.
+- **Task rules (Admin panel › Task rules):** choose task handlers per vertical. Handlers edit everything and archive. People on a task (owner, collaborators, reviewer) can update its status, checklist, blocked flag and code links; there’s a switch to turn this off, and reviewers can always approve or send back. Everyone else creates tasks, views, comments and attaches files. All of this is enforced by the database.
+- **No deleting tasks:** handlers archive instead. Archived tasks leave the boards, appear under Tasks › Archived, and can be restored.
+- **Complete, permanent history** for every task: every field (with before/after for the description), checklist steps, labels, dependencies, comments, files, archive and restore. Nobody can edit or delete it. Comments on tasks can only be removed by an admin, and that’s recorded too. Changes to the task rules appear in the activity log.
+
+## Live since 2 Nov 2026: version 2026-11b
+- Fix for saving with optional dropdowns left empty, meetings on selected days, Saturday as a working day.
 - **Fix:** saving with an optional dropdown left empty (e.g. bug severity on a normal task, service on a deal, channel on a campaign) failed with “null value … violates not-null constraint”. Fixed everywhere. Every module’s create and edit is now tested against the real database rules.
 - **Meetings:** “Repeats › On selected days” with Mon–Sun tick boxes. Google Calendar invites follow the same days.
 - **Saturday is a working day:** the scrum runs Mon–Sat, and leave counts Mon–Sat (change in Company settings).
