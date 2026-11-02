@@ -55,8 +55,10 @@ a{color:var(--p)}
 .nav a{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;color:#E9E8FF;text-decoration:none;font-weight:500;font-size:14px}
 .nav a:hover{background:var(--p-deep2)}
 .nav a.on{background:#fff;color:var(--p-deep);font-weight:700}
-.nav a .cnt{margin-left:auto;background:#fff;color:var(--p-deep);border-radius:999px;padding:0 7px;font-size:11.5px;font-weight:700}
-.nav a.on .cnt{background:var(--p);color:#fff}
+.nav a .cnt{margin-left:auto;border-radius:999px;padding:0 7px;font-size:11.5px;font-weight:700;line-height:18px;min-width:18px;text-align:center;white-space:nowrap}
+.nav a .cnt.due{background:#F0445A;color:#fff}
+.nav a .cnt.new{background:var(--brand-light);color:var(--p-deep)}
+.nav a.on .cnt.new{background:var(--p);color:#fff}
 .side .foot{margin-top:auto;padding:12px 10px 0;border-top:1px solid rgba(255,255,255,.1);display:flex;align-items:center;gap:10px}
 .side .foot .who{flex:1;min-width:0}
 .side .foot .who b{display:block;color:#fff;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -3338,6 +3340,100 @@ async function renderAdminGoogle(el){
   el.append(h("div", { class: "tablewrap" }, h("table", {}, h("thead", {}, h("tr", {}, ["Person","Vertical","Status","Google account","Last synced","Problem",""].map(x => h("th", {}, x)))), tb)));
 }
 /* ---------------------------------------------------------------------
+   Menu highlights: red = due / needs you, purple = new since you last looked
+   --------------------------------------------------------------------- */
+const SEEN_KEY = () => "tc_seen_" + (S.me ? S.me.id : "");
+let SEEN = null;
+function seenMap(){
+  if (SEEN) return SEEN;
+  try { SEEN = JSON.parse(localStorage.getItem(SEEN_KEY()) || "null"); } catch (e) { SEEN = null; }
+  if (!SEEN || typeof SEEN !== "object") { SEEN = { _first: new Date().toISOString() }; saveSeen(); }   // first visit: nothing counts as new
+  return SEEN;
+}
+function saveSeen(){ try { localStorage.setItem(SEEN_KEY(), JSON.stringify(SEEN)); } catch (e) {} }
+const seenAt = r => seenMap()[r] || seenMap()._first;
+function markSeen(route){ seenMap()[route] = new Date().toISOString(); saveSeen(); }
+function resetSeenCache(){ SEEN = null; }
+
+const isNewer = (ts, route) => !!ts && ts > seenAt(route);
+const byOthers = r => r.created_by !== S.me.id && r.owner_id !== S.me.id && r.user_id !== S.me.id;
+
+function badgeInfo(route){
+  const me = S.me.id, t0 = today(), soon = addDays(t0, 3);
+  const L = t => S.loaded.has(t);
+  let due = 0, fresh = 0; const why = [];
+  const add = (n, text, kind) => { if (!n) return; if (kind === "due") due += n; else fresh += n; why.push(n + " " + text); };
+  const myTask = t => t.assignee_id === me || (t.collaborators || []).includes(me);
+  switch (route){
+    case "tasks": if (L("tasks")) {
+      const ts = rows("tasks");
+      add(ts.filter(t => myTask(t) && t.status !== "Done" && t.due_date && t.due_date <= t0).length, "due or overdue", "due");
+      add(ts.filter(t => t.reviewer_id === me && t.status === "In review").length, "waiting for your review", "due");
+      add(ts.filter(t => t.created_by !== me && (myTask(t) || (t.mentions || []).includes(me) || t.reviewer_id === me) && isNewer(t.created_at, route)).length, "new for you", "new");
+    } break;
+    case "notes": if (L("notes")) add(rows("notes").filter(n => n.owner_id !== me && isNewer(n.updated_at, route)).length, "new or updated", "new"); break;
+    case "calendar": case "meetings": if (L("meetings")) {
+      const now = Date.now();
+      const left = occurrences(t0, t0, m => invited(m, me)).filter(([, m]) => !m.start_time || new Date(t0 + "T" + String(m.start_time).slice(0, 5) + ":00").getTime() + (m.duration_min || 30) * 60000 > now).length;
+      const g = typeof agenda === "function" ? agenda(t0, t0).filter(it => it.source === "google" && it.end && new Date(it.end).getTime() > now).length : 0;
+      add(left + (route === "calendar" ? g : 0), "meeting" + (left + g === 1 ? "" : "s") + " still to come today", "due");
+      if (route === "meetings") add(rows("meetings").filter(m => m.created_by !== me && invited(m, me) && isNewer(m.created_at, route)).length, "new invitations", "new");
+    } break;
+    case "projects": if (L("projects")) {
+      add(rows("projects").filter(p => p.manager_id === me && p.end_date && p.end_date < t0 && !["Completed","Cancelled"].includes(p.status)).length, "past deadline", "due");
+      add(rows("projects").filter(p => byOthers(p) && isNewer(p.created_at, route)).length, "new", "new");
+    } break;
+    case "sprints": if (L("sprints")) add(rows("sprints").filter(s => byOthers(s) && isNewer(s.created_at, route)).length, "new", "new"); break;
+    case "releases": if (L("releases")) {
+      add(rows("releases").filter(r => (r.owner_id === me || r.qa_signoff_id === me) && r.release_date && r.release_date <= soon && !["Released","Rolled back"].includes(r.status)).length, "due within 3 days", "due");
+      add(rows("releases").filter(r => byOthers(r) && isNewer(r.created_at, route)).length, "new", "new");
+    } break;
+    case "tickets": if (L("tickets")) {
+      add(rows("tickets").filter(t => t.assignee_id === me && !["Resolved","Closed"].includes(t.status) && t.due_date && t.due_date <= t0).length, "to respond to today or overdue", "due");
+      add(rows("tickets").filter(t => byOthers(t) && isNewer(t.created_at, route) && (t.assignee_id === me || !t.assignee_id)).length, "new", "new");
+    } break;
+    case "deals": if (L("deals")) {
+      add(rows("deals").filter(d => d.owner_id === me && !["Won","Lost"].includes(d.stage) && d.next_followup && d.next_followup <= t0).length, "follow-ups due", "due");
+      add(rows("deals").filter(d => d.owner_id === me && d.created_by !== me && isNewer(d.created_at, route)).length, "new for you", "new");
+    } break;
+    case "leads": if (L("leads")) {
+      add(rows("leads").filter(l => l.status === "Sent to sales" && !l.deal_id && (l.sales_owner_id === me || (!l.sales_owner_id && lvl("sales") >= 2))).length, "waiting for Sales", "due");
+      add(rows("leads").filter(l => l.created_by !== me && isNewer(l.created_at, route)).length, "new", "new");
+    } break;
+    case "clients": case "contacts": { const tb = route; if (L(tb)) add(rows(tb).filter(r => byOthers(r) && isNewer(r.created_at, route)).length, "new", "new"); } break;
+    case "activities": if (L("activities")) add(rows("activities").filter(a => a.owner_id === me && a.next_step && a.next_step_date && a.next_step_date <= t0).length, "next steps due", "due"); break;
+    case "proposals": if (L("proposals")) add(rows("proposals").filter(p => p.owner_id === me && p.status === "Sent" && p.valid_until && p.valid_until <= soon).length, "expiring within 3 days", "due"); break;
+    case "campaigns": if (L("campaigns")) {
+      add(rows("campaigns").filter(c => c.owner_id === me && c.status === "Live" && ((c.end_date && c.end_date <= soon) || (+c.budget && +c.spent > +c.budget))).length, "ending soon or over budget", "due");
+      add(rows("campaigns").filter(c => byOthers(c) && isNewer(c.created_at, route)).length, "new", "new");
+    } break;
+    case "content": if (L("content")) add(rows("content").filter(c => c.owner_id === me && c.status !== "Published" && c.publish_date && c.publish_date <= t0).length, "due to publish", "due"); break;
+    case "seo_keywords": case "social_stats": { if (L(route)) add(rows(route).filter(r => byOthers(r) && isNewer(r.created_at, route)).length, "new", "new"); } break;
+    case "people": add(activePeople().filter(p => p.id !== me && isNewer(p.created_at, route)).length, "new people", "new"); break;
+    case "leave_requests": if (L("leave_requests")) {
+      if (lvl("leave") >= 2) add(rows("leave_requests").filter(r => r.status === "Pending" && r.user_id !== me).length, "waiting for approval", "due");
+      add(rows("leave_requests").filter(r => r.user_id === me && r.status !== "Pending" && r.reviewed_by && r.reviewed_by !== me && isNewer(r.updated_at, route)).length, "of your requests decided", "new");
+    } break;
+    case "holidays": { const h1 = (S.settings.holidays || []).filter(x => x.date >= t0 && x.date <= addDays(t0, 2)).length; add(h1, "coming up in the next 2 days", "new"); } break;
+    case "attendance": if (L("attendance") && L("leave_requests")) {
+      const working = (S.settings.working_days || [1,2,3,4,5,6]).includes(parseD(t0).getDay()) && !(S.settings.holidays || []).some(x => x.date === t0);
+      const onLeave = rows("leave_requests").some(r => r.user_id === me && r.status === "Approved" && r.start_date <= t0 && r.end_date >= t0 && r.type !== "Work from home");
+      if (working && !onLeave && !rows("attendance").some(a => a.user_id === me && a.day === t0)) { due += 1; why.push("you haven’t checked in today"); return { due, fresh, why, bang: true }; }
+    } break;
+    case "announcements": if (L("announcements")) add(rows("announcements").filter(a => a.created_by !== me && isNewer(a.created_at, route)).length, "new", "new"); break;
+    case "documents": if (L("documents")) add(rows("documents").filter(d => byOthers(d) && isNewer(d.updated_at, route)).length, "new or updated", "new"); break;
+    case "admin-users": if (L("google_links") && googleOn()) add(rows("google_links").filter(l => l.last_error).length, "Google sync problems", "due"); break;
+  }
+  return { due, fresh, why };
+}
+function navBadge(route){
+  const b = badgeInfo(route);
+  if (b.bang) return h("span", { class: "cnt due", title: b.why.join(" · ") }, "!");
+  if (b.due) return h("span", { class: "cnt due", title: b.why.join(" · ") }, String(b.due > 99 ? "99+" : b.due));
+  if (b.fresh) return h("span", { class: "cnt new", title: b.why.join(" · ") }, b.fresh > 99 ? "99+" : b.fresh + " new");
+  return null;
+}
+/* ---------------------------------------------------------------------
    Admin panel
    --------------------------------------------------------------------- */
 async function callAdmin(body){
@@ -3652,12 +3748,6 @@ function canSee(route){
   const M = MOD[route]; if (!M) return false;
   return access(M).canView;
 }
-function badgeFor(route){
-  if (route === "leave_requests" && lvl("leave") >= 2 && S.loaded.has("leave_requests")) return rows("leave_requests").filter(r => r.status === "Pending").length;
-  if (route === "tasks" && S.loaded.has("tasks")) return rows("tasks").filter(t => (t.assignee_id === S.me.id && t.status !== "Done") || (t.reviewer_id === S.me.id && t.status === "In review")).length;
-  if (route === "leads" && lvl("sales") >= 1 && S.loaded.has("leads")) return rows("leads").filter(l => l.status === "Sent to sales" && (!l.sales_owner_id || l.sales_owner_id === S.me.id)).length;
-  return 0;
-}
 function renderShell(){
   const side = $("side");
   const label0 = (NAV.flatMap(([, i]) => i).find(([r]) => r === S.route) || [null, S.route.startsWith("admin-") ? "Admin panel" : ""])[1];
@@ -3668,7 +3758,7 @@ function renderShell(){
   // rebuild the sidebar only when something in it actually changed
   const role = byId("roles", S.me.role_id);
   const key = JSON.stringify([S.route, S.me.full_name, S.me.vertical, S.me.is_admin, role && role.permissions, S.settings.company,
-    NAV.flatMap(([, i]) => i).map(([r]) => badgeFor(r))]);
+    NAV.flatMap(([, i]) => i).map(([r]) => { const b = badgeInfo(r); return [b.due, b.fresh, b.bang ? 1 : 0]; })]);
   if (key === shellKey && side.children.length) return;
   shellKey = key;
   const keepScroll = side.scrollTop;
@@ -3679,9 +3769,9 @@ function renderShell(){
     const visible = items.filter(([r]) => canSee(r) && !(r === "leads" && ((group === "Sales" && !(isAdmin() || lvl("sales") >= 1)) || (group === "Marketing" && !(isAdmin() || lvl("marketing") >= 1)))));
     if (!visible.length) continue;
     nav.append(h("div", { class: "nav-group" }, group ? h("h4", {}, group) : null, visible.map(([r, l]) => {
-      const n = badgeFor(r);
+      const badge = navBadge(r);
       const on = S.route === r || (r === "admin-users" && S.route.startsWith("admin-"));
-      return h("a", { href: "#" + r, class: on ? "on" : null, onclick: () => side.classList.remove("open") }, l, n ? h("span", { class: "cnt" }, String(n)) : null);
+      return h("a", { href: "#" + r, class: on ? "on" : null, onclick: () => side.classList.remove("open") }, l, badge);
     })));
   }
   side.append(nav, h("div", { class: "foot" }, avatar(S.me.id),
@@ -3697,7 +3787,9 @@ let renderSeq = 0;
 async function rerender(){
   const seq = ++renderSeq;
   const route = (location.hash.replace(/^#/, "") || "dashboard");
+  if (S.route && S.route !== route && S.me) markSeen(S.route);   // leaving a tab: everything you saw there is no longer "new"
   S.route = route;
+  if (S.me) markSeen(route);
   renderShell();
   const el = $("content");
   const focused = document.activeElement && document.activeElement.id && el.contains(document.activeElement) ? document.activeElement.id : null;
@@ -3843,9 +3935,10 @@ async function prefetch(){
   const want = new Set(["attendance","leave_requests","meetings","announcements","tasks","meeting_joins","calendar_events","google_links","notes"]);
   for (const M of Object.values(MOD)) if (access(M).canView) { want.add(M.table); (M.needs || []).forEach(t => want.add(t)); }
   for (const t of want){ if (!S.me) return; if (!S.loaded.has(t)) await load(t); }
+  if (S.me) renderShell();            // menu highlights now have everything they need
 }
 function endSession(){
-  shellKey = "";
+  shellKey = ""; resetSeenCache();
   if (channel) { sb.removeChannel(channel); channel = null; }
   S.me = null; S.cache = {}; S.loaded = new Set(); S.notifications = []; S.ui = {};
   closeDlg(); showScreen("login");
