@@ -2,8 +2,13 @@
 
 Version 1 (first upload): three verticals, admin panel, roles, leads handoff, tasks with review, leave and attendance, logo and brand colours.
 
-## Ready to go live: version 2026-11d (this folder)
-Needs: run `upgrade-2026-11d.sql` once in Supabase, then upload `index.html` to GitHub.
+## Ready to go live: version 2026-11e (this folder)
+Needs: upload `index.html`, `privacy.html` and `terms.html` to GitHub. No database change.
+- **Google Client ID added** to index.html (Google features switch on once the `google-sync` function is deployed in Supabase).
+- **privacy.html / terms.html** for Google’s consent screen.
+- **Menu highlights on every tab:** a red number for things due or needing you (overdue tasks, reviews, follow-ups, approvals, posts due, tickets, today’s meetings, “!” if you haven’t checked in), and a purple “new” count for things added by others since you last opened that tab. Opening a tab clears its “new” count. Hover a badge to see what it counts.
+
+## Version 2026-11d (live 2 Nov 2026)
 - **Team calendar:** everyone’s Google meetings, workspace meetings and leave, by person and day (week or day view, filter by vertical). Full details for everyone, a Join button on every Meet, and “In a meeting”, “Not connected” and “Sync problem” markers.
 - **Admin panel › Google:** who’s connected, their Google account, last sync and any problems. Remind one person or everyone; the reminder notification opens Connect Google in one click.
 
