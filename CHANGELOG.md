@@ -1,6 +1,19 @@
 # Tcipher Workspace – changelog
 
-## Ready to go live: version 2026-11g (this folder)
+## Ready to go live: version 2026-11h (this folder)
+Needs:
+1. Run `upgrade-2026-11h.sql` in Supabase.
+2. In Google Cloud, enable the Gmail API and add the Gmail scopes.
+3. Redeploy `google-sync-function.ts`.
+4. Upload `index.html` and `privacy.html`.
+- **Email from your own Gmail:**
+  - on Leads, Instagram leads, Deals, Clients, Contacts and Proposals (with the PDF attached)
+  - offer letter and onboarding emails for new joinees, and an Emails page for writing to anyone (optionally saved as a lead)
+  - templates; replies (only to emails sent from the workspace) shown on the record, with notifications and threaded replies
+- **Admins mark attendance:** present, half day or absent for anyone on any day, with times and a note. The person is notified, and only admins can change it after.
+- **Left menu:** the logo and your name stay fixed; only the links scroll.
+
+## Version 2026-11g (live 2 Nov 2026)
 Needs: run `upgrade-2026-11g.sql` in Supabase, then upload `index.html`. Optional: deploy `lead-capture-function.ts` for website forms.
 - **Sales and Marketing CRM**, from the old marketing app:
   - lead numbers, lead type, priority, tags, alternate phone, address, zone, follow-up and last contacted

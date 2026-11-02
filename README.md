@@ -14,6 +14,7 @@ The internal workspace for Tcipher's three verticals, **Development**, **Sales**
 | `upgrade-2026-11c.sql` | Task rules, archive instead of delete, permanent task history | Supabase › SQL Editor |
 | `upgrade-2026-11d.sql` | Team calendar: everyone sees each other’s Google events | Supabase › SQL Editor |
 | `upgrade-2026-11g.sql` | Sales and Marketing CRM: lead numbers, Instagram pipeline, form answers, call outcomes, history | Supabase › SQL Editor |
+| `upgrade-2026-11h.sql` | Email from your Gmail, and admin-marked attendance | Supabase › SQL Editor |
 | `lead-capture-function.ts` | Optional: website forms post leads straight into the workspace | Supabase › Edge Functions, named `lead-capture` |
 | `CHANGELOG.md` | What’s in each version, and what still needs doing to go live | Keep with the files |
 
@@ -77,6 +78,28 @@ Each person then clicks **Connect Google** on their Home page, or in My profile,
 - People click **Join morning scrum** on their Home page. This opens Meet, logs the join, and checks them in as **Remote** for the day if they haven’t checked in yet.
 - People who join straight from Google Calendar or Meet are imported automatically every 10 minutes, as long as the scrum’s organiser has connected Google. Every join and re-join is logged, and anyone not yet checked in that day is marked **Remote**. Organisers and admins can also click **Import joins from Google Meet** on the meeting to do it immediately.
 - The **Attendance › Today’s team** view shows who joined the scrum and when.
+
+## Email from your own Gmail
+
+Send email from the workspace, from your own Gmail or tcipher.com address:
+- **Leads, Instagram leads, Deals, Clients and Contacts:** the ✉️ Email button, plus an **Emails** list on each record.
+- **Proposals:** the **✉️ Email this proposal** button. The PDF is attached automatically, and the proposal is marked Sent.
+- **New joinees (admins):** People › open the person › **✉️ Offer letter** or **✉️ Onboarding email**. Upload the offer letter in the email (only you and admins can see it), and attach company documents such as the handbook.
+- **Sales and Marketing › Emails:** every email you’ve sent and the replies, plus **New email** to anyone. Tick “Save as lead” to keep the conversation on a lead.
+
+**Replies:** only replies to emails sent from the workspace are picked up, checked every 10 minutes (or click **Check for replies**). They show on the record, you’re notified, and you can reply in the same conversation. Nothing else in your inbox is read.
+
+**Templates:** Emails › Templates (admins). Placeholders such as {first_name}, {company} and {my_signature} are filled in automatically.
+
+**Setup (once):**
+1. **Google Cloud › APIs & Services › Library:** enable the **Gmail API**.
+2. **Google Auth Platform › Data Access › Add or remove scopes:** add `.../auth/gmail.send` and `.../auth/gmail.readonly`, then **Save**.
+3. **Supabase › Edge Functions › google-sync:** replace the code with the new `google-sync-function.ts` and deploy.
+4. Everyone: **My profile › Reconnect to allow email**, and tick the Gmail boxes on Google’s screen.
+
+## Attendance marked by admins
+
+**Attendance › Mark attendance** (or **Mark** / **Edit** on anyone’s row): choose the person, the day, **Present, Half day or Absent**, where they worked, and check-in and check-out times. The person is notified. Once a day is marked by an admin, only an admin can change it.
 
 ## Sales and Marketing CRM
 

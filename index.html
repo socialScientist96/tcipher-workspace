@@ -278,6 +278,15 @@ a.tkey:hover{background:var(--tint2)}
 .frow .fbar{height:10px;border-radius:5px;background:var(--tint);overflow:hidden}
 .frow .fbar span{display:block;height:100%;background:var(--p);border-radius:5px}
 .frow .fn{white-space:nowrap;font-size:12.5px}
+.ethread{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.ethread .eth{display:flex;justify-content:space-between;gap:10px;margin-bottom:6px;font-size:13.5px}
+.emsg{border-left:3px solid var(--line);padding:6px 10px;margin:6px 0;border-radius:0 8px 8px 0;background:#FBFBFE}
+.emsg.in{border-left-color:var(--ok);background:#F5FBF7}
+.emsg.unread{box-shadow:0 0 0 1px var(--ok) inset}
+.emsg .em{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;margin-bottom:4px}
+.emsg .eb{font-size:13.5px;white-space:pre-wrap;overflow-wrap:anywhere}
+.emsg .eq{white-space:pre-wrap;color:var(--ink3);font-size:12.5px;border-left:2px solid var(--line);padding-left:8px;margin-top:6px}
+tr.unread-row td{background:#F5FBF7;font-weight:600}
 .hday{flex:none;width:44px;height:44px;border-radius:10px;background:var(--tint);color:var(--p-ink);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
 .hday b{font-size:16px}
 .hday small{font-size:11px;font-weight:600;text-transform:uppercase;margin-top:2px}
@@ -560,7 +569,7 @@ let sb = null, channel = null;
    --------------------------------------------------------------------- */
 const ORDER = {
   profiles: ["full_name", true], roles: ["name", true], targets: ["month", false], social_stats: ["month", false], activities: ["activity_date", false],
-  meetings: ["meeting_date", false], attendance: ["day", false], meeting_joins: ["joined_at", false], notes: ["updated_at", false], tasks: ["created_at", false], google_links: ["connected_at", false], calendar_events: ["start_date", true], settings: ["id", true], time_entries: ["work_date", false],
+  meetings: ["meeting_date", false], attendance: ["day", false], meeting_joins: ["joined_at", false], notes: ["updated_at", false], tasks: ["created_at", false], google_links: ["connected_at", false], emails: ["sent_at", false], calendar_events: ["start_date", true], settings: ["id", true], time_entries: ["work_date", false],
   activity_log: ["at", false], notifications: ["created_at", false], invoices: ["issue_date", false],
   leave_requests: ["start_date", false], expenses: ["spent_on", false]
 };
@@ -2302,6 +2311,10 @@ function attendanceWidget(light){
       : h("button", { type: "button", class: "btn", style: "font-weight:700", onclick: () => joinMeeting(scrum, today()) }, "Join morning scrum" + (scrum.start_time ? " · " + fmtTimeOfDay(scrum.start_time) : "")));
     if (!r && !j) wrap.append(h("span", {}, "or"));
   }
+  if (r && r.status === "Absent"){
+    wrap.append(h("span", {}, "Marked absent today" + (r.marked_by ? " by " + (pname(r.marked_by) || "an admin") : "")));
+    return wrap;
+  }
   if (!r){
     const mode = h("select", { class: "in", style: "width:auto;min-height:36px;" + (light ? "background:#fff;color:var(--ink)" : ""), "aria-label": "Working from" }, WORK_MODES.map(m => h("option", { value: m }, m)));
     wrap.append(h("span", {}, "Not checked in yet"), mode, h("button", { type: "button", class: "btn", onclick: () => checkIn(mode.value) }, "Check in"));
@@ -2321,7 +2334,8 @@ async function renderAttendance(el){
   const L = lvl("attendance");
   if (!S.ui.attendance) S.ui.attendance = { month: today().slice(0, 7), scope: L >= 1 ? "today" : "mine", person: "" };
   const u = S.ui.attendance;
-  el.append(h("div", { class: "ph" }, h("div", {}, h("h1", {}, "Attendance"), h("p", {}, "Daily check-in and check-out, with hours worked."))));
+  el.append(h("div", { class: "ph" }, h("div", {}, h("h1", {}, "Attendance"), h("p", {}, "Daily check-in and check-out, with hours worked.")),
+    canMarkAttendance() ? h("div", { class: "acts" }, h("button", { type: "button", class: "btn pri", onclick: () => openMarkAttendance() }, "Mark attendance")) : null));
   el.append(h("div", { class: "panel", style: "margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap" }, h("b", {}, "Today"), attendanceWidget()));
 
   const tb = h("div", { class: "tb" });
@@ -2339,10 +2353,12 @@ async function renderAttendance(el){
     for (const p of activePeople()){
       const r = rows("attendance").find(x => x.user_id === p.id && x.day === t0);
       const lv = rows("leave_requests").find(x => x.user_id === p.id && x.status === "Approved" && x.start_date <= t0 && x.end_date >= t0);
-      const st = r ? (r.check_out ? "Checked out" : "Present") : lv ? (lv.type === "Work from home" ? "Work from home" : "On leave") : "Not checked in";
+      const st = r ? (r.status === "Absent" ? "Absent" : r.status === "Half day" ? "Half day" : r.check_out ? "Checked out" : "Present") : lv ? (lv.type === "Work from home" ? "Work from home" : "On leave") : "Not checked in";
       const scr = occurrences(t0, t0, isScrum)[0];
       const sj = scr ? rows("meeting_joins").filter(j => j.meeting_id === scr[1].id && j.joined_on === t0 && j.user_id === p.id).sort((a, b) => String(a.joined_at).localeCompare(String(b.joined_at)))[0] : null;
-      tbody.append(h("tr", {}, h("td", {}, personChip(p.id)), h("td", {}, pill(st, st === "Present" || st === "Checked out" ? "ok" : st === "On leave" ? "warn" : st === "Work from home" ? "info" : "grey")),
+      tbody.append(h("tr", {}, h("td", {}, personChip(p.id), r && r.marked_by ? h("div", { class: "muted", style: "font-size:11.5px" }, "Marked by " + (pname(r.marked_by) || "admin")) : null),
+        h("td", {}, pill(st, st === "Present" || st === "Checked out" ? "ok" : st === "Absent" ? "bad" : st === "On leave" || st === "Half day" ? "warn" : st === "Work from home" ? "info" : "grey"),
+          canMarkAttendance() ? h("button", { type: "button", class: "linkbtn", style: "margin-left:8px", onclick: () => openMarkAttendance(p.id, t0) }, r ? "Edit" : "Mark") : null),
         h("td", {}, scr ? (sj ? h("span", { style: "color:var(--ok);font-weight:600" }, "✓ " + fmtTime(sj.joined_at)) : h("span", { class: "muted" }, "Not joined")) : h("span", { class: "muted" }, "–")),
         h("td", {}, r ? fmtTime(r.check_in) : "–"), h("td", {}, r && r.check_out ? fmtTime(r.check_out) : "–"), h("td", {}, r ? r.mode : "–"), h("td", { class: "num" }, r && hoursOf(r) != null ? hoursOf(r).toFixed(1) : "–")));
     }
@@ -2352,10 +2368,14 @@ async function renderAttendance(el){
   let rs = rows("attendance").filter(r => r.day.slice(0, 7) === u.month);
   if (u.scope === "mine") rs = rs.filter(r => r.user_id === S.me.id);
   const total = rs.reduce((s, r) => s + (hoursOf(r) || 0), 0);
-  el.append(statStrip([["Days present", new Set(rs.map(r => r.user_id + r.day)).size], ["Hours logged", total.toFixed(1)], ["Average per day", rs.length ? (total / rs.filter(r => r.check_out).length || 0).toFixed(1) : "–"]]));
+  el.append(statStrip([["Days present", new Set(rs.filter(r => r.status !== "Absent").map(r => r.user_id + r.day)).size], ["Days absent", rs.filter(r => r.status === "Absent").length, "var(--bad)"], ["Hours logged", total.toFixed(1)], ["Average per day", rs.length ? (total / rs.filter(r => r.check_out).length || 0).toFixed(1) : "–"]]));
   const tbody = h("tbody");
-  for (const r of rs) tbody.append(h("tr", {}, h("td", {}, fmtDate(r.day)), h("td", {}, personChip(r.user_id)), h("td", {}, fmtTime(r.check_in)), h("td", {}, r.check_out ? fmtTime(r.check_out) : h("span", { class: "muted" }, "–")), h("td", {}, r.mode), h("td", { class: "num" }, hoursOf(r) != null ? hoursOf(r).toFixed(1) : "–")));
-  el.append(h("div", { class: "tablewrap" }, rs.length ? h("table", {}, h("thead", {}, h("tr", {}, ["Date","Person","In","Out","Where","Hours"].map((x, i) => h("th", { class: i === 5 ? "num" : null }, x)))), tbody) : h("div", { class: "empty" }, h("b", {}, "No attendance for this month"))));
+  for (const r of rs) tbody.append(h("tr", {}, h("td", {}, fmtDate(r.day)), h("td", {}, personChip(r.user_id)),
+    h("td", {}, pill(r.status || "Present", r.status === "Absent" ? "bad" : r.status === "Half day" ? "warn" : "ok"), r.marked_by ? h("span", { class: "muted", style: "font-size:11.5px" }, " by " + (pname(r.marked_by) || "admin").split(" ")[0]) : null),
+    h("td", {}, r.check_in ? fmtTime(r.check_in) : "–"), h("td", {}, r.check_out ? fmtTime(r.check_out) : h("span", { class: "muted" }, "–")), h("td", {}, r.status === "Absent" ? "–" : r.mode),
+    h("td", { class: "num" }, hoursOf(r) != null ? hoursOf(r).toFixed(1) : "–"),
+    canMarkAttendance() ? h("td", {}, h("button", { type: "button", class: "linkbtn", onclick: () => openMarkAttendance(r.user_id, r.day) }, "Edit")) : null));
+  el.append(h("div", { class: "tablewrap" }, rs.length ? h("table", {}, h("thead", {}, h("tr", {}, ["Date","Person","Status","In","Out","Where","Hours", ...(canMarkAttendance() ? [""] : [])].map((x, i) => h("th", { class: i === 6 ? "num" : null }, x)))), tbody) : h("div", { class: "empty" }, h("b", {}, "No attendance for this month"))));
 }
 
 /* ---------------------------------------------------------------------
@@ -2402,7 +2422,9 @@ function openPerson(id){
       h("div", { class: "ri" }, h("span", {}, "Phone"), p.phone ? h("a", { href: "tel:" + p.phone }, p.phone) : h("span", { class: "muted" }, "–")),
       h("div", { class: "ri" }, h("span", {}, "Joined"), h("span", {}, p.joined_on ? fmtDate(p.joined_on, true) : "–")),
       lv ? h("div", { class: "ri" }, h("span", {}, "Today"), pill(lv.type === "Work from home" ? "Working from home" : "On leave", "warn")) : null)
-  ], [h("span", { class: "sp" }), S.me.is_admin ? h("button", { type: "button", class: "btn soft", onclick: () => { closeDlg(); openUserEditor(p.id); } }, "Edit in admin") : null, h("button", { type: "button", class: "btn", onclick: closeDlg }, "Close")], true);
+  ], [S.me.is_admin ? h("button", { type: "button", class: "btn sm", onclick: () => { closeDlg(); emailPerson(p, "offer"); } }, "✉️ Offer letter") : null,
+      S.me.is_admin ? h("button", { type: "button", class: "btn sm", onclick: () => { closeDlg(); emailPerson(p, "onboarding"); } }, "✉️ Onboarding email") : null,
+      h("span", { class: "sp" }), S.me.is_admin ? h("button", { type: "button", class: "btn soft", onclick: () => { closeDlg(); openUserEditor(p.id); } }, "Edit in admin") : null, h("button", { type: "button", class: "btn", onclick: closeDlg }, "Close")], true);
 }
 
 /* my profile + password */
@@ -2839,7 +2861,7 @@ function joinsSection(m){
    Each person connects once; after that the server keeps their calendar in sync.
    --------------------------------------------------------------------- */
 const G = { loading: null, ready: false, syncing: false };
-const G_SCOPES = "openid email https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/meetings.space.readonly";
+const G_SCOPES = "openid email https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/meetings.space.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly";
 const googleOn = () => /\.apps\.googleusercontent\.com$/.test(GOOGLE_CLIENT_ID || "");
 const myGoogle = () => rows("google_links").find(l => l.user_id === S.me.id) || null;
 const googleConnected = () => !!myGoogle();
@@ -2965,6 +2987,7 @@ function googleCard(){
   if (l) return h("div", { style: "display:flex;align-items:center;gap:10px;flex-wrap:wrap" }, pill("Connected", "ok"),
     h("span", { class: "muted", style: "font-size:13px" }, (l.google_email || "Google") + " · " + (l.last_error ? l.last_error : l.last_sync_at ? "synced " + fmtAgo(l.last_sync_at) : "syncing…")),
     h("button", { type: "button", class: "btn sm soft", onclick: () => syncGoogleNow(false) }, "Sync now"),
+    !String(l.scopes || "").includes("gmail.send") ? h("button", { type: "button", class: "btn sm pri", onclick: () => { closeDlg(); connectGoogle(); } }, "Reconnect to allow email") : pill("Email on", "ok"),
     h("button", { type: "button", class: "btn sm ghost", onclick: () => { closeDlg(); disconnectGoogle(); } }, "Disconnect"));
   return h("div", { style: "display:flex;align-items:center;gap:10px;flex-wrap:wrap" }, h("button", { type: "button", class: "btn soft", onclick: () => { closeDlg(); connectGoogle(); } }, "Connect Google"),
     h("span", { class: "muted", style: "font-size:13px" }, "Connect once. Your Google Calendar then syncs automatically. Works with tcipher.com and personal Gmail."));
@@ -3462,6 +3485,9 @@ function badgeInfo(route){
       const onLeave = rows("leave_requests").some(r => r.user_id === me && r.status === "Approved" && r.start_date <= t0 && r.end_date >= t0 && r.type !== "Work from home");
       if (working && !onLeave && !rows("attendance").some(a => a.user_id === me && a.day === t0)) { due += 1; why.push("you haven’t checked in today"); return { due, fresh, why, bang: true }; }
     } break;
+    case "emails": if (L("emails")) {
+      add(rows("emails").filter(e => e.user_id === me && e.direction === "in" && !e.read_at).length, "new " + "replies", "due");
+    } break;
     case "announcements": if (L("announcements")) add(rows("announcements").filter(a => a.created_by !== me && isNewer(a.created_at, route)).length, "new", "new"); break;
     case "documents": if (L("documents")) add(rows("documents").filter(d => byOthers(d) && isNewer(d.updated_at, route)).length, "new or updated", "new"); break;
     case "admin-users": if (L("google_links") && googleOn()) add(rows("google_links").filter(l => l.last_error).length, "Google sync problems", "due"); break;
@@ -3578,7 +3604,7 @@ function contactBar(table, rec){
   return h("div", { class: "cbar" },
     btn("📞 Call", phone ? "tel:" + String(phone).replace(/\s/g, "") : null, "Call", !!phone),
     btn("💬 WhatsApp", phone ? "https://wa.me/" + waNumber(phone) + "?text=" + encodeURIComponent("Hi " + first + ", ") : null, "WhatsApp", !!phone),
-    btn("✉️ Email", email ? "mailto:" + email : null, "Email", !!email),
+    h("button", { type: "button", class: "btn sm", disabled: !email, title: email ? "" : "No email saved", onclick: () => { closeDlg(); openComposer({ ...emailCtx(table, rec), tbl: table, entity_id: rec.id }); } }, "✉️ Email"),
     btn("SMS", phone ? "sms:" + String(phone).replace(/\s/g, "") : null, "SMS", !!phone),
     h("button", { type: "button", class: "btn sm soft", onclick: () => log("Note") }, "+ Log activity"));
 }
@@ -4077,6 +4103,304 @@ function exportCsv(key){
   toast("Exported " + rs.length + " " + (rs.length === 1 ? M.one : M.label.toLowerCase()) + ".");
 }
 /* ---------------------------------------------------------------------
+   Email from your own Gmail (sent through the google-sync server function)
+   --------------------------------------------------------------------- */
+const canEmail = () => googleOn() && googleConnected() && String((myGoogle() || {}).scopes || "").includes("gmail.send");
+const DEFAULT_TEMPLATES = [
+  { id: "intro", name: "Introduction", for: "sales", subject: "Tcipher Technologies: {company}", body: "Hi {first_name},\n\nI’m {my_name} from Tcipher Technologies. We build mobile apps, websites and custom software for businesses like {company}.\n\nWould you have 15 minutes this week for a quick call to see if we can help?\n\nBest regards,\n{my_signature}" },
+  { id: "followup", name: "Follow-up", for: "sales", subject: "Following up", body: "Hi {first_name},\n\nJust following up on my last message. Is this a good time to talk about your requirements?\n\nBest regards,\n{my_signature}" },
+  { id: "meeting", name: "Meeting request", for: "sales", subject: "Quick call this week?", body: "Hi {first_name},\n\nCould we set up a short call this week? Let me know a time that suits you, or reply with your number and I’ll call.\n\nBest regards,\n{my_signature}" },
+  { id: "proposal", name: "Proposal", for: "sales", subject: "Proposal from Tcipher Technologies: {deal}", body: "Hi {first_name},\n\nThank you for your time. Please find our proposal attached.\n\nHappy to walk you through it or answer any questions.\n\nBest regards,\n{my_signature}" },
+  { id: "offer", name: "Offer letter", for: "people", subject: "Your offer from Tcipher Technologies", body: "Dear {first_name},\n\nWe’re delighted to offer you the role of {title} at Tcipher Technologies. Please find your offer letter attached.\n\nKindly review it and reply to confirm your acceptance. If you have any questions, I’m happy to help.\n\nWarm regards,\n{my_signature}" },
+  { id: "onboarding", name: "Onboarding welcome", for: "people", subject: "Welcome to Tcipher, {first_name}!", body: "Hi {first_name},\n\nWelcome to Tcipher Technologies! We’re excited to have you join us{start_date_text}.\n\nTo get started:\n1. Sign in to our workspace at https://internal.tcipher.com with {work_email}.\n2. Change your password in My profile, and connect your Google Calendar.\n3. Join our morning scrum, Monday to Saturday, from the Home page.\n\nPlease read the attached documents before your first day. Reply here if you have any questions.\n\nWarm regards,\n{my_signature}" }
+];
+const emailTemplates = () => (S.settings.email_templates && S.settings.email_templates.length) ? S.settings.email_templates : DEFAULT_TEMPLATES;
+function mySignature(){ return [S.me.full_name, S.me.title, "Tcipher Technologies", S.me.phone].filter(Boolean).join("\n"); }
+function fillTemplate(text, ctx){
+  return String(text || "").replace(/\{(\w+)\}/g, (m, k) => {
+    const v = { first_name: String(ctx.name || "").split(/\s+/)[0] || "there", name: ctx.name || "", company: ctx.company || "your business", deal: ctx.deal || ctx.company || "",
+      title: ctx.title || "", my_name: S.me.full_name, my_title: S.me.title || "", my_phone: S.me.phone || "", my_signature: mySignature(),
+      start_date_text: ctx.start_date ? " on " + fmtDate(ctx.start_date, true) : "", work_email: ctx.work_email || "your work email" }[k];
+    return v === undefined ? m : v;
+  });
+}
+
+/* ---------- compose ---------- */
+async function openComposer(o){
+  // o: { to, cc, name, company, deal, title, tbl, entity_id, subject, body, templateFor, replyTo, attachKeys }
+  if (!googleOn()) { toast("Email needs Google set up. Ask your admin."); return; }
+  if (!canEmail()){
+    openDialog("Connect your email", [h("p", {}, googleConnected()
+      ? "To send email from the workspace, reconnect Google once and tick the Gmail boxes. Emails then go from your own address, and replies to them show up here."
+      : "Connect your Google account once. Emails then go from your own Gmail or tcipher.com address, and replies to them show up here."),
+      o.to ? h("p", { class: "muted", style: "font-size:13px" }, "Or ", h("a", { href: "mailto:" + o.to + (o.subject ? "?subject=" + encodeURIComponent(o.subject) : "") }, "open it in your email app"), " instead.") : null],
+      [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Not now"), h("button", { type: "button", class: "btn pri", onclick: () => { closeDlg(); connectGoogle(); } }, googleConnected() ? "Reconnect Google" : "Connect Google")], true);
+    return;
+  }
+  const files = o.tbl && o.entity_id ? (await sb.from("files").select("*").eq("tbl", o.tbl).eq("entity_id", o.entity_id)).data || [] : [];
+  const extraFiles = [];
+  if (o.companyDocs){ const r = (await sb.from("files").select("*").eq("tbl", "documents").order("created_at", { ascending: false }).limit(40)).data || []; r.forEach(f => f._doc = refLabel("documents", f.entity_id) || "Company document"); extraFiles.push(...r); }
+  const allFiles = [...files, ...extraFiles];
+  const to = h("input", { class: "in", value: o.to || "", placeholder: "name@example.com, another@example.com" });
+  const cc = h("input", { class: "in", value: o.cc || "" });
+  const subj = h("input", { class: "in", value: o.subject || "", maxlength: "250" });
+  const body = h("textarea", { class: "in", rows: 12, style: "font-family:inherit" }); body.value = o.body || "";
+  const tpls = emailTemplates().filter(t => !o.templateFor || t.for === o.templateFor || t.for === "any");
+  const tsel = h("select", { class: "in", "aria-label": "Template" }, h("option", { value: "" }, "Start from a template…"), tpls.map(t => h("option", { value: t.id }, t.name)));
+  tsel.addEventListener("change", () => {
+    const t = tpls.find(x => x.id === tsel.value); if (!t) return;
+    if (body.value.trim() && !confirm("Replace what you’ve written with the “" + t.name + "” template?")) { tsel.value = ""; return; }
+    if (!o.replyTo) subj.value = fillTemplate(t.subject, o);
+    body.value = fillTemplate(t.body, o);
+  });
+  if (!o.body && !o.replyTo && o.defaultTemplate){ tsel.value = o.defaultTemplate; tsel.dispatchEvent(new Event("change")); }
+  const checks = allFiles.map(f => [f, h("input", { type: "checkbox", checked: !!(o.preselectFiles && o.preselectFiles(f)) })]);
+  const attachList = h("div", { class: "multi", style: "max-height:160px" });
+  const fileRow = ([f, c]) => h("label", {}, c, f.name, h("span", { class: "muted", style: "font-size:12px" }, " · " + ((+f.size || 0) / 1024 < 1024 ? Math.round((+f.size || 0) / 1024) + " KB" : ((+f.size || 0) / 1048576).toFixed(1) + " MB") + (f._doc ? " · " + f._doc : f.tbl === "email_attachments" ? " · uploaded for this email" : "")));
+  const drawAttach = () => { attachList.replaceChildren(...(checks.length ? checks.map(fileRow) : [h("span", { class: "muted" }, "No files yet.")])); };
+  const upIn = h("input", { type: "file", multiple: true, hidden: true });
+  upIn.addEventListener("change", async () => {
+    for (const file of [...upIn.files]){
+      if (file.size > 20 * 1048576) { toast(file.name + " is over 20 MB."); continue; }
+      const safe = file.name.replace(/[^\w.\-]+/g, "_").slice(-100) || "file";
+      const path = "email_attachments/" + S.me.id + "/" + Date.now() + "-" + uid() + "-" + safe;
+      try {
+        ok(await sb.storage.from(FILE_BUCKET).upload(path, file, { contentType: file.type || "application/octet-stream", upsert: false }));
+        const row = ok(await sb.from("files").insert({ tbl: "email_attachments", entity_id: S.me.id, name: file.name, path, size: file.size, mime: file.type || "", uploaded_by: S.me.id }).select().single());
+        const c = h("input", { type: "checkbox", checked: true }); c.addEventListener("change", upd); checks.push([row, c]);
+      } catch (e) { fail(e, file.name + " not uploaded"); }
+    }
+    upIn.value = ""; drawAttach(); upd();
+  });
+  const sizeOf = () => checks.filter(([, c]) => c.checked).reduce((s, [f]) => s + (+f.size || 0), 0);
+  const sizeNote = h("span", { class: "muted", style: "font-size:12.5px" });
+  const upd = () => { const mb = sizeOf() / 1048576; sizeNote.textContent = mb ? mb.toFixed(1) + " MB attached" + (mb > 20 ? " (too big: 20 MB is the limit)" : "") : ""; sizeNote.style.color = mb > 20 ? "var(--bad)" : ""; };
+  checks.forEach(([, c]) => c.addEventListener("change", upd)); drawAttach(); upd();
+  const err = h("p", { class: "err", hidden: true });
+  const send = h("button", { type: "button", class: "btn pri" }, "Send");
+  send.addEventListener("click", async () => {
+    err.hidden = true;
+    if (!to.value.trim()) { err.textContent = "Add who it’s to."; err.hidden = false; return; }
+    if (!subj.value.trim()) { err.textContent = "Add a subject."; err.hidden = false; return; }
+    if (sizeOf() > 20 * 1048576) { err.textContent = "Attachments are over 20 MB."; err.hidden = false; return; }
+    send.disabled = true; send.textContent = "Sending…";
+    try {
+      const r = await callGoogle("send_email", { to: to.value, cc: cc.value, subject: subj.value, body: body.value, tbl: o.tbl || "", entity_id: o.entity_id || null,
+        file_ids: checks.filter(([, c]) => c.checked).map(([f]) => f.id), reply_to: o.replyTo || null });
+      if (r && r.email) upsertCache("emails", r.email);
+      if (o.saveAsLead && o.saveAsLead.checked && !o.entity_id) await saveRecipientAsLead(to.value, o.name, r && r.email);
+      closeDlg(); toast("Sent from " + ((myGoogle() || {}).google_email || "your email") + "."); load("activities", true).then(rerender); rerender();
+      if (o.after) o.after(r && r.email);
+    } catch (e) { err.textContent = friendly(e); err.hidden = false; send.disabled = false; send.textContent = "Send"; }
+  });
+  const nodes = [
+    h("p", { class: "muted", style: "margin:0 0 10px;font-size:13px" }, "From ", h("b", {}, (myGoogle() || {}).google_email || ""), o.replyTo ? " · replying in the same conversation" : "", ". Replies to this email will show up here."),
+    h("div", { class: "form" },
+      h("label", { class: "fl full" }, "To", to), h("label", { class: "fl full" }, "Cc", cc),
+      tpls.length && !o.replyTo ? h("label", { class: "fl full" }, "Template", tsel) : null,
+      h("label", { class: "fl full" }, "Subject", subj), h("label", { class: "fl full" }, "Message", body),
+      h("div", { class: "fl full" }, h("span", { style: "display:flex;align-items:center;gap:8px" }, "Attach", h("button", { type: "button", class: "btn sm soft", onclick: () => upIn.click() }, "+ Upload a file"), sizeNote), attachList, upIn,
+        h("span", { class: "hint" }, o.tbl && o.tbl !== "profiles" ? "Files on this record are listed. Files you upload here are private to you." : "Files you upload here are private to you (and admins).")),
+      o.saveAsLead ? h("div", { class: "full" }, o.saveAsLead.wrap) : null),
+    err];
+  openDialog(o.replyTo ? "Reply" : "New email" + (o.name ? " to " + o.name : ""), nodes, [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), send]);
+}
+async function saveRecipientAsLead(toStr, name, email){
+  const addr = String(toStr).split(/[,;]/)[0].trim();
+  try {
+    const lead = await insertRow("leads", { name: name || addr.split("@")[0], email: addr, source: "Cold outreach", status: "Contacted", pipeline: "General", owner_id: S.me.vertical === "Marketing" ? S.me.id : null, sales_owner_id: S.me.vertical === "Sales" ? S.me.id : null });
+    toast("Saved as lead " + (lead.lead_number || "") + ".");
+  } catch (e) { fail(e, "Sent, but couldn’t save the lead"); }
+}
+
+/* ---------- email thread on a record ---------- */
+function emailCtx(tbl, rec){
+  if (tbl === "leads") return { to: rec.email, name: rec.name, company: rec.company, templateFor: "sales", defaultTemplate: "intro" };
+  if (tbl === "deals") return { to: rec.email || (byId("contacts", rec.contact_id) || {}).email || "", name: rec.contact_name || (byId("contacts", rec.contact_id) || {}).name || "", company: refLabel("clients", rec.client_id) || rec.company, deal: rec.title, templateFor: "sales", defaultTemplate: "followup" };
+  if (tbl === "clients") { const pc = rows("contacts").find(c => c.client_id === rec.id && c.is_primary) || rows("contacts").find(c => c.client_id === rec.id); return { to: rec.email || (pc && pc.email) || "", name: (pc && pc.name) || rec.contact_person || "", company: rec.name, templateFor: "sales" }; }
+  if (tbl === "contacts") return { to: rec.email, name: rec.name, company: refLabel("clients", rec.client_id), templateFor: "sales" };
+  if (tbl === "proposals") { const dl = byId("deals", rec.deal_id) || {}; const cl = byId("clients", rec.client_id || dl.client_id) || {}; const ct = byId("contacts", dl.contact_id) || {};
+    return { to: dl.email || ct.email || cl.email || "", name: dl.contact_name || ct.name || "", company: cl.name || dl.company || "", deal: rec.title || dl.title, templateFor: "sales", defaultTemplate: "proposal", preselectFiles: f => /\.pdf$/i.test(f.name) }; }
+  return { to: rec.email, name: rec.full_name || rec.name, templateFor: "any" };
+}
+function emailsSection(tbl, rec){
+  const list = rows("emails").filter(e => e.tbl === tbl && e.entity_id === rec.id).sort((a, b) => String(a.sent_at).localeCompare(String(b.sent_at)));
+  const threads = new Map(); for (const e of list){ const k = e.gmail_thread_id || e.id; if (!threads.has(k)) threads.set(k, []); threads.get(k).push(e); }
+  const unread = list.filter(e => e.direction === "in" && !e.read_at && e.user_id === S.me.id);
+  const sec = h("div", { class: "section" }, h("h3", {}, "Emails", unread.length ? h("span", { class: "pill bad", style: "margin-left:6px" }, unread.length + " new " + (unread.length === 1 ? "reply" : "replies")) : null,
+    h("button", { type: "button", class: "btn sm soft", style: "margin-left:auto", onclick: () => { closeDlg(); openComposer({ ...emailCtx(tbl, rec), tbl, entity_id: rec.id }); } }, "✉️ New email")));
+  if (!threads.size) sec.append(h("p", { class: "nothing" }, canEmail() ? "No emails yet. Emails you send from here, and the replies, show up in this list." : "Connect Google with email to send from your own address and see replies here."));
+  for (const [, msgs] of [...threads.entries()].reverse()) sec.append(threadView(msgs, tbl, rec));
+  if (unread.length) setTimeout(() => markRead(unread), 1500);
+  return sec;
+}
+function threadView(msgs, tbl, rec){
+  const last = msgs[msgs.length - 1], first = msgs[0];
+  const box = h("div", { class: "ethread" });
+  box.append(h("div", { class: "eth" }, h("b", {}, first.subject || "(no subject)"), h("span", { class: "muted" }, msgs.length + " message" + (msgs.length === 1 ? "" : "s") + " · " + fmtAgo(last.sent_at))));
+  for (const e of msgs){
+    const quoteAt = e.body.search(/\n(On .{5,120}wrote:|-{2,} ?Original Message|From: .+\nSent: )/);
+    const main = quoteAt > 0 ? e.body.slice(0, quoteAt) : e.body;
+    const bodyEl = h("div", { class: "eb" }, renderRich(main.trim()));
+    if (quoteAt > 0){ const q = h("div", { class: "eq", hidden: true }, e.body.slice(quoteAt).trim()); bodyEl.append(h("button", { type: "button", class: "linkbtn", onclick: ev => { q.hidden = !q.hidden; ev.currentTarget.textContent = q.hidden ? "Show earlier message" : "Hide earlier message"; } }, "Show earlier message"), q); }
+    box.append(h("div", { class: "emsg " + e.direction + (e.direction === "in" && !e.read_at ? " unread" : "") },
+      h("div", { class: "em" }, e.direction === "in" ? h("b", {}, e.from_email.replace(/<.*>/, "").trim() || e.from_email) : h("span", {}, h("b", {}, pname(e.user_id) || "You"), h("span", { class: "muted" }, " to " + e.to_email)),
+        h("span", { class: "muted" }, new Date(e.sent_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }))),
+      bodyEl, (e.attachments || []).length ? h("div", { class: "muted", style: "font-size:12.5px;margin-top:4px" }, "📎 " + e.attachments.map(a => a.name).join(", ")) : null));
+  }
+  if (last.user_id === S.me.id || msgs.some(m => m.user_id === S.me.id)){
+    const anchor = [...msgs].reverse().find(m => m.user_id === S.me.id) || last;
+    const replyTo = last.direction === "in" ? (last.from_email.match(/<([^>]+)>/) || [, last.from_email])[1] : last.to_email;
+    box.append(h("div", { style: "display:flex;justify-content:flex-end;margin-top:6px" }, h("button", { type: "button", class: "btn sm", onclick: () => { closeDlg(); openComposer({ ...emailCtx(tbl, rec), to: replyTo, subject: /^re:/i.test(first.subject) ? first.subject : "Re: " + first.subject, body: "\n\n" + fillTemplate("{my_signature}", {}), tbl, entity_id: rec.id, replyTo: anchor.id }); } }, "Reply")));
+  }
+  return box;
+}
+async function markRead(list){
+  const ids = list.map(e => e.id); const t = new Date().toISOString();
+  try { ok(await sb.from("emails").update({ read_at: t }).in("id", ids)); for (const e of list) e.read_at = t; renderShell(); } catch (e) { console.warn("mark read", e); }
+}
+
+/* ---------- where email shows up ---------- */
+for (const [key, tbl] of [["leads","leads"], ["ig_leads","leads"], ["deals","deals"], ["clients","clients"], ["contacts","contacts"], ["proposals","proposals"]]){
+  const M = MOD[key]; if (!M) continue;
+  M.needs = [...new Set([...(M.needs || []), "emails", "contacts", "clients"])];
+  const old = M.detail;
+  M.detail = (rec, box) => { if (old) old(rec, box); box.append(emailsSection(tbl, rec)); };
+}
+{
+  const M = MOD.proposals, old = M.actions;
+  M.actions = rec => {
+    const out = (old && old(rec)) || [];
+    out.push(h("b", { style: "flex:1" }, rec.status === "Draft" ? "Ready to send?" : ""), h("button", { type: "button", class: "btn pri", onclick: () => { closeDlg(); openComposer({ ...emailCtx("proposals", rec), tbl: "proposals", entity_id: rec.id,
+      after: async () => { if (["Draft", ""].includes(rec.status || "")) { try { await updateRow("proposals", rec.id, { status: "Sent", sent_on: today() }); } catch (e) {} } } }); } }, "✉️ Email this proposal"));
+    return out;
+  };
+}
+
+/* ---------- new joinees: offer letter and onboarding ---------- */
+function emailPerson(p, which){
+  openComposer({ to: which === "offer" ? (p.personal_email || "") : p.email, name: p.full_name, title: p.title, start_date: p.joined_on, work_email: p.email,
+    tbl: "profiles", entity_id: p.id, templateFor: "people", defaultTemplate: which, companyDocs: true });
+}
+
+/* ---------- the Emails page (Sales and Marketing) ---------- */
+async function renderEmails(el){
+  await ensure(["emails","leads","deals","clients","contacts","proposals"]);
+  if (S.route !== "emails") return;
+  if (!S.ui.emails) S.ui.emails = { view: "replies", q: "" };
+  const u = S.ui.emails;
+  el.append(h("div", { class: "ph" }, h("div", {}, h("h1", {}, "Emails"), h("p", {}, "Emails you’ve sent from the workspace, and the replies to them. Only these conversations are read; the rest of your inbox stays private.")),
+    h("div", { class: "acts" }, h("button", { type: "button", class: "btn pri", onclick: () => newEmailToAnyone() }, "✉️ New email"))));
+  if (!canEmail()) el.append(h("div", { class: "panel", style: "background:var(--tint);border-color:transparent;display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px" },
+    h("span", { style: "flex:1;min-width:200px" }, h("b", {}, "Send from your own email. "), "Connect Google once and tick the Gmail boxes. Emails go from your address, and replies show up here."),
+    h("button", { type: "button", class: "btn pri", onclick: () => connectGoogle() }, googleConnected() ? "Reconnect Google" : "Connect Google")));
+  const mine = rows("emails").filter(e => e.user_id === S.me.id || isAdmin());
+  const q = h("input", { class: "in search", type: "search", placeholder: "Search emails", value: u.q });
+  const listBox = h("div", { class: "tablewrap" });
+  const linkOf = e => {
+    if (!e.entity_id) return null;
+    const M = e.tbl === "leads" ? (((byId("leads", e.entity_id) || {}).pipeline === "Instagram") ? "ig_leads" : "leads") : ["deals","clients","contacts","proposals"].includes(e.tbl) ? e.tbl : null;
+    const r = M ? byId(e.tbl, e.entity_id) : null;
+    return r ? h("button", { type: "button", class: "linkbtn", onclick: ev => { ev.stopPropagation(); openRecord(M, r.id); } }, (r.lead_number ? r.lead_number + " " : "") + (r.name || r.title || "")) : e.tbl === "profiles" ? h("span", { class: "muted" }, pname(e.entity_id) || "Team member") : null;
+  };
+  function draw(){
+    const s = u.q.trim().toLowerCase();
+    let rs = mine.filter(e => u.view === "replies" ? e.direction === "in" : e.direction === "out");
+    if (s) rs = rs.filter(e => (e.subject + " " + e.to_email + " " + e.from_email + " " + e.snippet).toLowerCase().includes(s));
+    rs.sort((a, b) => String(b.sent_at).localeCompare(String(a.sent_at)));
+    listBox.replaceChildren(rs.length ? h("table", {}, h("thead", {}, h("tr", {}, [u.view === "replies" ? "From" : "To", "Subject", "About", "When"].map(x => h("th", {}, x)))),
+      h("tbody", {}, rs.slice(0, 300).map(e => h("tr", { class: "click" + (e.direction === "in" && !e.read_at && e.user_id === S.me.id ? " unread-row" : ""), onclick: () => openEmail(e) },
+        h("td", {}, (u.view === "replies" ? e.from_email : e.to_email).replace(/<.*>/, "").trim().slice(0, 40)), h("td", {}, h("b", {}, e.subject || "(no subject)"), h("br"), h("span", { class: "muted", style: "font-size:12.5px" }, e.snippet.slice(0, 90))),
+        h("td", {}, linkOf(e) || h("span", { class: "muted" }, "–")), h("td", { style: "white-space:nowrap" }, fmtAgo(e.sent_at))))))
+      : h("div", { class: "empty" }, h("b", {}, u.view === "replies" ? "No replies yet" : "Nothing sent yet"), u.view === "replies" ? "Replies to emails you send from the workspace appear here within about 10 minutes." : "Send from a lead, deal, client, contact or proposal, or use New email."));
+  }
+  q.addEventListener("input", () => { u.q = q.value; draw(); });
+  const unread = mine.filter(e => e.direction === "in" && !e.read_at && e.user_id === S.me.id).length;
+  el.append(h("div", { class: "tb" }, q, segmented([["replies", "Replies" + (unread ? " (" + unread + " new)" : "")], ["sent", "Sent"], ...(isAdmin() ? [["templates", "Templates"]] : [])], u.view, v => { u.view = v; rerender(); }),
+    canEmail() ? h("button", { type: "button", class: "btn", onclick: async () => { try { const r = await callGoogle("check_replies"); await load("emails", true); toast(r && r.replies ? r.replies + " new " + (r.replies === 1 ? "reply" : "replies") + "." : "No new replies."); rerender(); } catch (e) { fail(e, "Couldn’t check"); } } }, "Check for replies") : null));
+  if (u.view === "templates") { el.append(templatesEditor()); return; }
+  el.append(listBox); draw();
+}
+function openEmail(e){
+  const map = { leads: "leads", deals: "deals", clients: "clients", contacts: "contacts", proposals: "proposals" };
+  if (e.entity_id && map[e.tbl] && byId(e.tbl, e.entity_id)){ const r = byId(e.tbl, e.entity_id); openRecord(e.tbl === "leads" && r.pipeline === "Instagram" ? "ig_leads" : map[e.tbl], r.id); return; }
+  const msgs = rows("emails").filter(x => x.gmail_thread_id && x.gmail_thread_id === e.gmail_thread_id).sort((a, b) => String(a.sent_at).localeCompare(String(b.sent_at)));
+  openDialog(e.subject || "Email", [threadView(msgs.length ? msgs : [e], e.tbl, { id: e.entity_id, email: e.to_email, full_name: pname(e.entity_id) })], [h("span", { class: "sp" }), h("button", { type: "button", class: "btn", onclick: closeDlg }, "Close")]);
+  const unread = (msgs.length ? msgs : [e]).filter(x => x.direction === "in" && !x.read_at && x.user_id === S.me.id); if (unread.length) markRead(unread);
+}
+function newEmailToAnyone(){
+  const cb = h("input", { type: "checkbox", checked: true });
+  openComposer({ templateFor: "sales", saveAsLead: { checked: true, wrap: h("label", { class: "chk" }, cb, "Save this person as a lead, so the conversation is kept on their record"), get checked(){ return cb.checked; } } });
+}
+function templatesEditor(){
+  let list = clone(emailTemplates());
+  const box = h("div", {});
+  const save = async () => {
+    try { const data = { ...S.settings, email_templates: list }; ok(await sb.from("settings").upsert({ id: 1, data, updated_at: new Date().toISOString() })); S.settings = data; toast("Templates saved."); }
+    catch (e) { fail(e, "Not saved"); }
+  };
+  function draw(){
+    box.replaceChildren(h("p", { class: "muted", style: "font-size:13px;margin:0 0 10px" }, "Placeholders: {first_name}, {name}, {company}, {deal}, {title}, {my_name}, {my_title}, {my_phone}, {my_signature}, {work_email}, {start_date_text}. They’re filled in when someone picks the template."));
+    list.forEach((t, i) => {
+      const nm = h("input", { class: "in", value: t.name }), sj = h("input", { class: "in", value: t.subject }), bd = h("textarea", { class: "in", rows: 7 }); bd.value = t.body;
+      const fr = h("select", { class: "in" }, [["sales","Sales and Marketing"], ["people","New joinees"], ["any","Everywhere"]].map(([v, l]) => h("option", { value: v }, l))); fr.value = t.for || "any";
+      [nm, sj, bd, fr].forEach(x => x.addEventListener("change", () => { list[i] = { ...t, name: nm.value, subject: sj.value, body: bd.value, for: fr.value }; }));
+      box.append(h("div", { class: "panel", style: "margin-bottom:12px" }, h("div", { class: "form" },
+        h("label", { class: "fl" }, "Name", nm), h("label", { class: "fl" }, "Used for", fr), h("label", { class: "fl full" }, "Subject", sj), h("label", { class: "fl full" }, "Message", bd)),
+        h("button", { type: "button", class: "btn sm ghost", onclick: () => { if (confirm("Delete the “" + t.name + "” template?")) { list.splice(i, 1); draw(); } } }, "Delete template")));
+    });
+    box.append(h("div", { style: "display:flex;gap:8px" }, h("button", { type: "button", class: "btn", onclick: () => { list.push({ id: "t" + Date.now(), name: "New template", for: "sales", subject: "", body: "Hi {first_name},\n\n\n\nBest regards,\n{my_signature}" }); draw(); } }, "+ Add template"),
+      h("button", { type: "button", class: "btn pri", onclick: save }, "Save templates")));
+  }
+  draw();
+  return box;
+}
+
+/* ---------------------------------------------------------------------
+   Attendance marked by an admin
+   --------------------------------------------------------------------- */
+const canMarkAttendance = () => lvl("attendance") >= 2;
+function openMarkAttendance(userId, day){
+  const d0 = day || today();
+  const existing = uid => rows("attendance").find(a => a.user_id === uid && a.day === d0);
+  const who = h("select", { class: "in" }, activePeople().slice().sort((a, b) => a.full_name.localeCompare(b.full_name)).map(p => h("option", { value: p.id }, p.full_name)));
+  if (userId) who.value = userId;
+  const date = h("input", { class: "in", type: "date", value: d0, max: today() });
+  const status = h("select", { class: "in" }, ["Present","Half day","Absent"].map(x => h("option", { value: x }, x)));
+  const mode = h("select", { class: "in" }, WORK_MODES.map(m => h("option", { value: m }, m)));
+  const tin = h("input", { class: "in", type: "time" }), tout = h("input", { class: "in", type: "time" });
+  const note = h("input", { class: "in", placeholder: "e.g. Forgot to check in, was at client site" });
+  const timeOf = iso => iso ? new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }) : "";
+  const fill = () => {
+    const ex = rows("attendance").find(a => a.user_id === who.value && a.day === date.value);
+    status.value = ex ? (ex.status || "Present") : "Present"; mode.value = ex ? ex.mode : WORK_MODES[0];
+    tin.value = ex ? timeOf(ex.check_in) : "10:00"; tout.value = ex ? timeOf(ex.check_out) : ""; note.value = ex ? ex.note || "" : "";
+    times.forEach(t => t.hidden = status.value === "Absent");
+  };
+  const times = [h("label", { class: "fl" }, "Checked in at", tin), h("label", { class: "fl" }, "Checked out at", tout), h("label", { class: "fl" }, "Where", mode)];
+  [who, date].forEach(x => x.addEventListener("change", fill)); status.addEventListener("change", () => times.forEach(t => t.hidden = status.value === "Absent"));
+  const err = h("p", { class: "err", hidden: true });
+  const save = h("button", { type: "button", class: "btn pri" }, "Save");
+  save.addEventListener("click", async () => {
+    err.hidden = true;
+    const at = t => t ? new Date(date.value + "T" + t + ":00").toISOString() : null;
+    if (status.value !== "Absent" && tin.value && tout.value && tout.value <= tin.value) { err.textContent = "Check-out must be after check-in."; err.hidden = false; return; }
+    const row = { user_id: who.value, day: date.value, status: status.value, mode: mode.value, marked_by: S.me.id,
+      check_in: status.value === "Absent" ? null : at(tin.value), check_out: status.value === "Absent" ? null : at(tout.value), note: note.value.trim() || ("Marked by " + S.me.full_name) };
+    save.disabled = true;
+    try {
+      const saved = ok(await sb.from("attendance").upsert(row, { onConflict: "user_id,day" }).select().single());
+      upsertCache("attendance", saved);
+      if (who.value !== S.me.id) notify([who.value], "Your attendance for " + fmtDate(date.value, true) + " was marked " + status.value.toLowerCase(), "By " + S.me.full_name + (note.value.trim() ? ": " + note.value.trim() : ""), "", null);
+      closeDlg(); toast("Attendance saved."); rerender();
+    } catch (e) { err.textContent = friendly(e); err.hidden = false; save.disabled = false; }
+  });
+  openDialog("Mark attendance", [h("div", { class: "form" }, h("label", { class: "fl" }, "Person", who), h("label", { class: "fl" }, "Date", date), h("label", { class: "fl" }, "Status", status), ...times, h("label", { class: "fl full" }, "Note", note)), err,
+    h("p", { class: "muted", style: "font-size:12.5px;margin:6px 0 0" }, "Once you mark a day, only an admin can change it. The person is notified.")],
+    [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), save], true);
+  fill();
+}
+/* ---------------------------------------------------------------------
    Admin panel
    --------------------------------------------------------------------- */
 async function callAdmin(body){
@@ -4363,7 +4687,7 @@ async function renderAdminActivity(el){
   await load("activity_log", true);
   if (S.route !== "admin-activity") return;
   el.lastChild.remove();
-  const names = { settings: "Settings", notes: "Note", clients: "Client", contacts: "Contact", projects: "Project", sprints: "Sprint", tasks: "Task", releases: "Release", tickets: "Ticket", meetings: "Meeting", deals: "Deal", activities: "Sales activity", proposals: "Proposal", targets: "Sales target", leads: "Lead", campaigns: "Campaign", content: "Content", seo_keywords: "SEO keyword", leave_requests: "Leave", announcements: "Announcement", documents: "Document" };
+  const names = { emails: "Email", settings: "Settings", notes: "Note", clients: "Client", contacts: "Contact", projects: "Project", sprints: "Sprint", tasks: "Task", releases: "Release", tickets: "Ticket", meetings: "Meeting", deals: "Deal", activities: "Sales activity", proposals: "Proposal", targets: "Sales target", leads: "Lead", campaigns: "Campaign", content: "Content", seo_keywords: "SEO keyword", leave_requests: "Leave", announcements: "Announcement", documents: "Document" };
   const verb = { insert: "created", update: "updated", delete: "deleted" };
   const tb = h("tbody");
   for (const a of rows("activity_log")){
@@ -4381,8 +4705,8 @@ async function renderAdminActivity(el){
 const NAV = [
   ["", [["dashboard","Home"], ["overview","Company overview"], ["tasks","Tasks"], ["notes","Notes"], ["calendar","Calendar"], ["team-calendar","Team calendar"]]],
   ["Development", [["dev","Dev dashboard"], ["projects","Projects"], ["sprints","Sprints"], ["releases","Releases"], ["tickets","Support tickets"]]],
-  ["Sales", [["sales","Sales dashboard"], ["deals","Pipeline"], ["leads","Leads"], ["ig_leads","Instagram leads"], ["clients","Clients"], ["contacts","Contacts"], ["activities","Activities"], ["proposals","Proposals"], ["targets","Targets"], ["crm-analytics","Analytics"]]],
-  ["Marketing", [["marketing","Marketing dashboard"], ["leads","Leads"], ["ig_leads","Instagram leads"], ["campaigns","Campaigns"], ["content","Content calendar"], ["seo_keywords","SEO keywords"], ["social_stats","Social media"], ["crm-analytics","Analytics"]]],
+  ["Sales", [["sales","Sales dashboard"], ["deals","Pipeline"], ["leads","Leads"], ["ig_leads","Instagram leads"], ["clients","Clients"], ["contacts","Contacts"], ["activities","Activities"], ["proposals","Proposals"], ["targets","Targets"], ["emails","Emails"], ["crm-analytics","Analytics"]]],
+  ["Marketing", [["marketing","Marketing dashboard"], ["leads","Leads"], ["ig_leads","Instagram leads"], ["campaigns","Campaigns"], ["content","Content calendar"], ["seo_keywords","SEO keywords"], ["social_stats","Social media"], ["emails","Emails"], ["crm-analytics","Analytics"]]],
   ["Company", [["people","People"], ["leave_requests","Leave"], ["holidays","Holidays"], ["attendance","Attendance"], ["meetings","Meetings"], ["announcements","Announcements"], ["documents","Documents"]]],
   ["Admin", [["admin-users","Admin panel"]]]
 ];
@@ -4393,7 +4717,7 @@ function canSee(route){
   if (route === "sales") return isAdmin() || S.me.vertical === "Sales" || lvl("sales") >= 1;
   if (route === "marketing") return isAdmin() || S.me.vertical === "Marketing" || lvl("marketing") >= 1;
   if (route.startsWith("admin-")) return !!S.me.is_admin;
-  if (route === "crm-analytics") return lvl("sales") >= 1 || lvl("leads") >= 1 || lvl("marketing") >= 1;
+  if (route === "crm-analytics" || route === "emails") return lvl("sales") >= 1 || lvl("leads") >= 1 || lvl("marketing") >= 1;
   const M = MOD[route]; if (!M) return false;
   return access(M).canView;
 }
@@ -4417,7 +4741,7 @@ function renderShell(){
   const nav = h("nav", { class: "nav", "aria-label": "Main" });
   for (const [group, items] of NAV){
     // items shared by Sales and Marketing show under your own team only (admins see them under both)
-    const shared = ["leads","ig_leads","crm-analytics"];
+    const shared = ["leads","ig_leads","crm-analytics","emails"];
     const visible = items.filter(([r]) => canSee(r) && !(shared.includes(r) && ((group === "Sales" && !(isAdmin() || lvl("sales") >= 1)) || (group === "Marketing" && !(isAdmin() || lvl("marketing") >= 1)))));
     if (!visible.length) continue;
     nav.append(h("div", { class: "nav-group" }, group ? h("h4", {}, group) : null, visible.map(([r, l]) => {
@@ -4474,6 +4798,7 @@ async function rerender(){
     else if (route === "holidays") renderHolidays(page);
     else if (route === "admin-activity") await renderAdminActivity(page);
     else if (route === "crm-analytics") await renderCrmAnalytics(page);
+    else if (route === "emails") await renderEmails(page);
     else if (MOD[route]) await renderModule(route, page);
     else page.append(h("div", { class: "panel empty" }, h("b", {}, "Page not found"), h("a", { href: "#dashboard" }, "Go to the dashboard")));
   } catch (e) {
@@ -4585,7 +4910,7 @@ async function startSession(session){
 }
 // Quietly load every section this person can open, so switching pages is instant.
 async function prefetch(){
-  const want = new Set(["attendance","leave_requests","meetings","announcements","tasks","meeting_joins","calendar_events","google_links","notes"]);
+  const want = new Set(["attendance","leave_requests","meetings","announcements","tasks","meeting_joins","calendar_events","google_links","notes","emails"]);
   for (const M of Object.values(MOD)) if (access(M).canView) { want.add(M.table); (M.needs || []).forEach(t => want.add(t)); }
   for (const t of want){ if (!S.me) return; if (!S.loaded.has(t)) await load(t); }
   if (S.me) renderShell();            // menu highlights now have everything they need

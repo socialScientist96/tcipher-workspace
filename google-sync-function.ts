@@ -111,6 +111,7 @@ async function syncUserInner(userId: string) {
   must(await db.from("calendar_events").delete().eq("user_id", userId).gte("start_date", fromDay));
   for (let i = 0; i < rows.length; i += 200) must(await db.from("calendar_events").upsert(rows.slice(i, i + 200), { onConflict: "user_id,google_event_id" }));
   await db.from("google_links").update({ last_sync_at: new Date().toISOString(), last_error: "" }).eq("user_id", userId);
+  try { await syncReplies(userId); } catch (e) { console.warn("replies", userId, e); }
   return rows.length;
 }
 
@@ -217,6 +218,127 @@ function occursOn(m: Any, d: string, workingDays: number[], holidays: string[]) 
   return workingDays.includes(weekday(d)) && !holidays.includes(d);
 }
 
+/* ---------------- email (Gmail) ---------------- */
+const GMAIL = "https://gmail.googleapis.com/gmail/v1/users/me/";
+function b64(bytes: Uint8Array): string { let s = ""; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(s); }
+const b64url = (str: string) => b64(new TextEncoder().encode(str)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const encHeader = (v: string) => /^[\x20-\x7e]*$/.test(v) ? v : "=?UTF-8?B?" + b64(new TextEncoder().encode(v)) + "?=";
+const wrap76 = (x: string) => x.replace(/.{1,76}/g, "$&\r\n");
+function fromB64url(data: string): string {
+  const bin = atob(String(data || "").replace(/-/g, "+").replace(/_/g, "/"));
+  const bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+const escHtml = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const toHtml = (t: string) => "<div style=\"font-family:Arial,sans-serif;font-size:14px;line-height:1.5\">" +
+  escHtml(t).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1">$1</a>').replace(/\n/g, "<br>") + "</div>";
+async function hasGmail(userId: string) {
+  const l = must(await db.from("google_links").select("scopes").eq("user_id", userId).maybeSingle());
+  return !!(l && String(l.scopes || "").includes("gmail.send"));
+}
+async function sendEmail(me: Any, body: Any) {
+  if (!(await hasGmail(me.id))) throw new Error("Email isn’t allowed yet. In My profile, click Reconnect Google and tick the Gmail boxes.");
+  const to = String(body.to || "").split(/[,;]/).map((x: string) => x.trim()).filter(Boolean);
+  const cc = String(body.cc || "").split(/[,;]/).map((x: string) => x.trim()).filter(Boolean);
+  if (!to.length || to.some((x: string) => !/^[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+$/.test(x))) throw new Error("Check the email address.");
+  const subject = String(body.subject || "").slice(0, 250), text = String(body.body || "").slice(0, 100000);
+  if (!subject.trim()) throw new Error("Add a subject.");
+  const tbl = String(body.tbl || ""), entity = body.entity_id || null;
+  // attachments: files already uploaded to the record (max 20 MB together)
+  const files: Any[] = [];
+  let total = 0;
+  for (const fid of (Array.isArray(body.file_ids) ? body.file_ids.slice(0, 10) : [])) {
+    const f = must(await db.from("files").select("*").eq("id", fid).maybeSingle()); if (!f) continue;
+    const dl = await db.storage.from("files").download(f.path); if (dl.error || !dl.data) throw new Error("Couldn’t attach " + f.name);
+    const bytes = new Uint8Array(await dl.data.arrayBuffer()); total += bytes.length;
+    if (total > 20 * 1024 * 1024) throw new Error("Attachments are over 20 MB. Remove some, or share a link instead.");
+    files.push({ name: f.name, mime: f.mime || "application/octet-stream", data: bytes });
+  }
+  // replying inside an existing conversation
+  let threadId = "", inReplyTo = "";
+  if (body.reply_to) {
+    const prev = must(await db.from("emails").select("*").eq("id", body.reply_to).maybeSingle());
+    if (prev && prev.user_id === me.id) { threadId = prev.gmail_thread_id || ""; inReplyTo = prev.rfc_message_id || ""; }
+  }
+  const token = await accessFor(me.id);
+  const link = must(await db.from("google_links").select("google_email").eq("user_id", me.id).maybeSingle());
+  const fromAddr = (link && link.google_email) || me.email;
+  const boundary = "tc_" + crypto.randomUUID().replace(/-/g, ""), alt = "alt_" + crypto.randomUUID().replace(/-/g, "");
+  const head = [
+    "From: " + encHeader(me.full_name || "") + " <" + fromAddr + ">",
+    "To: " + to.join(", "), ...(cc.length ? ["Cc: " + cc.join(", ")] : []),
+    "Subject: " + encHeader(subject), "MIME-Version: 1.0",
+    ...(inReplyTo ? ["In-Reply-To: " + inReplyTo, "References: " + inReplyTo] : []),
+    "Content-Type: multipart/mixed; boundary=\"" + boundary + "\"", "", "--" + boundary,
+    "Content-Type: multipart/alternative; boundary=\"" + alt + "\"", "",
+    "--" + alt, "Content-Type: text/plain; charset=UTF-8", "Content-Transfer-Encoding: base64", "", wrap76(b64(new TextEncoder().encode(text))),
+    "--" + alt, "Content-Type: text/html; charset=UTF-8", "Content-Transfer-Encoding: base64", "", wrap76(b64(new TextEncoder().encode(toHtml(text)))),
+    "--" + alt + "--"];
+  for (const f of files) head.push("--" + boundary, "Content-Type: " + f.mime + "; name=\"" + encHeader(f.name) + "\"", "Content-Disposition: attachment; filename=\"" + encHeader(f.name) + "\"", "Content-Transfer-Encoding: base64", "", wrap76(b64(f.data)));
+  head.push("--" + boundary + "--", "");
+  const raw = b64url(head.join("\r\n"));
+  const sent = await g(token, GMAIL + "messages/send", { method: "POST", body: JSON.stringify(threadId ? { raw, threadId } : { raw }) });
+  // the Message-ID header lets replies thread properly
+  let rfc = "";
+  try { const meta = await g(token, GMAIL + "messages/" + sent.id + "?format=metadata&metadataHeaders=Message-ID"); rfc = ((meta.payload && meta.payload.headers) || []).find((x: Any) => /^message-id$/i.test(x.name))?.value || ""; } catch (_) { /* fine */ }
+  const row = must(await db.from("emails").insert({ user_id: me.id, direction: "out", tbl, entity_id: entity, from_email: fromAddr, to_email: to.join(", "), cc: cc.join(", "),
+    subject, body: text, snippet: text.replace(/\s+/g, " ").slice(0, 160), attachments: files.map((f) => ({ name: f.name, size: f.data.length })),
+    gmail_message_id: sent.id, gmail_thread_id: sent.threadId, rfc_message_id: rfc }).select().single());
+  await logEmailActivity(me.id, tbl, entity, "Outbound", subject, text);
+  return row;
+}
+async function logEmailActivity(userId: string, tbl: string, entity: string | null, direction: string, subject: string, text: string) {
+  if (!entity || !["leads", "deals", "clients", "contacts", "proposals"].includes(tbl)) return;
+  const a: Any = { kind: "Email", direction, subject: (direction === "Inbound" ? "Reply: " : "") + subject.slice(0, 180), activity_date: today(), owner_id: userId, created_by: userId, outcome: text.replace(/\s+/g, " ").slice(0, 400) };
+  if (tbl === "leads") a.lead_id = entity;
+  else if (tbl === "deals") a.deal_id = entity;
+  else if (tbl === "clients") a.client_id = entity;
+  else if (tbl === "contacts") { a.contact_id = entity; const c = must(await db.from("contacts").select("client_id").eq("id", entity).maybeSingle()); if (c && c.client_id) a.client_id = c.client_id; }
+  else if (tbl === "proposals") { const p = must(await db.from("proposals").select("deal_id,client_id").eq("id", entity).maybeSingle()); if (p) { a.deal_id = p.deal_id || null; a.client_id = p.client_id || null; } }
+  await db.from("activities").insert(a);
+}
+function plainBody(payload: Any): string {
+  const parts: Any[] = []; const walk = (p: Any) => { if (!p) return; parts.push(p); (p.parts || []).forEach(walk); }; walk(payload);
+  const plain = parts.find((p) => p.mimeType === "text/plain" && p.body && p.body.data);
+  if (plain) return fromB64url(plain.body.data);
+  const html = parts.find((p) => p.mimeType === "text/html" && p.body && p.body.data);
+  if (html) return fromB64url(html.body.data).replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n\n").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+  return "";
+}
+// Only conversations started from the workspace are read; nothing else in the inbox is touched.
+async function syncReplies(userId: string) {
+  if (!(await hasGmail(userId))) return 0;
+  const since = new Date(Date.now() - 60 * 864e5).toISOString();
+  const outs = must(await db.from("emails").select("gmail_thread_id,tbl,entity_id,subject").eq("user_id", userId).eq("direction", "out").gte("sent_at", since).order("sent_at", { ascending: false }).limit(300)) || [];
+  const threads = new Map<string, Any>(); for (const o of outs) if (o.gmail_thread_id && !threads.has(o.gmail_thread_id)) threads.set(o.gmail_thread_id, o);
+  if (!threads.size) return 0;
+  const token = await accessFor(userId);
+  let found = 0;
+  for (const [tid, origin] of [...threads.entries()].slice(0, 150)) {
+    let th: Any;
+    try { th = await g(token, GMAIL + "threads/" + tid + "?format=full"); } catch (_) { continue; }
+    const ids = (th.messages || []).map((m: Any) => m.id);
+    const known = new Set(((must(await db.from("emails").select("gmail_message_id").in("gmail_message_id", ids)) || []) as Any[]).map((r) => r.gmail_message_id));
+    for (const m of th.messages || []) {
+      if (known.has(m.id) || (m.labelIds || []).includes("DRAFT")) continue;
+      const hd = (n: string) => ((m.payload && m.payload.headers) || []).find((x: Any) => x.name.toLowerCase() === n)?.value || "";
+      const mine = (m.labelIds || []).includes("SENT");
+      const text = plainBody(m.payload).slice(0, 100000);
+      const row = { user_id: userId, direction: mine ? "out" : "in", tbl: origin.tbl, entity_id: origin.entity_id, from_email: hd("from"), to_email: hd("to"), cc: hd("cc"),
+        subject: hd("subject") || origin.subject, body: text, snippet: String(m.snippet || "").slice(0, 160), gmail_message_id: m.id, gmail_thread_id: tid, rfc_message_id: hd("message-id"),
+        sent_at: new Date(+m.internalDate || Date.now()).toISOString() };
+      const ins = await db.from("emails").insert(row);
+      if (ins.error) continue;
+      if (!mine) {
+        found++;
+        await logEmailActivity(userId, origin.tbl, origin.entity_id, "Inbound", row.subject, text);
+        await db.from("notifications").insert({ user_id: userId, title: "Reply from " + row.from_email.replace(/<.*>/, "").trim(), body: row.subject, tbl: origin.tbl === "profiles" ? "" : origin.tbl, entity_id: origin.tbl === "profiles" ? null : origin.entity_id });
+      }
+    }
+  }
+  return found;
+}
+
 /* ---------------- handler ---------------- */
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -261,7 +383,7 @@ Deno.serve(async (req) => {
       if (!granted.includes("calendar.events")) return json({ error: "Calendar access wasn’t allowed. Click Connect Google again and tick the box for Google Calendar on Google’s permissions screen." }, 400);
       if (!refresh) return json({ error: "Google didn’t give permanent access. Remove “Tcipher Workspace” at myaccount.google.com/permissions, then click Connect Google again." }, 400);
       must(await db.from("google_tokens").upsert({ user_id: me.id, refresh_token: refresh, scopes: tok.scope || "", updated_at: new Date().toISOString() }));
-      must(await db.from("google_links").upsert({ user_id: me.id, google_email: info.email || "", connected_at: new Date().toISOString(), last_error: "" }));
+      must(await db.from("google_links").upsert({ user_id: me.id, google_email: info.email || "", connected_at: new Date().toISOString(), last_error: "", scopes: granted }));
       let n = 0, warning = "";
       try { n = await syncUser(me.id); } catch (e) { warning = String((e as Error)?.message || e); }
       return json({ ok: true, email: info.email || "", events: n, warning, scopes: tok.scope || "" });
@@ -275,6 +397,11 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     }
     if (action === "sync") return json({ ok: true, events: await syncUser(me.id) });
+    if (action === "send_email") {
+      const full = must(await db.from("profiles").select("id,email,full_name,is_admin").eq("id", me.id).single());
+      return json({ ok: true, email: await sendEmail(full, body) });
+    }
+    if (action === "check_replies") return json({ ok: true, replies: await syncReplies(me.id) });
 
     const meetingId = String(body.meeting_id || "");
     if (!meetingId) return json({ error: "Missing meeting." }, 400);
