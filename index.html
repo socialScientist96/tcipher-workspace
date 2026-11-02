@@ -204,6 +204,38 @@ td.num,th.num{text-align:right}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
 
 /* dashboard hero */
+/* tagging, task IDs, checklists, notes */
+.mention{background:var(--tint2);color:var(--p-ink);border-radius:5px;padding:0 4px;font-weight:600}
+.tkey{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;font-weight:700;color:var(--p);background:var(--tint);border-radius:5px;padding:1px 6px;white-space:nowrap;text-decoration:none}
+a.tkey:hover{background:var(--tint2)}
+.code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:2px 7px;overflow-wrap:anywhere}
+.mention-pop{position:absolute;left:0;top:100%;z-index:30;margin-top:4px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);min-width:240px;padding:4px;display:flex;flex-direction:column}
+.mention-pop[hidden]{display:none}
+.mention-item{display:flex;align-items:center;gap:8px;border:0;background:transparent;padding:6px 8px;border-radius:7px;cursor:pointer;text-align:left;font:inherit;color:var(--ink)}
+.mention-item small{margin-left:auto;color:var(--ink3);font-size:12px}
+.mention-item.on,.mention-item:hover{background:var(--tint)}
+.fhead{font-size:12.5px;font-weight:700;color:var(--p-ink);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--line);padding:10px 0 4px;margin-top:4px}
+.checklist .ck{display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--line)}
+.checklist .ck input{width:17px;height:17px;accent-color:var(--ok)}
+.checklist .ck.done .x{color:var(--ink3);text-decoration:line-through}
+.checklist .ck .x{flex:1;min-width:0;overflow-wrap:anywhere}
+.checklist .del{background:none;border:0;color:var(--ink3);cursor:pointer}
+.checklist .del:hover{color:var(--bad)}
+.hist{display:flex;align-items:center;gap:10px;padding:5px 0;font-size:13.5px}
+.hist .x{flex:1;min-width:0}
+.hist .y{color:var(--ink3);font-size:12.5px;white-space:nowrap}
+.notes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.note-card{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;text-align:left;cursor:pointer;font:inherit;color:inherit;display:flex;flex-direction:column;gap:8px;min-height:150px}
+.note-card:hover{border-color:var(--tint3);transform:translateY(-1px);box-shadow:var(--shadow)}
+.note-card.pinned{border-color:var(--tint3);background:linear-gradient(180deg,var(--tint) 0,#fff 60px)}
+.note-card .nt{font-weight:700;font-size:15px}
+.note-card .nb{font-size:13.5px;color:var(--ink2);white-space:pre-wrap;overflow-wrap:anywhere;flex:1}
+.note-card .nm{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12.5px}
+.note-card .nm .grow{flex:1}
+.hday{flex:none;width:44px;height:44px;border-radius:10px;background:var(--tint);color:var(--p-ink);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+.hday b{font-size:16px}
+.hday small{font-size:11px;font-weight:600;text-transform:uppercase;margin-top:2px}
+.hgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:0 18px}
 .hello{background:var(--p);color:#fff;border-radius:14px;padding:20px 22px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px;position:relative;overflow:hidden}
 .hello::after{content:"";position:absolute;right:-60px;top:-80px;width:260px;height:260px;border-radius:50%;border:40px solid rgba(255,255,255,.08);pointer-events:none}
 .hello h1{margin:0;font-size:clamp(22px,2.6vw,28px);letter-spacing:-.02em}
@@ -243,7 +275,7 @@ td.num,th.num{text-align:right}
 .ev{font-size:12px;border-radius:5px;padding:1px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:0;text-align:left;cursor:pointer;background:var(--tint);color:var(--p-ink);width:100%}
 .ev.k-task{background:var(--tint2)} .ev.k-meeting{background:var(--info-t);color:var(--info)} .ev.k-leave{background:var(--warn-t);color:var(--warn)}
 .ev.k-release{background:var(--ok-t);color:var(--ok)} .ev.k-holiday{background:var(--bad-t);color:var(--bad)} .ev.k-content{background:#F7E8F6;color:#8A2F83}
-.ev.k-invoice{background:#EFEDF3;color:var(--ink2)} .ev.k-renewal{background:#FFF1DE;color:#8A4B00}
+.ev.k-invoice{background:#EFEDF3;color:var(--ink2)} .ev.k-google{background:#E8F0FE;color:#1A56C4} .ev.k-renewal{background:#FFF1DE;color:#8A4B00}
 .ev.more{background:transparent;color:var(--ink3);padding-left:2px}
 @media (max-width:700px){.cal-day{min-height:76px;padding:4px}.ev{font-size:10.5px;padding:0 4px}}
 
@@ -383,6 +415,8 @@ dialog[open]::backdrop{animation:fadeIn .16s ease-out}
    ===================================================================== */
 const SUPABASE_URL = "https://pfdnziybqaumnofjknsj.supabase.co";        // e.g. https://abcdefghijk.supabase.co
 const SUPABASE_KEY = "sb_publishable_pqodY5Y9HWb0dsYTJy4CnA_c6nzCJ1q";    // sb_publishable_… (or the legacy “anon” key). Never the secret / service_role key.
+// Optional: Google Calendar + Meet. Paste the OAuth Client ID from Google Cloud (ends in .apps.googleusercontent.com).
+const GOOGLE_CLIENT_ID = "";
 const FILE_BUCKET = "files";
 const MAX_FILE_MB = 50;
 
@@ -480,11 +514,11 @@ let sb = null, channel = null;
    --------------------------------------------------------------------- */
 const ORDER = {
   profiles: ["full_name", true], roles: ["name", true], targets: ["month", false], social_stats: ["month", false], activities: ["activity_date", false],
-  meetings: ["meeting_date", false], attendance: ["day", false], time_entries: ["work_date", false],
+  meetings: ["meeting_date", false], attendance: ["day", false], meeting_joins: ["joined_at", false], notes: ["updated_at", false], tasks: ["created_at", false], time_entries: ["work_date", false],
   activity_log: ["at", false], notifications: ["created_at", false], invoices: ["issue_date", false],
   leave_requests: ["start_date", false], expenses: ["spent_on", false]
 };
-const LIMIT = { activity_log: 300, notifications: 60, attendance: 2000, time_entries: 3000 };
+const LIMIT = { activity_log: 300, notifications: 60, attendance: 3000, meeting_joins: 4000 };
 
 const rows = t => S.cache[t] || [];
 const byId = (t, id) => id ? rows(t).find(r => r.id === id) : null;
@@ -601,7 +635,7 @@ function opts(f, rec){
   return o.map(x => Array.isArray(x) ? { v: x[0], l: x[1] } : { v: x, l: x });
 }
 const REF_LABEL = {
-  projects: r => r.name, clients: r => r.name, campaigns: r => r.name, tasks: r => r.title,
+  projects: r => r.name, clients: r => r.name, campaigns: r => r.name, tasks: r => (r.number ? "TC-" + r.number + " " : "") + r.title, meetings: r => r.title, releases: r => r.version + (r.name ? " " + r.name : ""),
   sprints: r => { const p = byId("projects", r.project_id); return (p ? p.name + " · " : "") + r.name; },
   roles: r => r.name, contacts: r => r.name, deals: r => r.title,
   leads: r => r.name + (r.company ? " (" + r.company + ")" : "")
@@ -611,7 +645,22 @@ function refLabel(table, id){ const r = byId(table, id); return r ? REF_LABEL[ta
 function fieldInput(f, val, rec){
   const common = { class: "in", "data-k": f.k };
   switch (f.t){
-    case "textarea": { const el = h("textarea", { ...common, rows: f.rows || 4, placeholder: f.ph || "" }); el.value = val || ""; return el; }
+    case "textarea": { const el = h("textarea", { ...common, rows: f.rows || 4, placeholder: f.ph || (f.mentions ? "Type @ to tag someone" : "") }); el.value = val || ""; if (f.mentions) attachMentions(el); return el; }
+    case "tags": {
+      const listId = "dl-" + f.k + "-" + uid();
+      const el = h("input", { ...common, type: "text", value: (val || []).join(", "), placeholder: f.ph || "Comma separated", list: listId, autocomplete: "off" });
+      const sugg = [...new Set([...(typeof f.o === "function" ? f.o() : (f.o || [])), ...rows(f.from || "").flatMap(r => r[f.k] || [])])];
+      return h("span", { style: "display:block", "data-wrap": "1" }, el, h("datalist", { id: listId }, sugg.map(x => h("option", { value: x }))));
+    }
+    case "refs": {
+      const box = h("div", { class: "multi", "data-k": f.k, "data-multi": "1" });
+      const set = new Set(val || []);
+      const cands = f.cands ? f.cands(rec) : rows(f.ref);
+      const list = [...cands.filter(r => set.has(r.id)), ...cands.filter(r => !set.has(r.id))].slice(0, 80);
+      for (const r of list) box.append(h("label", {}, h("input", { type: "checkbox", value: r.id, checked: set.has(r.id) }), REF_LABEL[f.ref](r)));
+      if (!list.length) box.append(h("span", { class: "muted" }, f.empty || "Nothing to choose from yet."));
+      return box;
+    }
     case "number": case "money": case "int":
       return h("input", { ...common, type: "number", step: f.t === "int" ? "1" : "any", min: f.min != null ? String(f.min) : null, value: val == null ? "" : String(val), placeholder: f.ph || "" });
     case "date": return h("input", { ...common, type: "date", value: val ? String(val).slice(0, 10) : "" });
@@ -657,7 +706,8 @@ function fieldInput(f, val, rec){
 function readInput(f, el){
   if (!el) return undefined;
   if (f.t === "bool") return el.querySelector ? el.querySelector("input").checked : el.checked;
-  if (f.t === "users") return [...el.querySelectorAll("input:checked")].map(i => i.value);
+  if (f.t === "users" || f.t === "refs") return [...el.querySelectorAll("input:checked")].map(i => i.value);
+  if (f.t === "tags") { const inp = el.matches && el.matches("input") ? el : el.querySelector("input"); return [...new Set(inp.value.split(",").map(x => x.trim().toLowerCase()).filter(Boolean))]; }
   const v = el.value;
   if (f.t === "number" || f.t === "money") return v === "" ? null : +v;
   if (f.t === "int") return v === "" ? null : Math.round(+v);
@@ -670,13 +720,16 @@ function display(f, val, rec){
   switch (f.t){
     case "user": return personChip(val, f.none);
     case "users": return (val && val.length) ? h("span", { class: "stack" }, val.slice(0, 6).map(id => avatar(id, "sm"))) : h("span", { class: "muted" }, "–");
+    case "tags": return (val && val.length) ? h("span", { style: "display:inline-flex;gap:4px;flex-wrap:wrap" }, val.map(x => h("span", { class: "pill grey" }, x))) : h("span", { class: "muted" }, "–");
+    case "refs": return (val && val.length) ? h("span", {}, val.map(id => refLabel(f.ref, id) || "(hidden)").join(", ")) : h("span", { class: "muted" }, "–");
+    case "textarea": return val ? h("span", {}, renderRich(val)) : h("span", { class: "muted" }, "–");
     case "ref": { const l = refLabel(f.ref, val); return l ? h("span", {}, l) : h("span", { class: "muted" }, "–"); }
     case "money": return h("span", {}, money(val));
     case "date": return val ? h("span", {}, fmtDate(val)) : h("span", { class: "muted" }, "–");
     case "month": return val ? h("span", {}, fmtMonth(val)) : h("span", { class: "muted" }, "–");
     case "time": return val ? h("span", {}, fmtTimeOfDay(val)) : h("span", { class: "muted" }, "–");
     case "bool": return val ? h("span", { class: "pill ok" }, "Yes") : h("span", { class: "muted" }, "No");
-    case "select": return f.pill === false ? h("span", {}, val || "–") : pill(val);
+    case "select": { const o = opts(f, rec).find(x => x.v === val); const lbl = o ? o.l : val; return f.pill === false ? h("span", {}, lbl || "–") : (val ? h("span", { class: "pill " + tone(val) }, lbl) : pill(val)); }
     case "url": return val ? h("a", { href: /^https?:\/\//i.test(val) ? val : "https://" + val, target: "_blank", rel: "noopener" }, val.replace(/^https?:\/\//i, "").slice(0, 40)) : h("span", { class: "muted" }, "–");
     case "email": return val ? h("a", { href: "mailto:" + val }, val) : h("span", { class: "muted" }, "–");
     case "phone": return val ? h("a", { href: "tel:" + val }, val) : h("span", { class: "muted" }, "–");
@@ -688,6 +741,7 @@ function textOf(f, val){
   if (val == null) return "";
   if (f.t === "user") return pname(val);
   if (f.t === "ref") return refLabel(f.ref, val);
+  if (Array.isArray(val)) return val.join(" ");
   return String(val);
 }
 
@@ -708,6 +762,14 @@ function dueTag(date, done){
 const PRIORITY = ["Critical","High","Medium","Low"];
 const PRANK = { Critical: 0, High: 1, Medium: 2, Low: 3 };
 const TASK_STATUS = ["To do","In progress","In review","Done"];
+const REPEATS = ["Does not repeat", "Every weekday", "Every week"];
+const COMPONENTS = ["Android app","iOS app","Web app","Backend / API","Admin panel","Website","Database","Infrastructure / DevOps","Design system"];
+const LABEL_SUGGESTIONS = {
+  Development: ["frontend","backend","api","android","ios","flutter","react","database","performance","security","ui","tech-debt","hotfix"],
+  Sales: ["follow-up","proposal","demo","pricing","contract","hot-lead"],
+  Marketing: ["linkedin","instagram","blog","seo","ads","design","video","newsletter"]
+};
+const WORK_MODES = ["Remote", "Client site", "On-site"];
 const TASK_TYPES = ["Feature","Bug","Testing","Improvement","Research","Design","DevOps","Content","Campaign","SEO","Social media","Follow-up","Proposal","Admin","Other"];
 const LEAD_STATUS = ["New","Contacted","Qualified","Sent to sales","Converted","Not a fit"];
 const LEAD_SOURCES = ["Website","Referral","LinkedIn","Instagram","Google Ads","Meta Ads","SEO","Upwork","Fiverr","Clutch","Cold outreach","Event","WhatsApp","Other"];
@@ -799,54 +861,109 @@ const MOD = {
 
   tasks: {
     label: "Tasks", one: "task", table: "tasks", area: "tasks", title: "title",
-    desc: "Everyone’s work across Development, Sales and Marketing. Add teammates as collaborators; the reviewer approves finished work.",
-    needs: ["projects","sprints"], comments: true, files: true, personalCreate: true,
-    canEdit: (rec, L) => isAdmin() || !rec || involved(rec) || (L >= 2 && rec.vertical === S.me.vertical),
+    desc: "Everyone’s work across Development, Sales and Marketing. Type @ to tag people; the reviewer approves finished work.",
+    needs: ["projects","sprints","releases","notes"], comments: true, files: true, personalCreate: true,
+    keyOf: r => taskKey(r),
+    searchExtra: r => taskKey(r) + " " + (r.labels || []).join(" ") + " " + (r.branch || ""),
+    canEdit: (rec, L) => isAdmin() || !rec || [rec.assignee_id, rec.reviewer_id, rec.created_by].includes(S.me.id) || (rec.collaborators || []).includes(S.me.id) || (L >= 2 && rec.vertical === S.me.vertical),
     canDelete: (rec, L) => isAdmin() || (rec && rec.created_by === S.me.id) || (L >= 3 && rec && rec.vertical === S.me.vertical),
+    quick: [
+      ["all", "All"],
+      ["mine", "My tasks", t => t.assignee_id === S.me.id],
+      ["tagged", "Tagged me", t => (t.mentions || []).includes(S.me.id)],
+      ["review", "I’m reviewing", t => t.reviewer_id === S.me.id && t.status !== "Done"],
+      ["helping", "Helping", t => (t.collaborators || []).includes(S.me.id)]
+    ],
     fields: [
       { k: "title", l: "Title", t: "text", req: true, full: true },
-      { k: "description", l: "Details / what “done” looks like", t: "textarea", full: true },
+      { k: "description", l: "Details / what “done” looks like", t: "textarea", full: true, mentions: true, rows: 5 },
       { k: "vertical", l: "Vertical", t: "select", o: () => isAdmin() ? VERTICALS : [S.me.vertical || "Development"], req: true, def: () => S.me.vertical || "Development", filter: true },
       { k: "type", l: "Type", t: "select", o: TASK_TYPES, req: true, def: () => ({ Sales: "Follow-up", Marketing: "Content" })[S.me.vertical] || "Feature", filter: true },
-      { k: "project_id", l: "Project", t: "ref", ref: "projects", filter: true, show: r => r.vertical === "Development" },
-      { k: "sprint_id", l: "Sprint", t: "ref", ref: "sprints", none: "No sprint", show: r => r.vertical === "Development" },
+
+      { k: "_h_plan", l: "Planning", t: "heading" },
       { k: "priority", l: "Priority", t: "select", o: PRIORITY, req: true, def: "Medium", filter: true },
       { k: "status", l: "Status", t: "select", o: TASK_STATUS, req: true, def: "To do" },
-      { k: "assignee_id", l: "Owner", t: "user", filter: true, def: () => S.me.id },
-      { k: "reviewer_id", l: "Reviewer", t: "user", none: "No review needed", def: defaultReviewer },
-      { k: "collaborators", l: "Collaborators (people helping on this task)", t: "users", full: true },
+      { k: "project_id", l: "Project", t: "ref", ref: "projects", filter: true, show: r => r.vertical === "Development" },
+      { k: "sprint_id", l: "Sprint", t: "ref", ref: "sprints", none: "No sprint", show: r => r.vertical === "Development" },
+      { k: "release_id", l: "Release", t: "ref", ref: "releases", none: "No release", show: r => r.vertical === "Development" },
+      { k: "component", l: "Component", t: "select", o: COMPONENTS, show: r => r.vertical === "Development", filter: true },
+      { k: "labels", l: "Labels", t: "tags", o: () => LABEL_SUGGESTIONS[(S.me && S.me.vertical) || "Development"] || [], from: "tasks", ph: "e.g. frontend, api, urgent", filter: true },
+      { k: "start_date", l: "Start date", t: "date" },
       { k: "due_date", l: "Due date", t: "date" },
       { k: "estimate_hours", l: "Estimate (hours)", t: "number", min: 0 },
       { k: "story_points", l: "Story points", t: "int", min: 0, show: r => r.vertical === "Development" },
-      { k: "severity", l: "Bug severity", t: "select", o: ["Blocker","Major","Minor","Trivial"], show: r => r.type === "Bug" },
+
+      { k: "_h_people", l: "People", t: "heading" },
+      { k: "assignee_id", l: "Owner", t: "user", filter: true, def: () => S.me.id },
+      { k: "reviewer_id", l: "Reviewer", t: "user", none: "No review needed", def: defaultReviewer },
+      { k: "collaborators", l: "Collaborators (people helping on this task)", t: "users", full: true },
+
+      { k: "_h_bug", l: "Bug report", t: "heading", show: r => r.type === "Bug" },
+      { k: "severity", l: "Severity", t: "select", o: ["Blocker","Major","Minor","Trivial"], show: r => r.type === "Bug" },
+      { k: "reproducibility", l: "How often", t: "select", o: ["Always","Sometimes","Once"], show: r => r.type === "Bug" },
       { k: "environment", l: "Found in", t: "select", o: ["Production","Staging","Development","Android","iOS","Web"], show: r => r.type === "Bug" },
+      { k: "build_version", l: "App / build version", t: "text", ph: "e.g. 1.3.0 (42)", show: r => r.type === "Bug" },
+      { k: "device", l: "Device / browser / OS", t: "text", ph: "e.g. Pixel 7, Android 14", show: r => r.type === "Bug" },
       { k: "steps", l: "Steps to reproduce", t: "textarea", full: true, show: r => r.type === "Bug" },
-      { k: "blocked", l: "Blocked", t: "bool", cb: "This task is blocked" },
+      { k: "expected_result", l: "Expected result", t: "textarea", rows: 2, show: r => r.type === "Bug" },
+      { k: "actual_result", l: "What actually happens", t: "textarea", rows: 2, show: r => r.type === "Bug" },
+
+      { k: "_h_code", l: "Code and design", t: "heading", show: r => r.vertical === "Development" },
+      { k: "branch", l: "Branch", t: "text", ph: "Leave empty to use the suggested name", show: r => r.vertical === "Development" },
+      { k: "pr_url", l: "Merge / pull request link", t: "url", show: r => r.vertical === "Development" },
+      { k: "design_url", l: "Design link (Figma etc.)", t: "url", full: true, show: r => r.vertical !== "Sales" },
+
+      { k: "_h_dep", l: "Waiting on", t: "heading" },
+      { k: "blocked_by", l: "Waits on these tasks", t: "refs", ref: "tasks", full: true, empty: "No other open tasks in this vertical.",
+        cands: rec => rows("tasks").filter(t => t.id !== (rec && rec.id) && t.status !== "Done" && (!rec || !rec.vertical || t.vertical === rec.vertical)) },
+      { k: "blocked", l: "Blocked", t: "bool", cb: "This task is blocked for another reason" },
       { k: "blocked_reason", l: "What’s blocking it?", t: "text", show: r => r.blocked }
     ],
-    cols: ["title","vertical","type","assignee_id",{ k: "collaborators", l: "With", render: v => (v && v.length) ? h("span", { class: "stack" }, v.slice(0, 5).map(id => avatar(id, "sm"))) : h("span", { class: "muted" }, "–") },
-      "status","priority",{ k: "due_date", l: "Due", render: (v, r) => dueTag(v, r.status === "Done") || h("span", { class: "muted" }, "–") }],
+    cols: [{ k: "number", l: "ID", render: (v, r) => h("span", { class: "tkey" }, taskKey(r)) }, "title", "type", "assignee_id",
+      { k: "collaborators", l: "With", render: v => (v && v.length) ? h("span", { class: "stack" }, v.slice(0, 5).map(id => avatar(id, "sm"))) : h("span", { class: "muted" }, "–") },
+      "status", "priority", { k: "due_date", l: "Due", render: (v, r) => dueTag(v, r.status === "Done") || h("span", { class: "muted" }, "–") }],
     board: { field: "status", card: taskCard },
     defaultView: "board",
     sort: (a, b) => (b.blocked - a.blocked) || sortByPrioDue(a, b),
     top: tasksTop,
     actions: (rec) => {
-      if (rec.status !== "In review" || !(rec.reviewer_id === S.me.id || isAdmin())) return null;
-      return [h("b", { style: "flex:1" }, "Waiting for your review"),
-        h("button", { type: "button", class: "btn ok", onclick: () => reviewTask(rec, true) }, "Approve"),
-        h("button", { type: "button", class: "btn danger", onclick: () => reviewTask(rec, false) }, "Send back")];
+      const out = [];
+      if (rec.status === "In review" && (rec.reviewer_id === S.me.id || isAdmin()))
+        out.push(h("b", { style: "flex:1" }, "Waiting for your review"),
+          h("button", { type: "button", class: "btn ok", onclick: () => reviewTask(rec, true) }, "Approve"),
+          h("button", { type: "button", class: "btn danger", onclick: () => reviewTask(rec, false) }, "Send back"));
+      else out.push(h("span", { style: "flex:1", class: "muted" }, h("span", { class: "tkey" }, taskKey(rec)), "  ", rec.vertical, (rec.labels || []).length ? " · " + rec.labels.join(", ") : ""));
+      out.push(h("button", { type: "button", class: "btn sm", onclick: () => copyText(taskKey(rec) + " " + rec.title, "Copied") }, "Copy ID"));
+      if (access(MOD.tasks).canCreate) out.push(h("button", { type: "button", class: "btn sm", onclick: () => duplicateTask(rec) }, "Duplicate"));
+      return out;
+    },
+    detail: (rec, box) => {
+      const A = access(MOD.tasks, rec);
+      box.append(checklistSection(rec, A.canEdit));
+      const dep = dependencySection(rec); if (dep) box.append(dep);
+      const code = codeSection(rec); if (code) box.append(code);
+      box.append(linkedNotesSection("task_id", rec));
+      box.append(historySection(rec));
     },
     before: (d, prev) => {
       if (d.status === "Done" && (!prev || prev.status !== "Done")) { d.completed_at = new Date().toISOString(); d.blocked = false; }
       if (d.status && d.status !== "Done") d.completed_at = null;
-      if (d.vertical && d.vertical !== "Development") { d.project_id = null; d.sprint_id = null; }
+      if (d.vertical && d.vertical !== "Development") { d.project_id = null; d.sprint_id = null; d.release_id = null; }
+      if (d.description !== undefined) d.mentions = [...new Set([...((prev && prev.mentions) || []), ...mentionIds(d.description)])];
     },
     after: (rec, prev) => {
-      if (rec.assignee_id && (!prev || prev.assignee_id !== rec.assignee_id)) notify([rec.assignee_id], "Task assigned to you: " + rec.title, rec.priority + " priority" + (rec.due_date ? ", due " + fmtDate(rec.due_date) : ""), "tasks", rec.id);
+      const k = taskKey(rec) ? taskKey(rec) + " " : "";
+      if (rec.assignee_id && (!prev || prev.assignee_id !== rec.assignee_id)) notify([rec.assignee_id], "Task assigned to you: " + k + rec.title, rec.priority + " priority" + (rec.due_date ? ", due " + fmtDate(rec.due_date) : ""), "tasks", rec.id);
       const added = (rec.collaborators || []).filter(id => !prev || !(prev.collaborators || []).includes(id));
-      notify(added, pname(S.me.id) + " added you to a task: " + rec.title, "", "tasks", rec.id);
-      if (rec.status === "In review" && (!prev || prev.status !== "In review")) notify([rec.reviewer_id || defaultReviewer()], "Ready for your review: " + rec.title, "From " + (pname(rec.assignee_id) || "someone"), "tasks", rec.id);
-      if (prev && prev.status !== rec.status && rec.status === "Done") notify([rec.assignee_id, rec.created_by, ...(rec.collaborators || [])], "Task approved: " + rec.title, "", "tasks", rec.id);
+      notify(added, pname(S.me.id) + " added you to " + k + rec.title, "", "tasks", rec.id);
+      const tagged = (rec.mentions || []).filter(id => !(prev && (prev.mentions || []).includes(id)) && !added.includes(id) && id !== rec.assignee_id);
+      notify(tagged, pname(S.me.id) + " tagged you in " + k + rec.title, String(rec.description || "").slice(0, 140), "tasks", rec.id);
+      if (rec.status === "In review" && (!prev || prev.status !== "In review")) notify([rec.reviewer_id || defaultReviewer()], "Ready for your review: " + k + rec.title, "From " + (pname(rec.assignee_id) || "someone"), "tasks", rec.id);
+      if (prev && prev.status !== rec.status && rec.status === "Done") notify([rec.assignee_id, rec.created_by, ...(rec.collaborators || [])], "Task approved: " + k + rec.title, "", "tasks", rec.id);
+      if (prev && prev.status !== "Done" && rec.status === "Done") {
+        const unblocked = rows("tasks").filter(t => (t.blocked_by || []).includes(rec.id) && t.status !== "Done" && openDeps(t).every(x => x.id === rec.id));
+        for (const t of unblocked) notify([t.assignee_id], "You can start " + taskKey(t) + " " + t.title, k + rec.title + " is done.", "tasks", t.id);
+      }
     }
   },
 
@@ -901,29 +1018,59 @@ const MOD = {
 
   meetings: {
     label: "Meetings", one: "meeting", table: "meetings", area: "meetings", title: "title",
-    desc: "Stand-ups, client calls and reviews, with agenda, notes and action items.", needs: ["projects","clients"], comments: true, files: true,
+    desc: "Morning scrum, client calls and reviews, with Google Meet links, agenda, notes and a log of who joined.", needs: ["projects","clients","meeting_joins"], comments: true, files: true,
     personalCreate: true,
     canEdit: (rec, L) => L >= 2 || !rec || rec.created_by === S.me.id,
     canDelete: (rec, L) => L >= 3 || (rec && rec.created_by === S.me.id),
     fields: [
       { k: "title", l: "Title", t: "text", req: true, full: true },
-      { k: "meeting_date", l: "Date", t: "date", req: true, def: () => today() },
-      { k: "start_time", l: "Start time", t: "time" },
+      { k: "kind", l: "Type", t: "select", o: ["Morning scrum","Internal","Client call","Sprint review","Interview","One-on-one","Sales demo"], req: true, def: "Internal", filter: true },
+      { k: "repeat", l: "Repeats", t: "select", o: REPEATS, req: true, def: "Does not repeat" },
+      { k: "meeting_date", l: "Date (first day, if it repeats)", t: "date", req: true, def: () => today() },
+      { k: "start_time", l: "Start time", t: "time", def: "10:00" },
       { k: "duration_min", l: "Duration (minutes)", t: "int", def: 30, min: 5 },
-      { k: "kind", l: "Type", t: "select", o: ["Internal","Stand-up","Client call","Sprint review","Interview","One-on-one","Sales demo"], req: true, def: "Internal", filter: true },
       { k: "project_id", l: "Project", t: "ref", ref: "projects" },
       { k: "client_id", l: "Client", t: "ref", ref: "clients" },
-      { k: "link", l: "Meeting link", t: "url", ph: "Google Meet / Zoom / Teams" },
+      { k: "link", l: "Google Meet link", t: "url", ph: "Leave empty to create one in Google Calendar" },
+      { k: "_google", l: "Google Calendar", t: "bool", virtual: true, when: v => googleOn() && googleConnected() && !v.google_event_id, cb: "Add to Google Calendar, send invites and create a Google Meet link", def: () => googleOn() && googleConnected() },
       { k: "attendees", l: "Attendees", t: "users", full: true, def: () => [S.me.id] },
       { k: "agenda", l: "Agenda", t: "textarea", full: true },
       { k: "notes", l: "Notes / minutes", t: "textarea", full: true },
       { k: "action_items", l: "Action items", t: "textarea", full: true, ph: "One per line, with owner" }
     ],
-    cols: [{ k: "meeting_date", l: "When", get: r => fmtDate(r.meeting_date) + (r.start_time ? ", " + fmtTimeOfDay(r.start_time) : "") }, "title", "kind", "project_id", "attendees", "link"],
+    cols: [{ k: "meeting_date", l: "When", get: r => (r.repeat && r.repeat !== "Does not repeat" ? r.repeat + (r.start_time ? ", " + fmtTimeOfDay(r.start_time) : "") : fmtDate(r.meeting_date) + (r.start_time ? ", " + fmtTimeOfDay(r.start_time) : "")) },
+      "title", "kind", { k: "attendees", l: "Attendees", render: v => (v && v.length) ? h("span", { class: "stack" }, v.slice(0, 6).map(id => avatar(id, "sm"))) : h("span", {}, "Everyone") },
+      { k: "joined", l: "Joined today", get: r => occursOn(r, today()) ? String(new Set(joinsFor(r.id, today()).map(j => j.user_id || j.display_name)).size) : "–" },
+      { k: "join", l: "", render: (v, r) => (occursOn(r, today()) || r.meeting_date >= today()) ? (joinButton(r, today(), true) || h("span", { class: "muted" }, "No link")) : h("span", { class: "muted" }, "") }],
     sort: (a, b) => (a.meeting_date + (a.start_time || "")).localeCompare(b.meeting_date + (b.start_time || "")),
     views: [["upcoming","Upcoming"], ["past","Past"]],
-    viewFilter: (r, v) => v === "past" ? r.meeting_date < today() : r.meeting_date >= today(),
-    after: (rec, prev) => { if (!prev) notify(rec.attendees, "Meeting: " + rec.title, fmtDate(rec.meeting_date) + (rec.start_time ? " at " + fmtTimeOfDay(rec.start_time) : ""), "meetings", rec.id); }
+    viewFilter: (r, v) => { const rep = r.repeat && r.repeat !== "Does not repeat"; return v === "past" ? (!rep && r.meeting_date < today()) : (rep || r.meeting_date >= today()); },
+    actions: (rec) => {
+      const out = [];
+      const day = occursOn(rec, today()) ? today() : null;
+      if (meetUrl(rec)) out.push(h("b", { style: "flex:1" }, day ? (isScrum(rec) ? "Morning scrum is on today" : "This meeting is on today") : "Meeting link ready"), joinButton(rec, day || rec.meeting_date));
+      if (rec.google_html_link) out.push(h("a", { class: "btn", href: rec.google_html_link, target: "_blank", rel: "noopener" }, "Open in Google Calendar"));
+      if (googleOn() && meetCode(rec) && (isAdmin() || rec.created_by === S.me.id || rec.google_owner === S.me.id))
+        out.push(h("button", { type: "button", class: "btn", onclick: async e => {
+          const b = e.currentTarget; b.disabled = true; b.textContent = "Importing…";
+          try {
+            const r = await importMeetJoins(rec);
+            toast("Imported " + r.joins + " join" + (r.joins === 1 ? "" : "s") + " from Google Meet" + (r.checkedIn ? ", " + r.checkedIn + " checked in as Remote" : "") + (r.unmatched.length ? ". Not matched: " + r.unmatched.join(", ") : "") + ".");
+            closeDlg(); openRecord("meetings", rec.id);
+          } catch (err) { fail(err, "Import failed"); b.disabled = false; b.textContent = "Import joins from Google Meet"; }
+        } }, "Import joins from Google Meet"));
+      return out.length ? out : null;
+    },
+    detail: (rec, box) => box.append(joinsSection(rec)),
+    after: async (rec, prev, extra) => {
+      if (!prev) notify(rec.attendees, "Meeting: " + rec.title, (rec.repeat && rec.repeat !== "Does not repeat" ? rec.repeat + " from " : "") + fmtDate(rec.meeting_date) + (rec.start_time ? " at " + fmtTimeOfDay(rec.start_time) : ""), "meetings", rec.id);
+      const keepInSync = rec.google_event_id && rec.google_owner === S.me.id;
+      if (googleOn() && googleConnected() && ((extra && extra._google) || keepInSync)){
+        try { const saved = await syncMeetingToGoogle(rec); toast(keepInSync ? "Google Calendar updated. Attendees were notified." : saved && saved.link ? "Added to Google Calendar with a Meet link. Invites sent." : "Added to Google Calendar."); rerender(); }
+        catch (e) { fail(e, "Saved here, but not in Google Calendar"); }
+      }
+    },
+    beforeDelete: async (rec) => { if (rec.google_event_id) await deleteGoogleEvent(rec); }
   },
 
   /* ---------------- Sales ---------------- */
@@ -1281,6 +1428,39 @@ const MOD = {
     }
   },
 
+  notes: {
+    label: "Notes", one: "note", table: "notes", area: "notes", title: "title",
+    desc: "Private notes, or shared with specific people, your vertical or everyone. Type @ to tag someone.",
+    needs: ["tasks","projects","meetings"], comments: true, files: true, everyoneReads: true,
+    canCreateFn: () => true,
+    canEdit: (rec) => !rec || rec.owner_id === S.me.id,
+    canDelete: (rec) => !!rec && rec.owner_id === S.me.id,
+    fields: [
+      { k: "title", l: "Title", t: "text", req: true, full: true },
+      { k: "body", l: "Note", t: "textarea", full: true, rows: 10, mentions: true },
+      { k: "visibility", l: "Who can see it", t: "select", o: [["Private","Only me"],["People","Specific people"],["Vertical","My vertical (and admins)"],["Company","Everyone"]], req: true, def: "Private" },
+      { k: "pinned", l: "Pin", t: "bool", cb: "Pin to my Home page" },
+      { k: "shared_with", l: "Share with", t: "users", full: true, show: r => r.visibility === "People" },
+      { k: "task_id", l: "Linked task", t: "ref", ref: "tasks", none: "No task" },
+      { k: "project_id", l: "Linked project", t: "ref", ref: "projects", none: "No project" },
+      { k: "meeting_id", l: "Linked meeting", t: "ref", ref: "meetings", none: "No meeting" },
+      { k: "owner_id", l: "Written by", t: "user", auto: true }
+    ],
+    render: (el, A) => notesBoard(el, A),
+    before: (d, prev) => {
+      if (d.body !== undefined) d.mentions = [...new Set([...((prev && prev.mentions) || []), ...mentionIds(d.body)])];
+      if (!prev) d.owner_id = S.me.id;
+      d.vertical = (prev && prev.vertical) || S.me.vertical || null;
+      if (d.visibility && d.visibility !== "People") d.shared_with = [];
+    },
+    after: (rec, prev) => {
+      const tagged = (rec.mentions || []).filter(id => !(prev && (prev.mentions || []).includes(id)));
+      notify(tagged, pname(S.me.id) + " tagged you in a note: " + (rec.title || "Untitled"), String(rec.body || "").slice(0, 140), "notes", rec.id);
+      const shared = rec.visibility === "People" ? (rec.shared_with || []).filter(id => !(prev && prev.visibility === "People" && (prev.shared_with || []).includes(id)) && !tagged.includes(id)) : [];
+      notify(shared, pname(S.me.id) + " shared a note with you: " + (rec.title || "Untitled"), "", "notes", rec.id);
+    }
+  },
+
   announcements: {
     label: "Announcements", one: "announcement", table: "announcements", area: "announcements", title: "title",
     desc: "Company news, policies and updates for everyone.", needs: [], files: true, comments: true, everyoneReads: true,
@@ -1405,9 +1585,10 @@ function applyFilters(M, rs){
     else rs = rs.filter(r => r[k] === v || (Array.isArray(r[k]) && r[k].includes(v)));
   }
   if (M.views && M.viewFilter && ["upcoming","past"].includes(u.view)) rs = rs.filter(r => M.viewFilter(r, u.view));
+  if (M.quick && u.quick && u.quick !== "all"){ const fn = M.quick.find(x => x[0] === u.quick); if (fn && fn[2]) rs = rs.filter(fn[2]); }
   const q = u.q.trim().toLowerCase();
   if (q){
-    rs = rs.filter(r => M.fields.some(f => ["text","textarea","email","phone","url","select","user","ref"].includes(f.t) && textOf(f, r[f.k]).toLowerCase().includes(q)));
+    rs = rs.filter(r => M.fields.some(f => ["text","textarea","email","phone","url","select","user","ref","tags"].includes(f.t) && textOf(f, r[f.k]).toLowerCase().includes(q)) || (M.searchExtra && M.searchExtra(r).toLowerCase().includes(q)));
   }
   rs = rs.slice();
   if (M.sort) rs.sort(M.sort);
@@ -1449,11 +1630,13 @@ async function renderModule(key, el){
     sel.append(h("option", { value: "" }, (f.t === "user" ? "Anyone" : "All") + " (" + f.l.toLowerCase() + ")"));
     if (f.t === "user") { for (const p of activePeople()) sel.append(h("option", { value: p.id }, p.full_name)); sel.append(h("option", { value: "__none" }, f.none || "Unassigned")); }
     else if (f.t === "ref") { for (const r of rows(f.ref).slice().sort((a, b) => REF_LABEL[f.ref](a).localeCompare(REF_LABEL[f.ref](b)))) sel.append(h("option", { value: r.id }, REF_LABEL[f.ref](r))); }
+    else if (f.t === "tags") { for (const x of [...new Set(base.flatMap(r => r[f.k] || []))].sort()) sel.append(h("option", { value: x }, x)); }
     else for (const o of opts(f)) sel.append(h("option", { value: o.v }, o.l));
     sel.value = u.filters[f.k] || "";
     sel.addEventListener("change", () => { u.filters[f.k] = sel.value; drawBody(); });
     tb.append(sel);
   }
+  if (M.quick) tb.append(segmented(M.quick.map(x => [x[0], x[1]]), u.quick || "all", v => { u.quick = v; drawBody(); }));
   const views = M.views || (M.board ? [["board","Board"], ["list","List"]] : null);
   if (views) tb.append(segmented(views, u.view, v => { u.view = v; drawBody(); }));
   const chip = h("span", {});
@@ -1561,12 +1744,16 @@ function taskCard(r){
   const proj = r.vertical === "Development" ? refLabel("projects", r.project_id) : (isAdmin() ? r.vertical : "");
   return h("button", { type: "button", class: "card edge-" + String(r.priority || "medium").toLowerCase() },
     r.blocked ? h("span", { class: "flag" }, "Blocked" + (r.blocked_reason ? ": " + r.blocked_reason : "")) : null,
-    h("p", { class: "t" }, r.title),
+    openDeps(r).length ? h("span", { class: "flag", style: "background:var(--info-t);color:var(--info)" }, "Waits on " + openDeps(r).map(taskKey).join(", ")) : null,
+    h("p", { class: "t" }, taskKey(r) ? h("span", { class: "tkey" }, taskKey(r)) : null, " ", r.title),
+    (r.labels || []).length ? h("span", { class: "m", style: "margin-bottom:6px" }, r.labels.slice(0, 3).map(x => h("span", { class: "pill grey", style: "font-size:11.5px;padding:1px 7px" }, x))) : null,
     h("span", { class: "m" },
       h("span", { class: "pill " + (r.type === "Bug" ? "bad" : "grey") }, r.type),
       proj ? h("span", {}, proj) : null,
       dueTag(r.due_date, r.status === "Done"),
       r.status === "In review" && r.reviewer_id ? h("span", {}, "Review: " + pname(r.reviewer_id).split(" ")[0]) : null,
+      checklistProgress(r) ? h("span", { title: "Checklist" }, "☑ " + checklistProgress(r)) : null,
+      (r.mentions || []).includes(S.me.id) && r.assignee_id !== S.me.id ? h("span", { class: "pill info", style: "font-size:11.5px" }, "@you") : null,
       h("span", { class: "grow" }),
       h("span", { class: "stack" }, avatar(r.assignee_id, "sm"), (r.collaborators || []).slice(0, 3).map(id => avatar(id, "sm")))));
 }
@@ -1608,10 +1795,12 @@ async function openRecord(key, id, preset){
   const wraps = {};
   for (const f of M.fields){
     if (f.auto && !rec) continue;
+    if (f.t === "heading"){ const w = h("div", { class: "full fhead" }, f.l); wraps[f.k] = w; form.append(w); continue; }
     let node;
     const approverField = f.approverOnly;
     const fieldEditable = editable && !f.auto && (!approverField || A.isApprover);
     if (approverField && !rec && !A.isApprover) continue;
+    if (f.virtual && (!fieldEditable || (f.when && !f.when(values)))) continue;
     if (fieldEditable){ node = fieldInput(f, values[f.k], values); inputs[f.k] = node; }
     else {
       const v = values[f.k];
@@ -1625,6 +1814,7 @@ async function openRecord(key, id, preset){
     form.append(w);
   }
   const current = () => { const v = clone(values); for (const f of M.fields) if (inputs[f.k]) v[f.k] = readInput(f, inputs[f.k]); return v; };
+  const readExtra = () => { const x = {}; for (const f of M.fields) if (f.virtual && inputs[f.k]) x[f.k] = readInput(f, inputs[f.k]); return x; };
   const refreshShow = () => { const v = current(); for (const f of M.fields) if (f.show && wraps[f.k]) wraps[f.k].hidden = !f.show(v); };
   form.addEventListener("change", refreshShow);
   refreshShow();
@@ -1659,6 +1849,7 @@ async function openRecord(key, id, preset){
   const foot = [];
   if (rec && A.canDelete) foot.push(h("button", { type: "button", class: "btn danger", onclick: async () => {
     if (!confirm("Delete this " + M.one + "? This can’t be undone.")) return;
+    if (M.beforeDelete) { try { await M.beforeDelete(rec); } catch (e) { console.warn(e); } }
     try { await deleteRow(M.table, rec.id); closeDlg(); toast("Deleted."); rerender(); } catch (e) { fail(e, "Couldn’t delete"); }
   } }, "Delete"));
   foot.push(h("span", { class: "sp" }));
@@ -1666,8 +1857,10 @@ async function openRecord(key, id, preset){
   if (editable){
     const save = async (thenFiles) => {
       err.hidden = true;
+      const extra = readExtra();
+      if (M.preSave) M.preSave(extra, rec);      // runs straight away, while the click still counts (e.g. Google sign-in pop-up)
       const data = {};
-      for (const f of M.fields) if (inputs[f.k]) data[f.k] = readInput(f, inputs[f.k]);
+      for (const f of M.fields) if (inputs[f.k] && !f.virtual) data[f.k] = readInput(f, inputs[f.k]);
       const visible = current();
       for (const f of M.fields){
         if (f.req && inputs[f.k] && (!f.show || f.show(visible)) && (data[f.k] == null || data[f.k] === "")) { err.textContent = "Fill in “" + f.l + "”."; err.hidden = false; inputs[f.k].focus && inputs[f.k].focus(); return; }
@@ -1682,7 +1875,7 @@ async function openRecord(key, id, preset){
         if (thenFiles) openRecord(key, saved.id); else closeDlg();
         toast(rec ? "Saved." : (M.one[0].toUpperCase() + M.one.slice(1)) + " created.");
         rerender();
-        if (M.after) M.after(saved, rec);
+        if (M.after) M.after(saved, rec, extra);
       } catch (e) { err.textContent = "Not saved: " + friendly(e); err.hidden = false; }
       finally { saveBtns.forEach(b => { b.disabled = false; if (b.dataset.label) b.textContent = b.dataset.label; }); }
     };
@@ -1692,7 +1885,7 @@ async function openRecord(key, id, preset){
     saveBtns.push(b); foot.push(b);
   }
 
-  const title = rec ? (rec[M.title] ? String(rec[M.title]) : (M.one[0].toUpperCase() + M.one.slice(1))) : "New " + M.one;
+  const title = rec ? ((M.keyOf ? M.keyOf(rec) + "  " : "") + (rec[M.title] ? String(rec[M.title]) : (M.one[0].toUpperCase() + M.one.slice(1)))) : "New " + M.one;
   openDialog(title.length > 70 ? title.slice(0, 70) + "…" : title, body, foot);
   S.dlg = rec ? { tbl: M.table, id: rec.id } : null;
   const first = form.querySelector("input:not([type=checkbox]),textarea,select");
@@ -1713,7 +1906,8 @@ async function decide(M, rec, status){
 function commentsSection(tbl, id){
   const sec = h("div", { class: "section" }, h("h3", {}, "Comments"));
   const list = h("div", {}, h("p", { class: "nothing" }, "Loading…"));
-  const ta = h("textarea", { class: "in", rows: 2, placeholder: "Write a comment… use @Name to notify someone", maxlength: "4000" });
+  const ta = h("textarea", { class: "in", rows: 2, placeholder: "Write a comment… type @ to tag someone", maxlength: "4000" });
+  attachMentions(ta);
   const post = h("button", { type: "button", class: "btn pri sm" }, "Post comment");
   sec.append(list, h("div", { style: "display:flex;flex-direction:column;gap:8px;margin-top:8px;align-items:flex-end" }, ta, post));
   async function refresh(){
@@ -1724,21 +1918,23 @@ function commentsSection(tbl, id){
       for (const c of cs) list.append(h("div", { class: "cmt" }, avatar(c.author_id, "sm"),
         h("div", { class: "bd" }, h("div", { class: "hd" }, h("b", {}, pname(c.author_id) || "Someone"), fmtAgo(c.created_at),
           (c.author_id === S.me.id || S.me.is_admin) ? h("button", { type: "button", class: "del", onclick: async () => { try { ok(await sb.from("comments").delete().eq("id", c.id)); refresh(); } catch (e) { fail(e); } } }, " · Delete") : null),
-          h("p", {}, c.body))));
+          h("p", {}, renderRich(c.body)))));
     } catch (e) { list.replaceChildren(h("p", { class: "nothing" }, "Comments couldn’t be loaded.")); }
   }
   post.addEventListener("click", async () => {
     const body = ta.value.trim(); if (!body) return;
     post.disabled = true;
     try {
-      ok(await sb.from("comments").insert({ tbl, entity_id: id, body, author_id: S.me.id }));
+      const mentioned = mentionIds(body);
+      ok(await sb.from("comments").insert({ tbl, entity_id: id, body, author_id: S.me.id, mentions: mentioned }));
       ta.value = "";
       const M = Object.values(MOD).find(m => m.table === tbl);
       const rec = byId(tbl, id) || {};
-      const mentioned = activePeople().filter(p => body.toLowerCase().includes("@" + p.full_name.toLowerCase().split(" ")[0])).map(p => p.id);
-      const involved = [rec.assignee_id, rec.reviewer_id, rec.owner_id, rec.sales_owner_id, rec.manager_id, rec.created_by, rec.user_id, ...(rec.collaborators || [])].filter(Boolean);
-      const label = rec[M ? M.title : "title"] || (M ? M.one : "item");
-      notify([...new Set([...mentioned, ...involved])], pname(S.me.id) + " commented on " + label, body.slice(0, 140), tbl, id);
+      const involved = [rec.assignee_id, rec.reviewer_id, rec.owner_id, rec.sales_owner_id, rec.manager_id, rec.created_by, rec.user_id, ...(rec.collaborators || [])].filter(id2 => id2 && !mentioned.includes(id2));
+      const label = (M && M.keyOf ? M.keyOf(rec) + " " : "") + (rec[M ? M.title : "title"] || (M ? M.one : "item"));
+      notify(mentioned, pname(S.me.id) + " tagged you in " + label, body.slice(0, 140), tbl, id);
+      notify([...new Set(involved)], pname(S.me.id) + " commented on " + label, body.slice(0, 140), tbl, id);
+      if (mentioned.length && tbl === "tasks") { const r2 = byId("tasks", id); if (r2) r2.mentions = [...new Set([...(r2.mentions || []), ...mentioned])]; }
       refresh();
     } catch (e) { fail(e, "Comment not posted"); }
     post.disabled = false;
@@ -1830,6 +2026,7 @@ function attention(tasks){
     ["Waiting for review", open.filter(t => t.status === "In review"), t => "Reviewer: " + (pname(t.reviewer_id) || "none"), "warn"],
     ["Overdue", open.filter(t => t.due_date && t.due_date < t0), t => (pname(t.assignee_id) || "Unassigned") + ", due " + fmtDate(t.due_date), "bad"],
     ["Blocked", open.filter(t => t.blocked), t => pname(t.assignee_id) || "Unassigned", "warn"],
+    ["Waiting on other tasks", open.filter(t => openDeps(t).length), t => "Waits on " + openDeps(t).map(taskKey).join(", "), "info"],
     ["No owner", open.filter(t => !t.assignee_id), t => t.vertical, "grey"],
     ["Due in 3 days", open.filter(t => t.due_date && t.due_date >= t0 && dayDiff(t0, t.due_date) <= 3), t => (pname(t.assignee_id) || "Unassigned") + ", " + fmtDate(t.due_date), "info"]
   ];
@@ -1839,7 +2036,7 @@ function attention(tasks){
     if (!items.length) continue; any = true;
     const list = items.slice().sort(sortByPrioDue);
     box.append(h("div", { style: "margin-bottom:10px" }, h("div", { style: "display:flex;gap:8px;align-items:center;font-weight:700;font-size:13.5px;margin-bottom:2px" }, title, h("span", { class: "pill " + tn }, items.length)),
-      list.slice(0, 4).map(t => h("button", { type: "button", class: "row", onclick: () => openRecord("tasks", t.id) }, h("span", { class: "x" }, t.title), h("span", { class: "y" }, meta(t)))),
+      list.slice(0, 4).map(t => h("button", { type: "button", class: "row", onclick: () => openRecord("tasks", t.id) }, h("span", { class: "tkey" }, taskKey(t)), h("span", { class: "x" }, t.title), h("span", { class: "y" }, meta(t)))),
       list.length > 4 ? h("p", { class: "nothing", style: "font-size:12.5px" }, "and " + (list.length - 4) + " more") : null));
   }
   if (!any) box.append(h("p", { class: "nothing", style: "color:var(--ok);font-weight:600" }, tasks.length ? "Nothing needs attention right now." : "No tasks yet."));
@@ -1858,32 +2055,88 @@ function tasksTop(el, base, A){
 /* ---------------------------------------------------------------------
    Leave balance: one yearly pool (12 days by default)
    --------------------------------------------------------------------- */
-function leaveBalance(userId){
-  const quota = +(S.settings.annual_leave ?? 12);
+// Leave runs by calendar year: everyone starts each 1 January with the full allowance (no carry-over).
+function daysInYear(r, y){
+  const s = r.start_date > y + "-01-01" ? r.start_date : y + "-01-01";
+  const e = r.end_date < y + "-12-31" ? r.end_date : y + "-12-31";
+  if (e < s) return 0;
+  return workingDays(s, e, r.half_day && r.start_date === r.end_date);
+}
+// A year can have its own allowance (e.g. 2 days for the rest of 2026); otherwise the normal yearly number applies.
+function quotaFor(year){
+  const o = (S.settings.leave_overrides || {})[String(year)];
+  return o !== undefined && o !== null && o !== "" ? +o : +(S.settings.annual_leave ?? 12);
+}
+const leftText = b => b.left >= 0 ? b.left + " of " + b.quota : "Over by " + (-b.left);
+function leaveBalance(userId, year){
+  const quota = quotaFor(year || today().slice(0, 4));
   const counted = S.settings.counted_leave_types || ["Paid leave","Sick leave"];
-  const y = today().slice(0, 4);
-  const used = rows("leave_requests").filter(r => r.user_id === userId && counted.includes(r.type) && r.status === "Approved" && r.start_date.slice(0, 4) === y)
-    .reduce((s, r) => s + workingDays(r.start_date, r.end_date, r.half_day), 0);
-  const pending = rows("leave_requests").filter(r => r.user_id === userId && counted.includes(r.type) && r.status === "Pending" && r.start_date.slice(0, 4) === y)
-    .reduce((s, r) => s + workingDays(r.start_date, r.end_date, r.half_day), 0);
-  return { quota, used, pending, left: quota - used };
+  const y = String(year || today().slice(0, 4));
+  const mine = rows("leave_requests").filter(r => r.user_id === userId && counted.includes(r.type));
+  const used = mine.filter(r => r.status === "Approved").reduce((s, r) => s + daysInYear(r, y), 0);
+  const pending = mine.filter(r => r.status === "Pending").reduce((s, r) => s + daysInYear(r, y), 0);
+  return { quota, used, pending, left: quota - used, year: y, resets: (+y + 1) + "-01-01" };
+}
+const resetNote = b => "Resets to " + quotaFor(b.resets.slice(0, 4)) + " on 1 Jan " + b.resets.slice(0, 4) + " (in " + dayDiff(today(), b.resets) + " days). Unused leave doesn’t carry over.";
+
+/* ---------------------------------------------------------------------
+   Holidays
+   --------------------------------------------------------------------- */
+const allHolidays = () => (S.settings.holidays || []).slice().sort((a, b) => a.date.localeCompare(b.date));
+const upcomingHolidays = n => allHolidays().filter(x => x.date >= today()).slice(0, n || 99);
+function holidayRow(x){
+  const d = dayDiff(today(), x.date);
+  return h("div", { class: "row", style: "cursor:default" },
+    h("span", { class: "hday" }, h("b", {}, String(+x.date.slice(8))), h("small", {}, parseD(x.date).toLocaleDateString("en-IN", { month: "short" }))),
+    h("span", { class: "x" }, h("b", {}, x.name), h("br"), h("span", { class: "muted", style: "font-size:12.5px" }, parseD(x.date).toLocaleDateString("en-IN", { weekday: "long" }) + (x.date.slice(0, 4) !== today().slice(0, 4) ? " " + x.date.slice(0, 4) : ""))),
+    h("span", { class: "y" }, d === 0 ? pill("Today", "ok") : d === 1 ? pill("Tomorrow", "warn") : "in " + d + " days"));
+}
+function holidaysPanel(limit){
+  const list = upcomingHolidays(limit);
+  return listPanel("Upcoming holidays", list.map(holidayRow), isAdmin() ? "No upcoming holidays. Add them in Admin panel › Company settings." : "No upcoming holidays added yet.", ["All holidays", () => go("holidays")]);
+}
+function renderHolidays(el){
+  el.append(h("div", { class: "ph" }, h("div", {}, h("h1", {}, "Holidays"), h("p", {}, "Company holidays. They’re not counted as leave days and show on everyone’s calendar.")),
+    isAdmin() ? h("div", { class: "acts" }, h("button", { type: "button", class: "btn pri", onclick: () => go("admin-settings") }, "Edit holidays")) : null));
+  const list = allHolidays(), y = today().slice(0, 4);
+  const next = list.find(x => x.date >= today());
+  const thisYearLeft = list.filter(x => x.date >= today() && x.date.slice(0, 4) === y).length;
+  el.append(statStrip([
+    ["Next holiday", next ? next.name + (dayDiff(today(), next.date) === 0 ? " (today)" : " · in " + dayDiff(today(), next.date) + " days") : "None added"],
+    ["Left this year", thisYearLeft], ["Total in " + y, list.filter(x => x.date.slice(0, 4) === y).length]]));
+  if (!list.length){ el.append(h("div", { class: "panel empty" }, h("b", {}, "No holidays added yet"), isAdmin() ? "Add them in Admin panel › Company settings." : "")); return; }
+  const years = [...new Set(list.map(x => x.date.slice(0, 4)))].filter(yy => yy >= y);
+  for (const yy of years){
+    const items = list.filter(x => x.date.slice(0, 4) === yy);
+    const p = h("div", { class: "panel", style: "margin-bottom:14px" }, h("h2", {}, yy));
+    for (const x of items){
+      const past = x.date < today();
+      const r = holidayRow(x); if (past){ r.style.opacity = ".5"; r.lastChild.textContent = "Done"; }
+      p.append(r);
+    }
+    el.append(p);
+  }
 }
 function leaveTop(el, base, A){
   const b = leaveBalance(S.me.id);
-  const items = [["My leave left this year", b.left + " of " + b.quota, b.left <= 0 ? "var(--bad)" : b.left <= 2 ? "var(--warn)" : null]];
+  const items = [["My leave left in " + b.year, leftText(b), b.left <= 0 ? "var(--bad)" : b.left <= 2 ? "var(--warn)" : null]];
   if (b.pending) items.push(["My pending requests", b.pending + " day" + (b.pending === 1 ? "" : "s"), "var(--warn)"]);
   if (A.L >= 2) items.push(["Waiting for approval", rows("leave_requests").filter(r => r.status === "Pending").length, "var(--warn)"]);
   if (A.L >= 1) items.push(["Away today", rows("leave_requests").filter(r => r.status === "Approved" && r.start_date <= today() && r.end_date >= today() && r.type !== "Work from home").length]);
   el.append(statStrip(items));
+  el.append(h("p", { class: "muted", style: "margin:-8px 0 16px;font-size:13px" }, "Leave runs January to December. " + resetNote(b)));
+  const nextH = upcomingHolidays(4);
+  if (nextH.length) el.append(h("div", { class: "panel", style: "margin-bottom:16px" }, h("h2", {}, "Upcoming holidays", h("button", { type: "button", class: "link", onclick: () => go("holidays") }, "All holidays")),
+    h("div", { class: "hgrid" }, nextH.map(holidayRow))));
   if (A.L >= 1){
     const tb = h("tbody");
     for (const p of activePeople()){
       const lb = leaveBalance(p.id);
       tb.append(h("tr", {}, h("td", {}, personChip(p.id)), h("td", {}, p.vertical || "–"), h("td", { class: "num" }, String(lb.used)), h("td", { class: "num" }, lb.pending ? String(lb.pending) : "–"),
-        h("td", { class: "num" }, h("b", { class: lb.left <= 0 ? "over" : lb.left <= 2 ? "soon" : "" }, lb.left + " of " + lb.quota))));
+        h("td", { class: "num" }, h("b", { class: lb.left <= 0 ? "over" : lb.left <= 2 ? "soon" : "" }, leftText(lb)))));
     }
     el.append(h("details", { class: "panel", style: "margin-bottom:16px" }, h("summary", { style: "cursor:pointer;font-weight:700" }, "Everyone’s leave balance"),
-      h("div", { class: "tablewrap", style: "margin-top:10px" }, h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Person"), h("th", {}, "Vertical"), h("th", { class: "num" }, "Used"), h("th", { class: "num" }, "Pending"), h("th", { class: "num" }, "Left"))), tb))));
+      h("div", { class: "tablewrap", style: "margin-top:10px" }, h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Person"), h("th", {}, "Vertical"), h("th", { class: "num" }, "Used"), h("th", { class: "num" }, "Pending"), h("th", { class: "num" }, "Left in " + b.year))), tb))));
   }
 }
 
@@ -1953,8 +2206,20 @@ const hoursOf = r => r.check_in && r.check_out ? Math.max(0, (new Date(r.check_o
 function attendanceWidget(light){
   const r = myToday();
   const wrap = h("div", { class: "att" });
+  const nm = nextMeeting();
+  if (nm && !nm.scrum){
+    const mins = Math.round((new Date(nm.start) - Date.now()) / 60000);
+    wrap.append(h("button", { type: "button", class: "btn", style: "font-weight:700", onclick: () => joinAgendaItem(nm) }, "Join " + (nm.title.length > 28 ? nm.title.slice(0, 28) + "…" : nm.title) + (mins > 0 ? " · in " + mins + " min" : " · now")));
+  }
+  const scrum = todaysScrum();
+  if (scrum && meetUrl(scrum)){
+    const j = myJoin(scrum.id, today());
+    wrap.append(j ? h("span", {}, "✓ Joined morning scrum at " + fmtTime(j.joined_at))
+      : h("button", { type: "button", class: "btn", style: "font-weight:700", onclick: () => joinMeeting(scrum, today()) }, "Join morning scrum" + (scrum.start_time ? " · " + fmtTimeOfDay(scrum.start_time) : "")));
+    if (!r && !j) wrap.append(h("span", {}, "or"));
+  }
   if (!r){
-    const mode = h("select", { class: "in", style: "width:auto;min-height:36px;" + (light ? "background:#fff;color:var(--ink)" : ""), "aria-label": "Working from" }, ["Office","Remote","Client site"].map(m => h("option", { value: m }, m)));
+    const mode = h("select", { class: "in", style: "width:auto;min-height:36px;" + (light ? "background:#fff;color:var(--ink)" : ""), "aria-label": "Working from" }, WORK_MODES.map(m => h("option", { value: m }, m)));
     wrap.append(h("span", {}, "Not checked in yet"), mode, h("button", { type: "button", class: "btn", onclick: () => checkIn(mode.value) }, "Check in"));
   } else if (!r.check_out){
     wrap.append(h("span", {}, "Checked in at " + fmtTime(r.check_in) + " (" + r.mode + ")"), h("button", { type: "button", class: "btn", onclick: checkOut }, "Check out"));
@@ -1966,7 +2231,7 @@ function attendanceWidget(light){
 
 async function renderAttendance(el){
   el.append(h("div", { class: "loading" }, "Loading attendance…"));
-  await ensure(["attendance","leave_requests"]);
+  await ensure(["attendance","leave_requests","meetings","meeting_joins"]);
   if (S.route !== "attendance") return;
   el.replaceChildren();
   const L = lvl("attendance");
@@ -1991,10 +2256,13 @@ async function renderAttendance(el){
       const r = rows("attendance").find(x => x.user_id === p.id && x.day === t0);
       const lv = rows("leave_requests").find(x => x.user_id === p.id && x.status === "Approved" && x.start_date <= t0 && x.end_date >= t0);
       const st = r ? (r.check_out ? "Checked out" : "Present") : lv ? (lv.type === "Work from home" ? "Work from home" : "On leave") : "Not checked in";
+      const scr = occurrences(t0, t0, isScrum)[0];
+      const sj = scr ? rows("meeting_joins").filter(j => j.meeting_id === scr[1].id && j.joined_on === t0 && j.user_id === p.id).sort((a, b) => String(a.joined_at).localeCompare(String(b.joined_at)))[0] : null;
       tbody.append(h("tr", {}, h("td", {}, personChip(p.id)), h("td", {}, pill(st, st === "Present" || st === "Checked out" ? "ok" : st === "On leave" ? "warn" : st === "Work from home" ? "info" : "grey")),
+        h("td", {}, scr ? (sj ? h("span", { style: "color:var(--ok);font-weight:600" }, "✓ " + fmtTime(sj.joined_at)) : h("span", { class: "muted" }, "Not joined")) : h("span", { class: "muted" }, "–")),
         h("td", {}, r ? fmtTime(r.check_in) : "–"), h("td", {}, r && r.check_out ? fmtTime(r.check_out) : "–"), h("td", {}, r ? r.mode : "–"), h("td", { class: "num" }, r && hoursOf(r) != null ? hoursOf(r).toFixed(1) : "–")));
     }
-    el.append(h("div", { class: "tablewrap" }, h("table", {}, h("thead", {}, h("tr", {}, ["Person","Status","In","Out","Where",""].map((x, i) => h("th", { class: i === 5 ? "num" : null }, i === 5 ? "Hours" : x)))), tbody)));
+    el.append(h("div", { class: "tablewrap" }, h("table", {}, h("thead", {}, h("tr", {}, ["Person","Status","Morning scrum","In","Out","Where",""].map((x, i) => h("th", { class: i === 6 ? "num" : null }, i === 6 ? "Hours" : x)))), tbody)));
     return;
   }
   let rs = rows("attendance").filter(r => r.day.slice(0, 7) === u.month);
@@ -2085,16 +2353,19 @@ function openMyProfile(){
       h("label", { class: "fl full" }, "Full name", name), h("label", { class: "fl" }, "Job title", title), h("label", { class: "fl" }, "Phone", phone),
       h("div", { class: "fl full" }, "Email", h("div", { class: "ro" }, p.email)),
       h("div", { class: "full section", style: "margin-top:4px" }, h("h3", {}, "Change password")),
-      h("label", { class: "fl" }, "New password", pw1, h("span", { class: "hint" }, "At least 8 characters")), h("label", { class: "fl" }, "Repeat new password", pw2)),
+      h("label", { class: "fl" }, "New password", pw1, h("span", { class: "hint" }, "At least 8 characters")), h("label", { class: "fl" }, "Repeat new password", pw2),
+      h("div", { class: "full section", style: "margin-top:4px" }, h("h3", {}, "Google Calendar and Meet"), googleCard())),
     err
   ], [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), save], true);
 }
 
+// "9:30 am Title" -> minutes since midnight, for ordering a day's meetings
+function timeKey(t){ const m = String(t).match(/^(\d{1,2}):(\d{2})\s*([ap]m)?/i); if (!m) return 9999; let hh = +m[1] % 12; if (/p/i.test(m[3] || "")) hh += 12; return hh * 60 + +m[2]; }
 /* ---------------------------------------------------------------------
    Calendar
    --------------------------------------------------------------------- */
 async function renderCalendar(el){
-  const want = ["meetings","leave_requests","tasks"];
+  const want = ["meetings","leave_requests","tasks","meeting_joins","calendar_events","google_links"];
   if (lvl("releases") >= 1) want.push("releases");
   if (lvl("projects") >= 1) want.push("projects");
   if (lvl("marketing") >= 1) want.push("content", "campaigns");
@@ -2109,13 +2380,22 @@ async function renderCalendar(el){
   const shift = n => { const d = new Date(Y, Mo - 1 + n, 1); u.month = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); rerender(); };
   el.append(h("div", { class: "ph" }, h("div", {}, h("h1", {}, label), h("p", {}, "Deadlines, meetings, leave, releases, posts, follow-ups and holidays you can see.")),
     h("div", { class: "acts" }, h("button", { type: "button", class: "btn", onclick: () => shift(-1) }, "‹ Previous"), h("button", { type: "button", class: "btn", onclick: () => { u.month = today().slice(0, 7); rerender(); } }, "Today"), h("button", { type: "button", class: "btn", onclick: () => shift(1) }, "Next ›"))));
-  el.append(h("div", { class: "tb" }, segmented([["all","Everything I can see"], ["mine","Only mine"]], u.mine ? "mine" : "all", v => { u.mine = v === "mine"; rerender(); })));
+  el.append(h("div", { class: "tb" }, segmented([["all","Everything I can see"], ["mine","Only mine"]], u.mine ? "mine" : "all", v => { u.mine = v === "mine"; rerender(); }),
+    googleOn() ? (googleConnected()
+      ? h("span", { class: "muted", style: "font-size:13px;display:flex;align-items:center;gap:8px" }, pill("Google Calendar synced", "ok"), myGoogle().last_sync_at ? fmtAgo(myGoogle().last_sync_at) : "", h("button", { type: "button", class: "btn sm ghost", onclick: () => syncGoogleNow(false) }, "Sync now"))
+      : h("button", { type: "button", class: "btn soft", onclick: () => connectGoogle() }, "Connect Google Calendar")) : null));
 
   const ev = {};
-  const add = (date, kind, text, open) => { if (!date) return; const d = String(date).slice(0, 10); (ev[d] = ev[d] || []).push({ kind, text, open }); };
+  const RANK = { holiday: 0, meeting: 1, google: 1, leave: 2, release: 3, task: 4, content: 5, invoice: 6, renewal: 7 };
+  const add = (date, kind, text, open) => { if (!date) return; const d = String(date).slice(0, 10); (ev[d] = ev[d] || []).push({ kind, text, open, n: Object.values(ev).reduce((s, l) => s + l.length, 0) }); };
   const me = S.me.id, mine = u.mine;
   for (const t of rows("tasks")) if (t.status !== "Done" && (!mine || involved(t))) add(t.due_date, "task", t.title, () => openRecord("tasks", t.id));
-  for (const m of rows("meetings")) if (!mine || (m.attendees || []).includes(me)) add(m.meeting_date, "meeting", (m.start_time ? fmtTimeOfDay(m.start_time) + " " : "") + m.title, () => openRecord("meetings", m.id));
+  const monthFrom = u.month + "-01", monthTo = ymd(new Date(Y, Mo, 0));
+  for (const [day, m] of occurrences(addDays(monthFrom, -7), addDays(monthTo, 7), m => !mine || invited(m, me))) add(day, "meeting", (m.start_time ? fmtTimeOfDay(m.start_time) + " " : "") + m.title, () => openRecord("meetings", m.id));
+  for (const it of agenda(addDays(monthFrom, -7), addDays(monthTo, 7)).filter(x => x.source === "google")){
+    let dd = it.day; const last = it.event.end_date || it.day;
+    for (let i = 0; i < 14 && dd <= last; i++){ add(dd, "google", (it.allDay ? "" : agendaTime(it) + " ") + it.title, it.open); dd = addDays(dd, 1); }
+  }
   for (const l of rows("leave_requests")) if (l.status === "Approved" && (!mine || l.user_id === me)) {
     let d = l.start_date; for (let i = 0; i < 60 && d <= l.end_date; i++){ add(d, "leave", (pname(l.user_id).split(" ")[0] || "Someone") + ": " + l.type, () => openRecord("leave_requests", l.id)); d = addDays(d, 1); }
   }
@@ -2133,7 +2413,7 @@ async function renderCalendar(el){
   let d = ymd(new Date(Y, Mo - 1, 1 - startOffset));
   for (let i = 0; i < 42; i++){
     const inMonth = d.slice(0, 7) === u.month;
-    const list = ev[d] || [];
+    const list = (ev[d] || []).slice().sort((a, b) => (RANK[a.kind] ?? 9) - (RANK[b.kind] ?? 9) || (/^\d/.test(a.text) && /^\d/.test(b.text) ? timeKey(a.text) - timeKey(b.text) : 0) || a.n - b.n);
     const cell = h("div", { class: "cal-day" + (inMonth ? "" : " out") + (d === today() ? " today" : "") }, h("span", { class: "dn" }, String(+d.slice(8))));
     list.slice(0, 4).forEach(e => cell.append(h("button", { type: "button", class: "ev k-" + e.kind, title: e.text, onclick: e.open || null }, e.text)));
     if (list.length > 4){
@@ -2146,14 +2426,14 @@ async function renderCalendar(el){
   }
   cal.append(grid);
   el.append(h("div", { style: "overflow-x:auto" }, h("div", { style: "min-width:640px" }, cal)));
-  el.append(h("div", { class: "legend", style: "margin-top:12px" }, [["task","Task due"],["meeting","Meeting"],["leave","Leave"],["release","Release / deadline"],["content","Content"],["invoice","Sales follow-up"],["renewal","Proposal expiry"],["holiday","Holiday"]].map(([k, l]) => h("span", {}, h("span", { class: "ev k-" + k, style: "display:inline-block;width:auto;margin-right:4px" }, l)))));
+  el.append(h("div", { class: "legend", style: "margin-top:12px" }, [["task","Task due"],["meeting","Meeting"],["google","Google Calendar"],["leave","Leave"],["release","Release / deadline"],["content","Content"],["invoice","Sales follow-up"],["renewal","Proposal expiry"],["holiday","Holiday"]].map(([k, l]) => h("span", {}, h("span", { class: "ev k-" + k, style: "display:inline-block;width:auto;margin-right:4px" }, l)))));
 }
 
 /* ---------------------------------------------------------------------
    Home: what I need to do today
    --------------------------------------------------------------------- */
 async function renderDashboard(el){
-  const want = ["tasks","meetings","announcements","attendance","leave_requests"];
+  const want = ["tasks","meetings","announcements","attendance","leave_requests","meeting_joins","calendar_events","google_links","notes"];
   if (lvl("sales") >= 1 || lvl("leads") >= 1) want.push("deals", "activities", "leads");
   if (lvl("marketing") >= 1) want.push("content");
   await ensure(want);
@@ -2168,7 +2448,9 @@ async function renderDashboard(el){
   // everything on my plate, from every module
   const items = [];
   for (const t of rows("tasks")) if (t.status !== "Done" && (t.assignee_id === me || (t.collaborators || []).includes(me)))
-    items.push({ d: t.due_date, kind: t.assignee_id === me ? "Task" : "Helping", text: t.title, extra: pill(t.status), open: () => openRecord("tasks", t.id), blocked: t.blocked });
+    items.push({ d: t.due_date, kind: t.assignee_id === me ? "Task" : "Helping", text: (taskKey(t) ? taskKey(t) + " " : "") + t.title, extra: pill(t.status), open: () => openRecord("tasks", t.id), blocked: t.blocked });
+  for (const t of rows("tasks")) if (t.status !== "Done" && (t.mentions || []).includes(me) && t.assignee_id !== me && !(t.collaborators || []).includes(me) && t.reviewer_id !== me)
+    items.push({ d: t.due_date, kind: "Tagged", text: taskKey(t) + " " + t.title, extra: pill(t.status), open: () => openRecord("tasks", t.id) });
   for (const t of rows("tasks")) if (t.status === "In review" && t.reviewer_id === me && t.assignee_id !== me)
     items.push({ d: t.due_date || t0, kind: "Review", text: t.title + " (" + (pname(t.assignee_id) || "unassigned") + ")", extra: pill("Review", "warn"), open: () => openRecord("tasks", t.id) });
   for (const dl of rows("deals")) if (dl.owner_id === me && !["Won","Lost"].includes(dl.stage) && dl.next_followup && dl.next_followup <= addDays(t0, 3))
@@ -2186,7 +2468,9 @@ async function renderDashboard(el){
   const lb = leaveBalance(me);
   const stats = [["On my plate", items.length, null], ["Overdue", overdue, "var(--bad)"]];
   if (reviews) stats.push(["Waiting for my review", reviews, "var(--warn)"]);
-  stats.push(["My leave left", lb.left + " of " + lb.quota, lb.left <= 2 ? "var(--warn)" : null, () => go("leave_requests")]);
+  stats.push(["My leave left in " + lb.year, leftText(lb), lb.left <= 2 ? "var(--warn)" : null, () => go("leave_requests")]);
+  const nh = upcomingHolidays(1)[0];
+  if (nh) stats.push(["Next holiday", nh.name + " · " + (dayDiff(t0, nh.date) === 0 ? "today" : dayDiff(t0, nh.date) === 1 ? "tomorrow" : "in " + dayDiff(t0, nh.date) + " days"), "var(--ok)", () => go("holidays")]);
   if (lvl("leave") >= 2) stats.push(["Leave to approve", rows("leave_requests").filter(r => r.status === "Pending").length, "var(--warn)", () => go("leave_requests")]);
   el.append(statStrip(stats));
 
@@ -2217,10 +2501,16 @@ async function renderDashboard(el){
     "No announcements yet.", ["All", () => go("announcements")]));
 
   const week = addDays(t0, 7), up = [];
-  for (const m of rows("meetings")) if (m.meeting_date >= t0 && m.meeting_date <= week && ((m.attendees || []).includes(me) || m.created_by === me)) up.push([m.meeting_date + (m.start_time || ""), fmtDate(m.meeting_date) + (m.start_time ? " " + fmtTimeOfDay(m.start_time) : ""), m.title, () => openRecord("meetings", m.id)]);
-  for (const hd of (S.settings.holidays || [])) if (hd.date >= t0 && hd.date <= addDays(t0, 30)) up.push([hd.date, fmtDate(hd.date), "Holiday: " + hd.name, null]);
+  for (const it of agenda(t0, week).slice(0, 14)) up.push([it.day + (it.start || ""), (it.day === t0 ? "Today" : fmtDate(it.day)) + (agendaTime(it) ? " " + agendaTime(it) : ""), [it.title, it.source === "google" ? h("span", { class: "pill info", style: "margin-left:6px" }, "Google") : null], it.open, it.day === t0 ? agendaJoinButton(it, true) : null]);
   up.sort((a, b) => a[0].localeCompare(b[0]));
-  right.append(listPanel("Meetings and holidays", up.slice(0, 8).map(([, w, t, o]) => h("button", { type: "button", class: "row", onclick: o || null }, h("span", { class: "y", style: "min-width:86px" }, w), h("span", { class: "x" }, t))), "Nothing scheduled.", ["Calendar", () => go("calendar")]));
+  const pins = rows("notes").filter(n => n.pinned && n.owner_id === me);
+  if (pins.length) right.append(listPanel("Pinned notes", pins.slice(0, 5).map(n => h("button", { type: "button", class: "row", style: "align-items:flex-start", onclick: () => openRecord("notes", n.id) },
+    h("span", { class: "x", style: "white-space:normal" }, h("b", {}, n.title || "Untitled"), h("br"), h("span", { class: "muted", style: "font-size:13px" }, String(n.body || "").slice(0, 90) + (String(n.body || "").length > 90 ? "…" : ""))))), "", ["All notes", () => go("notes")]));
+  right.append(holidaysPanel(4));
+  if (googleOn() && !googleConnected()) right.append(h("div", { class: "panel", style: "background:var(--tint);border-color:transparent;display:flex;align-items:center;gap:10px;flex-wrap:wrap" },
+    h("span", { style: "flex:1;min-width:180px" }, h("b", {}, "See your Google Calendar here"), h("br"), h("span", { class: "muted", style: "font-size:13px" }, "Connect once and your meetings sync automatically, with Join buttons.")),
+    h("button", { type: "button", class: "btn pri", onclick: () => connectGoogle() }, "Connect Google")));
+  right.append(listPanel("Meetings this week", up.slice(0, 8).map(([, w, t, o, jb]) => h("div", { class: "row", role: "button", tabindex: "0", onclick: o || null, onkeydown: e => { if (e.key === "Enter" && o) o(); } }, h("span", { class: "y", style: "min-width:86px" }, w), h("span", { class: "x" }, t), jb || null)), "Nothing scheduled.", ["Calendar", () => go("calendar")]));
 
   const away = rows("leave_requests").filter(r => r.status === "Approved" && r.start_date <= t0 && r.end_date >= t0);
   if (away.length) right.append(listPanel("Away today", away.map(r => h("div", { class: "row", style: "cursor:default" }, avatar(r.user_id, "sm"), h("span", { class: "x" }, pname(r.user_id)), h("span", { class: "y" }, r.type + " until " + fmtDate(r.end_date)))), ""));
@@ -2377,6 +2667,452 @@ async function renderOverview(el){
         return h("div", { class: "row", style: "cursor:default" }, avatar(p.id, "sm"), h("span", { class: "x" }, p.full_name), pill(st, st === "Working" || st === "Checked out" ? "ok" : st === "On leave" ? "warn" : st === "WFH" ? "info" : "grey"));
       }) : h("p", { class: "nothing" }, "No one in this vertical yet."));
   })));
+}
+/* ---------------------------------------------------------------------
+   Meetings: repeats, joining, morning scrum check-in
+   --------------------------------------------------------------------- */
+const isScrum = m => m && m.kind === "Morning scrum";
+const meetUrl = m => m && m.link ? (/^https?:\/\//i.test(m.link) ? m.link : "https://" + m.link) : null;
+const meetCode = m => { const x = String((m && m.link) || "").match(/meet\.google\.com\/([a-z]{3}-[a-z]{4}-[a-z]{3})/i); return x ? x[1].toLowerCase() : null; };
+const invited = (m, uid) => !!m && (!(m.attendees || []).length || (m.attendees || []).includes(uid) || m.created_by === uid);
+
+function occursOn(m, d){
+  if (!m || !m.meeting_date || d < m.meeting_date) return false;
+  const rep = m.repeat || "Does not repeat";
+  if (rep === "Does not repeat") return d === m.meeting_date;
+  const wd = parseD(d).getDay();
+  if (rep === "Every week") return wd === parseD(m.meeting_date).getDay();
+  const working = S.settings.working_days || [1,2,3,4,5];
+  const hol = (S.settings.holidays || []).some(x => x.date === d);
+  return working.includes(wd) && !hol;
+}
+// all occurrences between two dates (inclusive), as [date, meeting]
+function occurrences(from, to, filter){
+  const out = [];
+  for (const m of rows("meetings")){
+    if (filter && !filter(m)) continue;
+    if ((m.repeat || "Does not repeat") === "Does not repeat"){ if (m.meeting_date >= from && m.meeting_date <= to) out.push([m.meeting_date, m]); continue; }
+    let d = from < m.meeting_date ? m.meeting_date : from;
+    for (let i = 0; i < 400 && d <= to; i++){ if (occursOn(m, d)) out.push([d, m]); d = addDays(d, 1); }
+  }
+  return out.sort((a, b) => (a[0] + (a[1].start_time || "")).localeCompare(b[0] + (b[1].start_time || "")));
+}
+const joinsFor = (meetingId, date) => rows("meeting_joins").filter(j => j.meeting_id === meetingId && (!date || j.joined_on === date));
+const myJoin = (meetingId, date) => joinsFor(meetingId, date).filter(j => j.user_id === S.me.id).sort((a, b) => String(a.joined_at).localeCompare(String(b.joined_at)))[0];
+function todaysScrum(){ return occurrences(today(), today(), m => isScrum(m) && invited(m, S.me.id))[0]?.[1] || null; }
+
+async function joinMeeting(m, date){
+  date = date || today();
+  const url = meetUrl(m);
+  if (!url){ toast("This meeting doesn’t have a link yet."); return; }
+  window.open(url, "_blank", "noopener");          // open first, while the click still counts
+  try {
+    const row = ok(await sb.from("meeting_joins").insert({ meeting_id: m.id, user_id: S.me.id, display_name: S.me.full_name, joined_on: date, joined_at: new Date().toISOString(), source: "Workspace" }).select().single());
+    upsertCache("meeting_joins", row);
+    if (isScrum(m) && date === today()){
+      await ensure(["attendance"]);
+      if (!myToday()){
+        await insertRow("attendance", { user_id: S.me.id, day: today(), check_in: new Date().toISOString(), mode: "Remote", note: "Joined morning scrum" });
+        toast("Joined the morning scrum. You’re checked in as Remote.");
+      } else toast("Joined the morning scrum.");
+    }
+  } catch (e) { console.warn("join log", e); }
+  rerender();
+}
+function joinButton(m, date, small){
+  if (!meetUrl(m)) return null;
+  const mine = myJoin(m.id, date || today());
+  return h("button", { type: "button", class: "btn " + (small ? "sm " : "") + (mine ? "soft" : "pri"), onclick: e => { e.stopPropagation(); joinMeeting(m, date); } },
+    mine ? "Rejoin" : "Join");
+}
+
+/* who joined, shown inside a meeting */
+function joinsSection(m){
+  const sec = h("div", { class: "section" }, h("h3", {}, "Who joined"));
+  const days = [...new Set(joinsFor(m.id).map(j => j.joined_on))].sort().reverse().slice(0, 10);
+  const last = occurrences(addDays(today(), -30), today(), x => x.id === m.id).map(x => x[0]).pop();
+  if (last && !days.includes(last)) days.unshift(last);
+  if (!days.length){ sec.append(h("p", { class: "nothing" }, "No one has joined yet. Joins are logged when people click Join here, or imported from Google Meet.")); return sec; }
+  for (const d of days.slice(0, 6)){
+    const js = joinsFor(m.id, d).slice().sort((a, b) => String(a.joined_at).localeCompare(String(b.joined_at)));
+    const first = {};
+    for (const j of js){ const k = j.user_id || "n:" + j.display_name; if (!first[k]) first[k] = j; }
+    const who = Object.values(first);
+    const invitees = (m.attendees || []).length ? m.attendees : activePeople().map(p => p.id);
+    const missing = invitees.filter(id => !js.some(j => j.user_id === id));
+    sec.append(h("div", { style: "margin-bottom:10px" },
+      h("div", { style: "font-weight:700;font-size:13.5px;margin-bottom:4px" }, fmtDate(d, true) + " · " + who.length + " joined" + (missing.length && d <= today() ? ", " + missing.length + " missing" : "")),
+      who.map(j => h("div", { class: "row", style: "cursor:default" }, avatar(j.user_id, "sm"), h("span", { class: "x" }, pname(j.user_id) || j.display_name || "Guest"),
+        h("span", { class: "y" }, fmtTime(j.joined_at) + (j.left_at ? " – " + fmtTime(j.left_at) : "")), pill(j.source === "Google Meet" ? "Meet" : "Workspace", j.source === "Google Meet" ? "info" : "grey"))),
+      missing.length && d <= today() ? h("p", { class: "nothing", style: "font-size:12.5px" }, "Didn’t join: " + missing.map(id => pname(id)).filter(Boolean).join(", ")) : null));
+  }
+  return sec;
+}
+
+/* ---------------------------------------------------------------------
+   Google Calendar + Google Meet (synced automatically by the google-sync server function)
+   Each person connects once; after that the server keeps their calendar in sync.
+   --------------------------------------------------------------------- */
+const G = { loading: null, ready: false, syncing: false };
+const G_SCOPES = "openid email https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/meetings.space.readonly";
+const googleOn = () => /\.apps\.googleusercontent\.com$/.test(GOOGLE_CLIENT_ID || "");
+const myGoogle = () => rows("google_links").find(l => l.user_id === S.me.id) || null;
+const googleConnected = () => !!myGoogle();
+
+function loadGoogle(){
+  if (!G.ready && window.google && window.google.accounts && window.google.accounts.oauth2) G.ready = true;
+  if (G.ready) return Promise.resolve();
+  if (G.loading) return G.loading;
+  G.loading = new Promise((res, rej) => {
+    const s = document.createElement("script");
+    s.src = "https://accounts.google.com/gsi/client"; s.async = true;
+    s.onload = () => { G.ready = true; res(); };
+    s.onerror = () => { G.loading = null; rej(new Error("Couldn’t load Google sign-in. Check your connection.")); };
+    document.head.append(s);
+  });
+  return G.loading;
+}
+async function callGoogle(action, extra){
+  const { data, error } = await sb.functions.invoke("google-sync", { body: Object.assign({ action }, extra || {}) });
+  if (error){
+    let msg = error.message || "Request failed";
+    try { const j = await error.context.json(); if (j && j.error) msg = j.error; } catch (e) {}
+    if (/Failed to send|not found|404|FunctionsFetchError|Failed to fetch/i.test(msg)) msg = "The “google-sync” function isn’t set up yet.";
+    throw new Error(msg);
+  }
+  if (data && data.error) throw new Error(data.error);
+  return data;
+}
+async function refreshGoogleData(){ await Promise.all([load("google_links", true), load("calendar_events", true)]); }
+
+// Must be called straight from a click, so Google's pop-up isn't blocked.
+function connectGoogle(){
+  if (!googleOn()) { toast("Google Calendar isn’t set up yet. Ask your admin."); return Promise.resolve(false); }
+  if (!G.ready) { loadGoogle(); toast("Getting Google ready… click again in a moment."); return Promise.resolve(false); }
+  return new Promise(resolve => {
+    const client = window.google.accounts.oauth2.initCodeClient({
+      client_id: GOOGLE_CLIENT_ID, scope: G_SCOPES, ux_mode: "popup", prompt: "consent", hint: S.me.email,
+      callback: async r => {
+        if (r.error) { fail(new Error(r.error_description || r.error), "Google not connected"); resolve(false); return; }
+        try { const res = await callGoogle("connect", { code: r.code }); await refreshGoogleData(); toast("Google connected" + (res.email ? " as " + res.email : "") + ". Your calendar now syncs automatically."); rerender(); resolve(true); }
+        catch (e) { fail(e, "Google not connected"); resolve(false); }
+      },
+      error_callback: e => { toast(e && e.type === "popup_failed_to_open" ? "Your browser blocked the Google pop-up. Allow pop-ups for this site and try again." : "Google sign-in was closed before finishing."); resolve(false); }
+    });
+    client.requestCode();
+  });
+}
+async function disconnectGoogle(){
+  if (!confirm("Disconnect Google? Your Google events will no longer show here, and the workspace won’t add meetings to your Google Calendar.")) return;
+  try { await callGoogle("disconnect"); await refreshGoogleData(); toast("Google disconnected."); rerender(); } catch (e) { fail(e, "Couldn’t disconnect"); }
+}
+async function syncGoogleNow(quiet){
+  if (!googleConnected() || G.syncing) return;
+  G.syncing = true;
+  try { await callGoogle("sync"); await refreshGoogleData(); if (!quiet) toast("Google Calendar synced."); rerender(); }
+  catch (e) { if (!quiet) fail(e, "Sync failed"); else console.warn("google sync", e); }
+  finally { G.syncing = false; }
+}
+// sync when the workspace opens (if it's been a while) and every 15 minutes while it's open
+async function autoSyncGoogle(){
+  if (!googleOn()) return;
+  await ensure(["google_links"]);
+  const l = myGoogle(); if (!l) return;
+  if (!l.last_sync_at || Date.now() - new Date(l.last_sync_at) > 10 * 60000) syncGoogleNow(true);
+}
+setInterval(() => { if (S.me && googleConnected()) syncGoogleNow(true); }, 15 * 60000);
+
+async function syncMeetingToGoogle(m){ const r = await callGoogle("save_event", { meeting_id: m.id }); if (r && r.meeting) upsertCache("meetings", r.meeting); return r && r.meeting; }
+async function deleteGoogleEvent(m){ if (googleOn() && m.google_event_id) await callGoogle("delete_event", { meeting_id: m.id }); }
+async function importMeetJoins(m){ const r = await callGoogle("import_joins", { meeting_id: m.id }); await Promise.all([load("meeting_joins", true), load("attendance", true)]); return r; }
+
+/* ---------------------------------------------------------------------
+   One agenda for everyone: workspace meetings + synced Google events
+   --------------------------------------------------------------------- */
+function relevantGoogle(e){ return e.user_id === S.me.id || (e.attendee_emails || []).includes(String(S.me.email || "").toLowerCase()); }
+function agenda(from, to){
+  const out = [];
+  const linked = new Set(rows("meetings").map(m => m.google_event_id).filter(Boolean));
+  for (const [day, m] of occurrences(from, to, m => invited(m, S.me.id))){
+    const startIso = m.start_time ? new Date(day + "T" + String(m.start_time).slice(0, 5) + ":00").toISOString() : null;
+    out.push({ key: "m:" + m.id + ":" + day, day, start: startIso, end: startIso ? new Date(new Date(startIso).getTime() + (m.duration_min || 30) * 60000).toISOString() : null,
+      title: m.title, link: meetUrl(m), source: "workspace", scrum: isScrum(m), meeting: m, open: () => openRecord("meetings", m.id) });
+  }
+  const seen = new Set();
+  for (const e of rows("calendar_events")){
+    if (!relevantGoogle(e) || !e.start_date || e.start_date > to || (e.end_date || e.start_date) < from) continue;
+    if ([...linked].some(id => e.google_event_id === id || e.google_event_id.startsWith(id + "_"))) continue;   // already shown as a workspace meeting
+    const k = (e.ical_uid || e.google_event_id) + "|" + (e.starts_at || e.start_date);
+    if (seen.has(k)) continue; seen.add(k);
+    out.push({ key: "g:" + e.id, day: e.start_date < from ? from : e.start_date, start: e.starts_at, end: e.ends_at, allDay: e.all_day, title: e.title,
+      link: e.meet_link || null, source: "google", event: e, open: e.html_link ? () => window.open(e.html_link, "_blank", "noopener") : null });
+  }
+  return out.sort((a, b) => (a.day + (a.start || "")).localeCompare(b.day + (b.start || "")));
+}
+async function joinAgendaItem(it){
+  if (it.meeting) return joinMeeting(it.meeting, it.day);
+  if (!it.link) { toast("This event doesn’t have a Meet link."); return; }
+  window.open(it.link, "_blank", "noopener");
+  try {
+    const row = ok(await sb.from("meeting_joins").insert({ meeting_id: null, event_uid: it.event.ical_uid || it.event.google_event_id, title: it.title, user_id: S.me.id, display_name: S.me.full_name, joined_on: today(), joined_at: new Date().toISOString(), source: "Workspace" }).select().single());
+    upsertCache("meeting_joins", row);
+  } catch (e) { console.warn("join log", e); }
+  rerender();
+}
+function agendaJoinButton(it, small){
+  if (!it.link) return null;
+  const joined = it.meeting ? myJoin(it.meeting.id, it.day) : rows("meeting_joins").find(j => j.user_id === S.me.id && j.joined_on === it.day && j.event_uid && it.event && j.event_uid === (it.event.ical_uid || it.event.google_event_id));
+  return h("button", { type: "button", class: "btn " + (small ? "sm " : "") + (joined ? "soft" : "pri"), onclick: e => { e.stopPropagation(); joinAgendaItem(it); } }, joined ? "Rejoin" : "Join");
+}
+const agendaTime = it => it.allDay ? "All day" : it.start ? fmtTime(it.start) : "";
+// the meeting that's on now or starts within the next hour
+function nextMeeting(){
+  const now = Date.now();
+  return agenda(today(), today()).find(it => it.link && it.start && new Date(it.end || it.start).getTime() > now && new Date(it.start).getTime() - now < 60 * 60000) || null;
+}
+
+function googleCard(){
+  if (!googleOn()) return h("p", { class: "muted", style: "font-size:13px;margin:0" }, "Google Calendar isn’t set up yet. Ask your admin.");
+  const l = myGoogle();
+  if (l) return h("div", { style: "display:flex;align-items:center;gap:10px;flex-wrap:wrap" }, pill("Connected", "ok"),
+    h("span", { class: "muted", style: "font-size:13px" }, (l.google_email || "Google") + " · " + (l.last_error ? l.last_error : l.last_sync_at ? "synced " + fmtAgo(l.last_sync_at) : "syncing…")),
+    h("button", { type: "button", class: "btn sm soft", onclick: () => syncGoogleNow(false) }, "Sync now"),
+    h("button", { type: "button", class: "btn sm ghost", onclick: () => { closeDlg(); disconnectGoogle(); } }, "Disconnect"));
+  return h("div", { style: "display:flex;align-items:center;gap:10px;flex-wrap:wrap" }, h("button", { type: "button", class: "btn soft", onclick: () => { closeDlg(); connectGoogle(); } }, "Connect Google"),
+    h("span", { class: "muted", style: "font-size:13px" }, "Connect once. Your Google Calendar then syncs automatically. Works with tcipher.com and personal Gmail."));
+}
+/* ---------------------------------------------------------------------
+   @tagging: suggestions while typing, reliable matching, highlighted text
+   --------------------------------------------------------------------- */
+function escRe(s){ return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+// Who is tagged in this text? Full names first (longest first, so "@Harshita" never also tags "Harsh"),
+// then a unique first name like "@Ankit".
+function mentionIds(text){
+  const t = String(text || ""); if (!t.includes("@")) return [];
+  const people = activePeople().slice().sort((a, b) => b.full_name.length - a.full_name.length);
+  const found = new Set(); let rest = t;
+  for (const p of people){
+    const re = new RegExp("@" + escRe(p.full_name) + "(?![\\p{L}\\p{N}])", "giu");
+    if (re.test(rest)) { found.add(p.id); rest = rest.replace(re, " "); }
+  }
+  const byFirst = {};
+  for (const p of people){ const f = p.full_name.split(/\s+/)[0].toLowerCase(); (byFirst[f] = byFirst[f] || []).push(p); }
+  for (const [f, ps] of Object.entries(byFirst)){
+    if (ps.length !== 1) continue;
+    if (new RegExp("@" + escRe(f) + "(?![\\p{L}\\p{N}])", "iu").test(rest)) found.add(ps[0].id);
+  }
+  return [...found];
+}
+function attachMentions(ta){
+  const box = h("div", { class: "mention-pop", role: "listbox", hidden: true });
+  let items = [], idx = 0, start = -1, placed = false;
+  const close = () => { box.hidden = true; start = -1; };
+  const draw = () => box.replaceChildren(...items.map((p, i) => h("button", { type: "button", class: "mention-item" + (i === idx ? " on" : ""), role: "option",
+    onmousedown: e => { e.preventDefault(); pick(p); } }, avatar(p.id, "sm"), h("span", {}, p.full_name), h("small", {}, p.vertical || p.title || ""))));
+  const pick = p => {
+    const pos = ta.selectionStart;
+    ta.value = ta.value.slice(0, start) + "@" + p.full_name + " " + ta.value.slice(pos);
+    const c = start + p.full_name.length + 2; ta.setSelectionRange(c, c);
+    close(); ta.focus(); ta.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+  const query = () => {
+    const pos = ta.selectionStart, before = ta.value.slice(0, pos);
+    const m = before.match(/(^|[\s(])@([^\s@]{0,24})$/u);
+    if (!m) { close(); return; }
+    start = pos - m[2].length - 1;
+    const q = m[2].toLowerCase();
+    items = activePeople().filter(p => !q || p.full_name.toLowerCase().startsWith(q) || p.full_name.toLowerCase().split(/\s+/).some(w => w.startsWith(q))).slice(0, 6);
+    if (!items.length) { close(); return; }
+    if (!placed && ta.parentNode) { ta.parentNode.style.position = "relative"; ta.after(box); placed = true; }
+    idx = 0; draw(); box.hidden = false;
+  };
+  ta.addEventListener("input", query);
+  ta.addEventListener("keydown", e => {
+    if (box.hidden) return;
+    if (e.key === "ArrowDown") { idx = (idx + 1) % items.length; draw(); e.preventDefault(); }
+    else if (e.key === "ArrowUp") { idx = (idx - 1 + items.length) % items.length; draw(); e.preventDefault(); }
+    else if (e.key === "Enter" || e.key === "Tab") { pick(items[idx]); e.preventDefault(); }
+    else if (e.key === "Escape") { close(); e.preventDefault(); e.stopPropagation(); }
+  });
+  ta.addEventListener("blur", () => setTimeout(close, 150));
+  return ta;
+}
+// text -> nodes, with @people highlighted, TC-123 task links and web links clickable
+function renderRich(text){
+  const t = String(text || "");
+  const names = activePeople().map(p => p.full_name).sort((a, b) => b.length - a.length).map(escRe);
+  const re = new RegExp("(" + (names.length ? "@(?:" + names.join("|") + ")(?![\\p{L}\\p{N}])|" : "") + "@[\\p{L}][\\p{L}\\p{N}]*|\\bTC-\\d+\\b|https?:\\/\\/[^\\s<]+)", "giu");
+  const out = []; let last = 0, m;
+  while ((m = re.exec(t))){
+    if (m.index > last) out.push(t.slice(last, m.index));
+    const tok = m[0];
+    if (tok[0] === "@"){
+      const ids = mentionIds(tok);
+      out.push(ids.length ? h("span", { class: "mention", title: pname(ids[0]) }, tok) : tok);
+    } else if (/^TC-/i.test(tok)){
+      const n = +tok.slice(3);
+      out.push(h("a", { href: "#tasks", class: "tkey", onclick: e => { e.preventDefault(); openTaskByNumber(n); } }, tok.toUpperCase()));
+    } else out.push(h("a", { href: tok, target: "_blank", rel: "noopener" }, tok.length > 60 ? tok.slice(0, 57) + "…" : tok));
+    last = m.index + tok.length;
+  }
+  if (last < t.length) out.push(t.slice(last));
+  return out;
+}
+
+/* ---------------------------------------------------------------------
+   Task extras: IDs, checklist, dependencies, branch name, history, duplicate
+   --------------------------------------------------------------------- */
+const taskKey = t => t && t.number ? "TC-" + t.number : "";
+async function openTaskByNumber(n){
+  await ensure(["tasks"]);
+  let t = rows("tasks").find(x => +x.number === +n);
+  if (!t) { try { t = ok(await sb.from("tasks").select("*").eq("number", n).maybeSingle()); if (t) upsertCache("tasks", t); } catch (e) {} }
+  if (!t) { toast("TC-" + n + " isn’t available to you."); return; }
+  closeDlg(); openRecord("tasks", t.id);
+}
+const openDeps = t => (t.blocked_by || []).map(id => byId("tasks", id)).filter(x => x && x.status !== "Done");
+const checklistProgress = t => { const c = Array.isArray(t.checklist) ? t.checklist : []; return c.length ? c.filter(x => x.done).length + "/" + c.length : ""; };
+function branchName(t){
+  const slug = String(t.title || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
+  const kind = t.type === "Bug" ? "fix" : t.type === "DevOps" || t.type === "Chore" ? "chore" : "feature";
+  return kind + "/" + (taskKey(t) || "task").toLowerCase() + (slug ? "-" + slug : "");
+}
+async function copyText(text, label){
+  try { await navigator.clipboard.writeText(text); toast((label || "Copied") + ": " + text); }
+  catch (e) { prompt("Copy this:", text); }
+}
+
+function checklistSection(rec, canEdit){
+  let items = Array.isArray(rec.checklist) ? clone(rec.checklist) : [];
+  const head = h("h3", {}, "Checklist");
+  const list = h("div", { class: "checklist" });
+  const sec = h("div", { class: "section" }, head, list);
+  const save = async () => {
+    try { const row = await updateRow("tasks", rec.id, { checklist: items }); rec.checklist = row.checklist; draw(); rerender(); }
+    catch (e) { fail(e, "Checklist not saved"); }
+  };
+  function draw(){
+    const done = items.filter(x => x.done).length;
+    head.replaceChildren("Checklist", items.length ? h("span", { class: "muted", style: "font-weight:500;font-size:13px" }, done + " of " + items.length + " done") : "");
+    list.replaceChildren();
+    if (items.length) list.append(h("div", { class: "bar", style: "height:6px;margin-bottom:8px" }, h("span", { class: "b2", style: "width:" + (done / items.length * 100) + "%;background:var(--ok)" })));
+    items.forEach((it, i) => list.append(h("div", { class: "ck" + (it.done ? " done" : "") },
+      h("input", { type: "checkbox", checked: !!it.done, disabled: !canEdit, "aria-label": it.text, onchange: e => { items[i].done = e.target.checked; save(); } }),
+      h("span", { class: "x" }, renderRich(it.text)),
+      canEdit ? h("button", { type: "button", class: "del", "aria-label": "Remove", onclick: () => { items.splice(i, 1); save(); } }, "✕") : null)));
+    if (!items.length) list.append(h("p", { class: "nothing" }, canEdit ? "Break the work into steps, e.g. “API endpoint”, “UI”, “Tests”." : "No checklist."));
+    if (canEdit){
+      const inp = h("input", { class: "in", placeholder: "Add a step and press Enter", maxlength: "300" });
+      const add = () => { const v = inp.value.trim(); if (!v) return; items.push({ text: v, done: false }); inp.value = ""; save(); };
+      inp.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); add(); } });
+      list.append(h("div", { style: "display:flex;gap:6px;margin-top:8px" }, inp, h("button", { type: "button", class: "btn soft", onclick: add }, "Add")));
+    }
+  }
+  draw();
+  return sec;
+}
+function dependencySection(rec){
+  const waits = (rec.blocked_by || []).map(id => byId("tasks", id)).filter(Boolean);
+  const blocks = rows("tasks").filter(t => (t.blocked_by || []).includes(rec.id));
+  if (!waits.length && !blocks.length) return null;
+  const row = t => h("button", { type: "button", class: "row", onclick: () => { closeDlg(); openRecord("tasks", t.id); } }, h("span", { class: "tkey" }, taskKey(t)), h("span", { class: "x" }, t.title), pill(t.status));
+  return h("div", { class: "section" }, h("h3", {}, "Linked tasks"),
+    waits.length ? [h("div", { class: "muted", style: "font-size:13px;margin-bottom:2px" }, "This task waits on:"), waits.map(row)] : null,
+    blocks.length ? [h("div", { class: "muted", style: "font-size:13px;margin:8px 0 2px" }, "These tasks are waiting on this one:"), blocks.map(row)] : null);
+}
+function codeSection(rec){
+  if (rec.vertical !== "Development") return null;
+  const br = rec.branch || branchName(rec);
+  return h("div", { class: "section" }, h("h3", {}, "Code"),
+    h("div", { class: "related" },
+      h("div", { class: "ri" }, h("span", {}, "Branch"), h("span", { style: "display:flex;gap:6px;align-items:center" }, h("code", { class: "code" }, br), h("button", { type: "button", class: "btn sm soft", onclick: () => copyText(br, "Branch name copied") }, "Copy"))),
+      h("div", { class: "ri" }, h("span", {}, "In commit messages"), h("span", { style: "display:flex;gap:6px;align-items:center" }, h("code", { class: "code" }, taskKey(rec) + ": " + rec.title.slice(0, 40)), h("button", { type: "button", class: "btn sm soft", onclick: () => copyText(taskKey(rec) + ": " + rec.title, "Commit message copied") }, "Copy"))),
+      rec.pr_url ? h("div", { class: "ri" }, h("span", {}, "Merge / pull request"), h("a", { href: rec.pr_url, target: "_blank", rel: "noopener" }, "Open")) : null,
+      rec.design_url ? h("div", { class: "ri" }, h("span", {}, "Design"), h("a", { href: rec.design_url, target: "_blank", rel: "noopener" }, "Open")) : null));
+}
+function historySection(rec){
+  const sec = h("div", { class: "section" }, h("h3", {}, "History"));
+  const list = h("div", {}, h("p", { class: "nothing" }, "Loading…"));
+  sec.append(list);
+  const nm = v => pname(v) || "nobody";
+  const arr = v => { try { const a = JSON.parse(v || "[]"); return Array.isArray(a) ? a : []; } catch (e) { return String(v || "").replace(/[{}"]/g, "").split(",").filter(Boolean); } };
+  const describe = e => {
+    switch (e.field){
+      case "created": return "created the task";
+      case "status": return "moved it from " + e.old_value + " to " + e.new_value;
+      case "assignee_id": return e.new_value ? "assigned it to " + nm(e.new_value) : "removed the owner";
+      case "reviewer_id": return e.new_value ? "set the reviewer to " + nm(e.new_value) : "removed the reviewer";
+      case "priority": return "changed priority from " + e.old_value + " to " + e.new_value;
+      case "due_date": return e.new_value ? "set the due date to " + fmtDate(e.new_value, true) : "removed the due date";
+      case "sprint_id": return e.new_value ? "moved it to " + (refLabel("sprints", e.new_value) || "a sprint") : "took it out of the sprint";
+      case "release_id": return e.new_value ? "planned it for " + (refLabel("releases", e.new_value) || "a release") : "removed it from the release";
+      case "blocked": return e.new_value === "true" ? "marked it blocked" : "unblocked it";
+      case "title": return "renamed it to “" + e.new_value + "”";
+      case "collaborators": {
+        const o = arr(e.old_value), n = arr(e.new_value);
+        const add = n.filter(x => !o.includes(x)).map(nm), rem = o.filter(x => !n.includes(x)).map(nm);
+        return [add.length ? "added " + add.join(", ") : "", rem.length ? "removed " + rem.join(", ") : ""].filter(Boolean).join(" and ") || "changed collaborators";
+      }
+      default: return "changed " + e.field;
+    }
+  };
+  (async () => {
+    try {
+      const evs = ok(await sb.from("task_events").select("*").eq("task_id", rec.id).order("at", { ascending: false }).limit(40)) || [];
+      list.replaceChildren();
+      if (!evs.length) list.append(h("p", { class: "nothing" }, "No changes recorded yet."));
+      for (const e of evs) list.append(h("div", { class: "hist" }, avatar(e.actor_id, "sm"), h("span", { class: "x" }, h("b", {}, pname(e.actor_id) || "Someone"), " ", describe(e)), h("span", { class: "y" }, fmtAgo(e.at))));
+    } catch (e) { list.replaceChildren(h("p", { class: "nothing" }, "History couldn’t be loaded.")); }
+  })();
+  return sec;
+}
+function linkedNotesSection(field, rec){
+  const ns = rows("notes").filter(n => n[field] === rec.id);
+  return h("div", { class: "section" }, h("h3", {}, "Notes", h("button", { type: "button", class: "btn sm soft", onclick: () => { closeDlg(); openRecord("notes", null, { [field]: rec.id, visibility: S.me.vertical ? "Vertical" : "Private", title: (taskKey(rec) ? taskKey(rec) + " " : "") + (rec.title || rec.name || "") }); } }, "+ Add note")),
+    ns.length ? ns.map(n => h("button", { type: "button", class: "row", onclick: () => { closeDlg(); openRecord("notes", n.id); } }, h("span", { class: "x" }, h("b", {}, n.title || "Untitled"), " ", h("span", { class: "muted" }, String(n.body || "").slice(0, 80))), pill(VIS_LABEL[n.visibility] || n.visibility, "grey")))
+      : h("p", { class: "nothing" }, "No notes linked yet."));
+}
+async function duplicateTask(rec){
+  const skip = ["id","number","created_at","updated_at","completed_at","created_by"];
+  const d = {};
+  for (const [k, v] of Object.entries(rec)) if (!skip.includes(k)) d[k] = v;
+  d.title = "Copy of " + rec.title; d.status = "To do"; d.blocked = false;
+  d.checklist = (Array.isArray(rec.checklist) ? rec.checklist : []).map(x => ({ text: x.text, done: false }));
+  try { const row = await insertRow("tasks", d); toast("Duplicated as " + taskKey(row) + "."); closeDlg(); rerender(); openRecord("tasks", row.id); }
+  catch (e) { fail(e, "Couldn’t duplicate"); }
+}
+
+/* ---------------------------------------------------------------------
+   Notes
+   --------------------------------------------------------------------- */
+const VIS_LABEL = { Private: "Only me", People: "Specific people", Vertical: "My vertical", Company: "Everyone" };
+function notesBoard(el, A){
+  if (!S.ui.notes) S.ui.notes = { q: "", scope: "all" };
+  const u = S.ui.notes;
+  const q = h("input", { class: "in search", type: "search", placeholder: "Search notes", value: u.q, id: "q-notes" });
+  const grid = h("div", { class: "notes-grid" });
+  function draw(){
+    grid.replaceChildren();
+    const s = u.q.trim().toLowerCase();
+    let list = rows("notes").slice();
+    if (u.scope === "mine") list = list.filter(n => n.owner_id === S.me.id);
+    if (u.scope === "shared") list = list.filter(n => n.owner_id !== S.me.id);
+    if (s) list = list.filter(n => (n.title + " " + n.body).toLowerCase().includes(s));
+    list.sort((a, b) => ((b.pinned && b.owner_id === S.me.id) - (a.pinned && a.owner_id === S.me.id)) || String(b.updated_at).localeCompare(String(a.updated_at)));
+    if (!list.length) grid.append(h("div", { class: "panel empty", style: "grid-column:1 / -1" }, h("b", {}, u.scope === "shared" ? "Nothing shared with you yet" : "No notes yet"), "Jot down ideas, meeting prep, specs or to-dos. Notes are private unless you share them."));
+    for (const n of list){
+      const t = byId("tasks", n.task_id), pr = byId("projects", n.project_id), mt = byId("meetings", n.meeting_id);
+      grid.append(h("button", { type: "button", class: "note-card" + (n.pinned && n.owner_id === S.me.id ? " pinned" : ""), onclick: () => openRecord("notes", n.id) },
+        h("div", { class: "nt" }, n.pinned && n.owner_id === S.me.id ? "📌 " : "", n.title || "Untitled"),
+        h("div", { class: "nb" }, renderRich(String(n.body || "").slice(0, 260) + (String(n.body || "").length > 260 ? "…" : ""))),
+        h("div", { class: "nm" }, pill(VIS_LABEL[n.visibility] || n.visibility, n.visibility === "Private" ? "grey" : "info"),
+          t ? h("span", { class: "tkey" }, taskKey(t)) : null, pr ? h("span", {}, pr.name) : null, mt ? h("span", {}, mt.title) : null,
+          h("span", { class: "grow" }), n.owner_id !== S.me.id ? personChip(n.owner_id) : null, h("span", { class: "muted" }, fmtAgo(n.updated_at)))));
+    }
+  }
+  q.addEventListener("input", () => { u.q = q.value; draw(); });
+  el.append(h("div", { class: "tb" }, q, segmented([["all","All I can see"], ["mine","Mine"], ["shared","Shared with me"]], u.scope, v => { u.scope = v; draw(); })), grid);
+  draw();
 }
 /* ---------------------------------------------------------------------
    Admin panel
@@ -2577,6 +3313,8 @@ function renderAdminSettings(el){
   const days = [[1,"Mon"],[2,"Tue"],[3,"Wed"],[4,"Thu"],[5,"Fri"],[6,"Sat"],[0,"Sun"]].map(([n, l]) => { const c = h("input", { type: "checkbox", value: String(n), checked: (s.working_days || [1,2,3,4,5]).includes(n) }); return [c, h("label", { class: "chk", style: "min-height:30px" }, c, l)]; });
   const types = h("input", { class: "in", value: (s.leave_types || ["Paid leave","Sick leave","Work from home","Unpaid leave"]).join(", ") });
   const annual = h("input", { class: "in", type: "number", min: "0", value: String(s.annual_leave ?? 12) });
+  const curY = today().slice(0, 4);
+  const thisYear = h("input", { class: "in", type: "number", min: "0", placeholder: "Same as normal", value: (s.leave_overrides || {})[curY] != null ? String(s.leave_overrides[curY]) : "" });
   const counted = h("input", { class: "in", value: (s.counted_leave_types || ["Paid leave","Sick leave"]).join(", ") });
   const hol = h("textarea", { class: "in", rows: 8 }); hol.value = (s.holidays || []).slice().sort((a, b) => a.date.localeCompare(b.date)).map(x => x.date + " " + x.name).join("\n");
   const err = h("p", { class: "err", hidden: true });
@@ -2591,7 +3329,9 @@ function renderAdminSettings(el){
     }
     const leave_types = types.value.split(",").map(x => x.trim()).filter(Boolean);
     const counted_leave_types = counted.value.split(",").map(x => x.trim()).filter(Boolean);
-    const data = { ...s, company: company.value.trim() || "Company", currency: currency.value, working_days: days.filter(([c]) => c.checked).map(([c]) => +c.value), leave_types, annual_leave: +annual.value || 0, counted_leave_types, holidays };
+    const leave_overrides = { ...(s.leave_overrides || {}) };
+    if (thisYear.value === "") delete leave_overrides[curY]; else leave_overrides[curY] = Math.max(0, +thisYear.value);
+    const data = { ...s, company: company.value.trim() || "Company", currency: currency.value, working_days: days.filter(([c]) => c.checked).map(([c]) => +c.value), leave_types, annual_leave: +annual.value || 0, leave_overrides, counted_leave_types, holidays };
     delete data.leave_quota;
     save.disabled = true;
     try { ok(await sb.from("settings").upsert({ id: 1, data, updated_at: new Date().toISOString() })); S.settings = data; toast("Settings saved."); renderShell(); }
@@ -2602,7 +3342,8 @@ function renderAdminSettings(el){
     h("div", { class: "panel" }, h("h2", {}, "Company"), h("div", { class: "form" }, h("label", { class: "fl full" }, "Company name", company), h("label", { class: "fl" }, "Currency", currency)),
       h("div", { class: "fl", style: "margin-top:12px" }, "Working days", h("div", { style: "display:flex;gap:12px;flex-wrap:wrap" }, days.map(([, l]) => l)))),
     h("div", { class: "panel" }, h("h2", {}, "Leave"), h("div", { class: "form" },
-      h("label", { class: "fl" }, "Leaves per person per year", annual), h("label", { class: "fl" }, "Types that count against it", counted, h("span", { class: "hint" }, "Comma separated. Others, like work from home, don’t reduce the balance.")),
+      h("label", { class: "fl" }, "Normal leaves per year", annual, h("span", { class: "hint" }, "Everyone’s balance resets to this on 1 January. Unused days don’t carry over.")),
+      h("label", { class: "fl" }, "Allowance for " + curY + " only", thisYear, h("span", { class: "hint" }, "Optional. Overrides the normal number for " + curY + ". Leave empty to use the normal number.")), h("label", { class: "fl" }, "Types that count against it", counted, h("span", { class: "hint" }, "Comma separated. Others, like work from home, don’t reduce the balance.")),
       h("label", { class: "fl full" }, "All leave types (comma separated)", types))),
     h("div", { class: "panel", style: "grid-column:1 / -1" }, h("h2", {}, "Holidays"), h("label", { class: "fl" }, "One per line: date then name", hol, h("span", { class: "hint" }, "Holidays aren’t counted as leave days and show on everyone’s calendar.")))),
     err, h("div", { style: "margin-top:14px" }, save));
@@ -2614,7 +3355,7 @@ async function renderAdminActivity(el){
   await load("activity_log", true);
   if (S.route !== "admin-activity") return;
   el.lastChild.remove();
-  const names = { clients: "Client", contacts: "Contact", projects: "Project", sprints: "Sprint", tasks: "Task", releases: "Release", tickets: "Ticket", meetings: "Meeting", deals: "Deal", activities: "Sales activity", proposals: "Proposal", targets: "Sales target", leads: "Lead", campaigns: "Campaign", content: "Content", seo_keywords: "SEO keyword", leave_requests: "Leave", announcements: "Announcement", documents: "Document" };
+  const names = { notes: "Note", clients: "Client", contacts: "Contact", projects: "Project", sprints: "Sprint", tasks: "Task", releases: "Release", tickets: "Ticket", meetings: "Meeting", deals: "Deal", activities: "Sales activity", proposals: "Proposal", targets: "Sales target", leads: "Lead", campaigns: "Campaign", content: "Content", seo_keywords: "SEO keyword", leave_requests: "Leave", announcements: "Announcement", documents: "Document" };
   const verb = { insert: "created", update: "updated", delete: "deleted" };
   const tb = h("tbody");
   for (const a of rows("activity_log")){
@@ -2630,15 +3371,15 @@ async function renderAdminActivity(el){
    Navigation
    --------------------------------------------------------------------- */
 const NAV = [
-  ["", [["dashboard","Home"], ["overview","Company overview"], ["tasks","Tasks"], ["calendar","Calendar"]]],
+  ["", [["dashboard","Home"], ["overview","Company overview"], ["tasks","Tasks"], ["notes","Notes"], ["calendar","Calendar"]]],
   ["Development", [["dev","Dev dashboard"], ["projects","Projects"], ["sprints","Sprints"], ["releases","Releases"], ["tickets","Support tickets"]]],
   ["Sales", [["sales","Sales dashboard"], ["deals","Pipeline"], ["leads","Leads"], ["clients","Clients"], ["contacts","Contacts"], ["activities","Activities"], ["proposals","Proposals"], ["targets","Targets"]]],
   ["Marketing", [["marketing","Marketing dashboard"], ["leads","Leads"], ["campaigns","Campaigns"], ["content","Content calendar"], ["seo_keywords","SEO keywords"], ["social_stats","Social media"]]],
-  ["Company", [["people","People"], ["leave_requests","Leave"], ["attendance","Attendance"], ["meetings","Meetings"], ["announcements","Announcements"], ["documents","Documents"]]],
+  ["Company", [["people","People"], ["leave_requests","Leave"], ["holidays","Holidays"], ["attendance","Attendance"], ["meetings","Meetings"], ["announcements","Announcements"], ["documents","Documents"]]],
   ["Admin", [["admin-users","Admin panel"]]]
 ];
 function canSee(route){
-  if (["dashboard","calendar","people","attendance","tasks"].includes(route)) return true;
+  if (["dashboard","calendar","people","attendance","tasks","holidays"].includes(route)) return true;
   if (route === "overview") return isAdmin();
   if (route === "dev") return isAdmin() || S.me.vertical === "Development" || lvl("projects") >= 1;
   if (route === "sales") return isAdmin() || S.me.vertical === "Sales" || lvl("sales") >= 1;
@@ -2719,6 +3460,7 @@ async function rerender(){
     else if (route === "sales") await renderSalesHub(page);
     else if (route === "marketing") await renderMarketingHub(page);
     else if (route === "admin-settings") renderAdminSettings(page);
+    else if (route === "holidays") renderHolidays(page);
     else if (route === "admin-activity") await renderAdminActivity(page);
     else if (MOD[route]) await renderModule(route, page);
     else page.append(h("div", { class: "panel empty" }, h("b", {}, "Page not found"), h("a", { href: "#dashboard" }, "Go to the dashboard")));
@@ -2817,6 +3559,7 @@ async function startSession(session){
     showScreen("app");
     loadNotifications();
     setTimeout(prefetch, 1200);
+    if (googleOn()) { loadGoogle().catch(() => {}); autoSyncGoogle(); }   // Google ready before anyone clicks; calendar synced if it's been a while
     if (!channel){
       channel = sb.channel("ws-live").on("postgres_changes", { event: "*", schema: "public" }, onChange).subscribe();
     }
@@ -2829,14 +3572,14 @@ async function startSession(session){
 }
 // Quietly load every section this person can open, so switching pages is instant.
 async function prefetch(){
-  const want = new Set(["attendance","leave_requests","meetings","announcements","tasks"]);
+  const want = new Set(["attendance","leave_requests","meetings","announcements","tasks","meeting_joins","calendar_events","google_links","notes"]);
   for (const M of Object.values(MOD)) if (access(M).canView) { want.add(M.table); (M.needs || []).forEach(t => want.add(t)); }
   for (const t of want){ if (!S.me) return; if (!S.loaded.has(t)) await load(t); }
 }
 function endSession(){
   shellKey = "";
   if (channel) { sb.removeChannel(channel); channel = null; }
-  S.me = null; S.cache = {}; S.loaded = new Set(); S.notifications = [];
+  S.me = null; S.cache = {}; S.loaded = new Set(); S.notifications = []; S.ui = {};
   closeDlg(); showScreen("login");
 }
 
