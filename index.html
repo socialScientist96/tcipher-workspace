@@ -336,7 +336,20 @@ tr.unread-row td{background:#F5FBF7;font-weight:600}
 .cmsg:hover .cedit{visibility:visible}
 .chat-foot{display:flex;gap:8px;align-items:flex-end;padding:10px 14px 0;border-top:1px solid var(--line)}
 .chat-foot textarea{resize:none}
-@media (max-width:760px){.chat{grid-template-columns:1fr;height:auto}.chat-list{max-height:220px;border-right:0;border-bottom:1px solid var(--line)}.chat-msgs{min-height:320px}}
+.m-back{display:none}
+@media (max-width:760px){
+  .chat{grid-template-columns:1fr;height:calc(100dvh - 120px);min-height:420px}
+  .chat .chat-list{border-right:0;max-height:none}
+  .chat:not(.m-conv) .chat-main{display:none}
+  .chat.m-conv .chat-list{display:none}
+  .m-back{display:inline-flex;align-items:center;justify-content:center;flex:none;width:34px;height:34px;margin-right:2px;border:0;border-radius:8px;background:var(--tint);color:var(--p-deep);font-size:24px;line-height:1;cursor:pointer}
+  .chat-head{gap:8px;padding:8px 10px}
+  .chat-head .x{min-width:0}
+  .chat-head .x b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chat-head .chat-acts{flex-wrap:nowrap}
+  .chat-head .chat-acts .btn{padding:6px 9px;font-size:15px}
+  .chat-head .chat-acts .btn .bl{display:none}
+}
 .gicon{width:28px;height:28px;border-radius:50%;background:var(--tint);display:inline-flex;align-items:center;justify-content:center;font-size:14px;flex:none}
 /* Report a problem */
 .bugbtn{position:fixed;right:0;top:58%;z-index:40;display:flex;align-items:center;gap:6px;writing-mode:vertical-rl;transform:rotate(180deg);background:var(--p-deep);color:#fff;border:0;border-radius:0 10px 10px 0;padding:12px 7px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(27,20,80,.25);opacity:.9}
@@ -419,6 +432,7 @@ button.busy:not(.btn):not(.iconbtn):not(.linkbtn):not(.link){opacity:.6;cursor:p
 .bugbtn:hover,.bugbtn:focus-visible{opacity:1}
 .bugbtn:hover .bt,.bugbtn:focus-visible .bt{max-height:160px}
 .chat-debug{position:fixed;left:12px;bottom:12px;z-index:2000;max-width:560px;max-height:46vh;overflow:auto;margin:0;padding:10px 12px;background:rgba(20,16,60,.92);color:#E9E6FF;font:11.5px/1.45 ui-monospace,Menlo,monospace;border-radius:10px;white-space:pre-wrap}
+.chat-items{display:flex;flex-direction:column;gap:2px}
 .hday{flex:none;width:44px;height:44px;border-radius:10px;background:var(--tint);color:var(--p-ink);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
 .hday b{font-size:16px}
 .hday small{font-size:11px;font-weight:600;text-transform:uppercase;margin-top:2px}
@@ -4769,6 +4783,7 @@ async function markChatRead(id){
   C.reads[id] = maxId; C.unread[id] = 0; C.mentions[id] = 0;
   try { await sb.from("chat_reads").upsert({ user_id: S.me.id, channel_id: id, last_read_id: maxId }, { onConflict: "user_id,channel_id" }); } catch (e) {}
   liveSend("read", { cid: id, uid: S.me.id, last: maxId });
+  updateTabTitle();
   renderShell();
 }
 async function openDM(userId){
@@ -4808,10 +4823,17 @@ function chatOnChange0(payload){
     if (S.route === "chat") drawChatList();
     return;
   }
-  if (S.route === "chat" && C.active === m.channel_id && document.visibilityState === "visible"){
+  if (S.route === "chat" && C.active === m.channel_id){
+    // the conversation you have open: show it straight away, even if this window is behind another one
     const mm = chatEls && chatEls.msgs, away = mm && mm.scrollHeight - mm.scrollTop - mm.clientHeight > 250;
     drawChatMessages(!away); if (away && chatEls) { chatEls.jumpNew = true; drawJump(); }
-    markChatRead(m.channel_id); playSound("pop");
+    if (document.visibilityState === "visible") { markChatRead(m.channel_id); playSound("pop"); }
+    else {
+      // you're not looking: keep it unread (and count it in the browser tab) until you come back
+      C.unread[m.channel_id] = (C.unread[m.channel_id] || 0) + 1;
+      if ((m.mentions || []).includes(S.me.id)) C.mentions[m.channel_id] = (C.mentions[m.channel_id] || 0) + 1;
+      playSound("chime"); renderShell(); drawChatList(); updateTabTitle();
+    }
   }
   else {
     C.unread[m.channel_id] = (C.unread[m.channel_id] || 0) + 1;
@@ -4820,6 +4842,7 @@ function chatOnChange0(payload){
     if (ch && (ch.kind !== "channel" || (m.mentions || []).includes(S.me.id))) playSound("chime");
     if (ch && (ch.kind !== "channel" || (m.mentions || []).includes(S.me.id))) toast((ch.kind === "dm" ? "Message from " + pname(m.author_id) : ch.kind === "group" ? pname(m.author_id) + " in " + chName(ch) : pname(m.author_id) + " mentioned you in " + chName(ch)) + ": " + m.body.slice(0, 60));
     renderShell(); if (S.route === "chat") drawChatList(); if (S.route === "dashboard") rerender();
+    updateTabTitle();
   }
 }
 
@@ -4841,7 +4864,7 @@ async function renderChat(el){
   try { const ro = new ResizeObserver(() => { if (chatEls && chatEls.msgs === msgs && chatEls.pinned) msgs.scrollTop = msgs.scrollHeight; }); ro.observe(msgs); } catch (e) {}
   chatEls = { list, head, msgs, ta, typing, live, jump, pending: true };   // being drawn off-screen, about to be shown
   el._chatEls = chatEls;           // so the chat can always find the copy that's actually on screen
-  el.append(h("div", { class: "chat" }, list, h("div", { class: "chat-main" }, head, h("div", { class: "chat-msgwrap" }, msgs, jump), typing, foot,
+  el.append(h("div", { class: "chat" + (C.mobileView === "conv" ? " m-conv" : "") }, list, h("div", { class: "chat-main" }, head, h("div", { class: "chat-msgwrap" }, msgs, jump), typing, foot,
     h("p", { class: "muted", style: "font-size:12px;margin:4px 14px 10px" }, "Text and links only. To send a file, use ✉️ Email or 💬 WhatsApp at the top of a direct chat. Messages are kept permanently."))));
   ta.value = C.drafts[C.active] || "";
   ta.addEventListener("input", () => { C.drafts[C.active] = ta.value; if (ta.value.trim() && Date.now() - typingSentAt > 2000) { typingSentAt = Date.now(); liveSend("typing", { cid: C.active, uid: S.me.id }); } });
@@ -4872,26 +4895,41 @@ function drawChatList(){
   if (!visibleChat()) return;
   if (!chatEls) return;
   const { list } = chatEls;
-  const q = (C.q || "").toLowerCase();
-  const item = (id, label, sub, unread, mention, extra) => h("button", { type: "button", class: "chat-item" + (C.active === id ? " on" : "") + (unread ? " unread" : ""), onclick: async () => { await openChannel(id); rerender(); } },
+  const q = (C.q || "").trim().toLowerCase();
+  if (!chatEls.search){
+    const search = h("input", { id: "chatSearch", class: "in", type: "search", placeholder: "Find a person or chat", "aria-label": "Find a person or chat", value: C.q || "", autocomplete: "off" });
+    search.addEventListener("input", () => { C.q = search.value; drawChatList(); });
+    chatEls.search = search; chatEls.items = h("div", { class: "chat-items" });
+    list.replaceChildren(search, chatEls.items);
+  }
+  const item = (id, label, sub, unread, mention, extra) => h("button", { type: "button", class: "chat-item" + (C.active === id ? " on" : "") + (unread ? " unread" : ""), onclick: async () => { C.mobileView = "conv"; await openChannel(id); rerender(); } },
     extra || null, h("span", { class: "x" }, h("b", {}, label), sub ? h("br") : null, sub || null), unread ? h("span", { class: "cnt " + (mention ? "due" : "new") }, String(unread > 99 ? "99+" : unread)) : null);
-  const search = h("input", { class: "in", type: "search", placeholder: "Find a person", value: C.q || "" });
-  search.addEventListener("input", () => { C.q = search.value; drawChatList(); const s = chatEls.list.querySelector("input"); s.focus(); s.setSelectionRange(s.value.length, s.value.length); });
-  const channels = C.channels.filter(c => c.kind === "channel");
-  const groups = C.channels.filter(c => c.kind === "group").sort((a, b) => String((C.last[b.id] || {}).created_at || b.created_at).localeCompare(String((C.last[a.id] || {}).created_at || a.created_at)));
+  const match = t => !q || String(t || "").toLowerCase().includes(q);
+  const channels = C.channels.filter(c => c.kind === "channel" && match(c.name));
+  const groups = C.channels.filter(c => c.kind === "group" && match(chName(c))).sort((a, b) => String((C.last[b.id] || {}).created_at || b.created_at).localeCompare(String((C.last[a.id] || {}).created_at || a.created_at)));
   const dms = C.channels.filter(c => c.kind === "dm");
   const people = activePeople().filter(p => p.id !== S.me.id && (!q || p.full_name.toLowerCase().includes(q)))
     .map(p => { const ch = dms.find(c => c.dm_key === dmKey(S.me.id, p.id)); return { p, ch, t: ch && C.last[ch.id] ? C.last[ch.id].created_at : "" }; })
     .sort((a, b) => (b.ch && C.unread[b.ch.id] ? 1 : 0) - (a.ch && C.unread[a.ch.id] ? 1 : 0) || String(b.t).localeCompare(String(a.t)) || (isOnline(b.p.id) - isOnline(a.p.id)) || a.p.full_name.localeCompare(b.p.full_name));
-  list.replaceChildren(search,
-    h("h4", {}, "Channels"), ...channels.map(c => item(c.id, "# " + c.name, c.vertical ? c.vertical + " team" : "Everyone", C.unread[c.id], C.mentions[c.id])),
+  // on a phone, opening a chat switches to the conversation
+  const open = fn => async (...a) => { C.mobileView = "conv"; await fn(...a); };
+  chatEls.items.replaceChildren(...[
+    channels.length ? h("h4", {}, "Channels") : null, ...channels.map(c => item(c.id, "# " + c.name, c.vertical ? c.vertical + " team" : "Everyone", C.unread[c.id], C.mentions[c.id])),
     h("h4", { style: "display:flex;align-items:center" }, "Groups", h("button", { type: "button", class: "linkbtn", style: "margin-left:auto;text-transform:none;letter-spacing:0", onclick: () => groupDialog(null) }, "+ New group")),
     ...(groups.length ? groups.map(c => item(c.id, chName(c), (c.members || []).length + " people", C.unread[c.id], true, h("span", { class: "gicon", "aria-hidden": "true" }, "👥")))
-      : [h("p", { class: "muted", style: "font-size:12.5px;margin:2px 8px 6px" }, "Private chats with a few people.")]),
-    h("h4", {}, "Direct messages"), ...people.map(({ p, ch }) => h("button", { type: "button", class: "chat-item" + (ch && C.active === ch.id ? " on" : "") + (ch && C.unread[ch.id] ? " unread" : ""), onclick: () => openDM(p.id) },
-      avatar(p.id, "sm"), h("span", { class: "x" }, h("b", {}, p.full_name), h("br"), statusLine(p.id)), ch && C.unread[ch.id] ? h("span", { class: "cnt due" }, String(C.unread[ch.id])) : null)));
+      : [h("p", { class: "muted", style: "font-size:12.5px;margin:2px 8px 6px" }, q ? "No groups match." : "Private chats with a few people.")]),
+    h("h4", {}, "Direct messages"), ...(people.length ? [] : [h("p", { class: "muted", style: "font-size:12.5px;margin:2px 8px 6px" }, "No one matches “" + C.q.trim() + "”.")]),
+    ...people.map(({ p, ch }) => h("button", { type: "button", class: "chat-item" + (ch && C.active === ch.id ? " on" : "") + (ch && C.unread[ch.id] ? " unread" : ""), onclick: open(() => openDM(p.id)) },
+      avatar(p.id, "sm"), h("span", { class: "x" }, h("b", {}, p.full_name), h("br"), statusLine(p.id)), ch && C.unread[ch.id] ? h("span", { class: "cnt due" }, String(C.unread[ch.id])) : null))].filter(Boolean));
 }
-function drawChatHead(){ drawChatHead0(); if (chatEls && chatEls.head && chatEls.live) { chatEls.head.append(chatEls.live); drawLiveStatus(); } }
+function drawChatHead(){
+  drawChatHead0();
+  if (chatEls && chatEls.head) {
+    // ‹ Back to the list of chats (phones only)
+    chatEls.head.prepend(h("button", { type: "button", class: "m-back", "aria-label": "Back to chats", onclick: () => { C.mobileView = "list"; const c = chatEls.msgs.closest(".chat"); if (c) c.classList.remove("m-conv"); drawChatList(); } }, "‹"));
+    if (chatEls.live) { chatEls.head.append(chatEls.live); drawLiveStatus(); }
+  }
+}
 function drawChatHead0(){
   if (!chatEls) return;
   const ch = C.channels.find(c => c.id === C.active);
@@ -4909,9 +4947,9 @@ function drawChatHead0(){
     chatEls.head.replaceChildren(avatar(other && other.id), h("span", { class: "x" }, h("b", {}, other ? other.full_name : "Someone"), h("br"), other ? statusLine(other.id) : null),
       h("span", { class: "chat-acts" },
         other && other.phone
-          ? h("button", { type: "button", class: "btn sm", title: "Opens WhatsApp with " + other.full_name.split(" ")[0], onclick: () => window.open("https://wa.me/" + waNumber(other.phone) + "?text=" + encodeURIComponent("Hi " + other.full_name.split(" ")[0] + ", "), "_blank", "noopener") }, "💬 WhatsApp")
-          : other ? h("button", { type: "button", class: "btn sm", disabled: true, title: other.full_name.split(" ")[0] + " hasn’t added a phone number in My profile yet" }, "💬 WhatsApp") : null,
-        other && other.email ? h("button", { type: "button", class: "btn sm", onclick: () => openComposer({ to: other.email, name: other.full_name, templateFor: "any", tbl: "", entity_id: null }) }, "✉️ Email") : null));
+          ? h("button", { type: "button", class: "btn sm", title: "Opens WhatsApp with " + other.full_name.split(" ")[0], onclick: () => window.open("https://wa.me/" + waNumber(other.phone) + "?text=" + encodeURIComponent("Hi " + other.full_name.split(" ")[0] + ", "), "_blank", "noopener") }, h("span", { "aria-hidden": "true" }, "💬"), h("span", { class: "bl" }, " WhatsApp"))
+          : other ? h("button", { type: "button", class: "btn sm", disabled: true, title: other.full_name.split(" ")[0] + " hasn’t added a phone number in My profile yet" }, h("span", { "aria-hidden": "true" }, "💬"), h("span", { class: "bl" }, " WhatsApp")) : null,
+        other && other.email ? h("button", { type: "button", class: "btn sm", onclick: () => openComposer({ to: other.email, name: other.full_name, templateFor: "any", tbl: "", entity_id: null }) }, h("span", { "aria-hidden": "true" }, "✉️"), h("span", { class: "bl" }, " Email")) : null));
   } else {
     const members = activePeople().filter(p => !ch.vertical || p.vertical === ch.vertical || p.is_admin);
     const on = members.filter(p => isOnline(p.id)).length;
@@ -5196,11 +5234,26 @@ function drawChatDebug(){
     "on screen: " + !!(chatEls && chatEls.msgs && chatEls.msgs.isConnected) + " · newest message seen: " + (C.maxId || 0) + "\n\n" + CHATLOG.slice(-18).join("\n");
 }
 window.addEventListener("hashchange", drawChatDebug);
+
+/* ---------- unread count in the browser tab, e.g. "(2) Tcipher …" ---------- */
+let baseTitle = null;
+function updateTabTitle(){
+  if (baseTitle === null) baseTitle = document.title.replace(/^\(\d+\+?\)\s*/, "");
+  let n = 0; try { const t = chatTotals(); n = t.due + t.fresh; } catch (e) {}
+  const want = (n ? "(" + (n > 99 ? "99+" : n) + ") " : "") + baseTitle;
+  if (document.title !== want) document.title = want;
+}
+// coming back to the window: what's on screen in the open chat is now read
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible" || !S.me) return;
+  if (S.route === "chat" && C.active && (C.unread[C.active] || 0) > 0) { markChatRead(C.active); drawChatList(); }
+  updateTabTitle();
+});
 /* ---------------------------------------------------------------------
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11o";
+const APP_VERSION = "2026-11p";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -5826,7 +5879,7 @@ function drawNotifications(){
       p.hidden = true;
       if (!n.is_read) { try { await sb.from("notifications").update({ is_read: true }).eq("id", n.id); n.is_read = true; renderShell(); } catch (e) {} }
       if (n.tbl === "connect-google") { if (googleConnected()) toast("Google is already connected."); else connectGoogle(); return; }
-      if (n.tbl === "chat" && n.entity_id) { (async () => { if (!C.ready) await loadChat(); if (!C.channels.find(c => c.id === n.entity_id)) await loadChat(true); await openChannel(n.entity_id); go("chat"); rerender(); })(); return; }
+      if (n.tbl === "chat" && n.entity_id) { C.mobileView = "conv"; (async () => { if (!C.ready) await loadChat(); if (!C.channels.find(c => c.id === n.entity_id)) await loadChat(true); await openChannel(n.entity_id); go("chat"); rerender(); })(); return; }
       if (n.tbl === "emails") { (async () => { await load("emails", true); const e = byId("emails", n.entity_id); if (e) openEmail(e); else go("emails"); })(); return; }
       const key = Object.keys(MOD).find(k => MOD[k].table === n.tbl);
       if (key && n.entity_id) openRecord(key, n.entity_id);
