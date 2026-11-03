@@ -1371,7 +1371,7 @@ const MOD = {
       notify(added, pname(S.me.id) + " added you to " + k + rec.title, "", "tasks", rec.id);
       const tagged = (rec.mentions || []).filter(id => !(prev && (prev.mentions || []).includes(id)) && !added.includes(id) && id !== rec.assignee_id);
       notify(tagged, pname(S.me.id) + " tagged you in " + k + rec.title, String(rec.description || "").slice(0, 140), "tasks", rec.id);
-      if (rec.status === "In review" && (!prev || prev.status !== "In review")) notify([rec.reviewer_id || defaultReviewer()], "Ready for your review: " + k + rec.title, "From " + (pname(rec.assignee_id) || "someone"), "tasks", rec.id);
+      if (rec.status === "In review" && (!prev || prev.status !== "In review")) notify([rec.reviewer_id || rec.tester_id || defaultReviewer()], (rec.vertical === "Development" ? (rec.qa_state === "Retest" ? "Ready for retest: " : "Ready for QA: ") : "Ready for your review: ") + k + rec.title, "From " + (pname(rec.assignee_id) || "someone"), "tasks", rec.id);
       if (prev && prev.status !== rec.status && rec.status === "Done") notify([rec.assignee_id, rec.created_by, ...(rec.collaborators || [])], "Task approved: " + k + rec.title, "", "tasks", rec.id);
       if (prev && prev.status !== "Done" && rec.status === "Done") {
         const unblocked = rows("tasks").filter(t => (t.blocked_by || []).includes(rec.id) && t.status !== "Done" && openDeps(t).every(x => x.id === rec.id));
@@ -1905,15 +1905,16 @@ function wonFor(userId, month){
 }
 async function reviewTask(rec, approve){
   let note = "";
-  if (!approve){ note = prompt("What needs to change? This is posted as a comment for " + (pname(rec.assignee_id) || "the owner") + "."); if (note === null) return; }
+  const qa = rec.vertical === "Development" && !!rec.qa_state;
+  if (!approve){ note = prompt((qa ? "What failed in testing?" : "What needs to change?") + " This is posted as a comment for " + (pname(rec.assignee_id) || "the owner") + "."); if (note === null) return; }
   try {
     const d = approve ? { status: "Done", completed_at: new Date().toISOString(), blocked: false } : { status: "In progress", completed_at: null };
     const saved = await updateRow("tasks", rec.id, d);
     if (!approve){
-      if (note && note.trim()) await sb.from("comments").insert({ tbl: "tasks", entity_id: rec.id, body: "Sent back: " + note.trim(), author_id: S.me.id });
-      notify([rec.assignee_id, ...(rec.collaborators || [])], "Changes requested: " + rec.title, note || "", "tasks", rec.id);
+      if (note && note.trim()) await sb.from("comments").insert({ tbl: "tasks", entity_id: rec.id, body: (qa ? "Failed QA: " : "Sent back: ") + note.trim(), author_id: S.me.id });
+      notify([rec.assignee_id, ...(rec.collaborators || [])], (qa ? "Failed QA: " : "Changes requested: ") + rec.title, note || "", "tasks", rec.id);
     } else MOD.tasks.after(saved, rec);
-    toast(approve ? "Approved." : "Sent back."); closeDlg(); rerender();
+    toast(approve ? (qa ? "Passed QA." : "Approved.") : (qa ? "Sent back to " + (pname(rec.assignee_id) || "the developer") + " as failed." : "Sent back.")); closeDlg(); rerender();
   } catch (e) { fail(e, "Couldn’t update"); }
 }
 async function sendLeadToSales(rec){
@@ -5414,7 +5415,7 @@ document.addEventListener("visibilitychange", () => {
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11r";
+const APP_VERSION = "2026-11s";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -5848,6 +5849,70 @@ for (const k of ["features", "test_cases", "bugs"]) MOD[k].key = k;
     const at = P.fields.findIndex(f => f.k === "manager_id");
     P.fields.splice(at >= 0 ? at + 1 : P.fields.length, 0, { k: "qa_lead_id", l: "QA lead (tests finished work)", t: "user", none: "–" });
   }
+}
+
+/* ---------- "In QA" for development work, and the Send to QA button ---------- */
+const isDevTask = r => !!r && r.vertical === "Development";
+// the board's column name: "In QA" when you're looking at development work
+function inQALabel(){
+  const v = ((S.ui.tasks || {}).filters || {}).vertical;
+  if (v === "Development") return "In QA";
+  if (v) return "In review";
+  return S.me && S.me.vertical === "Development" ? "In QA" : (isAdmin() ? "In review / QA" : "In review");
+}
+{
+  const T = MOD.tasks;
+  const st = T.fields.find(f => f.k === "status");
+  st.o = rec => TASK_STATUS.map(s => s === "In review" ? [s, rec ? (isDevTask(rec) ? "In QA" : "In review") : inQALabel()] : s);
+  const bst = MOD.bugs.fields.find(f => f.k === "status");
+  MOD.bugs.fields = MOD.bugs.fields.map(f => f === bst ? Object.assign({}, f, { o: TASK_STATUS.map(s => s === "In review" ? [s, "In QA"] : s) }) : f);
+  // who tests it: the feature's tester, else the project's QA lead
+  const testerFor = rec => rec.tester_id || ((byId("features", rec.feature_id) || {}).tester_id) || ((byId("projects", rec.project_id) || {}).qa_lead_id) || null;
+  const actions0 = T.actions;
+  T.actions = rec => {
+    const out = (actions0 ? actions0(rec) : []) || [];
+    if (isDevTask(rec)) {
+      // the reviewer of development work is its tester
+      for (const el of out) if (el && el.tagName === "B" && /Waiting for your review/.test(el.textContent)) el.textContent = rec.qa_state === "Retest" ? "Fixed: waiting for you to retest" : "Waiting for you to test";
+      const working = rec.assignee_id === S.me.id || (rec.collaborators || []).includes(S.me.id) || isTaskHandler(rec.vertical);
+      if (working && ["To do", "In progress"].includes(rec.status) && !rec.archived)
+        out.unshift(h("b", { style: "flex:1" }, rec.qa_state === "Failed" ? "Fixed what QA found?" : "Finished building it?"),
+          h("button", { type: "button", class: "btn sm pri", onclick: () => sendToQA(rec, testerFor(rec)) }, rec.qa_state === "Failed" ? "✓ Fixed: send back to QA" : "✓ Done: send to QA"));
+    }
+    return out;
+  };
+  MOD.bugs.actions = T.actions;
+}
+async function sendToQA(rec, tester){
+  const open = (rec.checklist || []).filter(c => !c.done).length;
+  if (open && !confirm(open + " checklist item" + (open === 1 ? " isn’t" : "s aren’t") + " ticked yet. Send to QA anyway?")) return;
+  if (!tester) {
+    // nobody set to test this feature or project: ask who
+    const testers = activePeople().filter(p => { const r = byId("roles", p.role_id); return p.is_admin || (r && r.permissions && r.permissions.qa === "manage"); });
+    const sel = h("select", { class: "in" }, h("option", { value: "" }, "Choose a tester…"), testers.map(p => h("option", { value: p.id }, p.full_name)));
+    const remember = h("input", { type: "checkbox", checked: !!rec.project_id });
+    const go2 = h("button", { type: "button", class: "btn pri" }, "Send to QA");
+    go2.addEventListener("click", async () => {
+      if (!sel.value) { toast("Choose a tester."); return; }
+      if (remember.checked && rec.project_id && lvl("projects") >= 2) { try { await updateRow("projects", rec.project_id, { qa_lead_id: sel.value }); } catch (e) {} }
+      closeDlg(); await doSend(rec, sel.value);
+    });
+    openDialog("Who should test it?", [h("p", {}, "This task’s feature and project don’t have a tester yet."), h("label", { class: "fl full" }, "Tester", sel),
+      rec.project_id && lvl("projects") >= 2 ? h("label", { class: "chk", style: "margin-top:8px" }, remember, "Make them the QA lead for " + (refLabel("projects", rec.project_id) || "this project")) : null],
+      [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), go2], true);
+    return;
+  }
+  await doSend(rec, tester);
+}
+async function doSend(rec, tester){
+  try {
+    // only the status (and the tester, if one had to be chosen): the database fills in the reviewer and QA stage
+    const known = rec.tester_id || ((byId("features", rec.feature_id) || {}).tester_id) || ((byId("projects", rec.project_id) || {}).qa_lead_id);
+    const saved = await updateRow("tasks", rec.id, Object.assign({ status: "In review" }, !known && tester ? { tester_id: tester } : {}));
+    if (MOD.tasks.after) { try { await MOD.tasks.after(saved, rec); } catch (e) {} }
+    // the tester is told by the task's usual "ready" notification
+    closeDlg(); toast("Sent to " + (pname(tester) || "QA") + (saved.qa_state === "Retest" ? " to retest." : " for testing.")); rerender();
+  } catch (e) { fail(e, "Couldn’t send to QA"); }
 }
 /* ---------------------------------------------------------------------
    QA dashboard, and importing the testing / bugs / UX Gaps spreadsheets
