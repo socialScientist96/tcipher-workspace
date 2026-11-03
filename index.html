@@ -396,6 +396,17 @@ button.busy:not(.btn):not(.iconbtn):not(.linkbtn):not(.link){opacity:.6;cursor:p
 .chat-msgs .bub textarea{color:var(--ink);background:#fff;min-width:220px}
 .chat-typing{min-height:18px;font-size:12.5px;color:var(--ink3);padding:0 16px 4px;font-style:italic}
 .chat-head .chat-acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.live-dot{font-size:11.5px;font-weight:700;color:#B45309;white-space:nowrap;margin-left:4px}
+.live-dot::before{content:"● "}
+.live-dot.on{color:#16A34A}
+.verbar{position:fixed;left:50%;transform:translateX(-50%);top:calc(10px + env(safe-area-inset-top,0px));z-index:60;display:flex;gap:12px;align-items:center;background:var(--p-deep);color:#fff;padding:8px 10px 8px 16px;border-radius:999px;box-shadow:0 6px 20px rgba(27,20,80,.3);font-size:13.5px;font-weight:600}
+.verbar .btn{background:#fff;color:var(--p-deep);border-color:#fff}
+.chat-msgwrap{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}
+.chat-msgwrap .chat-msgs{flex:1}
+.chat-unread{display:flex;align-items:center;gap:10px;margin:12px 0 6px;color:#E5484D;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.chat-unread::before,.chat-unread::after{content:"";flex:1;height:1px;background:#F3B5B7}
+.chat-jump{position:absolute;right:16px;bottom:10px;z-index:3;border:0;border-radius:999px;background:var(--p);color:#fff;font:inherit;font-size:12.5px;font-weight:700;padding:6px 12px;box-shadow:0 4px 14px rgba(27,20,80,.25);cursor:pointer}
+.chat-jump[hidden]{display:none}
 .hday{flex:none;width:44px;height:44px;border-radius:10px;background:var(--tint);color:var(--p-ink);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
 .hday b{font-size:16px}
 .hday small{font-size:11px;font-weight:600;text-transform:uppercase;margin-top:2px}
@@ -2601,7 +2612,12 @@ function openMyProfile(){
       h("div", { class: "fl full" }, "Email", h("div", { class: "ro" }, p.email)),
       h("div", { class: "full section", style: "margin-top:4px" }, h("h3", {}, "Change password")),
       h("label", { class: "fl" }, "New password", pw1, h("span", { class: "hint" }, "At least 8 characters")), h("label", { class: "fl" }, "Repeat new password", pw2),
-      h("div", { class: "full section", style: "margin-top:4px" }, h("h3", {}, "Google Calendar and Meet"), googleCard())),
+      h("div", { class: "full section", style: "margin-top:4px" }, h("h3", {}, "Google Calendar and Meet"), googleCard()),
+      h("div", { class: "full section", style: "margin-top:4px" }, h("h3", {}, "Sounds"),
+        h("div", { style: "display:flex;align-items:center;gap:12px;flex-wrap:wrap" },
+          h("label", { class: "chk" }, h("input", { type: "checkbox", checked: soundOn(), onchange: e => { setSound(e.target.checked); toast(e.target.checked ? "Sounds on." : "Sounds off."); if (e.target.checked) playSound("chime", true); } }), "🔔 Play a sound for new notifications and messages"),
+          h("button", { type: "button", class: "btn sm soft", onclick: () => playSound("chime", true) }, "Test sound")),
+        h("p", { class: "muted", style: "font-size:12.5px;margin:4px 0 0" }, "Saved for this browser. Check that your computer or phone isn’t muted."))),
     err
   ], [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), save], true);
 }
@@ -4568,13 +4584,45 @@ function openMarkAttendance(userId, day){
   fill();
 }
 /* ---------------------------------------------------------------------
+   Notification sounds: a soft two-note chime for notifications and messages,
+   a quieter "pop" for a message in the chat you're looking at.
+   --------------------------------------------------------------------- */
+let audioCtx = null, lastSoundAt = 0;
+const soundKey = () => "tc_sound_" + (S.me ? S.me.id : "");
+function soundOn(){ try { return localStorage.getItem(soundKey()) !== "off"; } catch (e) { return true; } }
+function setSound(on){ try { localStorage.setItem(soundKey(), on ? "on" : "off"); } catch (e) {} }
+function unlockAudio(){
+  // browsers only allow sound after the person has clicked or typed on the page
+  try { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return; if (!audioCtx) audioCtx = new AC(); if (audioCtx.state === "suspended") audioCtx.resume(); } catch (e) {}
+}
+["pointerdown", "keydown", "touchstart"].forEach(ev => document.addEventListener(ev, unlockAudio, { passive: true }));
+function playSound(kind, force){
+  if (!force && (!S.me || !soundOn())) return;
+  const now = Date.now(); if (!force && now - lastSoundAt < 2500) return;   // a burst plays one sound, not five
+  lastSoundAt = now;
+  try {
+    unlockAudio(); if (!audioCtx || audioCtx.state !== "running") return;
+    const t0 = audioCtx.currentTime + 0.01;
+    const notes = kind === "pop" ? [[880, 0, 0.09, 0.05]] : [[784, 0, 0.16, 0.09], [1175, 0.11, 0.26, 0.08]];   // G5 then D6, gentle
+    for (const [f, start, dur, vol] of notes){
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = "sine"; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t0 + start);
+      g.gain.exponentialRampToValueAtTime(vol, t0 + start + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + start + dur);
+      o.connect(g).connect(audioCtx.destination);
+      o.start(t0 + start); o.stop(t0 + start + dur + 0.02);
+    }
+  } catch (e) {}
+}
+/* ---------------------------------------------------------------------
    Online and last-active status
    --------------------------------------------------------------------- */
 let ONLINE = new Set(), presenceCh = null, presenceTimer = null;
 function startPresence(){
   stopPresence();
   try {
-    presenceCh = sb.channel("ws-online", { config: { presence: { key: S.me.id } } });
+    presenceCh = sb.channel("online", { config: { private: true, presence: { key: S.me.id } } });
     presenceCh.on("presence", { event: "sync" }, () => {
       try { ONLINE = new Set(Object.keys(presenceCh.presenceState() || {})); } catch (e) {}
       paintPresence();
@@ -4668,6 +4716,7 @@ async function loadChat(force){
         C.unread[ch.id] = un.length; C.mentions[ch.id] = un.filter(m => (m.mentions || []).includes(S.me.id)).length;
       }));
       C.ready = true;
+      if (typeof syncChatSubs === "function" && S.userLive) syncChatSubs();
     } catch (e) { console.warn("chat", e); }
     C.loading = null;
   })();
@@ -4679,11 +4728,21 @@ function chatTotals(){
   return { due: dm + mention, fresh: other };
 }
 async function openChannel(id){
+  const switching = C.active !== id;
   C.active = id;
+  const lastRead = C.reads[id] || 0, hadUnread = (C.unread[id] || 0) > 0;
   const chx = C.channels.find(c => c.id === id); if (chx && chx.kind === "dm") loadOthersRead(id).then(() => { if (S.route === "chat" && C.active === id) drawChatMessages(); });
   if (!C.msgs[id]){
     const rs = ok(await sb.from("chat_messages").select("*").eq("channel_id", id).order("id", { ascending: false }).limit(60)) || [];
     C.msgs[id] = rs.reverse(); C.more[id] = rs.length === 60;
+  }
+  // where your unread messages start: show a divider there and open the conversation at it
+  C.unreadFrom = C.unreadFrom || {};
+  if (switching || hadUnread){
+    let first = (C.msgs[id] || []).find(m => m.id > lastRead && m.author_id !== S.me.id);
+    for (let i = 0; i < 4 && hadUnread && C.more[id] && (!first || first.id === (C.msgs[id][0] || {}).id); i++){ await loadEarlier(id); first = (C.msgs[id] || []).find(m => m.id > lastRead && m.author_id !== S.me.id); }
+    C.unreadFrom[id] = hadUnread && first ? first.id : null;
+    C.scrollToUnread = C.unreadFrom[id] ? id : null;
   }
   markChatRead(id);
 }
@@ -4706,7 +4765,7 @@ async function openDM(userId){
   if (!ch){
     try { ch = ok(await sb.from("chat_channels").insert({ kind: "dm", members: [S.me.id, userId], dm_key: key }).select().single()); }
     catch (e) { ch = (ok(await sb.from("chat_channels").select("*").eq("dm_key", key)) || [])[0]; if (!ch) { fail(e, "Couldn’t start the conversation"); return; } }
-    C.channels.push(ch); C.reads[ch.id] = 0; C.unread[ch.id] = 0;
+    C.channels.push(ch); C.reads[ch.id] = 0; C.unread[ch.id] = 0; syncChatSubs();
   }
   await openChannel(ch.id);
   if (S.route !== "chat") go("chat"); else rerender();
@@ -4726,12 +4785,22 @@ function chatOnChange(payload){
   if (list && !list.find(x => x.id === m.id)) list.push(m);
   C.last[m.channel_id] = m;
   if (!C.channels.find(c => c.id === m.channel_id)) { loadChat(true).then(() => { renderShell(); if (S.route === "chat") rerender(); }); return; }
-  if (m.author_id === S.me.id) return;
-  if (S.route === "chat" && C.active === m.channel_id && document.visibilityState === "visible"){ drawChatMessages(true); markChatRead(m.channel_id); }
+  if (m.author_id === S.me.id){
+    // sent by you from another tab, phone or computer: show it, but no unread count or sound
+    if (S.route === "chat" && C.active === m.channel_id) drawChatMessages(true);
+    if (S.route === "chat") drawChatList();
+    return;
+  }
+  if (S.route === "chat" && C.active === m.channel_id && document.visibilityState === "visible"){
+    const mm = chatEls && chatEls.msgs, away = mm && mm.scrollHeight - mm.scrollTop - mm.clientHeight > 250;
+    drawChatMessages(!away); if (away && chatEls) { chatEls.jumpNew = true; drawJump(); }
+    markChatRead(m.channel_id); playSound("pop");
+  }
   else {
     C.unread[m.channel_id] = (C.unread[m.channel_id] || 0) + 1;
     if ((m.mentions || []).includes(S.me.id)) C.mentions[m.channel_id] = (C.mentions[m.channel_id] || 0) + 1;
     const ch = C.channels.find(c => c.id === m.channel_id);
+    if (ch && (ch.kind !== "channel" || (m.mentions || []).includes(S.me.id))) playSound("chime");
     if (ch && (ch.kind !== "channel" || (m.mentions || []).includes(S.me.id))) toast((ch.kind === "dm" ? "Message from " + pname(m.author_id) : ch.kind === "group" ? pname(m.author_id) + " in " + chName(ch) : pname(m.author_id) + " mentioned you in " + chName(ch)) + ": " + m.body.slice(0, 60));
     renderShell(); if (S.route === "chat") drawChatList(); if (S.route === "dashboard") rerender();
   }
@@ -4748,8 +4817,11 @@ async function renderChat(el){
   const sendBtn = h("button", { type: "button", class: "btn pri" }, "Send");
   const foot = h("div", { class: "chat-foot" }, ta, sendBtn);
   const typing = h("div", { class: "chat-typing", "aria-live": "polite" });
-  chatEls = { list, head, msgs, ta, typing };
-  el.append(h("div", { class: "chat" }, list, h("div", { class: "chat-main" }, head, msgs, typing, foot,
+  const live = h("span", { class: "live-dot" });
+  const jump = h("button", { type: "button", class: "chat-jump", hidden: true, onclick: () => { msgs.scrollTop = msgs.scrollHeight; chatEls.jumpNew = false; drawJump(); } }, "↓ Jump to latest");
+  msgs.addEventListener("scroll", () => drawJump(), { passive: true });
+  chatEls = { list, head, msgs, ta, typing, live, jump };
+  el.append(h("div", { class: "chat" }, list, h("div", { class: "chat-main" }, head, h("div", { class: "chat-msgwrap" }, msgs, jump), typing, foot,
     h("p", { class: "muted", style: "font-size:12px;margin:4px 14px 10px" }, "Text and links only. To send a file, use ✉️ Email or 💬 WhatsApp at the top of a direct chat. Messages are kept permanently."))));
   ta.value = C.drafts[C.active] || "";
   ta.addEventListener("input", () => { C.drafts[C.active] = ta.value; if (ta.value.trim() && Date.now() - typingSentAt > 2000) { typingSentAt = Date.now(); liveSend("typing", { cid: C.active, uid: S.me.id }); } });
@@ -4764,7 +4836,7 @@ async function renderChat(el){
       const m = ok(await sb.from("chat_messages").insert({ channel_id: C.active, body, mentions, author_id: S.me.id }).select().single());
       (C.msgs[C.active] = C.msgs[C.active] || []).push(m); C.last[C.active] = m; C.reads[C.active] = m.id;
       C.seen = C.seen || new Set(); C.seen.add(m.id); if (m.id > (C.maxId || 0)) C.maxId = m.id;
-      liveSend("msg", { cid: C.active, mid: m.id });
+      // the database sends the live signal for this message to everyone in the conversation
       sb.from("chat_reads").upsert({ user_id: S.me.id, channel_id: C.active, last_read_id: m.id }, { onConflict: "user_id,channel_id" }).then(() => {}, () => {});
       ta.value = ""; C.drafts[C.active] = "";
       const tagged = mentions.filter(x => x !== S.me.id && (ch.kind === "channel" || (ch.members || []).includes(x)));
@@ -4798,7 +4870,8 @@ function drawChatList(){
     h("h4", {}, "Direct messages"), ...people.map(({ p, ch }) => h("button", { type: "button", class: "chat-item" + (ch && C.active === ch.id ? " on" : "") + (ch && C.unread[ch.id] ? " unread" : ""), onclick: () => openDM(p.id) },
       avatar(p.id, "sm"), h("span", { class: "x" }, h("b", {}, p.full_name), h("br"), statusLine(p.id)), ch && C.unread[ch.id] ? h("span", { class: "cnt due" }, String(C.unread[ch.id])) : null)));
 }
-function drawChatHead(){
+function drawChatHead(){ drawChatHead0(); if (chatEls && chatEls.head && chatEls.live) { chatEls.head.append(chatEls.live); drawLiveStatus(); } }
+function drawChatHead0(){
   if (!chatEls) return;
   const ch = C.channels.find(c => c.id === C.active);
   if (!ch) { chatEls.head.replaceChildren(h("b", {}, "Pick a conversation")); return; }
@@ -4843,6 +4916,7 @@ function drawChatMessages(toBottom){
   list.forEach((m, i) => {
     const day = String(m.created_at).slice(0, 10), t = new Date(m.created_at).getTime();
     if (day !== lastDay){ msgs.append(h("div", { class: "chat-day" }, h("span", {}, day === today() ? "Today" : day === addDays(today(), -1) ? "Yesterday" : fmtDate(day, true)))); lastDay = day; lastAuthor = null; }
+    if (C.unreadFrom && C.unreadFrom[C.active] === m.id) msgs.append(h("div", { class: "chat-unread", id: "unreadMark" }, h("span", {}, "New messages")));
     const next = list[i + 1];
     const first = !(lastAuthor === m.author_id && t - lastT < 5 * 60000);                         // first of a run from this person
     const lastOfRun = !(next && next.author_id === m.author_id && new Date(next.created_at) - t < 5 * 60000 && String(next.created_at).slice(0, 10) === day);
@@ -4859,13 +4933,24 @@ function drawChatMessages(toBottom){
     if (mine) row.prepend(row.lastChild);            // edit button sits to the left of your bubble
     msgs.append(row); lastAuthor = m.author_id; lastT = t;
   });
-  if (toBottom || atBottom) msgs.scrollTop = msgs.scrollHeight;
+  const mark = msgs.querySelector("#unreadMark");
+  if (C.scrollToUnread === C.active && mark) { msgs.scrollTop = Math.max(0, mark.offsetTop - 60); C.scrollToUnread = null; }
+  else if (toBottom || atBottom) msgs.scrollTop = msgs.scrollHeight;
+  drawJump();
+}
+// "Jump to latest" when you've scrolled up (shows "New message" if one arrived meanwhile)
+function drawJump(){
+  if (!chatEls || !chatEls.jump) return;
+  const m = chatEls.msgs, away = m.scrollHeight - m.scrollTop - m.clientHeight > 250;
+  chatEls.jump.hidden = !away;
+  if (!away) chatEls.jumpNew = false;
+  chatEls.jump.textContent = chatEls.jumpNew ? "↓ New message" : "↓ Jump to latest";
 }
 function editMessage(m, bodyEl){
   const ta = h("textarea", { class: "in", rows: 2, maxlength: "4000" }); ta.value = m.body;
   const save = async () => {
     const v = ta.value.trim(); if (!v || v === m.body) { drawChatMessages(); return; }
-    try { const r = ok(await sb.from("chat_messages").update({ body: v, mentions: mentionIds(v) }).eq("id", m.id).select().single()); Object.assign(m, r); drawChatMessages(); liveSend("msg", { cid: m.channel_id, mid: m.id, edit: true }); }
+    try { const r = ok(await sb.from("chat_messages").update({ body: v, mentions: mentionIds(v) }).eq("id", m.id).select().single()); Object.assign(m, r); drawChatMessages(); }
     catch (e) { fail(e, "Not saved"); }
   };
   ta.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); save(); } if (e.key === "Escape") { e.preventDefault(); drawChatMessages(); } });
@@ -4896,7 +4981,7 @@ function messagesPanel(){
 let chatPollT = null, notifPollT = null, lastChatPoll = 0;
 async function chatPoll(){
   if (!S.me || !C.ready || document.visibilityState === "hidden") return;
-  const now = Date.now(), every = S.route === "chat" ? 4000 : 15000;
+  const now = Date.now(), every = S.route === "chat" ? 2000 : 10000;
   if (now - lastChatPoll < every - 200) return;
   lastChatPoll = now;
   if (!C.maxId) C.maxId = Math.max(0, ...Object.values(C.last).filter(Boolean).map(x => x.id), ...Object.values(C.msgs).flat().map(x => x.id));
@@ -4908,13 +4993,15 @@ async function chatPoll(){
 }
 function startChatPolling(){
   stopChatPolling();
-  chatPollT = setInterval(chatPoll, 2000);
+  chatPollT = setInterval(chatPoll, 1000);
   notifPollT = setInterval(async () => {
     if (!S.me || document.visibilityState === "hidden") return;
     const before = new Set(S.notifications.map(n => n.id + "|" + n.created_at));
     try { await loadNotifications(); } catch (e) { return; }
     const fresh = S.notifications.filter(n => !n.is_read && !before.has(n.id + "|" + n.created_at) && before.size);
-    if (fresh.length) { toast(fresh[0].title); renderShell(); }
+    const other = fresh.filter(n => n.tbl !== "chat");
+    if (other.length) { toast(other[0].title); playSound("chime"); }
+    if (fresh.length) renderShell();
   }, 20000);
 }
 function stopChatPolling(){ if (chatPollT) clearInterval(chatPollT); if (notifPollT) clearInterval(notifPollT); chatPollT = notifPollT = null; }
@@ -4923,20 +5010,75 @@ document.addEventListener("visibilitychange", () => { if (document.visibilitySta
 /* ---------- instant updates over the live connection ----------
    A short signal ("new message in conversation X", never the text) goes to everyone online;
    each browser then fetches the message through the normal access rules. */
-let liveCh = null; const typingAt = {}; let typingSentAt = 0;
+const typingAt = {}; let typingSentAt = 0;
 C.othersRead = C.othersRead || {};
-function startChatLive(){
+// sign the live connection in as this person, so private channels and access rules apply
+async function liveAuth(){ try { if (sb.realtime && sb.realtime.setAuth) await sb.realtime.setAuth(); } catch (e) { console.warn("live auth", e); } }
+let liveSubs = {}, userCh = null, liveRetry = 0, liveRetryT = null, liveStopping = false, liveReported = false;
+async function startChatLive(){
   stopChatLive();
+  await liveAuth();
+  if (!S.me) return;
   try {
-    liveCh = sb.channel("ws-chat-live", { config: { broadcast: { self: false } } });
-    liveCh.on("broadcast", { event: "msg" }, ({ payload }) => onLiveMsg(payload));
-    liveCh.on("broadcast", { event: "typing" }, ({ payload }) => onLiveTyping(payload));
-    liveCh.on("broadcast", { event: "read" }, ({ payload }) => onLiveRead(payload));
-    liveCh.subscribe(st => { S.chatLive = st; if (st === "CHANNEL_ERROR" || st === "TIMED_OUT") captureError("Instant chat not connected: " + st, "", { realtime: st }); });
-  } catch (e) { console.warn("chat live", e); }
+    userCh = sb.channel("user:" + S.me.id, { config: { private: true } });
+    userCh.on("broadcast", { event: "notif" }, ({ payload }) => onLiveNotif(payload));
+    userCh.subscribe((st, err) => { S.userLive = st; drawLiveStatus(); liveTrouble(st, err); });
+  } catch (e) { console.warn("user live", e); }
+  syncChatSubs();
 }
-function stopChatLive(){ if (liveCh) { try { sb.removeChannel(liveCh); } catch (e) {} liveCh = null; } }
-function liveSend(event, payload){ try { if (liveCh) liveCh.send({ type: "broadcast", event, payload }); } catch (e) {} }
+// one private channel per conversation you can see
+function syncChatSubs(){
+  if (!S.me || liveStopping) return;
+  const want = new Set(C.channels.map(c => c.id));
+  for (const id of Object.keys(liveSubs)) if (!want.has(id)) { try { sb.removeChannel(liveSubs[id].ch); } catch (e) {} delete liveSubs[id]; }
+  for (const id of want){
+    if (liveSubs[id]) continue;
+    try {
+      const ch = sb.channel("chat:" + id, { config: { private: true, broadcast: { self: false } } });
+      ch.on("broadcast", { event: "msg" }, ({ payload }) => onLiveMsg(payload));
+      ch.on("broadcast", { event: "typing" }, ({ payload }) => onLiveTyping(payload));
+      ch.on("broadcast", { event: "read" }, ({ payload }) => onLiveRead(payload));
+      liveSubs[id] = { ch, st: "" };
+      ch.subscribe((st, err) => {
+        if (liveSubs[id]) liveSubs[id].st = st;
+        if (st === "SUBSCRIBED") { liveRetry = 0; if (id === C.active) { lastChatPoll = 0; chatPoll(); } }   // catch up on anything sent while connecting
+        drawLiveStatus(); liveTrouble(st, err);
+      });
+    } catch (e) { console.warn("chat live", e); }
+  }
+}
+function liveTrouble(st, err){
+  if (st !== "CHANNEL_ERROR" && st !== "TIMED_OUT") return;
+  if (!liveReported) { liveReported = true; captureError("Instant chat not connected: " + st + (err && err.message ? " (" + err.message + ")" : ""), "", { realtime: st }); }
+  // try again with growing pauses; the 2-second backup check keeps messages coming meanwhile
+  if (S.me && !liveStopping && !liveRetryT) { const wait = Math.min(30000, 3000 * Math.pow(2, liveRetry++)); liveRetryT = setTimeout(() => { liveRetryT = null; if (S.me) startChatLive(); }, wait); }
+}
+function stopChatLive(){
+  liveStopping = true; clearTimeout(liveRetryT); liveRetryT = null;
+  for (const id of Object.keys(liveSubs)) { try { sb.removeChannel(liveSubs[id].ch); } catch (e) {} }
+  liveSubs = {}; if (userCh) { try { sb.removeChannel(userCh); } catch (e) {} userCh = null; }
+  liveStopping = false;
+}
+function liveConnected(){ const a = liveSubs[C.active]; return S.userLive === "SUBSCRIBED" && (!C.active || (a && a.st === "SUBSCRIBED")); }
+function drawLiveStatus(){
+  const el = chatEls && chatEls.live; if (!el) return;
+  const on = liveConnected();
+  el.className = "live-dot" + (on ? " on" : "");
+  el.textContent = on ? "Live" : "Connecting…";
+  el.title = on ? "Messages arrive instantly." : "Connecting to instant updates. Messages still arrive every 2 seconds meanwhile.";
+}
+const notifSeen = new Set();
+async function onLiveNotif(p){
+  if (!p || !p.id) return;
+  const key = p.id + "|" + (p.title || "");
+  if (notifSeen.has(key)) return; notifSeen.add(key);
+  try { await loadNotifications(); } catch (e) {}
+  const viewing = p.tbl === "chat" && S.route === "chat" && C.active === p.entity_id && document.visibilityState === "visible";
+  if (!viewing) { toast(p.title || "New notification"); playSound("chime"); }
+  if (p.tbl === "chat" && p.entity_id && !C.channels.find(c => c.id === p.entity_id)) { await loadChat(true); syncChatSubs(); }
+  renderShell();
+}
+function liveSend(event, payload){ try { const sub = payload && liveSubs[payload.cid]; if (sub && sub.st === "SUBSCRIBED") sub.ch.send({ type: "broadcast", event, payload }); } catch (e) {} }
 async function onLiveMsg(p){
   if (!p || !p.cid || !p.mid || !C.ready) return;
   if (!C.channels.find(c => c.id === p.cid)) { await loadChat(true); if (!C.channels.find(c => c.id === p.cid)) return; renderShell(); }   // a new chat someone started with you
@@ -4966,11 +5108,30 @@ function drawTyping(){
 async function loadOthersRead(cid){
   try { const rs = ok(await sb.from("chat_reads").select("user_id,last_read_id").eq("channel_id", cid)) || []; C.othersRead[cid] = {}; for (const r of rs) if (r.user_id !== S.me.id) C.othersRead[cid][r.user_id] = +r.last_read_id || 0; } catch (e) {}
 }
+
+/* ---------- a newer version was uploaded? offer a reload ---------- */
+let versionBar = null;
+async function checkVersion(){
+  if (!/^https?:/.test(location.protocol) || location.hostname.endsWith("claude.ai") || location.hostname.endsWith("claudeusercontent.com")) return;
+  try {
+    const res = await fetch(location.pathname + "?v=" + Date.now(), { cache: "no-store" });
+    if (!res.ok) return;
+    const m = (await res.text()).match(/APP_VERSION = "([^"]+)"/);
+    if (m && m[1] !== APP_VERSION && !versionBar){
+      versionBar = h("div", { class: "verbar", role: "status" }, "A new version of the workspace is available.",
+        h("button", { type: "button", class: "btn sm", onclick: () => location.reload() }, "Reload now"));
+      document.body.append(versionBar);
+    }
+  } catch (e) {}
+}
+setInterval(checkVersion, 5 * 60000);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkVersion(); });
+setTimeout(checkVersion, 20000);
 /* ---------------------------------------------------------------------
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11l";
+const APP_VERSION = "2026-11m";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -5523,7 +5684,7 @@ async function rerender(){
   const seq = ++renderSeq;
   const route = (location.hash.replace(/^#/, "") || "dashboard");
   if (S.route && S.route !== route && S.me) markSeen(S.route);
-  if (route !== "chat") chatEls = null;   // leaving a tab: everything you saw there is no longer "new"
+  if (route !== "chat") { chatEls = null; if (typeof C !== "undefined") { C.unreadFrom = {}; C.scrollToUnread = null; } }   // leaving Chat: the "New messages" line is redrawn fresh next time   // leaving a tab: everything you saw there is no longer "new"
   S.route = route;
   if (S.me) markSeen(route);
   renderShell();
@@ -5614,7 +5775,7 @@ const pendingTables = new Set(); let liveT;
 function onChange(payload){
   const t = payload.table;
   if (t === "chat_messages" || t === "chat_channels") { chatOnChange(payload); return; }
-  if (t === "notifications") { loadNotifications(); if (payload.eventType === "INSERT" && payload.new && payload.new.user_id === S.me.id) toast(payload.new.title); return; }
+  if (t === "notifications") { loadNotifications(); if (payload.eventType === "INSERT" && payload.new && payload.new.user_id === S.me.id && payload.new.tbl !== "chat") { toast(payload.new.title); playSound("chime"); } return; }
   if (t === "comments" || t === "files"){
     const r = payload.new && payload.new.entity_id ? payload.new : payload.old;
     if (S.dlg && (!r || !r.tbl || (r.tbl === S.dlg.tbl && r.entity_id === S.dlg.id))) document.querySelectorAll("#dlg [data-live='" + t + "']").forEach(sec => sec._refresh && sec._refresh());
@@ -5663,10 +5824,10 @@ async function startSession(session){
     loadNotifications();
     setTimeout(prefetch, 1200);
     if (googleOn()) { loadGoogle().catch(() => {}); autoSyncGoogle(); }
-    startPresence(); startChatLive(); loadChat().then(() => { renderShell(); if (S.route === "dashboard") rerender(); startChatPolling(); });
+    await liveAuth(); startPresence(); loadChat().then(() => { renderShell(); if (S.route === "dashboard") rerender(); startChatPolling(); startChatLive(); });
     if (isAdmin()) load("problem_reports").then(() => renderShell());   // Google ready before anyone clicks; calendar synced if it's been a while
     if (!channel){
-      channel = sb.channel("ws-live").on("postgres_changes", { event: "*", schema: "public" }, onChange).subscribe((status, err) => {
+      channel = sb.channel("ws-live", { config: { private: true } }).on("postgres_changes", { event: "*", schema: "public" }, onChange).subscribe((status, err) => {
         S.live = status;
         // if live updates can't connect, the backup checks keep things current, and the problem is recorded for an admin
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") captureError("Live updates not connected: " + status + (err && err.message ? " (" + err.message + ")" : ""), "", { realtime: status });

@@ -1,7 +1,14 @@
 # Tcipher Workspace – changelog
 
-## Ready to go live: version 2026-11l (this folder; includes everything in 2026-11k, which was never uploaded)
-Needs: run `upgrade-2026-11k.sql` in Supabase, then upload `index.html`.
+## Ready to go live: version 2026-11m (this folder)
+Needs: run `upgrade-2026-11k.sql`, then `upgrade-2026-11m.sql`, in Supabase (both are safe to run again), then upload `index.html`.
+- **Instant chat that really is instant:** the workspace now signs in to Supabase’s live connection and uses **private channels**, one per conversation plus one per person. The database itself sends the “new message” and “new notification” signals. This works whether or not the project allows public live channels. The backup check runs every 2 seconds on Chat.
+- **● Live / Connecting…** at the top of each chat, so it’s clear whether messages are arriving instantly.
+- **Notification sound:** a soft chime for new messages and notifications, and a quieter pop in the chat you’re reading. Switch it off in My profile › Sounds.
+- **Start from unread:** conversations open at the first unread message, under a red **New messages** line; **↓ Jump to latest** appears when you scroll up, and shows **↓ New message** when one arrives.
+- **New version available:** when a newer version is uploaded, the workspace offers a **Reload now** bar, so nobody is stuck on an old copy.
+
+## Version 2026-11l (live 3 Nov 2026)
 - **Menu:** sections all start closed; clicking a section’s name always opens or closes it (including the one you’re on); several can be open at once; remembered.
 - **💬 WhatsApp in direct chats**, next to ✉️ Email: opens WhatsApp with that person’s number (from My profile).
 - Fixes the live problem where chat messages only appeared after a click.
