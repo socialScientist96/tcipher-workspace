@@ -454,6 +454,47 @@ button.busy:not(.btn):not(.iconbtn):not(.linkbtn):not(.link){opacity:.6;cursor:p
 .hbar .n{text-align:right;font-weight:700}
 tr.muted-row td{opacity:.55}
 select.in.sm{padding:4px 6px;font-size:13px;min-width:120px}
+/* status */
+.av.away::after{content:"";position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border-radius:50%;background:#F5A524;border:2px solid #fff}
+.lastact.st-away{color:#B45309} .lastact.st-bad{color:var(--bad)} .lastact.st-leave{color:var(--p)} .lastact.st-recent{color:var(--ink2)}
+.mystatus-slot{padding:0 12px 10px}
+.mystatus{display:flex;align-items:center;gap:7px;width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);color:#DCDDFB;border-radius:8px;padding:6px 9px;font:inherit;font-size:12px;cursor:pointer;text-align:left}
+.mystatus:hover{background:rgba(255,255,255,.12)}
+.mystatus .dot{width:8px;height:8px;border-radius:50%;background:#9A9CC8;flex:none}
+.mystatus.st-on .dot{background:#22C55E} .mystatus.st-away .dot{background:#F5A524} .mystatus.st-bad .dot{background:#F0445A} .mystatus.st-leave .dot{background:#A78BFA}
+.mystatus .x{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.status-menu{position:fixed;z-index:1200;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:4px;display:flex;flex-direction:column;min-width:220px}
+.status-menu button{background:none;border:0;text-align:left;padding:8px 10px;border-radius:7px;font:inherit;font-size:13.5px;cursor:pointer;color:var(--ink)}
+.status-menu button:hover{background:var(--tint)}
+.idle-warn{position:fixed;inset:0;z-index:3000;background:rgba(20,16,60,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+.iw-box{background:#fff;border-radius:16px;max-width:440px;width:100%;padding:24px;box-shadow:0 20px 60px rgba(20,16,60,.35);text-align:center}
+.iw-box .iw-icon{font-size:34px;margin-bottom:6px}
+.iw-box h2{margin:0 0 8px;font-size:19px}
+.iw-box p{margin:0 0 16px;color:var(--ink2)}
+.iw-acts{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+/* day history */
+.dh{display:flex;flex-direction:column}
+.dh-row{display:grid;grid-template-columns:190px 1fr 230px;gap:12px;align-items:center;padding:8px 6px;border-bottom:1px solid var(--line);background:none;border-left:0;border-right:0;border-top:0;font:inherit;text-align:left;width:100%;cursor:pointer;color:var(--ink)}
+.dh-row:hover,.dh-row.on{background:var(--tint)}
+.dh-head{cursor:default;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line)} .dh-head:hover{background:none}
+.dh-name{display:flex;gap:8px;align-items:center;min-width:0;font-size:13px}
+.dh-bar{position:relative;height:22px;border-radius:6px;background:#F4F4F9}
+.dh-head .dh-bar{background:none;height:16px}
+.dh-tick{position:absolute;transform:translateX(-50%);white-space:nowrap}
+.dh-work{position:absolute;top:0;bottom:0;background:#ECEBF7;border-radius:6px}
+.dh-seg{position:absolute;top:3px;bottom:3px;border-radius:4px}
+.k-active{background:#22C55E} .k-idle{background:#FCD34D} .k-offline{background:#F0445A} .k-lunch{background:#F59E0B} .k-ooo{background:#60A5FA} .k-leave{background:#C4B5FD}
+.dh-meet{position:absolute;top:0;height:4px;border-radius:2px;background:var(--p)}
+.dh-act{position:absolute;bottom:0;width:2px;height:6px;background:#1E1A4D;opacity:.55;transform:translateX(-1px)}
+.dh-alert{position:absolute;top:-6px;transform:translateX(-50%);font-size:11px;font-weight:800;color:#fff;background:var(--bad);border-radius:999px;width:14px;height:14px;line-height:14px;text-align:center}
+.dh-sum{font-size:12.5px}
+.dh-detail{padding:8px 12px 12px 210px;border-bottom:1px solid var(--line);background:#FBFBFE}
+.dh-item{display:flex;gap:12px;font-size:13px;padding:3px 0}
+.dh-item .t{width:70px;flex:none;color:var(--ink3)}
+.dh-key{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink2);margin-top:10px}
+.dh-key i{display:inline-block;width:12px;height:8px;border-radius:2px;margin-right:5px;vertical-align:middle}
+.dh-key i.km{background:var(--p);height:4px} .dh-key i.ka{background:#1E1A4D;width:2px;height:8px;opacity:.6}
+@media (max-width:760px){.dh-row{grid-template-columns:1fr}.dh-head{display:none}.dh-detail{padding-left:12px}}
 .hday{flex:none;width:44px;height:44px;border-radius:10px;background:var(--tint);color:var(--p-ink);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
 .hday b{font-size:16px}
 .hday small{font-size:11px;font-weight:600;text-transform:uppercase;margin-top:2px}
@@ -764,7 +805,7 @@ let sb = null, channel = null;
    --------------------------------------------------------------------- */
 const ORDER = {
   profiles: ["full_name", true], roles: ["name", true], targets: ["month", false], social_stats: ["month", false], activities: ["activity_date", false],
-  meetings: ["meeting_date", false], attendance: ["day", false], meeting_joins: ["joined_at", false], notes: ["updated_at", false], tasks: ["created_at", false], features: ["name", true], test_cases: ["number", true], google_links: ["connected_at", false], emails: ["sent_at", false], problem_reports: ["created_at", false], presence: ["last_seen_at", false], calendar_events: ["start_date", true], settings: ["id", true], time_entries: ["work_date", false],
+  meetings: ["meeting_date", false], attendance: ["day", false], meeting_joins: ["joined_at", false], notes: ["updated_at", false], tasks: ["created_at", false], features: ["name", true], test_cases: ["number", true], google_links: ["connected_at", false], emails: ["sent_at", false], problem_reports: ["created_at", false], presence: ["last_seen_at", false], user_status: ["updated_at", false], calendar_events: ["start_date", true], settings: ["id", true], time_entries: ["work_date", false],
   activity_log: ["at", false], notifications: ["created_at", false], invoices: ["issue_date", false],
   leave_requests: ["start_date", false], expenses: ["spent_on", false]
 };
@@ -4833,6 +4874,7 @@ async function heartbeat(){
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && S.me) heartbeat(); });
 const isOnline = id => ONLINE.has(id);
 function lastActive(id){
+  if (typeof statusOf === "function") return statusOf(id).label;   // lunch, out of office, leave, back tomorrow…
   if (isOnline(id)) return "Online";
   const p = allRows("presence").find(x => x.user_id === id);
   if (!p) return "Not seen yet";
@@ -4840,10 +4882,12 @@ function lastActive(id){
   return mins < 2 ? "Online" : "Active " + fmtAgo(p.last_seen_at);
 }
 function paintPresence(){
+  if (typeof paintStatus === "function") return paintStatus();
   document.querySelectorAll(".av[data-u]").forEach(a => a.classList.toggle("on", ONLINE.has(a.dataset.u)));
   document.querySelectorAll("[data-last]").forEach(el => { el.textContent = lastActive(el.dataset.last); el.classList.toggle("is-on", isOnline(el.dataset.last)); });
 }
-const statusLine = id => h("span", { class: "lastact" + (isOnline(id) ? " is-on" : ""), "data-last": id }, lastActive(id));
+const statusLine = id => { const st = typeof statusOf === "function" ? statusOf(id) : { label: lastActive(id), tone: isOnline(id) ? "on" : "off" };
+  return h("span", { class: "lastact st-" + st.tone + (st.tone === "on" ? " is-on" : ""), "data-last": id }, st.label); };
 
 /* ---------------------------------------------------------------------
    Team chat: channels and direct messages (text only, kept permanently)
@@ -5412,10 +5456,307 @@ document.addEventListener("visibilitychange", () => {
   updateTabTitle();
 });
 /* ---------------------------------------------------------------------
+   Activity and status: online / active X ago / lunch / out of office / leave / back tomorrow,
+   the 30-minute inactivity warning, and the admins' Day history.
+   The server checks every 5 minutes too (marks people offline, alerts admins), so it works with browsers closed.
+   --------------------------------------------------------------------- */
+const WH = () => {
+  const s = S.settings || {};
+  return { start: s.work_start || "10:00", end: s.work_end || "18:00", days: s.working_days || [1, 2, 3, 4, 5, 6],
+    warn: +s.idle_warn_min || 30, grace: +s.offline_grace_min || 5, alert: +s.admin_alert_min || 60,
+    remind: +s.checkin_remind_min || 30, lunch: +s.lunch_min || 45, watchAdmins: !!s.watch_admins };
+};
+const hm = t => { const [a, b] = String(t).split(":").map(Number); return a * 60 + (b || 0); };
+const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
+const isHoliday = day => (S.settings.holidays || []).some(x => x.date === day);
+const isWorkDay = day => WH().days.includes(parseD(day).getDay()) && !isHoliday(day);
+const inWorkHours = () => isWorkDay(today()) && nowMin() >= hm(WH().start) && nowMin() < hm(WH().end);
+const timeOf = iso => new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
+const clock = t => { const [a, b] = t.split(":").map(Number); const d = new Date(); d.setHours(a, b || 0, 0, 0); return d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }); };
+const ustatus = id => allRows("user_status").find(x => x.user_id === id) || null;
+// "on leave today" comes from the status (leave requests themselves are private); my own leave I can see directly
+const onLeaveToday = id => { const st = ustatus(id); if (st && st.leave_day === today()) return { half_day: st.leave_half }; return (allRows("leave_requests") || []).find(l => l.user_id === id && l.status === "Approved" && l.start_date <= today() && l.end_date >= today() && l.type !== "Work from home"); };
+function nextWorkStart(){
+  let d = addDays(today(), 1);
+  for (let i = 0; i < 14 && !isWorkDay(d); i++) d = addDays(d, 1);
+  const label = d === addDays(today(), 1) ? "tomorrow" : parseD(d).toLocaleDateString("en-IN", { weekday: "long" });
+  return label + " at " + clock(WH().start);
+}
+// what everyone sees about a person
+function statusOf(id){
+  const st = ustatus(id), t = Date.now();
+  const lv = onLeaveToday(id);
+  if (lv) return { label: lv.half_day ? "On half-day leave today" : "On leave today", tone: "leave" };
+  const checkedOut = st && st.checked_out_at && st.checked_out_at.slice(0, 10) >= addDays(today(), -1) && new Date(st.checked_out_at).toDateString() === new Date().toDateString();
+  if (checkedOut || !isWorkDay(today()) || nowMin() >= hm(WH().end)) {
+    if (isOnline(id) && !checkedOut) return { label: "Online", tone: "on" };
+    return { label: "Back " + nextWorkStart(), tone: "off" };
+  }
+  if (st && st.state === "ooo" && st.until && new Date(st.until) > t) return { label: "Out of office until " + timeOf(st.until) + (st.note ? " · " + st.note : ""), tone: "away" };
+  if (st && st.state === "lunch" && st.until) {
+    const over = Math.round((t - new Date(st.until)) / 60000);
+    return { label: over > 0 ? "At lunch · " + over + " min over" : "At lunch · back by " + timeOf(st.until), tone: "away" };
+  }
+  if (st && st.state === "offline") return { label: "Offline · inactive since " + timeOf(st.idle_since || st.last_active_at), tone: "bad" };
+  const last = Math.max(st ? +new Date(st.last_active_at) : 0, +new Date((allRows("presence").find(x => x.user_id === id) || {}).last_seen_at || 0));
+  const mins = last ? (t - last) / 60000 : Infinity;
+  if (isOnline(id) && mins < 10) return { label: "Online", tone: "on" };
+  if (!last) return { label: nowMin() < hm(WH().start) ? "Starts at " + clock(WH().start) : "Not seen yet", tone: "off" };
+  return { label: "Active " + fmtAgo(new Date(last).toISOString()), tone: mins < 30 ? "recent" : "off" };
+}
+function paintStatus(){
+  document.querySelectorAll("[data-last]").forEach(el => { const s = statusOf(el.dataset.last); el.textContent = s.label; el.className = "lastact st-" + s.tone + (s.tone === "on" ? " is-on" : ""); });
+  document.querySelectorAll(".av[data-u]").forEach(a => { const s = statusOf(a.dataset.u); a.classList.toggle("on", s.tone === "on"); a.classList.toggle("away", s.tone === "away"); });
+  drawMyStatus();
+}
+
+/* ---------- my activity ---------- */
+let lastInput = Date.now(), lastSent = 0, warnState = null, watchT = null;
+const ACT_EVENTS = ["pointerdown", "keydown", "wheel", "touchstart", "scroll"];
+function noteActivity(){ lastInput = Date.now(); if (warnState === "warning") return; }
+ACT_EVENTS.forEach(ev => document.addEventListener(ev, noteActivity, { passive: true, capture: true }));
+document.addEventListener("mousemove", (() => { let t = 0; return () => { const n = Date.now(); if (n - t > 20000) { t = n; noteActivity(); } }; })(), { passive: true });
+async function saveMyStatus(patch){
+  if (!S.me) return;
+  try {
+    const row = ok(await sb.from("user_status").upsert(Object.assign({ user_id: S.me.id }, patch), { onConflict: "user_id" }).select().single());
+    upsertCache("user_status", row); paintStatus();
+    return row;
+  } catch (e) { console.warn("status", e); }
+}
+async function activityTick(){
+  if (!S.me) return;
+  const st = ustatus(S.me.id), idleMin = (Date.now() - lastInput) / 60000;
+  // tell the server about real use, at most once a minute
+  if (lastInput > lastSent && idleMin < 1.5) {
+    lastSent = Date.now();
+    const back = st && ["idle", "offline"].includes(st.state);
+    await saveMyStatus(Object.assign({ last_active_at: new Date(lastInput).toISOString() }, back || !st ? { state: "active", idle_since: null } : {}));
+    if (warnState) closeIdleWarning();
+  } else if (st && st.state === "active" && idleMin >= 10) {
+    await saveMyStatus({ state: "idle", idle_since: new Date(lastInput).toISOString() });   // for the day history
+  }
+  checkIdleWarning();
+  paintStatus();
+}
+function startActivity(){ stopActivity(); lastInput = Date.now(); activityTick(); watchT = setInterval(activityTick, 60000); }
+function stopActivity(){ if (watchT) clearInterval(watchT); watchT = null; closeIdleWarning(); }
+
+/* ---------- the warning ---------- */
+let warnEl = null, warnStart = 0, warnTimer = null;
+function watched(){ return !(S.me.is_admin && !WH().watchAdmins) && inWorkHours() && !onLeaveToday(S.me.id); }
+function checkIdleWarning(){
+  if (!S.me || !watched()) return;
+  const st = ustatus(S.me.id) || {}, me = typeof myToday === "function" ? myToday() : null;
+  if (st.checked_out_at && new Date(st.checked_out_at).toDateString() === new Date().toDateString()) return;
+  if (me && me.check_out) return;
+  if (["lunch", "ooo"].includes(st.state) && st.until && new Date(st.until) > Date.now()) return;
+  const idleMin = (Date.now() - Math.max(lastInput, st.last_active_at ? +new Date(st.last_active_at) : 0)) / 60000;
+  if (!me || !me.check_in) {
+    if (nowMin() >= hm(WH().start) + WH().remind && !warnState && idleMin >= 0) showIdleWarning("checkin");
+    return;
+  }
+  if (idleMin >= WH().warn && !warnState) showIdleWarning("idle");
+}
+function showIdleWarning(kind){
+  warnState = "warning"; warnStart = Date.now();
+  playSound("chime");
+  document.title = "(!) Still there? · " + document.title.replace(/^\(!\) Still there\? · /, "");
+  if (kind === "idle") sb.from("status_events").insert({ user_id: S.me.id, kind: "warned" }).then(() => {}, () => {});
+  warnEl = h("div", { class: "idle-warn", role: "alertdialog", "aria-live": "assertive" });
+  const body = h("div", { class: "iw-box" });
+  warnEl.append(body); document.body.append(warnEl);
+  const draw = () => {
+    if (!warnEl) return;
+    const left = Math.max(0, WH().grace * 60 - Math.round((Date.now() - warnStart) / 1000));
+    const offline = kind === "idle" && left === 0;
+    if (offline && warnState !== "offline") { warnState = "offline"; saveMyStatus({ state: "offline", idle_since: new Date(lastInput).toISOString() }); }
+    const mm = Math.floor(left / 60), ss = String(left % 60).padStart(2, "0");
+    body.replaceChildren(
+      h("div", { class: "iw-icon", "aria-hidden": "true" }, offline ? "⏸" : "⏰"),
+      h("h2", {}, kind === "checkin" ? "You haven’t checked in yet" : offline ? "You’re now shown as offline" : "You’ve been inactive for " + WH().warn + " minutes"),
+      h("p", {}, kind === "checkin" ? "It’s " + timeOf(new Date().toISOString()) + ". Check in to start your day, or set yourself out of office."
+        : offline ? "Click I’m back when you’re at your desk. If you were working outside the workspace, that’s fine: just let us know."
+        : "If you don’t respond in " + mm + ":" + ss + ", you’ll be shown as offline and your admins may be told."),
+      h("div", { class: "iw-acts" },
+        kind === "checkin" ? h("button", { type: "button", class: "btn pri", onclick: async () => { closeIdleWarning(); await checkIn("Remote"); } }, "Check in (Remote)") : h("button", { type: "button", class: "btn pri", onclick: () => imHere() }, offline ? "I’m back" : "I’m here"),
+        kind === "checkin" ? h("button", { type: "button", class: "btn", onclick: async () => { closeIdleWarning(); await checkIn("On-site"); } }, "Check in (On-site)") : h("button", { type: "button", class: "btn", onclick: () => { closeIdleWarning(); startLunch(); } }, "Lunch break"),
+        h("button", { type: "button", class: "btn ghost", onclick: () => { closeIdleWarning(); openOutOfOffice(); } }, "Out of office…")));
+  };
+  draw(); warnTimer = setInterval(draw, 1000);
+}
+function closeIdleWarning(){ if (warnTimer) clearInterval(warnTimer); warnTimer = null; if (warnEl) warnEl.remove(); warnEl = null; warnState = null; document.title = document.title.replace(/^\(!\) Still there\? · /, ""); }
+async function imHere(){
+  lastInput = Date.now(); lastSent = Date.now();
+  closeIdleWarning();
+  sb.from("status_events").insert({ user_id: S.me.id, kind: "im_here" }).then(() => {}, () => {});
+  await saveMyStatus({ state: "active", idle_since: null, until: null, note: "", last_active_at: new Date().toISOString() });
+  toast("Welcome back.");
+}
+
+/* ---------- lunch and out of office ---------- */
+async function startLunch(){
+  const until = new Date(Date.now() + WH().lunch * 60000).toISOString();
+  await saveMyStatus({ state: "lunch", until, note: "", last_active_at: new Date().toISOString() });
+  toast("Enjoy your lunch. Back by " + timeOf(until) + ".");
+}
+async function backNow(){ await saveMyStatus({ state: "active", until: null, note: "", idle_since: null, last_active_at: new Date().toISOString() }); lastInput = Date.now(); toast("You’re back."); }
+function openOutOfOffice(){
+  const def = new Date(Date.now() + 2 * 3600000); def.setMinutes(def.getMinutes() < 30 ? 0 : 30);
+  const until = h("input", { class: "in", type: "time", value: String(def.getHours()).padStart(2, "0") + ":" + String(def.getMinutes()).padStart(2, "0") });
+  const note = h("input", { class: "in", placeholder: "e.g. Client visit, bank, doctor (optional)", maxlength: "80" });
+  const err = h("p", { class: "err", hidden: true });
+  const go = h("button", { type: "button", class: "btn pri" }, "Set out of office");
+  go.addEventListener("click", async () => {
+    const [a, b] = until.value.split(":").map(Number); const d = new Date(); d.setHours(a, b || 0, 0, 0);
+    if (!(d > new Date())) { err.textContent = "Choose a time later today."; err.hidden = false; return; }
+    await saveMyStatus({ state: "ooo", until: d.toISOString(), note: note.value.trim(), last_active_at: new Date().toISOString() });
+    closeDlg(); toast("Out of office until " + timeOf(d.toISOString()) + ". Everyone can see it.");
+  });
+  openDialog("Out of office", [h("p", { class: "muted", style: "margin:0 0 10px" }, "Everyone sees when you’ll be back, and you won’t get inactivity warnings until then."),
+    h("div", { class: "form" }, h("label", { class: "fl" }, "Back at", until), h("label", { class: "fl full" }, "Reason", note)), err],
+    [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), go], true);
+}
+// my status, under my name in the menu
+function drawMyStatus(){
+  const slot = document.getElementById("myStatus"); if (!slot || !S.me) return;
+  const s = statusOf(S.me.id), st = ustatus(S.me.id) || {};
+  const away = ["lunch", "ooo"].includes(st.state) && st.until;
+  const btn = h("button", { type: "button", class: "mystatus st-" + s.tone, title: "Change your status" }, h("span", { class: "dot" }), h("span", { class: "x" }, s.label));
+  btn.addEventListener("click", e => {
+    e.stopPropagation();
+    const menu = h("div", { class: "status-menu", role: "menu" },
+      away ? h("button", { type: "button", role: "menuitem", onclick: () => { menu.remove(); backNow(); } }, "✓ I’m back") : h("button", { type: "button", role: "menuitem", onclick: () => { menu.remove(); imHere(); } }, "● Available"),
+      h("button", { type: "button", role: "menuitem", onclick: () => { menu.remove(); startLunch(); } }, "🍽 Lunch break (" + WH().lunch + " min)"),
+      h("button", { type: "button", role: "menuitem", onclick: () => { menu.remove(); openOutOfOffice(); } }, "🚪 Out of office until…"));
+    document.body.append(menu);
+    const r = btn.getBoundingClientRect(); menu.style.left = r.left + "px"; menu.style.bottom = (window.innerHeight - r.top + 6) + "px";
+    setTimeout(() => document.addEventListener("click", () => menu.remove(), { once: true }), 0);
+  });
+  slot.replaceChildren(btn);
+}
+
+/* ---------- Admin panel › Day history ---------- */
+async function renderAdminDay(el){
+  adminHeader(el, "Day history", "What everyone’s day looked like: check-in, active and quiet time, lunch, out of office, meetings and work done. Useful before the scrum.");
+  if (!S.ui.day) S.ui.day = { day: today(), user: "" };
+  const u = S.ui.day;
+  const dayIn = h("input", { class: "in", type: "date", value: u.day, max: today() });
+  dayIn.addEventListener("change", () => { u.day = dayIn.value || today(); rerender(); });
+  const step = n => h("button", { type: "button", class: "btn sm", onclick: () => { u.day = addDays(u.day, n); if (u.day > today()) u.day = today(); rerender(); } }, n < 0 ? "‹ Previous day" : "Next day ›");
+  el.append(h("div", { class: "tb" }, step(-1), dayIn, step(1), u.day !== today() ? h("button", { type: "button", class: "btn sm ghost", onclick: () => { u.day = today(); rerender(); } }, "Today") : null,
+    h("span", { class: "muted", style: "margin-left:auto;font-size:13px" }, parseD(u.day).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" }))));
+  let data = [];
+  try { data = ok(await sb.rpc("day_history", { p_day: u.day })) || []; } catch (e) { el.append(h("div", { class: "panel err" }, "Couldn’t load the day: " + friendly(e) + ". Has upgrade-2026-11t.sql been run?")); return; }
+  if (S.route !== "admin-day") return;
+  const W = WH(), dayStart = hm(W.start) - 60, dayEnd = hm(W.end) + 60, span = dayEnd - dayStart;
+  const minOf = iso => { const d = new Date(iso); return d.getHours() * 60 + d.getMinutes(); };
+  const pct = m => Math.max(0, Math.min(100, (m - dayStart) / span * 100));
+  const isToday = u.day === today(), endNow = isToday ? Math.min(nowMin(), dayEnd) : dayEnd;
+  // turn the day's events into coloured spans
+  function spans(p){
+    const a = p.attendance || {}, out = [];
+    if (p.leave && p.leave !== "Work from home") return [{ from: hm(W.start), to: hm(W.end), kind: "leave", label: p.leave }];
+    if (!a.check_in) return out;
+    let cur = { kind: "active", from: minOf(a.check_in) };
+    const stop = a.check_out ? minOf(a.check_out) : endNow;
+    for (const e of p.events) {
+      if (!["active", "idle", "offline", "lunch", "ooo"].includes(e.kind)) continue;
+      const m = minOf(e.at); if (m < cur.from) { cur.kind = e.kind; continue; }
+      if (m > stop) break;
+      if (e.kind !== cur.kind) { out.push(Object.assign({}, cur, { to: m })); cur = { kind: e.kind, from: m, until: e.until, note: e.note }; }
+    }
+    out.push(Object.assign({}, cur, { to: Math.max(cur.from, stop) }));
+    return out.filter(s => s.to > s.from);
+  }
+  const KIND = { active: "Active", idle: "Quiet", offline: "Offline", lunch: "Lunch", ooo: "Out of office", leave: "On leave" };
+  const fmtM = m => { const hh = Math.floor(m / 60), mi = m % 60; const d = new Date(); d.setHours(hh, mi, 0, 0); return d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }); };
+  const dur = m => m >= 60 ? Math.floor(m / 60) + " h " + (m % 60 ? (m % 60) + " min" : "") : m + " min";
+  const every = span > 14 * 60 ? 180 : span > 10 * 60 ? 120 : 60;   // keep the hour labels apart on long days
+  const ticks = []; for (let m = Math.ceil(dayStart / every) * every; m <= dayEnd; m += every) ticks.push(m);
+  const head = h("div", { class: "dh-row dh-head" }, h("div", { class: "dh-name" }), h("div", { class: "dh-bar" }, ticks.map(m => h("span", { class: "dh-tick", style: "left:" + pct(m) + "%" }, fmtM(m).replace(":00", "")))), h("div", { class: "dh-sum" }, "Active · lunch · work done"));
+  const list = h("div", { class: "dh" }, head);
+  const people = data.filter(p => person(p.user_id) && (!person(p.user_id).is_admin || W.watchAdmins || p.attendance));
+  for (const p of people) {
+    const sp = spans(p), a = p.attendance || {};
+    const sum = k => sp.filter(s => s.kind === k).reduce((t, s) => t + (s.to - s.from), 0);
+    const alerts = p.events.filter(e => e.kind === "admin_alert").length;
+    const bar = h("div", { class: "dh-bar" },
+      h("span", { class: "dh-work", style: "left:" + pct(hm(W.start)) + "%;width:" + (pct(hm(W.end)) - pct(hm(W.start))) + "%" }),
+      sp.map(s => h("span", { class: "dh-seg k-" + s.kind, style: "left:" + pct(s.from) + "%;width:" + Math.max(0.4, pct(s.to) - pct(s.from)) + "%", title: KIND[s.kind] + " " + fmtM(s.from) + " to " + fmtM(s.to) + (s.note ? " · " + s.note : "") })),
+      p.meetings.map(m => h("span", { class: "dh-meet", style: "left:" + pct(minOf(m.joined_at)) + "%;width:" + Math.max(0.6, pct(m.left_at ? minOf(m.left_at) : minOf(m.joined_at) + 15) - pct(minOf(m.joined_at))) + "%", title: "Meeting: " + (m.title || "") + " from " + timeOf(m.joined_at) })),
+      p.activity.map(t => h("span", { class: "dh-act", style: "left:" + pct(minOf(t)) + "%" })),
+      p.events.filter(e => e.kind === "admin_alert").map(e => h("span", { class: "dh-alert", style: "left:" + pct(minOf(e.at)) + "%", title: "Admins alerted: " + e.note }, "!")));
+    const c = p.counts || {};
+    const row = h("button", { type: "button", class: "dh-row" + (u.user === p.user_id ? " on" : ""), onclick: () => { u.user = u.user === p.user_id ? "" : p.user_id; rerender(); } },
+      h("div", { class: "dh-name" }, avatar(p.user_id, "sm"), h("span", {}, h("b", {}, pname(p.user_id)), h("br"),
+        h("span", { class: "muted", style: "font-size:11.5px" }, p.leave && p.leave !== "Work from home" ? p.leave : a.check_in ? "In " + timeOf(a.check_in) + (a.check_out ? " · out " + timeOf(a.check_out) : isToday ? " · still in" : " · no check-out") : "No check-in"))),
+      bar,
+      h("div", { class: "dh-sum" }, h("b", {}, dur(sum("active"))), " active", sum("lunch") ? " · lunch " + dur(sum("lunch")) : "", alerts ? h("span", { class: "pill bad", style: "margin-left:6px" }, alerts + " alert" + (alerts === 1 ? "" : "s")) : null, h("br"),
+        h("span", { class: "muted", style: "font-size:11.5px" }, [[p.tasks.length, "task change"], [c.messages, "message"], [c.comments, "comment"], [c.emails, "email"], [c.test_runs, "test run"], [p.meetings.length, "meeting"]].filter(x => x[0]).map(([n, w]) => n + " " + w + (n === 1 ? "" : "s")).filter(Boolean).join(" · ") || "No recorded work")));
+    list.append(row);
+    if (u.user === p.user_id) list.append(dayDetail(p, sp, KIND, fmtM, dur));
+  }
+  if (!people.length) list.append(h("p", { class: "nothing" }, "Nobody to show for this day."));
+  el.append(h("div", { class: "panel" }, list,
+    h("div", { class: "dh-key" }, [["active", "Active"], ["idle", "Quiet (10+ min)"], ["offline", "Offline"], ["lunch", "Lunch"], ["ooo", "Out of office"], ["leave", "Leave"]].map(([k, l]) => h("span", {}, h("i", { class: "k-" + k }), l)),
+      h("span", {}, h("i", { class: "km" }), "Meeting"), h("span", {}, h("i", { class: "ka" }), "Work done"), h("span", {}, h("b", { style: "color:var(--bad)" }, "!"), " Admins alerted")),
+    h("p", { class: "muted", style: "font-size:12px;margin:8px 0 0" }, "Activity is time spent using the workspace (or clicking “I’m here”). Message and email contents are never shown, only how many.")));
+}
+function dayDetail(p, sp, KIND, fmtM, dur){
+  const items = [];
+  const a = p.attendance || {};
+  if (a.check_in) items.push([a.check_in, "Checked in", (a.mode || "") + (a.marked_by ? " (marked by an admin)" : "")]);
+  if (a.check_out) items.push([a.check_out, "Checked out", ""]);
+  for (const s of sp) if (s.kind !== "active") items.push([null, KIND[s.kind] + " " + fmtM(s.from) + " to " + fmtM(s.to), dur(s.to - s.from) + (s.note ? " · " + s.note : ""), s.from]);
+  for (const e of p.events) {
+    if (e.kind === "warned") items.push([e.at, "Inactivity warning shown", ""]);
+    else if (e.kind === "im_here") items.push([e.at, "Clicked “I’m here”", ""]);
+    else if (e.kind === "admin_alert") items.push([e.at, "Admins alerted", e.note]);
+    else if (e.kind === "lunch_over") items.push([e.at, "Lunch over-ran", ""]);
+    else if (e.kind === "checkin_reminder") items.push([e.at, "Reminded to check in", ""]);
+  }
+  for (const m of p.meetings) items.push([m.joined_at, "Meeting: " + (m.title || "untitled"), m.left_at ? "until " + timeOf(m.left_at) : ""]);
+  for (const t of p.tasks) items.push([t.at, "TC-" + t.number + " " + t.title, t.field === "created" ? "created" : t.field === "status" ? "moved from " + (t.old || "–") + " to " + t.new : "changed " + t.field.replace(/_/g, " ")]);
+  const minOf = iso => { const d = new Date(iso); return d.getHours() * 60 + d.getMinutes(); };
+  items.sort((x, y) => (x[0] ? minOf(x[0]) : x[3]) - (y[0] ? minOf(y[0]) : y[3]));
+  return h("div", { class: "dh-detail" }, items.length ? items.map(([at, what, more, m]) => h("div", { class: "dh-item" }, h("span", { class: "t" }, at ? timeOf(at) : fmtM(m)), h("span", { class: "w" }, what, more ? h("span", { class: "muted" }, " · " + more) : null)))
+    : h("p", { class: "nothing" }, "Nothing recorded for this day."));
+}
+
+/* ---------- Company settings: working hours and activity ---------- */
+function activitySettingsPanel(){
+  const W = WH();
+  const tIn = v => h("input", { class: "in", type: "time", value: v });
+  const nIn = (v, min, max) => h("input", { class: "in", type: "number", min: String(min), max: String(max), value: String(v) });
+  const start = tIn(W.start), end = tIn(W.end), warn = nIn(W.warn, 5, 240), grace = nIn(W.grace, 1, 60), alert = nIn(W.alert, 10, 480), remind = nIn(W.remind, 5, 240), lunch = nIn(W.lunch, 10, 180);
+  const admins = h("input", { type: "checkbox", checked: W.watchAdmins });
+  const err = h("p", { class: "err", hidden: true });
+  const save = h("button", { type: "button", class: "btn pri" }, "Save working hours");
+  save.addEventListener("click", async () => {
+    err.hidden = true;
+    if (hm(end.value) <= hm(start.value)) { err.textContent = "The day must end after it starts."; err.hidden = false; return; }
+    if (+alert.value < +warn.value) { err.textContent = "Tell admins after the warning, not before."; err.hidden = false; return; }
+    const data = { ...S.settings, work_start: start.value, work_end: end.value, idle_warn_min: +warn.value, offline_grace_min: +grace.value, admin_alert_min: +alert.value, checkin_remind_min: +remind.value, lunch_min: +lunch.value, watch_admins: admins.checked };
+    try { ok(await sb.from("settings").upsert({ id: 1, data, updated_at: new Date().toISOString() })); S.settings = data; toast("Working hours saved."); } catch (e) { fail(e, "Not saved"); }
+  });
+  return h("div", { class: "panel", style: "margin-bottom:14px" }, h("h2", {}, "Working hours and activity"),
+    h("p", { class: "muted", style: "margin:0 0 10px;font-size:13px" }, "On working days, during these hours. Working days and holidays are set below."),
+    h("div", { class: "form" },
+      h("label", { class: "fl" }, "Day starts", start), h("label", { class: "fl" }, "Day ends", end),
+      h("label", { class: "fl" }, "Warn after this many minutes of no activity", warn), h("label", { class: "fl" }, "Then shown offline after (minutes)", grace),
+      h("label", { class: "fl" }, "Tell admins after (minutes of no activity)", alert), h("label", { class: "fl" }, "Remind to check in after the day starts (minutes)", remind),
+      h("label", { class: "fl" }, "Lunch break (minutes)", lunch), h("label", { class: "chk", style: "align-self:end" }, admins, "Watch admins too")),
+    err, h("div", { style: "margin-top:8px" }, save));
+}
+
+// for the preview's automated tests only: fast-forward the clock and run the minute check
+window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), setLastInput: t => { lastInput = t; }, statusOf: id => statusOf(id) };
+/* ---------------------------------------------------------------------
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11s";
+const APP_VERSION = "2026-11t";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -6368,7 +6709,7 @@ async function callAdmin(body){
 }
 
 function adminHeader(el, title, desc, actions){
-  const tabs = [["admin-users","Users"], ["admin-roles","Roles & permissions"], ["admin-tasks","Task rules"], ["admin-google","Google"], ["admin-problems","Problems"], ["admin-settings","Company settings"], ["admin-activity","Activity log"]];
+  const tabs = [["admin-users","Users"], ["admin-roles","Roles & permissions"], ["admin-tasks","Task rules"], ["admin-google","Google"], ["admin-day","Day history"], ["admin-problems","Problems"], ["admin-settings","Company settings"], ["admin-activity","Activity log"]];
   el.append(h("div", { class: "ph" }, h("div", {}, h("h1", {}, title), h("p", {}, desc)), actions ? h("div", { class: "acts" }, actions) : null));
   el.append(h("div", { class: "tb" }, h("div", { class: "seg", role: "tablist" }, tabs.map(([r, l]) => h("button", { type: "button", "aria-pressed": String(S.route === r), onclick: () => go(r) }, l)))));
 }
@@ -6585,6 +6926,7 @@ function renderAdminTaskRules(el){
 
 function renderAdminSettings(el){
   adminHeader(el, "Company settings", "Name, currency, working days, leave rules and holidays.");
+  el.append(activitySettingsPanel());
   const s = clone(S.settings);
   const company = h("input", { class: "in", value: s.company || "", maxlength: "80" });
   const currency = h("select", { class: "in" }, ["INR","USD","EUR","GBP","AED","AUD","CAD","SGD"].map(c => h("option", { value: c }, c)));
@@ -6730,8 +7072,9 @@ function renderShell(){
   side.append(nav, h("div", { class: "foot" }, avatar(S.me.id),
     h("button", { type: "button", class: "who", style: "background:none;border:0;text-align:left;padding:0;cursor:pointer", onclick: openMyProfile, title: "My profile" },
       h("b", {}, S.me.full_name), h("span", {}, S.me.is_admin ? "Admin, all verticals" : [S.me.vertical, refLabel("roles", S.me.role_id)].filter(Boolean).join(" · ") || "Employee")),
-    h("button", { type: "button", onclick: () => sb.auth.signOut() }, "Sign out")));
+    h("button", { type: "button", onclick: () => sb.auth.signOut() }, "Sign out")), h("div", { id: "myStatus", class: "mystatus-slot" }));
   nav.scrollTop = keepScroll;
+  if (typeof drawMyStatus === "function") drawMyStatus();
 
 }
 
@@ -6773,6 +7116,7 @@ async function rerender(){
     else if (route === "admin-tasks") renderAdminTaskRules(page);
     else if (route === "admin-google") await renderAdminGoogle(page);
     else if (route === "admin-problems") await renderAdminProblems(page);
+    else if (route === "admin-day") await renderAdminDay(page);
     else if (route === "admin-storage") await renderAdminStorage(page);
     else if (route === "team-calendar") await renderTeamCalendar(page);
     else if (route === "holidays") renderHolidays(page);
@@ -6817,6 +7161,7 @@ function drawNotifications(){
       p.hidden = true;
       if (!n.is_read) { try { await sb.from("notifications").update({ is_read: true }).eq("id", n.id); n.is_read = true; renderShell(); } catch (e) {} }
       if (n.tbl === "connect-google") { if (googleConnected()) toast("Google is already connected."); else connectGoogle(); return; }
+      if (n.tbl === "team-day") { S.ui.day = { day: (n.created_at || new Date().toISOString()).slice(0, 10), user: n.entity_id || "" }; go("admin-day"); return; }
       if (n.tbl === "chat" && n.entity_id) { C.mobileView = "conv"; (async () => { if (!C.ready) await loadChat(); if (!C.channels.find(c => c.id === n.entity_id)) await loadChat(true); await openChannel(n.entity_id); go("chat"); rerender(); })(); return; }
       if (n.tbl === "emails") { (async () => { await load("emails", true); const e = byId("emails", n.entity_id); if (e) openEmail(e); else go("emails"); })(); return; }
       const key = Object.keys(MOD).find(k => MOD[k].table === n.tbl);
@@ -6836,6 +7181,8 @@ const pendingTables = new Set(); let liveT;
 function onChange(payload){
   const t = payload.table;
   if (t === "chat_messages" || t === "chat_channels") { chatOnChange(payload); return; }
+  // someone's status changed: update their status line without redrawing the page
+  if (t === "user_status") { if (payload.new && payload.new.user_id) upsertCache("user_status", payload.new); if (typeof paintStatus === "function") paintStatus(); return; }
   if (t === "notifications") { loadNotifications(); if (payload.eventType === "INSERT" && payload.new && payload.new.user_id === S.me.id && payload.new.tbl !== "chat") { toast(payload.new.title); playSound("chime"); } return; }
   if (t === "comments" || t === "files"){
     const r = payload.new && payload.new.entity_id ? payload.new : payload.old;
@@ -6885,7 +7232,7 @@ async function startSession(session){
     loadNotifications();
     setTimeout(prefetch, 1200);
     if (googleOn()) { loadGoogle().catch(() => {}); autoSyncGoogle(); }
-    await liveAuth(); startPresence(); loadChat().then(() => { renderShell(); if (S.route === "dashboard") rerender(); startChatPolling(); startChatLive(); });
+    await liveAuth(); startPresence(); load("user_status").then(() => { startActivity(); paintStatus(); }); loadChat().then(() => { renderShell(); if (S.route === "dashboard") rerender(); startChatPolling(); startChatLive(); });
     if (isAdmin()) load("problem_reports").then(() => renderShell());   // Google ready before anyone clicks; calendar synced if it's been a while
     if (!channel){
       channel = sb.channel("ws-live", { config: { private: true } }).on("postgres_changes", { event: "*", schema: "public" }, onChange).subscribe((status, err) => {
@@ -6903,12 +7250,13 @@ async function startSession(session){
 }
 // Quietly load every section this person can open, so switching pages is instant.
 async function prefetch(){
-  const want = new Set(["attendance","leave_requests","meetings","announcements","tasks","meeting_joins","calendar_events","google_links","notes","emails","presence"]);
+  const want = new Set(["attendance","leave_requests","meetings","announcements","tasks","meeting_joins","calendar_events","google_links","notes","emails","presence","user_status"]);
   for (const M of Object.values(MOD)) if (access(M).canView) { want.add(M.table); (M.needs || []).forEach(t => want.add(t)); }
   for (const t of want){ if (!S.me) return; if (!S.loaded.has(t)) await load(t); }
   if (S.me) renderShell();            // menu highlights now have everything they need
 }
 function endSession(){
+  if (typeof stopActivity === "function") stopActivity();
   stopChatPolling(); stopChatLive();
   { const b = document.getElementById("bugBtn"); if (b) b.hidden = true; }
   shellKey = ""; resetSeenCache(); stopPresence(); Object.assign(C, { ready: false, channels: [], reads: {}, msgs: {}, more: {}, unread: {}, mentions: {}, last: {}, active: null, drafts: {} }); chatEls = null;
