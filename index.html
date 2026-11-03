@@ -4818,8 +4818,10 @@ async function renderChat(el){
   const foot = h("div", { class: "chat-foot" }, ta, sendBtn);
   const typing = h("div", { class: "chat-typing", "aria-live": "polite" });
   const live = h("span", { class: "live-dot" });
-  const jump = h("button", { type: "button", class: "chat-jump", hidden: true, onclick: () => { msgs.scrollTop = msgs.scrollHeight; chatEls.jumpNew = false; drawJump(); } }, "↓ Jump to latest");
-  msgs.addEventListener("scroll", () => drawJump(), { passive: true });
+  const jump = h("button", { type: "button", class: "chat-jump", hidden: true, onclick: () => { chatEls.pinned = true; msgs.scrollTop = msgs.scrollHeight; chatEls.jumpNew = false; drawJump(); } }, "↓ Jump to latest");
+  msgs.addEventListener("scroll", () => { if (chatEls) chatEls.pinned = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 40; drawJump(); }, { passive: true });
+  // if the area grows (fonts, the typing line, the box below), stay at the newest message
+  try { const ro = new ResizeObserver(() => { if (chatEls && chatEls.msgs === msgs && chatEls.pinned) msgs.scrollTop = msgs.scrollHeight; }); ro.observe(msgs); } catch (e) {}
   chatEls = { list, head, msgs, ta, typing, live, jump };
   el.append(h("div", { class: "chat" }, list, h("div", { class: "chat-main" }, head, h("div", { class: "chat-msgwrap" }, msgs, jump), typing, foot,
     h("p", { class: "muted", style: "font-size:12px;margin:4px 14px 10px" }, "Text and links only. To send a file, use ✉️ Email or 💬 WhatsApp at the top of a direct chat. Messages are kept permanently."))));
@@ -4910,7 +4912,8 @@ function drawChatMessages(toBottom){
   if (!list.length) msgs.append(h("div", { class: "empty", style: "margin:auto" }, h("b", {}, "No messages yet"), "Say hello 👋"));
   // "Seen": in a direct chat, the other person has read up to here
   const other = ch.kind === "dm" ? dmOther(ch) : null;
-  const seenUpTo = other ? ((C.othersRead[C.active] || {})[other] || 0) : 0;
+  const theirLatest = other ? Math.max(0, ...list.filter(m => m.author_id === other).map(m => m.id)) : 0;
+  const seenUpTo = other ? Math.max((C.othersRead[C.active] || {})[other] || 0, theirLatest) : 0;
   const myLast = [...list].reverse().find(m => m.author_id === S.me.id);
   let lastDay = "", lastAuthor = null, lastT = 0;
   list.forEach((m, i) => {
@@ -4934,9 +4937,18 @@ function drawChatMessages(toBottom){
     msgs.append(row); lastAuthor = m.author_id; lastT = t;
   });
   const mark = msgs.querySelector("#unreadMark");
-  if (C.scrollToUnread === C.active && mark) { msgs.scrollTop = Math.max(0, mark.offsetTop - 60); C.scrollToUnread = null; }
-  else if (toBottom || atBottom) msgs.scrollTop = msgs.scrollHeight;
+  if (C.scrollToUnread === C.active && mark) {
+    C.scrollToUnread = null; chatEls.pinned = false;
+    const toMark = () => { msgs.scrollTop = Math.max(0, mark.offsetTop - 60); };
+    toMark(); requestAnimationFrame(() => { toMark(); requestAnimationFrame(toMark); });
+  } else if (toBottom || atBottom) { chatEls.pinned = true; stickBottom(); }
   drawJump();
+}
+// keep the newest message in view: scroll now, after the next paints, and whenever the area changes size
+function stickBottom(){
+  if (!chatEls) return;
+  const m = chatEls.msgs, go = () => { if (chatEls && chatEls.pinned) m.scrollTop = m.scrollHeight; };
+  go(); requestAnimationFrame(() => { go(); requestAnimationFrame(go); }); setTimeout(go, 120); setTimeout(go, 400);
 }
 // "Jump to latest" when you've scrolled up (shows "New message" if one arrived meanwhile)
 function drawJump(){
@@ -5116,7 +5128,7 @@ async function checkVersion(){
   try {
     const res = await fetch(location.pathname + "?v=" + Date.now(), { cache: "no-store" });
     if (!res.ok) return;
-    const m = (await res.text()).match(/APP_VERSION = "([^"]+)"/);
+    const m = (await res.text()).match(/const APP_VERSION = "(20\d\d-[0-9a-z]+)"/);
     if (m && m[1] !== APP_VERSION && !versionBar){
       versionBar = h("div", { class: "verbar", role: "status" }, "A new version of the workspace is available.",
         h("button", { type: "button", class: "btn sm", onclick: () => location.reload() }, "Reload now"));
@@ -5131,7 +5143,7 @@ setTimeout(checkVersion, 20000);
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11m";
+const APP_VERSION = "2026-11n";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
