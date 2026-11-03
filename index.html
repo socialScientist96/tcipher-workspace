@@ -454,6 +454,27 @@ button.busy:not(.btn):not(.iconbtn):not(.linkbtn):not(.link){opacity:.6;cursor:p
 .hbar .n{text-align:right;font-weight:700}
 tr.muted-row td{opacity:.55}
 select.in.sm{padding:4px 6px;font-size:13px;min-width:120px}
+/* files in chat */
+.chat-attach{font-size:18px;padding:6px 10px;align-self:flex-end}
+.chat-main.drop{outline:2px dashed var(--p);outline-offset:-6px;background:var(--tint)}
+.chat-uploads{display:flex;flex-direction:column;gap:6px;padding:6px 14px 0}
+.upitem{display:flex;align-items:center;gap:10px;background:#F7F7FC;border:1px solid var(--line);border-radius:10px;padding:7px 10px;font-size:13px}
+.upitem.error{border-color:var(--bad);background:#FFF5F6}
+.upic{font-size:18px} .upx{flex:1;min-width:0} .upx b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:inline-block;max-width:60%;vertical-align:bottom}
+.upbar{display:block;height:5px;border-radius:999px;background:#E4E3F3;overflow:hidden;margin-top:5px}
+.upbar span{display:block;height:100%;background:var(--p);border-radius:999px;transition:width .2s}
+.uppc{font-size:12px;min-width:34px;text-align:right}
+.upclose{background:none;border:0;cursor:pointer;color:var(--ink3);font-size:14px;padding:4px}
+.catts{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.bub.files-only .catts{margin-top:0}
+.cimgbtn{padding:0;border:0;background:none;cursor:zoom-in;display:block}
+.cimg{display:block;max-width:min(320px,70vw);max-height:260px;border-radius:10px;background:#EEE}
+.cfile{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.75);border:1px solid var(--line);border-radius:10px;padding:7px 9px;color:var(--ink);min-width:220px}
+.cmsg.mine .cfile{background:#fff}
+.cficon{font-size:20px} .cfx{flex:1;min-width:0;display:flex;flex-direction:column;font-size:13px} .cfx b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cfx .muted{font-size:12px}
+.dlprog{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:2500;background:#1E1A4D;color:#fff;border-radius:10px;padding:10px 14px;min-width:260px;font-size:13px;box-shadow:var(--shadow)}
+.dlprog .upbar{background:rgba(255,255,255,.2)}
 /* status */
 .av.away::after{content:"";position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border-radius:50%;background:#F5A524;border:2px solid #fff}
 .lastact.st-away{color:#B45309} .lastact.st-bad{color:var(--bad)} .lastact.st-leave{color:var(--p)} .lastact.st-recent{color:var(--ink2)}
@@ -5066,7 +5087,7 @@ function chatOnChange0(payload){
     if ((m.mentions || []).includes(S.me.id)) C.mentions[m.channel_id] = (C.mentions[m.channel_id] || 0) + 1;
     const ch = C.channels.find(c => c.id === m.channel_id);
     if (ch && (ch.kind !== "channel" || (m.mentions || []).includes(S.me.id))) playSound("chime");
-    if (ch && (ch.kind !== "channel" || (m.mentions || []).includes(S.me.id))) toast((ch.kind === "dm" ? "Message from " + pname(m.author_id) : ch.kind === "group" ? pname(m.author_id) + " in " + chName(ch) : pname(m.author_id) + " mentioned you in " + chName(ch)) + ": " + m.body.slice(0, 60));
+    if (ch && (ch.kind !== "channel" || (m.mentions || []).includes(S.me.id))) toast((ch.kind === "dm" ? "Message from " + pname(m.author_id) : ch.kind === "group" ? pname(m.author_id) + " in " + chName(ch) : pname(m.author_id) + " mentioned you in " + chName(ch)) + ": " + chatText(m).slice(0, 60));
     renderShell(); if (S.route === "chat") drawChatList(); if (S.route === "dashboard") rerender();
     updateTabTitle();
   }
@@ -5081,28 +5102,50 @@ async function renderChat(el){
   const ta = h("textarea", { class: "in", rows: 2, maxlength: "4000", placeholder: "Write a message… type @ to tag someone. Enter to send, Shift + Enter for a new line." });
   attachMentions(ta);
   const sendBtn = h("button", { type: "button", class: "btn pri" }, "Send");
-  const foot = h("div", { class: "chat-foot" }, ta, sendBtn);
+  const fileIn = h("input", { type: "file", multiple: true, hidden: true });
+  const attachBtn = h("button", { type: "button", class: "btn ghost chat-attach", title: "Attach files (up to 100 MB each)", "aria-label": "Attach files" }, "📎");
+  attachBtn.addEventListener("click", () => { if (chatFilesReady()) fileIn.click(); });
+  fileIn.addEventListener("change", () => { addChatFiles([...fileIn.files]); fileIn.value = ""; });
+  const upl = h("div", { class: "chat-uploads", hidden: true });
+  const foot = h("div", { class: "chat-foot" }, attachBtn, fileIn, ta, sendBtn);
   const typing = h("div", { class: "chat-typing", "aria-live": "polite" });
   const live = h("span", { class: "live-dot" });
   const jump = h("button", { type: "button", class: "chat-jump", hidden: true, onclick: () => { chatEls.pinned = true; msgs.scrollTop = msgs.scrollHeight; chatEls.jumpNew = false; drawJump(); } }, "↓ Jump to latest");
   msgs.addEventListener("scroll", () => { if (chatEls) chatEls.pinned = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 40; drawJump(); }, { passive: true });
   // if the area grows (fonts, the typing line, the box below), stay at the newest message
   try { const ro = new ResizeObserver(() => { if (chatEls && chatEls.msgs === msgs && chatEls.pinned) msgs.scrollTop = msgs.scrollHeight; }); ro.observe(msgs); } catch (e) {}
-  chatEls = { list, head, msgs, ta, typing, live, jump, pending: true };   // being drawn off-screen, about to be shown
+  chatEls = { list, head, msgs, ta, typing, live, jump, upl, pending: true };   // being drawn off-screen, about to be shown
   el._chatEls = chatEls;           // so the chat can always find the copy that's actually on screen
-  el.append(h("div", { class: "chat" + (C.mobileView === "conv" ? " m-conv" : "") }, list, h("div", { class: "chat-main" }, head, h("div", { class: "chat-msgwrap" }, msgs, jump), typing, foot,
-    h("p", { class: "muted", style: "font-size:12px;margin:4px 14px 10px" }, "Text and links only. To send a file, use ✉️ Email or 💬 WhatsApp at the top of a direct chat. Messages are kept permanently."))));
+  el.append(h("div", { class: "chat" + (C.mobileView === "conv" ? " m-conv" : "") }, list, h("div", { class: "chat-main" }, head, h("div", { class: "chat-msgwrap" }, msgs, jump), typing, upl, foot,
+    h("p", { class: "muted", style: "font-size:12px;margin:4px 14px 10px" }, "Text, links and files up to 100 MB each (📎, drag a file here, or paste a screenshot). Files are kept in the company’s Google Drive; only this conversation’s members can open them. Messages are kept permanently."))));
   ta.value = C.drafts[C.active] || "";
+  // drop files anywhere on the conversation, or paste a screenshot into the box
+  const main = el.querySelector(".chat-main");
+  if (main) {
+    main.addEventListener("dragover", e => { if ([...(e.dataTransfer && e.dataTransfer.types || [])].includes("Files")) { e.preventDefault(); main.classList.add("drop"); } });
+    main.addEventListener("dragleave", e => { if (e.target === main) main.classList.remove("drop"); });
+    main.addEventListener("drop", e => { main.classList.remove("drop"); const fs = [...((e.dataTransfer && e.dataTransfer.files) || [])]; if (fs.length) { e.preventDefault(); if (chatFilesReady()) addChatFiles(fs); } });
+  }
+  ta.addEventListener("paste", e => {
+    const fs = [...((e.clipboardData && e.clipboardData.files) || [])];
+    if (fs.length) { e.preventDefault(); if (chatFilesReady()) addChatFiles(fs.map(f => f.name && f.name !== "image.png" ? f : new File([f], "Screenshot " + today() + " " + new Date().toTimeString().slice(0, 5).replace(":", ".") + ".png", { type: f.type || "image/png" }))); }
+  });
+  drawUploads();
   ta.addEventListener("input", () => { C.drafts[C.active] = ta.value; if (ta.value.trim() && Date.now() - typingSentAt > 2000) { typingSentAt = Date.now(); liveSend("typing", { cid: C.active, uid: S.me.id }); } });
   ta.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing && !(ta.parentNode.querySelector(".mention-pop:not([hidden])") || document.querySelector(".mention-pop:not([hidden])"))) { e.preventDefault(); send(); } });
   sendBtn.addEventListener("click", send);
   async function send(){
-    const body = ta.value.trim(); if (!body || !C.active) return;
+    const body = ta.value.trim(); if (!C.active) return;
+    const ups = (C.uploads && C.uploads[C.active]) || [];
+    if (ups.some(u => u.state === "uploading")) { toast("Wait for the upload to finish, then send."); return; }
+    const ready = ups.filter(u => u.state === "ready");
+    if (!body && !ready.length) return;
     const ch = C.channels.find(c => c.id === C.active);
     const mentions = mentionIds(body);
     sendBtn.disabled = true;
     try {
-      const m = ok(await sb.from("chat_messages").insert({ channel_id: C.active, body, mentions, author_id: S.me.id }).select().single());
+      const m = ok(await sb.from("chat_messages").insert(Object.assign({ channel_id: C.active, body, mentions, author_id: S.me.id }, ready.length ? { attachments: ready.map(u => ({ id: u.file.id })) } : {})).select().single());
+      if (ready.length) { C.uploads[m.channel_id] = ups.filter(u => !ready.includes(u)); drawUploads(); }
       (C.msgs[C.active] = C.msgs[C.active] || []).push(m); C.last[C.active] = m; C.reads[C.active] = m.id;
       C.seen = C.seen || new Set(); C.seen.add(m.id); if (m.id > (C.maxId || 0)) C.maxId = m.id;
       // the database sends the live signal for this message to everyone in the conversation
@@ -5209,7 +5252,7 @@ function drawChatMessages(toBottom){
     const lastOfRun = !(next && next.author_id === m.author_id && new Date(next.created_at) - t < 5 * 60000 && String(next.created_at).slice(0, 10) === day);
     const mine = m.author_id === S.me.id;
     const time = new Date(m.created_at).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
-    const bubble = h("div", { class: "bub" + ((m.mentions || []).includes(S.me.id) && !mine ? " tagged" : "") }, renderRich(m.body));
+    const bubble = h("div", { class: "bub" + ((m.mentions || []).includes(S.me.id) && !mine ? " tagged" : "") + (m.body ? "" : " files-only") }, m.body ? renderRich(m.body) : null, chatAttachments(m));
     const meta = lastOfRun ? h("div", { class: "bmeta" }, time, m.edited_at ? " · edited" : "",
       mine && myLast && m.id === myLast.id && other ? h("span", { class: "seen" + (seenUpTo >= m.id ? " on" : "") }, seenUpTo >= m.id ? " · Seen" : " · Sent") : null) : (m.edited_at ? h("div", { class: "bmeta" }, "edited") : null);
     const col = h("div", { class: "bcol" }, !mine && showNames && first ? h("div", { class: "bname" }, pname(m.author_id) || "Someone") : null, bubble, meta);
@@ -5263,7 +5306,7 @@ function messagesPanel(){
   return h("div", { class: "panel" }, h("h2", {}, "Messages", h("button", { type: "button", class: "link", onclick: () => go("chat") }, "Open chat")),
     items.length ? items.slice(0, 5).map(c => h("button", { type: "button", class: "row", onclick: async () => { await openChannel(c.id); go("chat"); } },
       c.kind === "dm" ? avatar(dmOther(c), "sm") : h("span", { class: "tkey" }, c.kind === "group" ? "👥" : "#"),
-      h("span", { class: "x" }, h("b", {}, chName(c)), h("br"), h("span", { class: "muted", style: "font-size:13px" }, C.last[c.id] ? (pname(C.last[c.id].author_id).split(" ")[0] + ": " + C.last[c.id].body.slice(0, 60)) : "")),
+      h("span", { class: "x" }, h("b", {}, chName(c)), h("br"), h("span", { class: "muted", style: "font-size:13px" }, C.last[c.id] ? (pname(C.last[c.id].author_id).split(" ")[0] + ": " + chatText(C.last[c.id]).slice(0, 60)) : "")),
       h("span", { class: "cnt " + (c.kind !== "channel" || C.mentions[c.id] ? "due" : "new") }, String(C.unread[c.id]))))
       : replies.length ? null : h("p", { class: "nothing" }, "You’re all caught up."),
     replies.slice(0, 4).map(e => h("button", { type: "button", class: "row", onclick: () => openEmail(e) }, h("span", { class: "tkey" }, "✉️"),
@@ -5475,6 +5518,135 @@ document.addEventListener("visibilitychange", () => {
   if (S.route === "chat" && C.active && (C.unread[C.active] || 0) > 0) { markChatRead(C.active); drawChatList(); }
   updateTabTitle();
 });
+/* ---------------------------------------------------------------------
+   Files in chat: up to 100 MB each, kept in Google Drive.
+   The browser sends each file straight to Google through a one-time upload slot the "files"
+   server function opens (no Google login ever reaches the browser), then the function checks it arrived.
+   Only the conversation's members can open its files.
+   --------------------------------------------------------------------- */
+const CHAT_MAX = 100 * 1024 * 1024;
+const chatSize = n => n >= 1048576 ? (n / 1048576).toFixed(n >= 10485760 ? 0 : 1) + " MB" : n >= 1024 ? Math.round(n / 1024) + " KB" : (n || 0) + " B";
+const chatText = m => m ? (m.body || ((m.attachments || []).length ? "📎 " + m.attachments[0].name + (m.attachments.length > 1 ? " and " + (m.attachments.length - 1) + " more" : "") : "")) : "";
+function chatFilesReady(){
+  if (!(S.settings && S.settings.drive_folder)) { toast(isAdmin() ? "Connect Google Drive first: Admin panel › Storage." : "Sending files needs Google Drive. Ask an admin to connect it (Admin panel › Storage)."); return false; }
+  return true;
+}
+function addChatFiles(files){
+  const cid = C.active; if (!cid) return;
+  C.uploads = C.uploads || {}; const list = (C.uploads[cid] = C.uploads[cid] || []);
+  for (const f of files) {
+    if (!f || !f.size) { toast("“" + (f && f.name || "That file") + "” is empty."); continue; }
+    if (f.size > CHAT_MAX) { toast("“" + f.name + "” is " + chatSize(f.size) + ". Files can be up to 100 MB."); continue; }
+    if (list.length >= 10) { toast("Up to 10 files per message."); break; }
+    const u = { key: Math.random().toString(36).slice(2), name: f.name || "file", size: f.size, mime: f.type || "application/octet-stream", progress: 0, state: "uploading", cid };
+    list.push(u); uploadChatFile(u, f);
+  }
+  drawUploads();
+}
+async function uploadChatFile(u, file){
+  try {
+    const start = await filesFn("start_upload", "", { body: JSON.stringify({ tbl: "chat", entity_id: u.cid, name: u.name, size: u.size, mime: u.mime }), headers: { "Content-Type": "application/json" } });
+    if (u.state === "cancelled") return;
+    const g = await putToDrive(start.upload_url, file, u.mime, p => { u.progress = p; drawUploads(true); }, x => { u.xhr = x; });
+    if (u.state === "cancelled") return;
+    const done = await filesFn("finish_upload", "", { body: JSON.stringify({ file_id: start.file_id, drive_id: g.id }), headers: { "Content-Type": "application/json" } });
+    u.file = done.file; u.state = "ready"; u.progress = 1;
+  } catch (e) {
+    if (u.state === "cancelled") return;
+    u.state = "error"; u.error = friendly(e);
+  }
+  drawUploads();
+}
+// send the bytes straight to Google Drive, with progress
+function putToDrive(url, file, mime, onProgress, keep){
+  if (window.__mockDrivePut) return window.__mockDrivePut(url, file, onProgress);   // the preview only
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest(); keep(x);
+    x.open("PUT", url); x.setRequestHeader("Content-Type", mime || "application/octet-stream");
+    x.upload.onprogress = e => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
+    x.onload = () => { let b = null; try { b = JSON.parse(x.responseText); } catch (e) {} if (x.status >= 200 && x.status < 300 && b && b.id) resolve(b); else reject(new Error("Google Drive refused the upload (" + x.status + ").")); };
+    x.onerror = () => reject(new Error("The upload was interrupted. Check your connection and try again."));
+    x.onabort = () => reject(new Error("Cancelled."));
+    x.send(file);
+  });
+}
+function drawUploads(progressOnly){
+  if (!chatEls || !chatEls.upl) return;
+  const list = ((C.uploads || {})[C.active] || []).filter(u => u.state !== "cancelled");
+  const box = chatEls.upl;
+  if (progressOnly) { for (const u of list) { const bar = box.querySelector('[data-up="' + u.key + '"] .upbar span'); if (bar) bar.style.width = Math.round(u.progress * 100) + "%"; const pc = box.querySelector('[data-up="' + u.key + '"] .uppc'); if (pc) pc.textContent = Math.round(u.progress * 100) + "%"; } return; }
+  box.hidden = !list.length;
+  box.replaceChildren(...list.map(u => h("div", { class: "upitem " + u.state, "data-up": u.key },
+    h("span", { class: "upic", "aria-hidden": "true" }, fileIcon(u.mime, u.name)),
+    h("span", { class: "upx" }, h("b", {}, u.name), h("span", { class: "muted" }, " · " + chatSize(u.size)),
+      u.state === "uploading" ? h("span", { class: "upbar" }, h("span", { style: "width:" + Math.round(u.progress * 100) + "%" })) : null,
+      u.state === "error" ? h("span", { class: "err", style: "display:block;font-size:12px" }, u.error) : null),
+    u.state === "uploading" ? h("span", { class: "uppc muted" }, Math.round(u.progress * 100) + "%") : u.state === "ready" ? h("span", { class: "pill ok" }, "Ready") : null,
+    h("button", { type: "button", class: "upclose", title: u.state === "uploading" ? "Cancel" : "Remove", "aria-label": "Remove " + u.name, onclick: () => cancelUpload(u) }, "✕"))));
+  if (chatEls.ta) chatEls.ta.placeholder = list.some(u => u.state === "ready") ? "Add a message (optional), then press Enter to send" : "Write a message… type @ to tag someone. Enter to send, Shift + Enter for a new line.";
+}
+function cancelUpload(u){
+  const wasReady = u.state === "ready";
+  u.state = "cancelled"; try { if (u.xhr) u.xhr.abort(); } catch (e) {}
+  const list = (C.uploads || {})[u.cid] || []; list.splice(list.indexOf(u), 1);
+  // a finished but unsent file is removed again
+  if (wasReady && u.file) filesFn("delete", "&id=" + encodeURIComponent(u.file.id)).catch(() => {});
+  drawUploads();
+}
+const fileIcon = (mime, name) => /^image\//.test(mime) ? "🖼" : /^video\//.test(mime) ? "🎬" : /^audio\//.test(mime) ? "🎵" : /pdf/.test(mime) || /\.pdf$/i.test(name) ? "📄"
+  : /sheet|excel|csv/.test(mime) || /\.(xlsx?|csv)$/i.test(name) ? "📊" : /zip|compressed|rar|7z/.test(mime) || /\.(zip|rar|7z)$/i.test(name) ? "🗜" : "📎";
+
+/* ---------- showing files in a conversation ---------- */
+const LINKS = new Map();   // file id → { url, until }
+async function fileLink(id, long){
+  const k = id + (long ? ":long" : ""), c = LINKS.get(k);
+  if (c && c.until > Date.now() + 30000) return c.url;
+  const r = await filesFn("link", "&id=" + encodeURIComponent(id) + (long ? "&long=1" : ""));
+  LINKS.set(k, { url: r.url, until: (r.expires ? r.expires * 1000 : Date.now() + 240000) }); return r.url;
+}
+function chatAttachments(m){
+  const atts = m.attachments || []; if (!atts.length) return null;
+  return h("div", { class: "catts" }, atts.map(a => {
+    const isImg = /^image\/(png|jpe?g|gif|webp)$/.test(a.mime || "") && a.size <= 15 * 1048576;
+    if (isImg) {
+      const img = h("img", { class: "cimg", alt: a.name, loading: "lazy" });
+      fileLink(a.id).then(u => { img.src = u; }, () => { img.replaceWith(fileCard(a)); });
+      return h("button", { type: "button", class: "cimgbtn", title: "Open " + a.name, onclick: () => openChatFile(a, false) }, img);
+    }
+    return fileCard(a);
+  }));
+}
+function fileCard(a){
+  return h("div", { class: "cfile" }, h("span", { class: "cficon", "aria-hidden": "true" }, fileIcon(a.mime || "", a.name)),
+    h("span", { class: "cfx" }, h("b", {}, a.name), h("span", { class: "muted" }, chatSize(a.size))),
+    h("button", { type: "button", class: "btn sm ghost", onclick: () => openChatFile(a, false) }, "Open"),
+    h("button", { type: "button", class: "btn sm ghost", onclick: () => openChatFile(a, true) }, "Download"));
+}
+// small files open in a new tab; big downloads come in pieces, so slow connections don't time out
+async function openChatFile(a, download){
+  try {
+    if (a.size <= 20 * 1048576 || !download) {
+      const u = await fileLink(a.id, a.size > 20 * 1048576);
+      const w = window.open(u + (download ? "&dl=1" : ""), "_blank", "noopener"); if (!w) location.href = u + (download ? "&dl=1" : "");
+      return;
+    }
+    const url = await fileLink(a.id, true), piece = 8 * 1048576, parts = [];
+    const t = toastProgress("Downloading " + a.name + "…");
+    for (let from = 0; from < a.size; from += piece) {
+      const res = await fetch(url, { headers: { Range: "bytes=" + from + "-" + Math.min(from + piece - 1, a.size - 1) } });
+      if (!res.ok) throw new Error("The download stopped (" + res.status + "). Try again.");
+      parts.push(await res.blob()); t.set(Math.min(1, (from + piece) / a.size));
+    }
+    const blob = new Blob(parts, { type: a.mime || "application/octet-stream" });
+    const link = h("a", { href: URL.createObjectURL(blob), download: a.name }); document.body.append(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 60000); t.done("Downloaded " + a.name + ".");
+  } catch (e) { document.querySelectorAll(".dlprog").forEach(x => x.remove()); fail(e, "Couldn’t open the file"); }
+}
+function toastProgress(text){
+  const el = h("div", { class: "dlprog", role: "status" }, h("span", {}, text), h("span", { class: "upbar" }, h("span", { style: "width:0%" })));
+  document.body.append(el);
+  return { set: p => { el.querySelector(".upbar span").style.width = Math.round(p * 100) + "%"; }, done: msg => { el.remove(); toast(msg); } };
+}
 /* ---------------------------------------------------------------------
    Activity and status: online / active X ago / lunch / out of office / leave / back tomorrow,
    the 30-minute inactivity warning, and the admins' Day history.
@@ -5776,7 +5948,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11v";
+const APP_VERSION = "2026-11w";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
