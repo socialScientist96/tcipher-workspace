@@ -433,6 +433,27 @@ button.busy:not(.btn):not(.iconbtn):not(.linkbtn):not(.link){opacity:.6;cursor:p
 .bugbtn:hover .bt,.bugbtn:focus-visible .bt{max-height:160px}
 .chat-debug{position:fixed;left:12px;bottom:12px;z-index:2000;max-width:560px;max-height:46vh;overflow:auto;margin:0;padding:10px 12px;background:rgba(20,16,60,.92);color:#E9E6FF;font:11.5px/1.45 ui-monospace,Menlo,monospace;border-radius:10px;white-space:pre-wrap}
 .chat-items{display:flex;flex-direction:column;gap:2px}
+.meter{height:8px;border-radius:999px;background:var(--tint);overflow:hidden}
+.meter span{display:block;height:100%;border-radius:999px}
+.drive-folders{display:flex;flex-direction:column;gap:4px;margin:10px 0 0;font-size:14px}
+.tipline{font-size:13px;margin:8px 0 0;padding:8px 10px;border-radius:8px;background:var(--tint)}
+/* QA */
+.qbar{display:inline-flex;align-items:center;gap:6px;min-width:110px}
+.qbar .qtrack{flex:1;height:7px;border-radius:999px;background:var(--tint);overflow:hidden}
+.qbar .qfill{display:block;height:100%;border-radius:999px;background:var(--ok)}
+.qbar em{font-style:normal;font-size:12px;color:var(--ink3);min-width:32px;text-align:right}
+.qstats{display:flex;gap:8px;flex-wrap:wrap}
+.qstat{display:flex;flex-direction:column;align-items:center;min-width:84px;padding:8px 10px;border-radius:10px;background:var(--tint);font-size:12px;color:var(--ink2)}
+.qstat b{font-size:18px;color:var(--ink)}
+.qstat.ok b{color:var(--ok)} .qstat.bad b{color:var(--bad)} .qstat.info b{color:var(--p)}
+.run{display:flex;gap:10px;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--line)}
+.run .x{flex:1;font-size:13.5px}
+.hbar{display:grid;grid-template-columns:80px 1fr 40px;gap:8px;align-items:center;margin:6px 0;font-size:13px}
+.hbar .b{height:10px;border-radius:999px;background:var(--tint);overflow:hidden}
+.hbar .b span{display:block;height:100%;border-radius:999px}
+.hbar .n{text-align:right;font-weight:700}
+tr.muted-row td{opacity:.55}
+select.in.sm{padding:4px 6px;font-size:13px;min-width:120px}
 .hday{flex:none;width:44px;height:44px;border-radius:10px;background:var(--tint);color:var(--p-ink);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
 .hday b{font-size:16px}
 .hday small{font-size:11px;font-weight:600;text-transform:uppercase;margin-top:2px}
@@ -743,7 +764,7 @@ let sb = null, channel = null;
    --------------------------------------------------------------------- */
 const ORDER = {
   profiles: ["full_name", true], roles: ["name", true], targets: ["month", false], social_stats: ["month", false], activities: ["activity_date", false],
-  meetings: ["meeting_date", false], attendance: ["day", false], meeting_joins: ["joined_at", false], notes: ["updated_at", false], tasks: ["created_at", false], google_links: ["connected_at", false], emails: ["sent_at", false], problem_reports: ["created_at", false], presence: ["last_seen_at", false], calendar_events: ["start_date", true], settings: ["id", true], time_entries: ["work_date", false],
+  meetings: ["meeting_date", false], attendance: ["day", false], meeting_joins: ["joined_at", false], notes: ["updated_at", false], tasks: ["created_at", false], features: ["name", true], test_cases: ["number", true], google_links: ["connected_at", false], emails: ["sent_at", false], problem_reports: ["created_at", false], presence: ["last_seen_at", false], calendar_events: ["start_date", true], settings: ["id", true], time_entries: ["work_date", false],
   activity_log: ["at", false], notifications: ["created_at", false], invoices: ["issue_date", false],
   leave_requests: ["start_date", false], expenses: ["spent_on", false]
 };
@@ -792,9 +813,12 @@ async function updateRow(t, id, data){
   upsertCache(t, row); return row;
 }
 async function deleteRow(t, id){
-  const files = ok(await sb.from("files").select("path").eq("tbl", t).eq("entity_id", id)) || [];
-  if (files.length) { try { await sb.storage.from(FILE_BUCKET).remove(files.map(f => f.path)); } catch (e) { console.warn(e); } }
-  ok(await sb.from(t).delete().eq("id", id));
+  const files = ok(await sb.from("files").select("id,path,storage").eq("tbl", t).eq("entity_id", id)) || [];
+  for (const f of files.filter(x => x.storage === "bunny")) { try { await storeDelete(f); } catch (e) { console.warn(e); } }
+  const old = files.filter(x => x.storage !== "bunny");
+  if (old.length) { try { await sb.storage.from(FILE_BUCKET).remove(old.map(f => f.path)); } catch (e) { console.warn(e); } }
+  const gone = ok(await sb.from(t).delete().eq("id", id).select("id")) || [];
+  if (!gone.length) throw new Error("It wasn’t deleted: you may not be allowed to delete this.");   // the database quietly refused
   if (S.cache[t]) S.cache[t] = S.cache[t].filter(r => r.id !== id);
 }
 function upsertCache(t, row){
@@ -816,7 +840,7 @@ async function notify(userIds, title, body, tbl, entityId){
 const VERTICALS = ["Development","Sales","Marketing"];
 const PERM_AREAS = [
   ["projects","Development: projects & sprints"], ["tasks","Development: tasks & bugs"], ["releases","Development: releases"],
-  ["support","Development: support tickets"], ["timesheets","Development: timesheets"],
+  ["support","Development: support tickets"], ["timesheets","Development: timesheets"], ["qa","Development: QA & testing"],
   ["clients","Sales: clients & contacts"], ["sales","Sales: pipeline, activities, proposals, targets"],
   ["leads","Leads (shared by Marketing and Sales)"],
   ["marketing","Marketing: campaigns, content, SEO, social"],
@@ -999,6 +1023,131 @@ function dueTag(date, done){
   if (d === 1) return h("span", { class: "soon" }, "Tomorrow");
   if (d <= 3) return h("span", { class: "soon" }, fmtDate(date));
   return h("span", {}, fmtDate(date));
+}
+/* ---------------------------------------------------------------------
+   Stored files: in Google Drive (through the "files" server function) once an admin turns it on in
+   Admin panel › Storage; files from before stay in Supabase storage until they're moved.
+   --------------------------------------------------------------------- */
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+const useDrive = () => !!(S.settings && S.settings.file_store === "drive" && S.settings.drive_folder);
+async function filesFn(action, qs, opts){
+  opts = opts || {};
+  const { data } = await sb.auth.getSession();
+  const token = data && data.session ? data.session.access_token : "";
+  const res = await fetch(SUPABASE_URL + "/functions/v1/files?action=" + action + (qs || ""), {
+    method: opts.method || "POST", body: opts.body,
+    headers: Object.assign({ Authorization: "Bearer " + token, apikey: SUPABASE_KEY }, opts.headers || {}) });
+  let j = null; try { j = await res.json(); } catch (e) {}
+  if (!res.ok || !j || j.error) throw new Error((j && j.error) || ("Storage replied " + res.status + (res.status === 404 ? ": the files function isn’t deployed yet." : ".")));
+  return j;
+}
+// upload one file to a record; returns its row in "files"
+async function storeUpload(tbl, entityId, file, name){
+  name = name || file.name || "file";
+  if (useDrive()){
+    const r = await filesFn("upload", "&tbl=" + encodeURIComponent(tbl) + "&entity_id=" + encodeURIComponent(entityId), {
+      body: file, headers: { "Content-Type": file.type || "application/octet-stream", "x-file-name": encodeURIComponent(name), "x-file-size": String(file.size || 0) } });
+    return r.file;
+  }
+  const safe = name.replace(/[^\w.\-]+/g, "_").slice(-100) || "file";
+  const path = tbl + "/" + entityId + "/" + Date.now() + "-" + uid() + "-" + safe;
+  ok(await sb.storage.from(FILE_BUCKET).upload(path, file, { contentType: file.type || "application/octet-stream", upsert: false }));
+  return ok(await sb.from("files").insert({ tbl, entity_id: entityId, name, path, size: file.size || 0, mime: file.type || "", uploaded_by: S.me.id }).select().single());
+}
+// a link that opens (or downloads) the file for a few minutes
+async function storeLink(f, download){
+  if (f.storage && f.storage !== "supabase") return (await filesFn("link", "&id=" + encodeURIComponent(f.id))).url + (download ? "&dl=1" : "");
+  const d = ok(await sb.storage.from(FILE_BUCKET).createSignedUrl(f.path, download ? 120 : 3600, download ? { download: f.name } : undefined));
+  return d.signedUrl;
+}
+async function storeDelete(f){
+  if (f.storage && f.storage !== "supabase") { await filesFn("delete", "&id=" + encodeURIComponent(f.id)); return; }
+  ok(await sb.storage.from(FILE_BUCKET).remove([f.path]));
+  ok(await sb.from("files").delete().eq("id", f.id));
+}
+
+/* ---------- Admin panel › Storage ---------- */
+async function renderAdminStorage(el){
+  adminHeader(el, "Storage", "Where uploaded files are kept, how much space they use, and the nightly backup.");
+  const fmt = b => (b = +b || 0) >= 1073741824 ? (b / 1073741824).toFixed(2) + " GB" : b >= 1048576 ? (b / 1048576).toFixed(1) + " MB" : Math.round(b / 1024) + " KB";
+  const meter = (label, used, limit, note) => {
+    const pct = limit ? Math.min(100, Math.round(used / limit * 100)) : 0;
+    return h("div", { class: "panel", style: "margin-bottom:12px" }, h("div", { style: "display:flex;justify-content:space-between;gap:10px;margin-bottom:6px;flex-wrap:wrap" }, h("b", {}, label), h("span", { class: "muted" }, fmt(used) + (limit ? " of " + fmt(limit) + " (" + pct + "%)" : ""))),
+      limit ? h("div", { class: "meter" }, h("span", { style: "width:" + Math.max(pct, used ? 1 : 0) + "%;background:" + (pct >= 85 ? "var(--bad)" : pct >= 70 ? "#F5A524" : "var(--p)") })) : null,
+      note ? h("p", { class: "muted", style: "font-size:12.5px;margin:6px 0 0" }, note) : null);
+  };
+  const box = h("div", {}, h("div", { class: "panel" }, h("p", { class: "muted", style: "margin:0" }, "Checking Google Drive…")));
+  el.append(box);
+  let st = null;
+  try { st = await filesFn("status", ""); } catch (e) { st = { ok: false, setup: false, message: friendly(e), usage: null }; }
+  if (S.route !== "admin-storage") return;
+  if (!st.usage) { try { st.usage = ok(await sb.rpc("storage_usage")); } catch (e) { st.usage = {}; } }
+  const u = st.usage || {};
+  const parts = [
+    meter("Database (Supabase free plan)", u.database_bytes || 0, 500 * 1048576, "Chats, tasks, leads and everything else that isn’t a file."),
+    meter("Files still in Supabase", u.supabase_bytes || 0, 1024 * 1048576, (u.supabase_files || 0) + " file" + ((u.supabase_files || 0) === 1 ? "" : "s") + ". The free plan allows 1 GB, so these are best moved to Google Drive.")];
+  if (st.quota && st.quota.limit) parts.push(meter("Google Drive (your company’s shared storage)", +st.quota.usage || 0, +st.quota.limit, (u.drive_files || 0) + " workspace file" + ((u.drive_files || 0) === 1 ? "" : "s") + ", " + fmt(u.drive_bytes || 0) + ". Everything else in the meter is your company’s other Drive files."));
+
+  // the Google Drive card
+  const card = h("div", { class: "panel", style: "margin-bottom:12px" }, h("b", {}, "Google Drive"));
+  const connectBtn = h("button", { type: "button", class: st.setup ? "btn ghost" : "btn pri" }, st.setup ? "Reconnect Google Drive" : "Connect Google Drive");
+  connectBtn.addEventListener("click", async () => {
+    if (!googleOn()) { toast("Google isn’t set up for this workspace yet."); return; }
+    const okc = await connectGoogle(DRIVE_SCOPE);
+    if (!okc) return;
+    try { await filesFn("setup", ""); toast("Google Drive is ready. The two workspace folders are in your Drive."); }
+    catch (e) { fail(e, "Google Drive not set up"); }
+    rerender();
+  });
+  if (!st.setup){
+    card.append(h("p", { style: "margin:6px 0 10px" }, "Keep the workspace’s files and nightly backups in your company’s Google Drive. The workspace only gets the narrowest Drive permission: it can see and change the files it creates, nothing else in your Drive."),
+      h("ol", { class: "muted", style: "font-size:13px;margin:0 0 10px;padding-left:18px" },
+        h("li", {}, "Click Connect Google Drive and sign in with your tcipher.com account."),
+        h("li", {}, "On Google’s screen, tick every box, including Google Drive (“See, edit, create and delete only the specific Google Drive files you use with this app”)."),
+        h("li", {}, "Two folders appear in your Drive: Tcipher Workspace files and Tcipher Workspace backups.")),
+      st.message && !/Not set up/.test(st.message) ? h("p", { class: "err" }, st.message) : null, connectBtn);
+  } else {
+    const on = useDrive();
+    const toggle = h("input", { type: "checkbox", checked: on, disabled: !st.ok && !on });
+    toggle.addEventListener("change", async () => {
+      try { const data = { ...S.settings, file_store: toggle.checked ? "drive" : "supabase" }; ok(await sb.from("settings").upsert({ id: 1, data, updated_at: new Date().toISOString() })); S.settings = data; toast(toggle.checked ? "New uploads now go to Google Drive." : "New uploads now go to Supabase."); rerender(); }
+      catch (e) { fail(e, "Not saved"); toggle.checked = !toggle.checked; }
+    });
+    const progress = h("p", { class: "muted", style: "margin:8px 0 0" });
+    const moveBtn = h("button", { type: "button", class: "btn", disabled: !st.ok || !(u.supabase_files > 0) }, "Move files to Google Drive");
+    moveBtn.addEventListener("click", async () => {
+      if (!confirm("Copy every file from Supabase to Google Drive, check each copy, then remove it from Supabase?")) return;
+      let moved = 0, failed = [];
+      try {
+        for (let round = 0; round < 400; round++){
+          const r = await filesFn("migrate", "");
+          moved += r.moved; failed = failed.concat(r.failed || []);
+          progress.textContent = "Moved " + moved + " file" + (moved === 1 ? "" : "s") + (r.remaining ? ", " + r.remaining + " to go…" : ".") + (failed.length ? " " + failed.length + " couldn’t be moved." : "");
+          if (!r.remaining || (!r.moved && !(r.failed || []).length)) break;
+        }
+        toast("Finished moving files."); setTimeout(rerender, 1500);
+      } catch (e) { progress.textContent = "Stopped: " + friendly(e) + " Click again to carry on where it stopped."; }
+      if (failed.length) progress.after(h("ul", { class: "muted", style: "font-size:12.5px" }, failed.slice(0, 20).map(x => h("li", {}, x.name + ": " + x.error))));
+    });
+    const f1 = st.folder || {}, f2 = st.backup_folder || {};
+    card.append(
+      h("p", { style: "margin:6px 0 0" }, pill(st.ok ? "Connected" : "Problem", st.ok ? "ok" : "bad"), " ", st.ok ? "Using " + (st.account || "your Google account") + "." : st.message),
+      h("div", { class: "drive-folders" },
+        h("div", {}, "📁 ", f1.link ? h("a", { href: f1.link, target: "_blank", rel: "noopener" }, f1.name || "Tcipher Workspace files") : (f1.name || "Tcipher Workspace files"), f1.shared_drive ? h("span", { class: "pill ok", style: "margin-left:6px" }, "In a Shared drive") : null),
+        h("div", {}, "📁 ", f2.link ? h("a", { href: f2.link, target: "_blank", rel: "noopener" }, f2.name || "Tcipher Workspace backups") : (f2.name || "Tcipher Workspace backups"), f2.shared_drive ? h("span", { class: "pill ok", style: "margin-left:6px" }, "In a Shared drive") : null)),
+      !(f1.shared_drive && f2.shared_drive) ? h("p", { class: "tipline" }, "Recommended: in Google Drive, create a Shared drive called “Tcipher Workspace”, add only admins, and drag both folders into it. The company then owns the files, not one person’s account. The workspace keeps working; nothing needs changing here.") : null,
+      h("p", { class: "muted", style: "font-size:12.5px;margin:8px 0 0" }, "Keep these folders private. Anyone who can open them can open every proposal and offer letter in them."),
+      h("label", { class: "chk", style: "margin-top:10px" }, toggle, "Store new uploads in Google Drive"),
+      h("div", { style: "margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap" }, moveBtn,
+        h("span", { class: "muted", style: "font-size:12.5px" }, u.supabase_files > 0 ? u.supabase_files + " file" + (u.supabase_files === 1 ? "" : "s") + " still in Supabase" : "Nothing left in Supabase."), connectBtn),
+      progress);
+  }
+  // the nightly backup card
+  const backup = h("div", { class: "panel", style: "margin-bottom:12px" }, h("b", {}, "Nightly backup"),
+    st.last_backup_at
+      ? h("p", { style: "margin:6px 0 0" }, pill(Date.now() - new Date(st.last_backup_at) < 36 * 3600e3 ? "Up to date" : "Missed", Date.now() - new Date(st.last_backup_at) < 36 * 3600e3 ? "ok" : "bad"), " Last backup " + fmtAgo(st.last_backup_at) + " (" + fmt(st.last_backup_bytes) + "), encrypted, in Tcipher Workspace backups. 30 daily backups are kept, plus one per month for good.")
+      : h("p", { class: "muted", style: "margin:6px 0 0" }, st.setup ? "No backup yet. Once the nightly backup job is set up (see the setup guide), a backup arrives here every night at about 2 am." : "Set up Google Drive first; the nightly backup is saved there."));
+  box.replaceChildren(...parts, card, backup);
 }
 /* ---------------------------------------------------------------------
    Module definitions
@@ -1964,6 +2113,7 @@ function boardView(M, rs, A){
       h("div", { class: "colh" }, h("b", {}, o.l), h("span", {}, items.length + (sum ? " · " + money(sum, true) : ""))),
       h("div", { class: "cards" }, items.length ? [...items.slice(0, boardLimit(M, o.v)).map(r => {
         const card = (M.board.card || genericCard(M.title, null, null))(r, M);
+        card.dataset.id = r.id;
         const can = access(M, r).canEdit;
         card.setAttribute("draggable", can ? "true" : "false");
         card.addEventListener("click", () => openRecord(M.key, r.id));
@@ -2105,7 +2255,7 @@ async function openRecord(key, id, preset){
 
   const foot = [];
   if (rec && A.canDelete) foot.push(h("button", { type: "button", class: "btn danger", onclick: async () => {
-    if (!confirm("Delete this " + M.one + "? This can’t be undone.")) return;
+    if (!confirm(M.deleteConfirm ? M.deleteConfirm(rec) : "Delete this " + M.one + "? This can’t be undone.")) return;
     if (M.beforeDelete) { try { await M.beforeDelete(rec); } catch (e) { console.warn(e); } }
     try { await deleteRow(M.table, rec.id); closeDlg(); toast("Deleted."); rerender(); } catch (e) { fail(e, "Couldn’t delete"); }
   } }, "Delete"));
@@ -2231,7 +2381,7 @@ function filesSection(tbl, id, canUpload){
         h("button", { type: "button", class: "btn sm", onclick: () => downloadFile(f) }, "Download"),
         (f.uploaded_by === S.me.id || S.me.is_admin) ? h("button", { type: "button", class: "btn sm danger", onclick: async () => {
           if (!confirm("Delete “" + f.name + "”?")) return;
-          try { ok(await sb.storage.from(FILE_BUCKET).remove([f.path])); ok(await sb.from("files").delete().eq("id", f.id)); refresh(); } catch (e) { fail(e, "File not deleted"); }
+          try { await storeDelete(f); refresh(); } catch (e) { fail(e, "File not deleted"); }
         } }, "Delete") : null));
       for (const n of uploading) list.append(h("div", { class: "file" }, h("span", { class: "fn" }, n), h("span", { class: "fs" }, "Uploading…")));
       if (!list.children.length) list.append(h("p", { class: "nothing" }, "No files yet."));
@@ -2242,12 +2392,7 @@ function filesSection(tbl, id, canUpload){
     for (const file of files){
       if (file.size > MAX_FILE_MB * 1048576) { toast(file.name + " is over " + MAX_FILE_MB + " MB."); continue; }
       uploading.push(file.name); refresh();
-      const safe = file.name.replace(/[^\w.\-]+/g, "_").slice(-100) || "file";
-      const path = tbl + "/" + id + "/" + Date.now() + "-" + uid() + "-" + safe;
-      try {
-        ok(await sb.storage.from(FILE_BUCKET).upload(path, file, { contentType: file.type || "application/octet-stream", upsert: false }));
-        ok(await sb.from("files").insert({ tbl, entity_id: id, name: file.name, path, size: file.size, mime: file.type || "", uploaded_by: S.me.id }));
-      } catch (e) { fail(e, file.name + " not uploaded"); }
+      try { await storeUpload(tbl, id, file); } catch (e) { fail(e, file.name + " not uploaded"); }
       uploading.splice(uploading.indexOf(file.name), 1);
     }
     refresh();
@@ -2258,8 +2403,8 @@ function filesSection(tbl, id, canUpload){
 }
 async function downloadFile(f){
   try {
-    const d = ok(await sb.storage.from(FILE_BUCKET).createSignedUrl(f.path, 120, { download: f.name }));
-    const a = h("a", { href: d.signedUrl, rel: "noopener" }); document.body.append(a); a.click(); a.remove();
+    const href = await storeLink(f, true);
+    const a = h("a", { href, rel: "noopener" }); document.body.append(a); a.click(); a.remove();
   } catch (e) { fail(e, "Download failed"); }
 }
 /* ---------------------------------------------------------------------
@@ -3077,12 +3222,12 @@ async function callGoogle(action, extra){
 async function refreshGoogleData(){ await Promise.all([load("google_links", true), load("calendar_events", true)]); }
 
 // Must be called straight from a click, so Google's pop-up isn't blocked.
-function connectGoogle(){
+function connectGoogle(extraScopes){
   if (!googleOn()) { toast("Google Calendar isn’t set up yet. Ask your admin."); return Promise.resolve(false); }
   if (!G.ready) { loadGoogle(); toast("Getting Google ready… click again in a moment."); return Promise.resolve(false); }
   return new Promise(resolve => {
     const client = window.google.accounts.oauth2.initCodeClient({
-      client_id: GOOGLE_CLIENT_ID, scope: G_SCOPES, ux_mode: "popup", prompt: "consent", hint: S.me.email,
+      client_id: GOOGLE_CLIENT_ID, scope: G_SCOPES + (extraScopes ? " " + extraScopes : ""), include_granted_scopes: true, ux_mode: "popup", prompt: "consent", hint: S.me.email,
       callback: async r => {
         if (r.error) { fail(new Error(r.error_description || r.error), "Google not connected"); resolve(false); return; }
         try { const res = await callGoogle("connect", { code: r.code }); await refreshGoogleData();
@@ -3419,7 +3564,16 @@ async function archiveTask(rec, archive){
   if (archive && !confirm("Archive " + (taskKey(rec) || "this task") + "? It disappears from boards and lists, but you can find it under Tasks › Archived and restore it. Its history is kept.")) return;
   try {
     await updateRow("tasks", rec.id, archive ? { archived: true, archived_at: new Date().toISOString(), archived_by: S.me.id } : { archived: false, archived_at: null, archived_by: null });
+    // check it really saved: read it back from the database
+    const back = ok(await sb.from("tasks").select("id,archived").eq("id", rec.id).maybeSingle());
+    if (!back || !!back.archived !== !!archive) {
+      captureError("Archive didn’t save for " + (taskKey(rec) || rec.id) + " (database says archived = " + (back ? back.archived : "row not visible") + ")", "", { task: rec.id, wanted: archive });
+      throw new Error("The database didn’t keep the change. It’s been reported to an admin.");
+    }
+    upsertCache("tasks", Object.assign({}, rec, back, { archived: !!archive }));
+    if (archive) document.querySelectorAll('[data-id="' + rec.id + '"]').forEach(el => el.remove());   // off every board straight away
     toast(archive ? "Archived." : "Restored."); closeDlg(); rerender();
+    if (archive) setTimeout(() => { if ([...document.querySelectorAll('#content [data-id="' + rec.id + '"]')].length) captureError("Archived task still showing after archiving: " + (taskKey(rec) || rec.id) + " on " + S.route, "", { task: rec.id }); }, 2500);
   } catch (e) { fail(e, archive ? "Couldn’t archive" : "Couldn’t restore"); }
 }
 function linkedNotesSection(field, rec){
@@ -3623,6 +3777,16 @@ function badgeInfo(route){
   const add = (n, text, kind) => { if (!n) return; if (kind === "due") due += n; else fresh += n; why.push(n + " " + text); };
   const myTask = t => t.assignee_id === me || (t.collaborators || []).includes(me);
   switch (route){
+    case "qa": if (L("tasks")) {
+      add(rows("tasks").filter(t => t.status === "In review" && t.qa_state && (t.tester_id === me || t.reviewer_id === me)).length + (L("test_cases") ? rows("test_cases").filter(c => c.status === "Retest" && c.tester_id === me).length : 0), "waiting for you to test", "due");
+    } break;
+    case "bugs": if (L("tasks")) {
+      add(rows("tasks").filter(t => t.type === "Bug" && t.assignee_id === me && t.status !== "Done" && t.status !== "In review").length, "bugs assigned to you", "due");
+      add(rows("tasks").filter(t => t.type === "Bug" && t.created_by !== me && t.status !== "Done" && isNewer(t.created_at, route)).length, "new bugs", "new");
+    } break;
+    case "test_cases": if (L("test_cases")) {
+      add(rows("test_cases").filter(c => c.assignee_id === me && ["Fail", "Blocked"].includes(c.status)).length, "failed test cases assigned to you", "due");
+    } break;
     case "tasks": if (L("tasks")) {
       const ts = rows("tasks");
       add(ts.filter(t => myTask(t) && t.status !== "Done" && t.due_date && t.due_date <= t0).length, "due or overdue", "due");
@@ -3952,7 +4116,7 @@ async function renderCrmAnalytics(el){
   ownSel.value = u.owner; ownSel.addEventListener("change", () => { u.owner = ownSel.value; rerender(); });
   el.append(h("div", { class: "ph" }, h("div", {}, h("h1", {}, "Sales & marketing analytics"), h("p", {}, "Funnels, conversion and where leads come from."))), h("div", { class: "tb" }, rangeSel, ownSel));
 
-  const overdue = allRows("tasks").filter(t => (t.lead_id || t.deal_id) && t.status !== "Done" && t.due_date && t.due_date < today()).length;
+  const overdue = rows("tasks").filter(t => (t.lead_id || t.deal_id) && t.status !== "Done" && t.due_date && t.due_date < today()).length;
   el.append(statStrip([
     ["Leads", leads.length], ["Deals won", won.length, "var(--ok)"],
     ["Win rate", won.length + lost.length ? Math.round(won.length / (won.length + lost.length) * 100) + "%" : "–"],
@@ -4367,11 +4531,8 @@ async function openComposer(o){
   upIn.addEventListener("change", async () => {
     for (const file of [...upIn.files]){
       if (file.size > 20 * 1048576) { toast(file.name + " is over 20 MB."); continue; }
-      const safe = file.name.replace(/[^\w.\-]+/g, "_").slice(-100) || "file";
-      const path = "email_attachments/" + S.me.id + "/" + Date.now() + "-" + uid() + "-" + safe;
       try {
-        ok(await sb.storage.from(FILE_BUCKET).upload(path, file, { contentType: file.type || "application/octet-stream", upsert: false }));
-        const row = ok(await sb.from("files").insert({ tbl: "email_attachments", entity_id: S.me.id, name: file.name, path, size: file.size, mime: file.type || "", uploaded_by: S.me.id }).select().single());
+        const row = await storeUpload("email_attachments", S.me.id, file);
         const c = h("input", { type: "checkbox", checked: true }); c.addEventListener("change", upd); checks.push([row, c]);
       } catch (e) { fail(e, file.name + " not uploaded"); }
     }
@@ -5253,7 +5414,7 @@ document.addEventListener("visibilitychange", () => {
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11p";
+const APP_VERSION = "2026-11r";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -5325,9 +5486,7 @@ function openReportDialog(){
       const rep = ok(await sb.from("problem_reports").insert({ user_id: S.me.id, kind: "user", status: "Open", page: S.route || "", message: (RECENT_ERRORS.length ? "Recent error: " + RECENT_ERRORS[RECENT_ERRORS.length - 1].m : ""), note: note.value.trim(),
         details: { steps: CRUMBS.slice(-15), recent_errors: RECENT_ERRORS.slice(-5), version: APP_VERSION, ...browserInfo(), online: navigator.onLine } }).select().single());
       if (shot){
-        const path = "problem_reports/" + rep.id + "/" + Date.now() + "-" + (shot.name || "screenshot.png").replace(/[^\w.\-]+/g, "_");
-        try { ok(await sb.storage.from(FILE_BUCKET).upload(path, shot, { contentType: shot.type || "image/png", upsert: false }));
-          ok(await sb.from("files").insert({ tbl: "problem_reports", entity_id: rep.id, name: shot.name || "screenshot.png", path, size: shot.size, mime: shot.type || "image/png", uploaded_by: S.me.id })); }
+        try { await storeUpload("problem_reports", rep.id, shot, shot.name || "screenshot.png"); }
         catch (e) { console.warn("screenshot upload", e); }
       }
       notify(activePeople().filter(p => p.is_admin && p.id !== S.me.id).map(p => p.id), "Problem reported by " + S.me.full_name, (note.value.trim() || "Screenshot attached").slice(0, 140), "", null);
@@ -5373,7 +5532,7 @@ async function renderAdminProblems(el){
     if (r.message && r.kind === "user") card.append(h("p", { class: "muted", style: "font-size:13px;margin:0 0 6px" }, r.message));
     if (r.kind === "auto") card.append(h("p", { class: "code", style: "display:block;white-space:pre-wrap;margin:0 0 6px" }, r.message));
     for (const f of files){
-      try { const { data } = await sb.storage.from(FILE_BUCKET).createSignedUrl(f.path, 3600); if (data && data.signedUrl) card.append(h("a", { href: data.signedUrl, target: "_blank", rel: "noopener" }, h("img", { src: data.signedUrl, alt: "Screenshot", class: "probshot" }))); } catch (e) {}
+      try { const link = await storeLink(f, false); if (link) card.append(h("a", { href: link, target: "_blank", rel: "noopener" }, h("img", { src: link, alt: "Screenshot", class: "probshot" }))); } catch (e) {}
     }
     const more = h("div", { hidden: true, class: "probmore" },
       (det.steps || []).length ? [h("b", {}, "What they did before"), h("ol", {}, det.steps.map(s => h("li", {}, s.s + " (" + new Date(s.t).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", second: "2-digit" }) + ")")))] : null,
@@ -5418,6 +5577,715 @@ async function copyForClaude(groups){
   const text = claudeText(groups);
   try { await navigator.clipboard.writeText(text); toast("Copied " + groups.length + " problem" + (groups.length === 1 ? "" : "s") + ". Paste it into your chat with Claude."); }
   catch (e) { openDialog("Copy for Claude", [h("p", {}, "Select all and copy this text, then paste it into your chat with Claude."), h("textarea", { class: "in", rows: 14, readonly: true }, text)], [h("span", { class: "sp" }), h("button", { type: "button", class: "btn", onclick: closeDlg }, "Close")]); }
+}
+/* ---------------------------------------------------------------------
+   Quality Assurance & Testing (under Development)
+   Project › Feature › Test case. Bugs are tasks of type Bug linked to a feature and test case.
+   The QA stage on a development task (Waiting for QA › Failed › Retest › Passed) is kept by the
+   database as the task moves; this file shows it and adds the testers' tools.
+   --------------------------------------------------------------------- */
+const TC_STATUS = ["Not run","Pass","Fail","Blocked","Pending","Retest"];
+const QA_STATES = ["Waiting for QA","Retest","Failed","Passed"];
+const SEVERITY = ["Critical","High","Medium","Low"];
+const sevOf = v => ({ Blocker: "Critical", Major: "High", Minor: "Medium", Trivial: "Low" })[v] || v || "";
+const sevRank = v => { const i = SEVERITY.indexOf(sevOf(v)); return i < 0 ? 9 : i; };
+const BUG_TYPES = ["Bug","Timing","Suggestion","Design bug"];
+const FEATURE_STATUS = ["Planned","In development","In QA","Done","On hold"];
+const TEST_TYPES = ["Functional","Negative / edge case","UI","Navigation","Responsive","Security","Performance","Regression","Integration"];
+const tcKey = r => r ? ((r.external_id ? String(r.external_id).split("/").pop() : "") || ("QA-" + r.number)) : "";
+const isTester = () => lvl("qa") >= 3;
+const TC_TONE = { "Pass": "ok", "Fail": "bad", "Blocked": "warn", "Pending": "grey", "Retest": "info", "Not run": "grey" };
+const QA_TONE = { "Waiting for QA": "info", "Retest": "info", "Failed": "bad", "Passed": "ok" };
+function qaBadge(t){
+  if (!t || !t.qa_state) return null;
+  return pill(t.qa_state === "Failed" && t.reopen_count > 1 ? "Failed ×" + t.reopen_count : t.qa_state, QA_TONE[t.qa_state] || "grey");
+}
+REF_LABEL.features = r => r.name;
+REF_LABEL.test_cases = r => tcKey(r) + " " + r.title;
+
+/* ---------- Features (children of a project) ---------- */
+function featureStats(fid){
+  const cs = rows("test_cases").filter(c => c.feature_id === fid);
+  const count = s => cs.filter(c => c.status === s).length;
+  const bugs = rows("tasks").filter(t => t.feature_id === fid && t.type === "Bug" && t.status !== "Done");
+  return { total: cs.length, pass: count("Pass"), fail: count("Fail"), retest: count("Retest"), notRun: count("Not run"), blocked: count("Blocked"), bugs: bugs.length };
+}
+function progressBar(pass, total){
+  const pct = total ? Math.round(pass / total * 100) : 0;
+  return h("span", { class: "qbar", title: pass + " of " + total + " passing" }, h("span", { class: "qtrack" }, h("span", { class: "qfill", style: "width:" + pct + "%" })), h("em", {}, total ? pct + "%" : "–"));
+}
+MOD.features = {
+  label: "Features", one: "feature", table: "features", area: "qa", title: "name",
+  desc: "The parts of each project. Test cases, bugs and tasks belong to a feature, so you can see how close each one is to done.",
+  needs: ["projects", "test_cases", "tasks"], comments: true, files: true,
+  fields: [
+    { k: "project_id", l: "Project", t: "ref", ref: "projects", req: true, filter: true },
+    { k: "name", l: "Feature name", t: "text", req: true, ph: "e.g. Authentication, Checkout, Pricing" },
+    { k: "key", l: "Short code (optional)", t: "text", ph: "e.g. F1 or AUTH" },
+    { k: "status", l: "Status", t: "select", o: FEATURE_STATUS, def: "In development", filter: true },
+    { k: "priority", l: "Priority", t: "select", o: PRIORITY, none: "–" },
+    { k: "owner_id", l: "Developer in charge", t: "user", none: "–" },
+    { k: "tester_id", l: "Tester", t: "user", none: "The project’s QA lead", filter: true },
+    { k: "description", l: "What it covers", t: "textarea", full: true, rows: 3 }
+  ],
+  cols: ["name", "project_id", "status",
+    { k: "_prog", l: "Passing", render: (v, r) => { const s = featureStats(r.id); return progressBar(s.pass, s.total); } },
+    { k: "_cases", l: "Test cases", render: (v, r) => { const s = featureStats(r.id); return h("span", {}, s.total + (s.fail ? " · " : ""), s.fail ? h("b", { style: "color:var(--bad)" }, s.fail + " failing") : null); } },
+    { k: "_bugs", l: "Open bugs", render: (v, r) => { const n = featureStats(r.id).bugs; return n ? h("b", { style: "color:var(--bad)" }, String(n)) : h("span", { class: "muted" }, "0"); } },
+    "tester_id"],
+  sort: (a, b) => (refLabel("projects", a.project_id) || "").localeCompare(refLabel("projects", b.project_id) || "") || a.name.localeCompare(b.name),
+  validate: d => (d.name || "").trim() ? null : "Give the feature a name.",
+  detail: (rec, box) => {
+    const s = featureStats(rec.id);
+    box.append(h("div", { class: "section" }, h("h3", {}, "Progress"),
+      h("div", { class: "qstats" }, [["Test cases", s.total], ["Passing", s.pass, "ok"], ["Failing", s.fail, "bad"], ["Retest", s.retest, "info"], ["Not run", s.notRun], ["Open bugs", s.bugs, "bad"]]
+        .map(([l, n, tone]) => h("span", { class: "qstat " + (tone && n ? tone : "") }, h("b", {}, String(n)), l))),
+      h("div", { style: "display:flex;gap:8px;flex-wrap:wrap;margin-top:10px" },
+        isTester() ? h("button", { type: "button", class: "btn sm pri", onclick: () => { closeDlg(); openRecord("test_cases", null, { project_id: rec.project_id, feature_id: rec.id }); } }, "+ Test case") : null,
+        isTester() ? h("button", { type: "button", class: "btn sm", onclick: () => { closeDlg(); openQAImport({ project_id: rec.project_id, feature_id: rec.id }); } }, "⬆ Import test cases into this feature") : null,
+        h("button", { type: "button", class: "btn sm ghost", onclick: () => { closeDlg(); S.ui.test_cases = Object.assign(uiFor("test_cases"), { filters: { feature_id: rec.id } }); go("test_cases"); } }, "Open its test cases"))));
+    const tasks = rows("tasks").filter(t => t.feature_id === rec.id).sort((a, b) => (a.status === "Done") - (b.status === "Done"));
+    box.append(h("div", { class: "section" }, h("h3", {}, "Tasks and bugs (" + tasks.length + ")"),
+      tasks.length ? tasks.slice(0, 40).map(t => h("button", { type: "button", class: "row", onclick: () => { closeDlg(); openRecord(t.type === "Bug" ? "bugs" : "tasks", t.id); } },
+        h("span", { class: "tkey" }, taskKey(t)), h("span", { class: "x" }, t.title), qaBadge(t), pill(t.status, t.status === "Done" ? "ok" : "grey")))
+        : h("p", { class: "nothing" }, "No tasks or bugs linked to this feature yet.")));
+  }
+};
+
+/* ---------- Test cases (children of a feature) ---------- */
+MOD.test_cases = {
+  label: "Test cases", one: "test case", table: "test_cases", area: "qa", title: "title",
+  desc: "Every check your testers run. Pass or fail them here; a failed case becomes a bug for the developer, and comes back to you to retest.",
+  needs: ["projects", "features", "tasks"], comments: true, files: true,
+  keyOf: r => tcKey(r),
+  searchExtra: r => tcKey(r) + " " + (r.steps || "") + " " + (r.notes || ""),
+  canEdit: rec => isTester() || (!!rec && rec.assignee_id === S.me.id),
+  canDelete: () => isTester(),
+  fieldEditable: (f, rec) => isTester() || ["notes", "evidence"].includes(f.k),
+  quick: [
+    ["all", "All"],
+    ["mine", "My cases", c => c.tester_id === S.me.id],
+    ["assigned", "Assigned to me", c => c.assignee_id === S.me.id && c.status !== "Pass"],
+    ["fail", "Failing", c => c.status === "Fail"],
+    ["retest", "Retest", c => c.status === "Retest"],
+    ["notrun", "Not run", c => c.status === "Not run"]
+  ],
+  fields: [
+    { k: "project_id", l: "Project", t: "ref", ref: "projects", req: true, filter: true },
+    { k: "feature_id", l: "Feature", t: "ref", ref: "features", none: "No feature", filter: true, refFilter: (fe, rec) => !rec || !rec.project_id || fe.project_id === rec.project_id },
+    { k: "external_id", l: "Test case ID", t: "text", ph: "e.g. AUTH-01 (optional)" },
+    { k: "title", l: "What it checks", t: "text", req: true, full: true },
+    { k: "status", l: "Result", t: "select", o: TC_STATUS, def: "Not run", filter: true },
+    { k: "test_type", l: "Type of test", t: "select", o: TEST_TYPES, none: "–", filter: true },
+    { k: "priority", l: "Priority", t: "select", o: PRIORITY, none: "–" },
+    { k: "platform", l: "Platform", t: "select", o: ["Web", "Android", "iOS", "App (both)", "Web and app", "Admin panel", "API"], none: "–", filter: true },
+    { k: "preconditions", l: "Before you start", t: "textarea", rows: 2, full: true },
+    { k: "test_data", l: "Test data", t: "textarea", rows: 2, full: true },
+    { k: "steps", l: "Steps", t: "textarea", rows: 5, full: true },
+    { k: "expected", l: "Expected result", t: "textarea", rows: 2, full: true },
+    { k: "actual", l: "What actually happened", t: "textarea", rows: 2, full: true },
+    { k: "evidence", l: "Evidence (screenshot or video links)", t: "textarea", rows: 2, full: true },
+    { k: "tester_id", l: "Tester", t: "user", def: () => S.me.id, filter: true },
+    { k: "assignee_id", l: "Developer to fix it", t: "user", none: "Nobody yet", filter: true },
+    { k: "notes", l: "Notes", t: "textarea", rows: 2, full: true, mentions: true }
+  ],
+  cols: [{ k: "number", l: "ID", render: (v, r) => h("span", { class: "tkey" }, tcKey(r)) }, "title", "feature_id",
+    { k: "status", l: "Result", render: v => pill(v, TC_TONE[v] || "grey") }, "test_type", "tester_id", "assignee_id",
+    { k: "last_run_at", l: "Last run", render: v => v ? h("span", { class: "muted" }, fmtAgo(v)) : h("span", { class: "muted" }, "–") }],
+  board: { field: "status", card: testCaseCard },
+  defaultView: "list",
+  sort: (a, b) => (a.number || 0) - (b.number || 0),
+  validate: d => (d.feature_id && d.project_id && byId("features", d.feature_id) && byId("features", d.feature_id).project_id !== d.project_id) ? "That feature belongs to a different project." : null,
+  actions: rec => {
+    const out = [];
+    if (isTester()) {
+      out.push(h("b", { style: "flex:1" }, rec.status === "Retest" ? "The developer says it’s fixed. Retest it:" : "Run it:"));
+      for (const [st, cls] of [["Pass", "ok"], ["Fail", "danger"], ["Blocked", ""]])
+        out.push(h("button", { type: "button", class: "btn sm " + cls, onclick: () => recordRun(rec, st) }, st === "Pass" ? "✓ Pass" : st === "Fail" ? "✕ Fail" : "Blocked"));
+    } else if (rec.assignee_id === S.me.id && ["Fail", "Blocked"].includes(rec.status)) {
+      out.push(h("b", { style: "flex:1" }, "Assigned to you to fix"), h("button", { type: "button", class: "btn sm pri", onclick: () => markRetest(rec) }, "Fixed: ready for retest"));
+    }
+    return out;
+  },
+  detail: (rec, box) => {
+    const linked = rec.task_id ? byId("tasks", rec.task_id) : null;
+    if (linked) box.append(h("div", { class: "section" }, h("h3", {}, "Linked bug or task"),
+      h("button", { type: "button", class: "row", onclick: () => { closeDlg(); openRecord(linked.type === "Bug" ? "bugs" : "tasks", linked.id); } },
+        h("span", { class: "tkey" }, taskKey(linked)), h("span", { class: "x" }, linked.title), qaBadge(linked), pill(linked.status, "grey"))));
+    const hist = h("div", { class: "section" }, h("h3", {}, "Test runs"), h("p", { class: "muted" }, "Loading…"));
+    box.append(hist);
+    sb.from("test_runs").select("*").eq("test_case_id", rec.id).order("at", { ascending: false }).limit(30).then(({ data }) => {
+      const rs = data || [];
+      hist.replaceChildren(h("h3", {}, "Test runs (" + rs.length + ")"), rs.length ? rs.map(r => h("div", { class: "run" }, pill(r.status, TC_TONE[r.status] || "grey"),
+        h("span", { class: "x" }, (pname(r.tester_id) || "Someone") + ((r.at || r.created_at) ? " · " + fmtAgo(r.at || r.created_at) : ""), r.actual ? h("div", { class: "muted", style: "font-size:13px" }, r.actual) : null)))
+        : h("p", { class: "nothing" }, "Not run yet."));
+    });
+  }
+};
+function testCaseCard(r){
+  const f = byId("features", r.feature_id);
+  return h("button", { type: "button", class: "card" },
+    h("div", { class: "ct" }, h("span", { class: "tkey" }, tcKey(r)), " ", r.title),
+    h("div", { class: "cm" }, f ? h("span", { class: "muted" }, f.name) : null, r.assignee_id ? avatar(r.assignee_id, "sm") : null));
+}
+// a tester records a result; a fail can become a bug for the developer
+async function recordRun(rec, status){
+  let actual = rec.actual || "";
+  if (status !== "Pass") { const v = prompt(status === "Fail" ? "What actually happened?" : "What’s blocking the test?", actual); if (v === null) return; actual = v.trim(); }
+  try {
+    const was = rec.status;
+    await updateRow("test_cases", rec.id, { status, actual: status === "Pass" ? "" : actual, last_run_at: new Date().toISOString(), tester_id: rec.tester_id || S.me.id, retest_count: was === "Retest" ? (rec.retest_count || 0) + 1 : (rec.retest_count || 0) });
+    ok(await sb.from("test_runs").insert({ test_case_id: rec.id, status, actual, tester_id: S.me.id }));
+    const bug = rec.task_id ? byId("tasks", rec.task_id) : null;
+    // the linked bug follows the retest: pass closes it, fail sends it back to the developer
+    if (bug && bug.status === "In review") {
+      if (status === "Pass") { await updateRow("tasks", bug.id, { status: "Done" }); toast("Passed. " + taskKey(bug) + " is done."); }
+      else if (status === "Fail") { await updateRow("tasks", bug.id, { status: "In progress" }); await addComment("tasks", bug.id, "Retest failed: " + actual); notify([bug.assignee_id], "Retest failed: " + taskKey(bug), actual.slice(0, 140), "tasks", bug.id); toast("Sent back to " + (pname(bug.assignee_id) || "the developer") + "."); }
+    } else if (status === "Fail" && !bug) {
+      closeDlg();
+      if (confirm("Create a bug for a developer from this failed test?")) return newBugFromCase(Object.assign({}, rec, { status, actual }));
+      toast("Marked failed.");
+    } else toast("Marked " + status.toLowerCase() + ".");
+    closeDlg(); rerender();
+  } catch (e) { fail(e, "Not saved"); }
+}
+function newBugFromCase(rec){
+  const f = byId("features", rec.feature_id);
+  openRecord("bugs", null, {
+    type: "Bug", vertical: "Development", project_id: rec.project_id, feature_id: rec.feature_id, test_case_id: rec.id,
+    title: tcKey(rec) + ": " + rec.title + " fails", priority: rec.priority || "High", severity: "High", bug_type: "Bug",
+    steps: [rec.preconditions && "Before you start: " + rec.preconditions, rec.test_data && "Test data: " + rec.test_data, rec.steps].filter(Boolean).join("\n\n"),
+    expected_result: rec.expected, actual_result: rec.actual, evidence: rec.evidence,
+    assignee_id: rec.assignee_id || (f && f.owner_id) || null, tester_id: S.me.id, reviewer_id: S.me.id
+  });
+}
+async function markRetest(rec){
+  const note = prompt("What did you fix? (the tester will see this)", "");
+  if (note === null) return;
+  try {
+    await updateRow("test_cases", rec.id, { status: "Retest", notes: [rec.notes, note.trim() && "Fix: " + note.trim()].filter(Boolean).join("\n") });
+    const bug = rec.task_id ? byId("tasks", rec.task_id) : null;
+    if (bug && bug.status !== "In review" && bug.status !== "Done") await updateRow("tasks", bug.id, { status: "In review" });
+    notify([rec.tester_id].filter(Boolean), "Ready for retest: " + tcKey(rec), (note || rec.title).slice(0, 140), "test_cases", rec.id);
+    toast("Sent to " + (pname(rec.tester_id) || "the tester") + " to retest."); closeDlg(); rerender();
+  } catch (e) { fail(e, "Not saved"); }
+}
+async function addComment(tbl, id, body){ try { await sb.from("comments").insert({ tbl, entity_id: id, body, author_id: S.me.id }); } catch (e) {} }
+
+/* ---------- Bugs: tasks of type Bug, with the QA columns ---------- */
+{
+  const T = MOD.tasks;
+  // severity in the same words as the test sheets; QA details on every development task
+  const sev = T.fields.find(f => f.k === "severity"); if (sev) sev.o = SEVERITY.concat(["Blocker", "Major", "Minor", "Trivial"].filter(x => !SEVERITY.includes(x)));
+  const at = T.fields.findIndex(f => f.k === "_h_bug");
+  T.fields.splice(at, 0,
+    { k: "_h_qa", l: "Testing (QA)", t: "heading", show: r => r.vertical === "Development" },
+    { k: "feature_id", l: "Feature", t: "ref", ref: "features", none: "No feature", filter: true, show: r => r.vertical === "Development", refFilter: (fe, rec) => !rec || !rec.project_id || fe.project_id === rec.project_id },
+    { k: "tester_id", l: "Tester", t: "user", none: "The feature’s or project’s tester", show: r => r.vertical === "Development" },
+    { k: "qa_state", l: "QA stage", t: "select", o: [""].concat(QA_STATES), auto: true, show: r => r.vertical === "Development" && !!r.qa_state },
+    { k: "reopen_count", l: "Times sent back", t: "int", auto: true, show: r => (r.reopen_count || 0) > 0 },
+    { k: "test_case_id", l: "From test case", t: "ref", ref: "test_cases", none: "–", show: r => !!r.test_case_id });
+  const bt = T.fields.findIndex(f => f.k === "reproducibility");
+  T.fields.splice(bt, 0,
+    { k: "bug_type", l: "Kind", t: "select", o: BUG_TYPES, none: "–", show: r => r.type === "Bug" },
+    { k: "page", l: "Page / screen", t: "text", show: r => r.type === "Bug" },
+    { k: "url", l: "Page link", t: "url", show: r => r.type === "Bug" });
+  const ar = T.fields.findIndex(f => f.k === "actual_result");
+  T.fields.splice(ar + 1, 0,
+    { k: "suggested_fix", l: "Suggested fix", t: "textarea", rows: 2, full: true, show: r => r.type === "Bug" },
+    { k: "evidence", l: "Evidence (screenshot or video links)", t: "textarea", rows: 2, full: true, show: r => r.type === "Bug" });
+  T.needs = [...new Set([...(T.needs || []), "features", "test_cases"])];
+  // admins and task handlers can delete tasks
+  T.canDelete = rec => !!rec && isTaskHandler(rec.vertical);
+  T.deleteConfirm = rec => "Delete " + (taskKey(rec) || "this task") + " permanently? Its comments and history go too. (Admins keep a copy.) If you just want it off the boards, use Archive instead.";
+  // QA stage on the cards
+  const card0 = T.board.card;
+  T.board.card = (r, M) => { const c = card0(r, M); const b = qaBadge(r); if (b) { const slot = c.querySelector(".cm") || c; slot.prepend(b); } return c; };
+  T.quick.splice(4, 0, ["qa", "In QA", t => t.status === "In review" && !!t.qa_state]);
+  // a bug's test case follows the bug: fixed → Retest for the tester
+  const after0 = T.after;
+  T.after = async (rec, prev) => {
+    if (after0) await after0(rec, prev);
+    if (rec.test_case_id && prev && prev.status !== rec.status) {
+      const tc = byId("test_cases", rec.test_case_id);
+      if (tc && rec.status === "In review" && ["Fail", "Blocked"].includes(tc.status)) { try { await updateRow("test_cases", tc.id, { status: "Retest" }); } catch (e) {} }
+    }
+    if (rec.test_case_id && !prev) {
+      const tc = byId("test_cases", rec.test_case_id);
+      if (tc && !tc.task_id) { try { await updateRow("test_cases", tc.id, { task_id: rec.id, assignee_id: rec.assignee_id || tc.assignee_id }); } catch (e) {} }
+    }
+  };
+  MOD.bugs = Object.assign({}, T, {
+    key: "bugs", label: "Bugs", one: "bug",
+    desc: "Everything testers have found. Each bug is a task for a developer; when it’s fixed it comes back to the tester to retest, and it stays open until it passes.",
+    rowFilter: t => t.type === "Bug",
+    quick: [
+      ["all", "All open", t => t.status !== "Done"],
+      ["mine", "Assigned to me", t => t.assignee_id === S.me.id && t.status !== "Done"],
+      ["retest", "Waiting for retest", t => t.status === "In review"],
+      ["failed", "Sent back", t => t.qa_state === "Failed"],
+      ["reported", "I reported", t => t.tester_id === S.me.id || t.created_by === S.me.id],
+      ["done", "Closed", t => t.status === "Done"],
+      ["archived", "Archived", t => t.archived]
+    ],
+    cols: [{ k: "number", l: "ID", render: (v, r) => h("span", { class: "tkey" }, taskKey(r)) }, "title",
+      { k: "severity", l: "Severity", render: v => v ? pill(v, ({ Critical: "bad", High: "bad", Blocker: "bad", Major: "warn", Medium: "warn" })[v] || "grey") : h("span", { class: "muted" }, "–") },
+      "feature_id", "assignee_id", "status", { k: "qa_state", l: "QA", render: (v, r) => qaBadge(r) || h("span", { class: "muted" }, "–") },
+      { k: "reopen_count", l: "Reopened", render: v => v ? h("b", { style: "color:var(--bad)" }, String(v)) : h("span", { class: "muted" }, "0") }],
+    defaultView: "list", top: null,
+    sort: (a, b) => sevRank(a.severity) - sevRank(b.severity) || sortByPrioDue(a, b)
+  });
+  MOD.bugs.fields = T.fields.map(f => f.k === "type" ? Object.assign({}, f, { def: "Bug" }) : f.k === "vertical" ? Object.assign({}, f, { def: "Development" }) : f);
+}
+
+// name the new sections, as the app does at start-up for the others
+for (const k of ["features", "test_cases", "bugs"]) MOD[k].key = k;
+
+// projects: who tests this project's finished work (used when a feature has no tester of its own)
+{
+  const P = MOD.projects;
+  if (P && !P.fields.some(f => f.k === "qa_lead_id")) {
+    const at = P.fields.findIndex(f => f.k === "manager_id");
+    P.fields.splice(at >= 0 ? at + 1 : P.fields.length, 0, { k: "qa_lead_id", l: "QA lead (tests finished work)", t: "user", none: "–" });
+  }
+}
+/* ---------------------------------------------------------------------
+   QA dashboard, and importing the testing / bugs / UX Gaps spreadsheets
+   --------------------------------------------------------------------- */
+async function renderQA(el){
+  await ensure(["projects", "features", "test_cases", "tasks"]);
+  if (S.route !== "qa") return;
+  if (!S.ui.qa) S.ui.qa = { project: "" };
+  const u = S.ui.qa, inP = r => !u.project || r.project_id === u.project;
+  const cases = rows("test_cases").filter(inP), bugs = rows("tasks").filter(t => t.type === "Bug" && inP(t));
+  const open = bugs.filter(b => b.status !== "Done");
+  const run = cases.filter(c => c.status !== "Not run"), pass = cases.filter(c => c.status === "Pass").length;
+  el.append(h("div", { class: "ph" }, h("div", {}, h("h1", {}, "Quality Assurance & Testing"), h("p", {}, "Test cases, bugs and everything waiting for a tester or a developer.")),
+    h("div", { class: "acts" },
+      isTester() ? h("button", { type: "button", class: "btn", onclick: () => openQAImport({}) }, "⬆ Import spreadsheet") : null,
+      isTester() ? h("button", { type: "button", class: "btn", onclick: () => openRecord("test_cases", null, u.project ? { project_id: u.project } : {}) }, "+ Test case") : null,
+      h("button", { type: "button", class: "btn pri", onclick: () => openRecord("bugs", null, Object.assign({ type: "Bug", vertical: "Development", tester_id: isTester() ? S.me.id : null }, u.project ? { project_id: u.project } : {})) }, "+ Report a bug"))));
+  const psel = h("select", { class: "in", "aria-label": "Project" }, h("option", { value: "" }, "All projects"), rows("projects").slice().sort((a, b) => a.name.localeCompare(b.name)).map(p => h("option", { value: p.id }, p.name)));
+  psel.value = u.project; psel.addEventListener("change", () => { u.project = psel.value; rerender(); });
+  el.append(h("div", { class: "tb" }, psel));
+  el.append(statStrip([
+    ["Test cases", cases.length], ["Passing", run.length ? Math.round(pass / run.length * 100) + "%" : "–", "var(--ok)"],
+    ["Failing", cases.filter(c => c.status === "Fail").length, "var(--bad)"], ["Waiting for retest", cases.filter(c => c.status === "Retest").length + bugs.filter(b => b.status === "In review").length, "var(--p)"],
+    ["Open bugs", open.length, open.length ? "var(--bad)" : null], ["Critical / high", open.filter(b => ["Critical", "High"].includes(sevOf(b.severity))).length, "var(--bad)"],
+    ["Sent back again", open.filter(b => (b.reopen_count || 0) > 0).length]]));
+  const grid = h("div", { class: "grid g2" }); el.append(grid);
+  const left = h("div", {}), right = h("div", {}); grid.append(left, right);
+  const taskRow = t => h("button", { type: "button", class: "row", onclick: () => openRecord(t.type === "Bug" ? "bugs" : "tasks", t.id) },
+    h("span", { class: "tkey" }, taskKey(t)), h("span", { class: "x" }, t.title, h("br"), h("span", { class: "muted", style: "font-size:12.5px" }, (t.type === "Bug" ? "Bug" : t.type) + (t.assignee_id ? " · " + pname(t.assignee_id) : "") + (t.severity ? " · " + t.severity : ""))), qaBadge(t));
+  const caseRow = c => h("button", { type: "button", class: "row", onclick: () => openRecord("test_cases", c.id) },
+    h("span", { class: "tkey" }, tcKey(c)), h("span", { class: "x" }, c.title, h("br"), h("span", { class: "muted", style: "font-size:12.5px" }, (refLabel("features", c.feature_id) || "No feature") + (c.assignee_id ? " · " + pname(c.assignee_id) : ""))), pill(c.status, TC_TONE[c.status]));
+  // for testers: what's waiting for them
+  const forMe = rows("tasks").filter(t => inP(t) && t.status === "In review" && t.qa_state && (t.tester_id === S.me.id || t.reviewer_id === S.me.id));
+  const retestMine = cases.filter(c => c.status === "Retest" && (c.tester_id === S.me.id || (isTester() && !c.tester_id)));
+  if (isTester() || forMe.length || retestMine.length)
+    left.append(h("div", { class: "panel" }, h("h2", {}, "Waiting for you to test", h("span", { class: "muted", style: "font-weight:400;font-size:13px" }, " " + (forMe.length + retestMine.length))),
+      forMe.length || retestMine.length ? [...forMe.slice(0, 15).map(taskRow), ...retestMine.slice(0, 15).map(caseRow)] : h("p", { class: "nothing" }, "Nothing waiting. Finished development work comes here automatically.")));
+  // for developers: what's been sent to them
+  const myBugs = rows("tasks").filter(t => inP(t) && t.assignee_id === S.me.id && t.vertical === "Development" && t.status !== "Done" && (t.type === "Bug" || t.qa_state === "Failed"));
+  const myCases = cases.filter(c => c.assignee_id === S.me.id && ["Fail", "Blocked"].includes(c.status));
+  left.append(h("div", { class: "panel" }, h("h2", {}, "Sent to you to fix", h("span", { class: "muted", style: "font-weight:400;font-size:13px" }, " " + (myBugs.length + myCases.length))),
+    myBugs.length || myCases.length ? [...myBugs.slice(0, 15).map(taskRow), ...myCases.slice(0, 15).map(caseRow)] : h("p", { class: "nothing" }, "Nothing assigned to you.")));
+  // by feature
+  const feats = rows("features").filter(inP);
+  right.append(h("div", { class: "panel" }, h("h2", {}, "Features", h("button", { type: "button", class: "link", onclick: () => go("features") }, "All features")),
+    feats.length ? h("div", { class: "tablewrap" }, h("table", {}, h("thead", {}, h("tr", {}, ["Feature", "Passing", "Failing", "Open bugs"].map(x => h("th", {}, x)))),
+      h("tbody", {}, feats.map(f => [f, featureStats(f.id)]).sort((a, b) => (b[1].fail + b[1].bugs) - (a[1].fail + a[1].bugs)).slice(0, 25).map(([f, s]) =>
+        h("tr", { class: "click", onclick: () => openRecord("features", f.id) }, h("td", {}, h("b", {}, f.name), h("br"), h("span", { class: "muted", style: "font-size:12px" }, refLabel("projects", f.project_id))),
+          h("td", {}, progressBar(s.pass, s.total)), h("td", {}, s.fail ? h("b", { style: "color:var(--bad)" }, String(s.fail)) : "0"), h("td", {}, s.bugs ? h("b", { style: "color:var(--bad)" }, String(s.bugs)) : "0"))))))
+      : h("p", { class: "nothing" }, "No features yet. They’re created when you import a spreadsheet (from its Module column), or add one in Features.")));
+  // open bugs by severity
+  const sevs = SEVERITY.map(s => [s, open.filter(b => sevOf(b.severity) === s).length]).concat([["Not set", open.filter(b => !SEVERITY.includes(sevOf(b.severity))).length]]);
+  const max = Math.max(1, ...sevs.map(x => x[1]));
+  right.append(h("div", { class: "panel" }, h("h2", {}, "Open bugs by severity", h("button", { type: "button", class: "link", onclick: () => go("bugs") }, "All bugs")),
+    sevs.map(([s, n]) => h("div", { class: "hbar" }, h("span", { class: "l" }, s), h("span", { class: "b" }, h("span", { style: "width:" + Math.round(n / max * 100) + "%;background:" + (s === "Critical" ? "var(--bad)" : s === "High" ? "#F0445A" : s === "Medium" ? "#F5A524" : "var(--p)") })), h("span", { class: "n" }, String(n))))));
+}
+
+/* ---------- importing spreadsheets ---------- */
+function openQAImport(opts){ S.ui.qaImport = Object.assign({}, opts || {}); go("qa-import"); }
+let xlsxLoading = null;
+function loadXLSX(){
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  if (!xlsxLoading) xlsxLoading = new Promise((res, rej) => { const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"; s.onload = () => res(window.XLSX); s.onerror = () => { xlsxLoading = null; rej(new Error("Couldn’t load the spreadsheet reader. Check your internet connection.")); }; document.head.append(s); });
+  return xlsxLoading;
+}
+const qnorm = s => String(s == null ? "" : s).replace(/\s+/g, " ").trim().toLowerCase();
+// which column holds what, by the headers your sheets use
+const QA_COLS = {
+  tc: {
+    external_id: ["test case id", "tc_id", "tc id", "bug/test case id", "test id", "id"],
+    title: ["title", "test case", "test scenario", "scenario", "test case title", "bug / issue"],
+    module: ["module", "page / module", "feature"],
+    preconditions: ["pre conditions", "preconditions", "preconditions / test data", "pre-conditions"],
+    test_data: ["test data"],
+    steps: ["steps", "test steps", "deep testing condition / action", "steps to reproduce"],
+    expected: ["expected result", "expected outcome", "expected"],
+    actual: ["actual result", "actual result (web)", "actual result / description", "result", "actual"],
+    status: ["pass/fail", "pass/fail (web)", "pass / fail", "status", "result status"],
+    test_type: ["test type", "type"],
+    evidence: ["notes/evidence", "notes / evidence", "evidence", "notes/evidence (web)", "web evidence", "url / evidence"],
+    notes: ["notes", "additional notes", "additional notes/evidence", "remarks", "qa notes"],
+    retest: ["retest", "retest 1", "retest harshita", "retest app"],
+    tester: ["tester", "tester (vachaspati/ harshita)"],
+    platform: ["platform"]
+  },
+  bug: {
+    external_id: ["id", "bug id", "bug/test case id"],
+    title: ["title", "bug / issue", "issue", "bug", "missing field"],
+    bug_type: ["type"],
+    severity: ["severity"],
+    module: ["module", "feature"],
+    page: ["page", "section / screen", "section"],
+    url: ["url", "url / evidence"],
+    steps: ["steps to reproduce", "steps"],
+    expected: ["expected", "expected result"],
+    actual: ["actual", "actual result / description", "actual result"],
+    suggested_fix: ["suggested fix"],
+    status: ["dev status", "status", "resolution status"],
+    owner: ["owner", "developer"],
+    notes: ["notes", "qa notes"],
+    reopen: ["reopen count"],
+    retest: ["retest"],
+    tester: ["tester (vachaspati/ harshita)", "tester"],
+    date: ["date"]
+  }
+};
+const STD_TC_HEADER = ["test case id", "title", "module", "pre conditions", "test data", "steps", "expected result", "actual result", "pass/fail", "notes/evidence", "additional notes"];
+// a tab whose first row is already a test case (no header row): e.g. PERM-150 | … | Pass
+function looksHeaderless(matrix){
+  const r = (matrix[0] || []).map(qnorm);
+  return /^[a-z][a-z0-9 ]{0,14}[-_ ]?\d{1,5}$/.test(r[0] || "") && r.some(c => /^(pass|fail|blocked|pending)$/.test(c));
+}
+// for a header-less tab: the first 7 columns are standard; find Pass/Fail, evidence links and the actual result by their contents
+function inferHeader(matrix){
+  const width = Math.max(...matrix.slice(0, 200).map(r => r.length), STD_TC_HEADER.length);
+  const score = (i, re) => matrix.slice(0, 300).reduce((a, r) => a + (re.test(qnorm(r[i])) ? 1 : 0), 0);
+  const header = STD_TC_HEADER.slice(0, 7).concat(Array(Math.max(0, width - 7)).fill(""));
+  let best = -1, bestN = 0;
+  for (let i = 7; i < width; i++){ const n = score(i, /^(pass|fail|blocked|pending|pendding|doubt)\b/); if (n > bestN) { bestN = n; best = i; } }
+  if (best >= 0) {
+    header[best] = "pass/fail";
+    let link = -1, linkN = 0;
+    for (let i = 7; i < width; i++){ if (i === best) continue; const n = score(i, /^https?:\/\//); if (n > linkN) { linkN = n; link = i; } }
+    if (link >= 0) header[link] = "notes/evidence";
+    for (let i = best - 1; i >= 7; i--) if (score(i, /\S/) > 0) { header[i] = "actual result"; break; }
+  }
+  return header;
+}
+function headerRowOf(matrix){
+  for (let i = 0; i < Math.min(6, matrix.length); i++){
+    const r = matrix[i].map(qnorm), filled = r.filter(Boolean).length;
+    if (filled >= 3 && r.some(c => /test case|^id$|title|module|severity|steps|expected|pass\/fail|current stage|what is wrong|feature|from row/.test(c))) return i;
+  }
+  return -1;
+}
+function classify(header){
+  const has = re => header.some(c => re.test(c));
+  if (has(/rows it is made of/)) return "ux_features";
+  if (has(/current stage \(auto/) || has(/what is wrong/) || has(/chart title/) || has(/tutorial name/)) return "ux_jobs";
+  if (has(/message to send the backend team \(copy-paste\)/) && has(/from row/)) return "ux_backend";
+  if (has(/out of scope/) || (header.length <= 3 && has(/why it is out of scope/))) return "skip";
+  const tc = (has(/test case|tc_id|test scenario/) ? 2 : 0) + (has(/pass\/fail|pass \/ fail/) ? 2 : 0) + (has(/expected (result|outcome)/) ? 1 : 0) + (has(/^steps$|test steps/) ? 1 : 0);
+  const bug = (has(/^severity$/) ? 2 : 0) + (has(/steps to reproduce/) ? 2 : 0) + (has(/dev status|suggested fix|reopen count/) ? 2 : 0) + (has(/bug \/ issue/) ? 2 : 0);
+  if (bug >= 3 && bug >= tc) return "bug";
+  if (tc >= 3) return "tc";
+  if (bug >= 2) return "bug";
+  return "skip";
+}
+function colIndex(header, aliases){
+  for (const a of aliases){ const i = header.findIndex(c => c === a); if (i >= 0) return i; }
+  for (const a of aliases){ const i = header.findIndex(c => c.startsWith(a)); if (i >= 0) return i; }
+  return -1;
+}
+function guessPerson(text){
+  const t = qnorm(text);
+  const ps = activePeople().filter(p => { const first = qnorm(p.full_name).split(" ")[0]; return first.length >= 3 && new RegExp("\\b" + first.replace(/[^a-z]/g, "") + "\\b").test(t); });
+  return ps.length === 1 ? ps[0].id : null;
+}
+function mapTcStatus(v, retest){
+  const r = qnorm(retest), s = qnorm(v);
+  if (/^pass/.test(r)) return "Pass"; if (/^fail/.test(r)) return "Fail";
+  if (/^pass/.test(s)) return "Pass"; if (/^fail/.test(s)) return "Fail";
+  if (/block/.test(s)) return "Blocked"; if (/pend|doubt|wip|in progress/.test(s)) return "Pending";
+  if (/retest/.test(s)) return "Retest";
+  return "Not run";
+}
+function mapBugStatus(v){
+  const s = qnorm(v);
+  if (/resolved|closed|done|verified/.test(s)) return { status: "Done", qa_state: "Passed" };
+  if (/fixed|ready for (re)?test/.test(s)) return { status: "In review" };
+  if (/in progress|working|wip/.test(s)) return { status: "In progress" };
+  return { status: "To do" };
+}
+const cap = s => { const t = String(s || "").trim(); return t ? t[0].toUpperCase() + t.slice(1).toLowerCase() : ""; };
+const mapSeverity = v => { const s = qnorm(v); return s.startsWith("crit") ? "Critical" : s.startsWith("high") ? "High" : s.startsWith("med") ? "Medium" : s.startsWith("low") ? "Low" : ""; };
+const mapPriority = v => { const s = qnorm(v); return /p1|critical/.test(s) ? "Critical" : /p2|high/.test(s) ? "High" : /p3|medium/.test(s) ? "Medium" : /p4|low/.test(s) ? "Low" : "Medium"; };
+const mapBugType = v => { const s = qnorm(v); return /timing/.test(s) ? "Timing" : /suggest/.test(s) ? "Suggestion" : /design/.test(s) ? "Design bug" : s ? "Bug" : ""; };
+const looksLikeUrl = v => /^https?:\/\//i.test(String(v || "").trim());
+
+function readSheet(XLSX, ws){
+  const m = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: false, blankrows: false });
+  return m.map(r => r.map(c => c == null ? "" : String(c)));
+}
+async function renderQAImport(el){
+  await ensure(["projects", "features", "test_cases", "tasks"]);
+  if (S.route !== "qa-import") return;
+  if (!isTester()) { el.append(h("div", { class: "empty" }, h("b", {}, "Only testers and admins can import"), "Ask a QA tester or an admin.")); return; }
+  const st = S.ui.qaImport = S.ui.qaImport || {};
+  const fixedFeature = st.feature_id ? byId("features", st.feature_id) : null;
+  el.append(h("div", { class: "ph" }, h("div", {}, h("h1", {}, fixedFeature ? "Import test cases into " + fixedFeature.name : "Import a spreadsheet"),
+    h("p", {}, fixedFeature ? "Every test case in the file goes into this feature of " + refLabel("projects", fixedFeature.project_id) + "."
+      : "Upload your testing sheet (.xlsx, every tab) or a CSV. Test-case tabs, bug tabs and UX Gaps tabs are recognised by their columns; you choose the project for each tab, then check the preview.")),
+    h("div", { class: "acts" }, h("button", { type: "button", class: "btn ghost", onclick: () => { S.ui.qaImport = {}; go("qa"); } }, "Back to QA"))));
+  if (!rows("projects").length) { el.append(h("div", { class: "panel empty" }, h("b", {}, "Create your projects first"), "Each tab is imported into a project. ", h("button", { type: "button", class: "btn sm pri", onclick: () => openRecord("projects", null) }, "+ Project"))); return; }
+  const pick = h("div", {}), box = h("div", {}); el.append(pick, box);
+  const drop = h("label", { class: "dropzone" }, h("b", {}, "Choose a file"), h("span", { class: "muted" }, " .xlsx, .xls or .csv, up to 40 MB"),
+    h("input", { type: "file", accept: ".xlsx,.xls,.xlsm,.csv", hidden: true, onchange: async e => {
+      const file = e.target.files[0]; if (!file) return;
+      if (file.size > 40 * 1048576) { toast("That file is over 40 MB."); return; }
+      box.replaceChildren(h("div", { class: "panel" }, h("b", {}, "Reading " + file.name + "…"), h("p", { class: "muted" }, "Large workbooks can take a few seconds.")));
+      try {
+        const XLSX = await loadXLSX();
+        const wb = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: false, cellHTML: false, cellStyles: false, sheetStubs: false });
+        st.file = file.name;
+        st.tabs = wb.SheetNames.map(name => {
+          const matrix = readSheet(XLSX, wb.Sheets[name]);
+          const noHeader = looksHeaderless(matrix);
+          const hi = noHeader ? -1 : headerRowOf(matrix);
+          const header = noHeader ? inferHeader(matrix) : hi >= 0 ? matrix[hi].map(qnorm) : [];
+          const data = noHeader ? matrix.filter(r => r.some(c => String(c).trim())) : hi >= 0 ? matrix.slice(hi + 1).filter(r => r.some(c => String(c).trim())) : [];
+          let kind = noHeader ? "tc" : hi >= 0 ? classify(header) : "skip";
+          if (fixedFeature) kind = kind === "skip" ? "skip" : "tc";
+          const t = { name, header, data, kind, noHeader, include: kind !== "skip" && data.length > 0, project: fixedFeature ? fixedFeature.project_id : (st.project_id || ""), tester: guessPerson(name) || (kind === "tc" || kind === "bug" ? S.me.id : null), featureMode: fixedFeature ? "fixed" : "module" };
+          t.modules = moduleCounts(t);
+          if (!fixedFeature && !Object.keys(t.modules).length) t.featureMode = "tab";
+          return t;
+        });
+        drawTabs();
+      } catch (e2) { box.replaceChildren(h("div", { class: "panel" }, h("b", {}, "Couldn’t read that file"), h("p", {}, friendly(e2)))); }
+    } }));
+  pick.append(h("div", { class: "panel" }, drop));
+  if (st.tabs) drawTabs();
+  function drawTabs(){
+    const KINDS = [["tc", "Test cases"], ["bug", "Bugs"], ["ux_jobs", "UX Gaps: jobs"], ["ux_features", "UX Gaps: features"], ["ux_backend", "UX Gaps: backend requests"], ["skip", "Skip"]];
+    const projects = rows("projects").slice().sort((a, b) => a.name.localeCompare(b.name));
+    const allProj = h("select", { class: "in" }, h("option", { value: "" }, "Set every tab to…"), projects.map(p => h("option", { value: p.id }, p.name)));
+    allProj.addEventListener("change", () => { for (const t of st.tabs) if (t.include) t.project = allProj.value; drawTabs(); });
+    const tbl = h("table", {}, h("thead", {}, h("tr", {}, ["", "Tab", "What it is", "Rows", "Project", "Feature", "Tester"].map(x => h("th", {}, x)))),
+      h("tbody", {}, st.tabs.map((t, i) => {
+        const inc = h("input", { type: "checkbox", checked: t.include }); inc.addEventListener("change", () => { t.include = inc.checked; drawSummary(); });
+        const kind = h("select", { class: "in sm", disabled: !!fixedFeature }, KINDS.map(([v, l]) => h("option", { value: v }, l))); kind.value = t.kind;
+        kind.addEventListener("change", () => { t.kind = kind.value; t.include = t.kind !== "skip"; drawTabs(); });
+        const proj = h("select", { class: "in sm", disabled: !!fixedFeature }, h("option", { value: "" }, "Choose…"), projects.map(p => h("option", { value: p.id }, p.name))); proj.value = t.project || "";
+        proj.addEventListener("change", () => { t.project = proj.value; drawTabs(); });
+        let feat = h("span", { class: "muted" }, "–");
+        if ((t.kind === "tc" || t.kind === "bug") && !fixedFeature){
+          const fromMod = featuresFromModules(t).length;
+          feat = h("select", { class: "in sm", title: "Where this tab’s rows go" },
+            Object.keys(t.modules || {}).length ? h("option", { value: "module" }, "From Module (" + fromMod + " feature" + (fromMod === 1 ? "" : "s") + " + “" + t.name.slice(0, 18) + "”)") : null,
+            h("option", { value: "tab" }, "One feature: “" + t.name.slice(0, 24) + "”"),
+            t.project ? rows("features").filter(f => f.project_id === t.project).map(f => h("option", { value: "f:" + f.id }, "Existing: " + f.name)) : null);
+          feat.value = t.featureMode === "existing" ? "f:" + t.featureId : t.featureMode;
+          feat.addEventListener("change", () => { const v = feat.value; if (v.startsWith("f:")) { t.featureMode = "existing"; t.featureId = v.slice(2); } else t.featureMode = v; drawSummary(); });
+        } else if (fixedFeature) feat = h("span", {}, fixedFeature.name);
+        const tester = h("select", { class: "in sm" }, h("option", { value: "" }, "–"), activePeople().map(p => h("option", { value: p.id }, p.full_name))); tester.value = t.tester || "";
+        tester.addEventListener("change", () => { t.tester = tester.value || null; });
+        return h("tr", { class: t.kind === "skip" ? "muted-row" : "" }, h("td", {}, inc), h("td", {}, h("button", { type: "button", class: "linkbtn", onclick: () => { st.preview = i; drawPreview(); } }, t.name)),
+          h("td", {}, kind, t.noHeader ? h("div", { class: "muted", style: "font-size:11.5px" }, "No header row: read as standard columns") : null), h("td", { class: "num" }, String(t.data.length)), h("td", {}, proj), h("td", {}, feat), h("td", {}, t.kind === "tc" || t.kind === "bug" ? tester : h("span", { class: "muted" }, "–")));
+      })));
+    const featureMode = fixedFeature ? h("p", { class: "muted" }, "Feature: ", h("b", {}, fixedFeature.name), " (all rows).")
+      : h("p", { class: "muted", style: "font-size:13px" }, "Feature: “From Module” makes a feature for each module used at least " + MIN_MODULE_ROWS + " times in that tab; rarer modules go into a feature named after the tab, and the module is kept in the row’s notes. Missing features are created in the tab’s project.");
+    box.replaceChildren(h("div", { class: "panel" }, h("div", { style: "display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px" }, h("b", { style: "flex:1" }, st.file + ": " + st.tabs.length + " tab" + (st.tabs.length === 1 ? "" : "s")), fixedFeature ? null : allProj),
+      featureMode, h("div", { class: "tablewrap" }, tbl), h("div", { id: "qiSummary", style: "margin-top:10px" })), h("div", { id: "qiPreview" }));
+    drawSummary(); drawPreview();
+  }
+  function drawSummary(){
+    const s = document.getElementById("qiSummary"); if (!s) return;
+    const inc = st.tabs.filter(t => t.include && t.kind !== "skip");
+    const missing = inc.filter(t => !t.project);
+    const n = k => inc.filter(t => t.kind === k).reduce((a, t) => a + t.data.length, 0);
+    const newFeatures = new Set();
+    for (const t of inc.filter(t => (t.kind === "tc" || t.kind === "bug") && t.project)){
+      const names = t.featureMode === "existing" || t.featureMode === "fixed" ? [] : t.featureMode === "tab" ? [t.name] : [...featuresFromModules(t).map(m => m.name), ...(Object.values(t.modules || {}).some(m => m.n < MIN_MODULE_ROWS) || t.data.length > featuresFromModules(t).reduce((a, m) => a + m.n, 0) ? [t.name] : [])];
+      for (const nm of names) if (!rows("features").some(f => f.project_id === t.project && qnorm(f.name) === qnorm(nm))) newFeatures.add(t.project + "|" + qnorm(nm));
+    }
+    const go2 = h("button", { type: "button", class: "btn pri", disabled: !inc.length || !!missing.length }, "Import");
+    go2.addEventListener("click", () => runImport(go2));
+    s.replaceChildren(...[h("p", { style: "margin:0 0 8px" }, [n("tc") && n("tc") + " test cases", n("bug") && n("bug") + " bugs", n("ux_jobs") && n("ux_jobs") + " development jobs", n("ux_features") && n("ux_features") + " features", n("ux_backend") && n("ux_backend") + " backend requests", newFeatures.size && newFeatures.size + " new features"].filter(Boolean).join(" · ") || "Nothing selected."),
+      missing.length ? h("p", { class: "err", style: "margin:0 0 8px" }, "Choose a project for: " + missing.map(t => t.name).join(", ")) : null, go2,
+      h("span", { class: "muted", style: "font-size:12.5px;margin-left:10px" }, "Importing the same sheet again updates existing rows (matched by their ID within each tab) instead of adding duplicates.")].filter(Boolean));
+  }
+  function drawPreview(){
+    const p = document.getElementById("qiPreview"); if (!p) return;
+    const t = st.tabs[st.preview || st.tabs.findIndex(x => x.include)] || st.tabs[0];
+    if (!t || t.kind === "skip") { p.replaceChildren(); return; }
+    const rowsOut = t.data.slice(0, 6).map(r => mapRow(t, r));
+    const keys = [...new Set(rowsOut.flatMap(o => Object.keys(o).filter(k => !k.startsWith("_") && o[k] !== "" && o[k] != null)))].slice(0, 9);
+    const cell = (o, k) => { const v = o[k]; if (v == null) return ""; if (k.endsWith("_id") && v && byId("profiles", v)) return pname(v); return String(v).slice(0, 90); };
+    const head = h("thead", {}, h("tr", {}, keys.map(k => h("th", {}, k.replace(/_/g, " ")))));
+    const body = h("tbody", {}, rowsOut.map(o => h("tr", {}, keys.map(k => h("td", {}, cell(o, k))))));
+    p.replaceChildren(h("div", { class: "panel" },
+      h("h2", {}, "Preview: " + t.name, h("span", { class: "muted", style: "font-weight:400;font-size:13px" }, " (first rows, as they’ll be saved)")),
+      h("div", { class: "tablewrap" }, h("table", {}, head, body))));
+  }
+  function mapRow(t, r){
+    const kind = t.kind;
+    if (kind === "tc" || kind === "bug"){
+      const A = QA_COLS[kind], get = k => { const i = colIndex(t.header, A[k] || []); return i >= 0 ? String(r[i] || "").trim() : ""; };
+      const module = get("module") || (fixedFeature ? "" : t.name);
+      if (kind === "tc"){
+        let evidence = get("evidence"), notes = get("notes");
+        const title = get("title") || get("steps").split("\n")[0].slice(0, 140) || get("expected").slice(0, 140);
+        return { external_id: get("external_id").slice(0, 80), title: title.slice(0, 300), _module: module, preconditions: get("preconditions"), test_data: get("test_data"), steps: get("steps"), expected: get("expected"),
+          actual: get("actual"), status: mapTcStatus(get("status"), get("retest")), test_type: get("test_type"), evidence, notes, platform: get("platform"),
+          tester_id: guessPerson(get("tester")) || t.tester || null, retest_count: /^(pass|fail)/i.test(get("retest")) ? 1 : 0, source: (st.file || "") + " › " + t.name };
+      }
+      const s = mapBugStatus(get("status"));
+      let url = get("url"), evidence = "";
+      if (url && !looksLikeUrl(url)) { evidence = url; url = ""; }
+      const title = get("title") || get("actual").slice(0, 140) || "Bug from " + t.name;
+      return { external_id: get("external_id").slice(0, 80), title: title.slice(0, 300), _module: module, type: "Bug", vertical: "Development", bug_type: mapBugType(get("bug_type")) || "Bug",
+        severity: mapSeverity(get("severity")), priority: mapSeverity(get("severity")) || "Medium", page: get("page"), url, steps: get("steps"), expected_result: get("expected"), actual_result: get("actual"),
+        suggested_fix: get("suggested_fix"), evidence, status: s.status, qa_state: s.qa_state || "", reopen_count: parseInt(get("reopen"), 10) || 0,
+        assignee_id: guessPerson(get("owner")) || null, tester_id: guessPerson(get("tester")) || t.tester || null, description: get("notes"), source: (st.file || "") + " › " + t.name };
+    }
+    const H = t.header, get = (...names) => { for (const n of names){ const i = H.findIndex(c => c.startsWith(n)); if (i >= 0 && String(r[i] || "").trim()) return String(r[i]).trim(); } return ""; };
+    if (kind === "ux_jobs"){
+      const id = get("id"), yes = n => /^yes/i.test(get(n));
+      const verdict = get("correctly implemented");
+      let status = "To do", qa = "", blocked = false;
+      if (/^yes/i.test(verdict)) { status = "Done"; qa = "Passed"; }
+      else if (/^(no|partly)/i.test(verdict)) { status = "In progress"; qa = "Failed"; }
+      else if (yes("testing done") || yes("testers informed") || yes("frontend implemented")) status = "In review";
+      else if (yes("backend work required") && !yes("backend work done")) blocked = true;
+      const what = get("what is wrong", "chart title", "tutorial name", "feature");
+      const parts = [["Why it matters", get("why it matters", "question it answers", "what the user can do after it")], ["Where", get("files to open", "where it goes", "page and file")],
+        ["Step by step", get("step-by-step")], ["How to test it", get("how to test it")], ["Do not touch", get("do not touch")], ["Backend request", get("message to send the backend team")], ["Developer notes", get("developer notes")]];
+      return { external_id: id, title: (id ? id + ": " : "") + what.slice(0, 200), type: /chart|graph/.test(H.join(" ")) ? "Feature" : "Improvement", vertical: "Development", priority: mapPriority(get("priority")),
+        labels: [get("area", "who sees it"), get("effort")].filter(Boolean).map(x => x.slice(0, 40)), description: parts.filter(p => p[1]).map(p => p[0] + ":\n" + p[1]).join("\n\n"),
+        status, qa_state: qa, blocked, blocked_reason: blocked ? "Waiting for backend" : "", assignee_id: guessPerson(get("developer")), tester_id: guessPerson(get("tester name")),
+        due_date: /^\d{4}-\d{2}-\d{2}/.test(get("target date")) ? get("target date").slice(0, 10) : null, _comment: get("tester comments"), source: (st.file || "") + " › " + t.name };
+    }
+    if (kind === "ux_features") return { key: get("id"), name: (get("feature") || get("id")).slice(0, 200), description: [get("what it gives them"), get("for") && "For: " + get("for"), get("backend work") && "Backend: " + get("backend work")].filter(Boolean).join("\n"),
+      priority: mapPriority(get("priority")), _rows: get("rows it is made of").split(/[,;\s]+/).filter(Boolean) };
+    if (kind === "ux_backend") { const done = /^yes/i.test(get("backend work done")); return { external_id: "BE-" + get("from row"), title: "Backend for " + get("from row") + ": " + get("what it is for").slice(0, 160), type: "Feature", vertical: "Development", component: "Backend / API", priority: "High",
+      description: get("message to send the backend team"), status: done ? "Done" : "To do", assignee_id: guessPerson(get("backend owner")), _for: get("from row"), source: (st.file || "") + " › " + t.name }; }
+    return {};
+  }
+  async function runImport(btn){
+    btn.disabled = true;
+    const tabs = st.tabs.filter(t => t.include && t.kind !== "skip" && t.project);
+    const prog = h("p", { class: "muted" }, "Starting…"); btn.after(prog);
+    const total = tabs.reduce((a, t) => a + t.data.length, 0); let done = 0; const out = { tc_new: 0, tc_upd: 0, bug_new: 0, bug_upd: 0, jobs: 0, feats: 0, skipped: 0, errors: [] };
+    const tick = () => { prog.textContent = "Imported " + done + " of " + total + " rows…"; };
+    const featureFor = async (project, name, t) => {
+      if (fixedFeature) return fixedFeature.id;
+      if (t && t.featureMode === "existing" && t.featureId) return t.featureId;
+      if (t) name = featureNameFor(t, name);
+      const n = String(name || "").trim().slice(0, 200); if (!n) return null;
+      let f = rows("features").find(x => x.project_id === project && qnorm(x.name) === qnorm(n));
+      if (!f) { f = await insertRow("features", { project_id: project, name: n, tester_id: null, status: "In development" }); out.feats++; }
+      return f.id;
+    };
+    try {
+      // UX Gaps features first, so jobs can be linked to them
+      const featureOfRow = {};
+      for (const t of tabs.filter(t => t.kind === "ux_features")) for (const r of t.data) {
+        const o = mapRow(t, r); if (!o.name) { done++; continue; }
+        const id = await featureFor(t.project, o.name);
+        if (id) { try { await updateRow("features", id, { key: o.key || "", description: o.description || "", priority: o.priority || "" }); } catch (e) {} for (const k of o._rows) featureOfRow[k.toUpperCase()] = id; }
+        done++; tick();
+      }
+      const backendFor = {};
+      for (const t of tabs.filter(t => ["tc", "bug", "ux_jobs", "ux_backend"].includes(t.kind))){
+        const table = t.kind === "tc" ? "test_cases" : "tasks";
+        const existing = new Map((await pageAll(table, t.project)).filter(x => x.external_id).map(x => [x.external_id, x]));
+        const seen = new Set();
+        const batch = [];
+        const flush = async () => {
+          if (!batch.length) return;
+          const chunk = batch.splice(0, batch.length);
+          const saved = ok(await sb.from(table).insert(chunk.map(x => x.row)).select()) || [];
+          saved.forEach((s, i) => { upsertCache(table, s); const c = chunk[i]; if (c.comment) addComment("tasks", s.id, "Tester comments (imported): " + c.comment); if (c.forRow) backendFor[c.forRow] = s.id; });
+          if (table === "test_cases") out.tc_new += saved.length; else if (t.kind === "bug") out.bug_new += saved.length; else out.jobs += saved.length;
+        };
+        for (const r of t.data){
+          const o = mapRow(t, r); done++;
+          if (!o.title) { out.skipped++; continue; }
+          // rows without an ID are matched by their tab and title, so importing again doesn't add them twice
+          let ext = o.external_id ? (t.kind === "ux_jobs" || t.kind === "ux_backend" ? o.external_id : tabKey(t.name) + "/" + o.external_id)
+            : tabKey(t.name) + "/~" + qnorm(o.title).slice(0, 70);
+          if (ext && seen.has(ext)) { let k = 2; while (seen.has(ext + "-" + k)) k++; ext = ext + "-" + k; }
+          if (ext) seen.add(ext);
+          const row = Object.assign({}, o, { project_id: t.project, external_id: ext });
+          const module = row._module, comment = row._comment, forRow = row._for;
+          for (const k of Object.keys(row)) if (k.startsWith("_")) delete row[k];
+          if (t.kind === "ux_jobs") row.feature_id = featureOfRow[String(o.external_id || "").toUpperCase()] || null;
+          else if (t.kind !== "ux_backend") {
+            row.feature_id = await featureFor(t.project, module, t);
+            // a rare module that didn't become its own feature is kept with the row
+            if (module && t.featureMode === "module" && qnorm(featureNameFor(t, module)) !== qnorm(module) && module !== t.name) {
+              if (t.kind === "tc") row.notes = ["Module: " + module, row.notes].filter(Boolean).join("\n");
+              else if (!row.page) row.page = module.slice(0, 200);
+            }
+          }
+          if (table === "tasks") { if (!row.assignee_id) delete row.assignee_id; row.created_by = S.me.id; }
+          const ex = ext ? existing.get(ext) : null;
+          if (ex){
+            const upd = Object.assign({}, row); delete upd.project_id; delete upd.external_id; delete upd.created_by; delete upd.source;
+            if (table === "tasks") { delete upd.qa_state; if (ex.status === "Done" && upd.status !== "Done") delete upd.status; }
+            try { const s = await updateRow(table, ex.id, upd); if (table === "test_cases") out.tc_upd++; else out.bug_upd++; if (forRow) backendFor[forRow] = s.id; }
+            catch (e) { out.errors.push(t.name + " " + ext + ": " + friendly(e)); }
+          } else batch.push({ row, comment, forRow });
+          if (batch.length >= 200) { try { await flush(); } catch (e) { out.errors.push(t.name + ": " + friendly(e)); } }
+          if (done % 25 === 0) tick();
+        }
+        try { await flush(); } catch (e) { out.errors.push(t.name + ": " + friendly(e)); }
+      }
+      // jobs waiting for backend wait on their backend request
+      for (const [row, beId] of Object.entries(backendFor)){
+        const job = rows("tasks").find(x => x.external_id === row);
+        const be = byId("tasks", beId);
+        if (job && be && be.status !== "Done" && !(job.blocked_by || []).includes(beId)) { try { await updateRow("tasks", job.id, { blocked_by: [...(job.blocked_by || []), beId], blocked: false }); } catch (e) {} }
+      }
+      prog.replaceChildren(...[h("b", {}, "Done. "), [out.tc_new && out.tc_new + " test cases added", out.tc_upd && out.tc_upd + " updated", out.bug_new && out.bug_new + " bugs added", out.bug_upd && out.bug_upd + " bugs updated", out.jobs && out.jobs + " development tasks added", out.feats && out.feats + " features created", out.skipped && out.skipped + " empty rows skipped"].filter(Boolean).join(" · "),
+        out.errors.length ? h("div", { class: "err" }, out.errors.length + " row(s) couldn’t be saved: " + out.errors.slice(0, 5).join(" | ")) : null,
+        h("div", { style: "margin-top:8px;display:flex;gap:8px" }, h("button", { type: "button", class: "btn sm", onclick: () => go("test_cases") }, "Open test cases"), h("button", { type: "button", class: "btn sm", onclick: () => go("bugs") }, "Open bugs"), h("button", { type: "button", class: "btn sm ghost", onclick: () => go("qa") }, "QA dashboard"))].filter(Boolean));
+      toast("Import finished.");
+      if (out.errors.length) captureError("QA import: " + out.errors.length + " rows failed", out.errors.slice(0, 10).join("\n"));
+    } catch (e) { prog.replaceChildren(h("span", { class: "err" }, "Import stopped: " + friendly(e) + ". Rows already imported are kept; importing again carries on (matched by ID)."), " "); btn.disabled = false; }
+  }
+}
+// which features a tab would create from its Module column: modules used at least 3 times, not ID-like
+const MIN_MODULE_ROWS = 3;
+const idLike = v => /^(bug|tc|test|id)?\s*[-_#]?\s*\d+$/i.test(String(v || "").trim()) || /^[a-z]{2,6}\s*-\s*\d+$/i.test(String(v || "").trim());
+function moduleCounts(t){
+  if (t.kind !== "tc" && t.kind !== "bug") return {};
+  const i = colIndex(t.header, (QA_COLS[t.kind] || {}).module || []); if (i < 0) return {};
+  const c = {}; for (const r of t.data) { const m = String(r[i] || "").trim(); if (m && !idLike(m)) { const k = qnorm(m); c[k] = c[k] || { name: m.slice(0, 120), n: 0 }; c[k].n++; } }
+  return c;
+}
+const featuresFromModules = t => Object.values(t.modules || {}).filter(x => x.n >= MIN_MODULE_ROWS);
+// the feature a row goes into, by the tab's choice
+function featureNameFor(t, module){
+  if (t.featureMode === "tab") return t.name;
+  const m = (t.modules || {})[qnorm(module)];
+  return m && m.n >= MIN_MODULE_ROWS ? m.name : t.name;
+}
+// IDs restart in every tester's tab, so an ID is matched together with its tab
+const tabKey = name => String(name || "").replace(/\//g, "-").trim().slice(0, 60);
+// every row of a table for one project (in pages of 1,000)
+async function pageAll(table, project){
+  const out = [];
+  for (let from = 0; from < 50000; from += 1000){
+    const r = ok(await sb.from(table).select("id,external_id,status").eq("project_id", project).range(from, from + 999)) || [];
+    out.push(...r); if (r.length < 1000) break;
+  }
+  return out;
 }
 /* ---------------------------------------------------------------------
    Admin panel
@@ -5724,6 +6592,7 @@ async function renderAdminActivity(el){
 const NAV = [
   ["", [["dashboard","Home"], ["overview","Company overview"], ["tasks","Tasks"], ["notes","Notes"], ["calendar","Calendar"], ["team-calendar","Team calendar"]]],
   ["Development", [["dev","Dev dashboard"], ["projects","Projects"], ["sprints","Sprints"], ["releases","Releases"], ["tickets","Support tickets"]]],
+  ["QA & Testing", [["qa","QA dashboard"], ["features","Features"], ["test_cases","Test cases"], ["bugs","Bugs"], ["qa-import","Import spreadsheet"]]],
   ["Communication", [["chat","Chat"], ["emails","Emails"], ["announcements","Announcements"]]],
   ["Sales", [["sales","Sales dashboard"], ["deals","Pipeline"], ["leads","Leads"], ["ig_leads","Instagram leads"], ["clients","Clients"], ["contacts","Contacts"], ["activities","Activities"], ["proposals","Proposals"], ["targets","Targets"], ["crm-analytics","Analytics"]]],
   ["Marketing", [["marketing","Marketing dashboard"], ["leads","Leads"], ["ig_leads","Instagram leads"], ["campaigns","Campaigns"], ["content","Content calendar"], ["seo_keywords","SEO keywords"], ["social_stats","Social media"], ["crm-analytics","Analytics"]]],
@@ -5739,6 +6608,7 @@ function canSee(route){
   if (route.startsWith("admin-")) return !!S.me.is_admin;
   if (route === "crm-analytics") return lvl("sales") >= 1 || lvl("leads") >= 1 || lvl("marketing") >= 1;
   if (route === "emails") return true;
+  if (["qa", "qa-import", "bugs"].includes(route)) return lvl("qa") >= 1;
   const M = MOD[route]; if (!M) return false;
   return access(M).canView;
 }
@@ -5838,12 +6708,15 @@ async function rerender(){
     else if (route === "admin-tasks") renderAdminTaskRules(page);
     else if (route === "admin-google") await renderAdminGoogle(page);
     else if (route === "admin-problems") await renderAdminProblems(page);
+    else if (route === "admin-storage") await renderAdminStorage(page);
     else if (route === "team-calendar") await renderTeamCalendar(page);
     else if (route === "holidays") renderHolidays(page);
     else if (route === "admin-activity") await renderAdminActivity(page);
     else if (route === "crm-analytics") await renderCrmAnalytics(page);
     else if (route === "emails") await renderEmails(page);
     else if (route === "chat") await renderChat(page);
+    else if (route === "qa") await renderQA(page);
+    else if (route === "qa-import") await renderQAImport(page);
     else if (MOD[route]) await renderModule(route, page);
     else page.append(h("div", { class: "panel empty" }, h("b", {}, "Page not found"), h("a", { href: "#dashboard" }, "Go to the dashboard")));
   } catch (e) {
