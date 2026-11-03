@@ -15,6 +15,7 @@ The internal workspace for Tcipher's three verticals, **Development**, **Sales**
 | `upgrade-2026-11d.sql` | Team calendar: everyone sees each other’s Google events | Supabase › SQL Editor |
 | `upgrade-2026-11g.sql` | Sales and Marketing CRM: lead numbers, Instagram pipeline, form answers, call outcomes, history | Supabase › SQL Editor |
 | `upgrade-2026-11h.sql` | Email from your Gmail, and admin-marked attendance | Supabase › SQL Editor |
+| `upgrade-2026-11i.sql` | Chat (channels, direct messages, groups), online status, problem reports | Supabase › SQL Editor |
 | `lead-capture-function.ts` | Optional: website forms post leads straight into the workspace | Supabase › Edge Functions, named `lead-capture` |
 | `CHANGELOG.md` | What’s in each version, and what still needs doing to go live | Keep with the files |
 
@@ -79,6 +80,27 @@ Each person then clicks **Connect Google** on their Home page, or in My profile,
 - People who join straight from Google Calendar or Meet are imported automatically every 10 minutes, as long as the scrum’s organiser has connected Google. Every join and re-join is logged, and anyone not yet checked in that day is marked **Remote**. Organisers and admins can also click **Import joins from Google Meet** on the meeting to do it immediately.
 - The **Attendance › Today’s team** view shows who joined the scrum and when.
 
+## Chat, online status and the Communication menu
+
+- **Communication › Chat:** channels (#general for everyone, plus #development, #sales and #marketing for each team and admins), **direct messages** with anyone, and **group chats**.
+  - Start a group with **+ New group**. The person who creates it can rename it and add or remove people; anyone can leave.
+  - Type **@** to tag someone; they’re notified. Press **Enter** to send, **Shift + Enter** for a new line.
+  - Edit your own messages (they show “edited”). Messages can’t be deleted and are kept permanently.
+  - Text and links only. To send a file, use **✉️ Send by email** in a direct message.
+- **Online and last active:** a green dot on anyone who’s online, and “Active 5 min ago” when they’re not. This shows on People, in chat, and wherever photos appear.
+- **Home › Messages:** your unread chats and new email replies, and who’s online.
+- **Menu sections open and close.** A closed section still shows its red (due) and “new” counts. Your own team’s section, and the page you’re on, stay open.
+
+## Problem reporting
+
+- **🐞 Report a problem:** the tab on the right side of every page (in the menu on phones). Describe what happened and add a screenshot; you can paste one with Cmd/Ctrl + V. The page, browser and your last few clicks are included automatically.
+- **Automatic capture:** unexpected errors are recorded on their own, once each, with the technical details.
+- **Admin panel › Problems:** everything reported or caught, with repeats grouped. **📋 Copy for Claude** copies all open problems; paste them into a chat with Claude to have them fixed. **Mark fixed** tells the person who reported it.
+
+## Admins: marking leave for someone
+
+**Company › Leave › + New leave request:** choose the **Employee**, the type and the dates. It’s approved straight away, and the person is notified.
+
 ## Email from your own Gmail
 
 Send email from the workspace, from your own Gmail or tcipher.com address:
@@ -87,7 +109,7 @@ Send email from the workspace, from your own Gmail or tcipher.com address:
 - **New joinees (admins):** People › open the person › **✉️ Offer letter** or **✉️ Onboarding email**. Upload the offer letter in the email (only you and admins can see it), and attach company documents such as the handbook.
 - **Sales and Marketing › Emails:** every email you’ve sent and the replies, plus **New email** to anyone. Tick “Save as lead” to keep the conversation on a lead.
 
-**Replies:** only replies to emails sent from the workspace are picked up, checked every 10 minutes (or click **Check for replies**). They show on the record, you’re notified, and you can reply in the same conversation. Nothing else in your inbox is read.
+**Replies:** only replies to emails sent from the workspace are picked up. New mail is checked **every minute**, with a full check every 10 minutes; you can also click **Check for replies**. They show on the record, you’re notified, and you can reply in the same conversation. Nothing else in your inbox is read.
 
 **Templates:** Emails › Templates (admins). Placeholders such as {first_name}, {company} and {my_signature} are filled in automatically.
 

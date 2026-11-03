@@ -217,7 +217,7 @@ td.num,th.num{text-align:right}
 .tkey{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;font-weight:700;color:var(--p);background:var(--tint);border-radius:5px;padding:1px 6px;white-space:nowrap;text-decoration:none}
 a.tkey:hover{background:var(--tint2)}
 .code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:2px 7px;overflow-wrap:anywhere}
-.mention-pop{position:absolute;left:0;top:100%;z-index:30;margin-top:4px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);min-width:240px;padding:4px;display:flex;flex-direction:column}
+.mention-pop{position:fixed;z-index:1000;max-height:260px;overflow-y:auto;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);min-width:240px;padding:4px;display:flex;flex-direction:column}
 .mention-pop[hidden]{display:none}
 .mention-item{display:flex;align-items:center;gap:8px;border:0;background:transparent;padding:6px 8px;border-radius:7px;cursor:pointer;text-align:left;font:inherit;color:var(--ink)}
 .mention-item small{margin-left:auto;color:var(--ink3);font-size:12px}
@@ -287,6 +287,79 @@ a.tkey:hover{background:var(--tint2)}
 .emsg .eb{font-size:13.5px;white-space:pre-wrap;overflow-wrap:anywhere}
 .emsg .eq{white-space:pre-wrap;color:var(--ink3);font-size:12.5px;border-left:2px solid var(--line);padding-left:8px;margin-top:6px}
 tr.unread-row td{background:#F5FBF7;font-weight:600}
+/* online dot on avatars, and last-active text */
+.av{position:relative}
+.av.on::after{content:"";position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border-radius:50%;background:#22C55E;border:2px solid #fff}
+.av.lg.on::after{width:12px;height:12px}
+.side .av.on::after{border-color:var(--p-deep)}
+.lastact{font-size:12px;color:var(--ink3)}
+.lastact.is-on{color:#16A34A;font-weight:600}
+.lastact.is-on::before{content:"● ";font-size:10px}
+.avbtn{background:none;border:0;padding:0;cursor:pointer;border-radius:50%}
+/* collapsible menu sections */
+.nav-group.coll{margin-top:4px}
+.nav-head{display:flex;align-items:center;gap:6px;width:100%;background:none;border:0;color:#AEB0E8;font:inherit;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:8px 10px 6px;cursor:pointer;border-radius:8px;text-align:left}
+.nav-head:hover{color:#fff;background:rgba(255,255,255,.06)}
+.nav-head .chev{display:inline-block;transition:transform .15s ease;font-size:14px;line-height:1;width:10px}
+.nav-group.open .nav-head .chev{transform:rotate(90deg)}
+.nav-head .gl{flex:1}
+.nav-head .cnt{margin-left:auto;text-transform:none;letter-spacing:0}
+.nav-head .cnt.due{background:#F0445A;color:#fff;border-radius:999px;padding:0 7px;font-size:11.5px;line-height:18px}
+.nav-head .cnt.new{background:var(--brand-light);color:var(--p-deep);border-radius:999px;padding:0 7px;font-size:11.5px;line-height:18px}
+/* chat */
+.chat{display:grid;grid-template-columns:280px minmax(0,1fr);height:calc(100dvh - 150px);min-height:440px;background:#fff;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.chat-list{border-right:1px solid var(--line);overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:2px;background:#FBFBFE}
+.chat-list h4{margin:12px 6px 4px;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3)}
+.chat-item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;border:0;border-radius:8px;padding:6px 8px;cursor:pointer;font:inherit;color:var(--ink)}
+.chat-item .x{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px}
+.chat-item:hover{background:var(--tint)}
+.chat-item.on{background:var(--tint2)}
+.chat-item.unread b{font-weight:800}
+.chat-item .cnt,.panel .cnt{border-radius:999px;padding:0 7px;font-size:11.5px;font-weight:700;line-height:18px}
+.cnt.due{background:#F0445A;color:#fff} .cnt.new{background:var(--brand-light);color:var(--p-deep)}
+.chat-main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.chat-head{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.chat-head .x{flex:1;min-width:0}
+.chat-msgs{flex:1;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column}
+.chat-day{text-align:center;margin:10px 0;font-size:12px;color:var(--ink3)}
+.chat-day span{background:var(--bg);border-radius:999px;padding:2px 10px}
+.cmsg{display:grid;grid-template-columns:32px 1fr auto;gap:8px;padding:6px 6px 2px;border-radius:8px;position:relative}
+.cmsg.g{padding-top:0}
+.cmsg:hover{background:#FAFAFD}
+.cmsg.me{background:#FFF8E6}
+.cmsg .ct{font-size:10.5px;color:var(--ink3);visibility:hidden;padding-top:3px;text-align:right}
+.cmsg:hover .ct{visibility:visible}
+.cmsg .ch{display:flex;gap:8px;align-items:baseline;font-size:13.5px}
+.cmsg .ch .muted{font-size:11.5px}
+.cmsg .cb{font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere}
+.cedit{visibility:hidden;background:none;border:0;color:var(--p);font-size:12px;cursor:pointer}
+.cmsg:hover .cedit{visibility:visible}
+.chat-foot{display:flex;gap:8px;align-items:flex-end;padding:10px 14px 0;border-top:1px solid var(--line)}
+.chat-foot textarea{resize:none}
+@media (max-width:760px){.chat{grid-template-columns:1fr;height:auto}.chat-list{max-height:220px;border-right:0;border-bottom:1px solid var(--line)}.chat-msgs{min-height:320px}}
+.gicon{width:28px;height:28px;border-radius:50%;background:var(--tint);display:inline-flex;align-items:center;justify-content:center;font-size:14px;flex:none}
+/* Report a problem */
+.bugbtn{position:fixed;right:0;top:58%;z-index:40;display:flex;align-items:center;gap:6px;writing-mode:vertical-rl;transform:rotate(180deg);background:var(--p-deep);color:#fff;border:0;border-radius:0 10px 10px 0;padding:12px 7px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(27,20,80,.25);opacity:.9}
+.bugbtn:hover{opacity:1;padding-right:9px}
+.bugbtn .bi{transform:rotate(90deg);font-size:14px}
+.bugbtn[hidden]{display:none}
+@media (max-width:760px){.bugbtn{display:none}}
+.side .bugnav{display:none}
+@media (max-width:760px){.side .bugnav{display:flex}}
+@media print{.bugbtn{display:none}}
+.shotprev{display:flex;align-items:flex-end;gap:8px;margin-top:6px}
+.shotprev img{max-width:260px;max-height:160px;border:1px solid var(--line);border-radius:8px}
+.prob .ph1{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.prob .ph1 .grow{flex:1}
+.probshot{max-width:320px;max-height:200px;border:1px solid var(--line);border-radius:8px;margin:4px 0}
+.probmore{margin-top:8px;font-size:13px}
+.probmore ol,.probmore ul{margin:4px 0 8px;padding-left:20px}
+/* clickable rows fill their panel and shorten long text with "…" instead of pushing the layout wider */
+button.row{max-width:calc(100% + 12px);min-width:0}
+.chat-item,.nitem{width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+.panel,.section,.grid>*{min-width:0}
+.panel h2{min-width:0;flex-wrap:wrap}
+.att{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}
 .hday{flex:none;width:44px;height:44px;border-radius:10px;background:var(--tint);color:var(--p-ink);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
 .hday b{font-size:16px}
 .hday small{font-size:11px;font-weight:600;text-transform:uppercase;margin-top:2px}
@@ -477,7 +550,7 @@ const MAX_FILE_MB = 50;
 
 (function(){
 "use strict";
-const LOGO_WHITE = "data:image/png;base64,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";
+const LOGO_WHITE = "data:image/png;base64,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";
 
 /* ---------------------------------------------------------------------
    Small helpers
@@ -569,7 +642,7 @@ let sb = null, channel = null;
    --------------------------------------------------------------------- */
 const ORDER = {
   profiles: ["full_name", true], roles: ["name", true], targets: ["month", false], social_stats: ["month", false], activities: ["activity_date", false],
-  meetings: ["meeting_date", false], attendance: ["day", false], meeting_joins: ["joined_at", false], notes: ["updated_at", false], tasks: ["created_at", false], google_links: ["connected_at", false], emails: ["sent_at", false], calendar_events: ["start_date", true], settings: ["id", true], time_entries: ["work_date", false],
+  meetings: ["meeting_date", false], attendance: ["day", false], meeting_joins: ["joined_at", false], notes: ["updated_at", false], tasks: ["created_at", false], google_links: ["connected_at", false], emails: ["sent_at", false], problem_reports: ["created_at", false], presence: ["last_seen_at", false], calendar_events: ["start_date", true], settings: ["id", true], time_entries: ["work_date", false],
   activity_log: ["at", false], notifications: ["created_at", false], invoices: ["issue_date", false],
   leave_requests: ["start_date", false], expenses: ["spent_on", false]
 };
@@ -590,7 +663,7 @@ async function load(t, force){
       const max = LIMIT[t] || 50000, PAGE = 1000;
       let all = [];
       for (let from = 0; from < max; from += PAGE){
-        let q = sb.from(t).select("*").order(o[0], { ascending: o[1], nullsFirst: false }).order(t === "google_links" ? "user_id" : "id", { ascending: true });
+        let q = sb.from(t).select("*").order(o[0], { ascending: o[1], nullsFirst: false }).order(["google_links","presence"].includes(t) ? "user_id" : "id", { ascending: true });
         if (t === "notifications") q = q.eq("user_id", S.me.id);
         const chunk = ok(await q.range(from, Math.min(from + PAGE, max) - 1)) || [];
         all = all.concat(chunk);
@@ -667,7 +740,7 @@ const pname = id => { const p = person(id); return p ? p.full_name : ""; };
 function avatar(id, size){
   const p = person(id);
   if (!p) return h("span", { class: "av" + (size ? " " + size : ""), style: "background:#C8C8DE", title: "Unassigned" }, "–");
-  return h("span", { class: "av" + (size ? " " + size : ""), style: "background:" + (p.color && p.color !== "#5B2BA6" && p.color !== "#6450F5" ? p.color : colorFor(p.id)), title: p.full_name }, initials(p.full_name));
+  return h("span", { class: "av" + (size ? " " + size : "") + (typeof isOnline === "function" && isOnline(p.id) ? " on" : ""), "data-u": p.id, style: "background:" + (p.color && p.color !== "#5B2BA6" && p.color !== "#6450F5" ? p.color : colorFor(p.id)), title: p.full_name + (typeof lastActive === "function" ? " · " + lastActive(p.id) : "") }, initials(p.full_name));
 }
 function personChip(id, empty){
   const p = person(id);
@@ -1477,14 +1550,15 @@ const MOD = {
     label: "Leave", one: "leave request", table: "leave_requests", area: "leave", title: "type", personal: true,
     desc: "Apply for leave or work-from-home, and see balances and approvals.", needs: [], comments: true, files: true,
     approval: { field: "status", pending: "Pending", options: ["Approved","Rejected"] },
+    fieldEditable: (f, rec) => f.k !== "user_id" || (!rec && lvl("leave") >= 2),
     fields: [
       { k: "type", l: "Leave type", t: "select", o: settingList("leave_types", ["Paid leave","Sick leave","Work from home","Unpaid leave"]), req: true, def: "Paid leave", filter: true },
       { k: "half_day", l: "Half day", t: "bool", cb: "Half day only" },
       { k: "start_date", l: "From", t: "date", req: true, def: () => today() },
       { k: "end_date", l: "To", t: "date", req: true, def: () => today() },
       { k: "reason", l: "Reason", t: "textarea", full: true },
-      { k: "user_id", l: "Employee", t: "user", auto: true },
-      { k: "status", l: "Status", t: "select", o: ["Pending","Approved","Rejected","Cancelled"], req: true, def: "Pending", approverOnly: true, filter: true },
+      { k: "user_id", l: "Employee", t: "user", def: () => S.me.id, show: r => !!r.id || lvl("leave") >= 2 },
+      { k: "status", l: "Status", t: "select", o: ["Pending","Approved","Rejected","Cancelled"], req: true, def: () => lvl("leave") >= 2 ? "Approved" : "Pending", approverOnly: true, filter: true },
       { k: "review_note", l: "Approver’s note", t: "text", full: true, approverOnly: true }
     ],
     cols: ["user_id","type",{ k: "dates", l: "Dates", get: r => fmtDate(r.start_date) + (r.end_date !== r.start_date ? " – " + fmtDate(r.end_date) : "") },
@@ -1492,9 +1566,11 @@ const MOD = {
     sort: (a, b) => String(b.start_date).localeCompare(String(a.start_date)),
     top: leaveTop,
     validate: d => (d.end_date && d.start_date && d.end_date < d.start_date) ? "The end date is before the start date." : null,
+    before: (d, prev) => { if (!prev && d.status && d.status !== "Pending" && lvl("leave") >= 2) d.reviewed_by = S.me.id; },
     after: (rec, prev) => {
-      if (!prev) notify(peopleWith("leave", 2).map(p => p.id), pname(rec.user_id) + " applied for " + rec.type.toLowerCase() + " leave", fmtDate(rec.start_date) + (rec.end_date !== rec.start_date ? " – " + fmtDate(rec.end_date) : ""), "leave_requests", rec.id);
-      else if (prev.status !== rec.status) notify([rec.user_id], "Your leave request was " + rec.status.toLowerCase(), fmtDate(rec.start_date) + (rec.review_note ? ". " + rec.review_note : ""), "leave_requests", rec.id);
+      if (!prev && rec.user_id !== S.me.id) notify([rec.user_id], pname(S.me.id) + " marked " + rec.type.toLowerCase() + " for you", fmtDate(rec.start_date) + (rec.end_date !== rec.start_date ? " – " + fmtDate(rec.end_date) : "") + " · " + rec.status, "leave_requests", rec.id);
+      else if (!prev && rec.status === "Pending") notify(peopleWith("leave", 2).map(p => p.id), pname(rec.user_id) + " applied for " + rec.type.toLowerCase() + " leave", fmtDate(rec.start_date) + (rec.end_date !== rec.start_date ? " – " + fmtDate(rec.end_date) : ""), "leave_requests", rec.id);
+      else if (prev && prev.status !== rec.status) notify([rec.user_id], "Your leave request was " + rec.status.toLowerCase(), fmtDate(rec.start_date) + (rec.review_note ? ". " + rec.review_note : ""), "leave_requests", rec.id);
     }
   },
 
@@ -1948,7 +2024,7 @@ async function openRecord(key, id, preset){
       const v = M.validate && M.validate({ ...values, ...data });
       if (v) { err.textContent = v; err.hidden = false; return; }
       if (M.before) M.before(data, rec);
-      if (!rec && M.personal) data.user_id = S.me.id;
+      if (!rec && M.personal && !(data.user_id && lvl(M.area) >= 2)) data.user_id = S.me.id;   // managers may add it for someone else
       if (!rec && M.dupCheck && !save.confirmedDup){
         const dup = M.dupCheck(data);
         if (dup){
@@ -2397,7 +2473,7 @@ function renderDirectory(el){
     for (const p of list){
       const role = byId("roles", p.role_id);
       grid.append(h("button", { type: "button", class: "pcard", onclick: () => openPerson(p.id) },
-        h("div", { class: "top" }, avatar(p.id, "lg"), h("div", { style: "min-width:0" }, h("b", {}, p.full_name), h("small", {}, p.title || (role ? role.name : "")))),
+        h("div", { class: "top" }, avatar(p.id, "lg"), h("div", { style: "min-width:0" }, h("b", {}, p.full_name), h("small", {}, p.title || (role ? role.name : "")), h("br"), statusLine(p.id))),
         h("div", { class: "c" }, p.vertical || (p.is_admin ? "All verticals" : "No vertical"), p.is_admin ? " · Admin" : ""),
         h("div", { class: "c" }, p.email, p.phone ? h("br") : null, p.phone || null)));
     }
@@ -2414,7 +2490,8 @@ function openPerson(id){
   const role = byId("roles", p.role_id);
   const lv = rows("leave_requests").find(x => x.user_id === p.id && x.status === "Approved" && x.start_date <= today() && x.end_date >= today());
   openDialog(p.full_name, [
-    h("div", { style: "display:flex;gap:14px;align-items:center;margin-bottom:14px" }, avatar(p.id, "lg"), h("div", {}, h("b", { style: "font-size:16px" }, p.full_name), h("div", { class: "muted" }, p.title || ""))),
+    h("div", { style: "display:flex;gap:14px;align-items:center;margin-bottom:14px" }, avatar(p.id, "lg"), h("div", { style: "flex:1" }, h("b", { style: "font-size:16px" }, p.full_name), h("div", { class: "muted" }, p.title || ""), statusLine(p.id)),
+      h("button", { type: "button", class: "btn sm pri", onclick: () => { closeDlg(); openDM(p.id); } }, "💬 Message")),
     h("div", { class: "related" },
       h("div", { class: "ri" }, h("span", {}, "Vertical"), h("b", {}, p.vertical || "–")),
       h("div", { class: "ri" }, h("span", {}, "Role"), h("b", {}, role ? role.name : "–")),
@@ -2609,6 +2686,7 @@ async function renderDashboard(el){
   const week = addDays(t0, 7), up = [];
   for (const it of agenda(t0, week).slice(0, 14)) up.push([it.day + (it.start || ""), (it.day === t0 ? "Today" : fmtDate(it.day)) + (agendaTime(it) ? " " + agendaTime(it) : ""), [it.title, it.source === "google" ? h("span", { class: "pill info", style: "margin-left:6px" }, "Google") : null], it.open, it.day === t0 ? agendaJoinButton(it, true) : null]);
   up.sort((a, b) => a[0].localeCompare(b[0]));
+  if (C.ready) right.append(messagesPanel());
   const pins = rows("notes").filter(n => n.pinned && n.owner_id === me);
   if (pins.length) right.append(listPanel("Pinned notes", pins.slice(0, 5).map(n => h("button", { type: "button", class: "row", style: "align-items:flex-start", onclick: () => openRecord("notes", n.id) },
     h("span", { class: "x", style: "white-space:normal" }, h("b", {}, n.title || "Untitled"), h("br"), h("span", { class: "muted", style: "font-size:13px" }, String(n.body || "").slice(0, 90) + (String(n.body || "").length > 90 ? "…" : ""))))), "", ["All notes", () => go("notes")]));
@@ -2987,7 +3065,8 @@ function googleCard(){
   if (l) return h("div", { style: "display:flex;align-items:center;gap:10px;flex-wrap:wrap" }, pill("Connected", "ok"),
     h("span", { class: "muted", style: "font-size:13px" }, (l.google_email || "Google") + " · " + (l.last_error ? l.last_error : l.last_sync_at ? "synced " + fmtAgo(l.last_sync_at) : "syncing…")),
     h("button", { type: "button", class: "btn sm soft", onclick: () => syncGoogleNow(false) }, "Sync now"),
-    !String(l.scopes || "").includes("gmail.send") ? h("button", { type: "button", class: "btn sm pri", onclick: () => { closeDlg(); connectGoogle(); } }, "Reconnect to allow email") : pill("Email on", "ok"),
+    !String(l.scopes || "").includes("gmail.send") ? h("button", { type: "button", class: "btn sm pri", onclick: () => { closeDlg(); connectGoogle(); } }, "Reconnect to allow email")
+      : !String(l.scopes || "").includes("gmail.readonly") ? h("button", { type: "button", class: "btn sm pri", title: "Tick “View your email messages” so replies show up here", onclick: () => { closeDlg(); connectGoogle(); } }, "Reconnect to see replies") : pill("Email on", "ok"),
     h("button", { type: "button", class: "btn sm ghost", onclick: () => { closeDlg(); disconnectGoogle(); } }, "Disconnect"));
   return h("div", { style: "display:flex;align-items:center;gap:10px;flex-wrap:wrap" }, h("button", { type: "button", class: "btn soft", onclick: () => { closeDlg(); connectGoogle(); } }, "Connect Google"),
     h("span", { class: "muted", style: "font-size:13px" }, "Connect once. Your Google Calendar then syncs automatically. Works with tcipher.com and personal Gmail."));
@@ -3015,8 +3094,23 @@ function mentionIds(text){
   return [...found];
 }
 function attachMentions(ta){
+  // The list floats on top of everything (inside the open dialog, if any) and is placed where it fits:
+  // below the box if there's room, otherwise above it. It used to open inside the scrolling area and get cut off.
   const box = h("div", { class: "mention-pop", role: "listbox", hidden: true });
-  let items = [], idx = 0, start = -1, placed = false;
+  let items = [], idx = 0, start = -1;
+  const host = () => ta.closest("dialog") || document.body;
+  const place = () => {
+    if (box.hidden) return;
+    if (box.parentNode !== host()) host().append(box);
+    const r = ta.getBoundingClientRect();
+    const hBox = box.offsetHeight || 220, wBox = Math.max(240, Math.min(320, r.width));
+    const below = window.innerHeight - r.bottom, above = r.top;
+    // open upwards, above the box; only go below when there isn't room above
+    const top = above >= hBox + 8 || above >= below ? r.top - hBox - 4 : r.bottom + 4;
+    box.style.top = Math.max(6, Math.min(top, window.innerHeight - hBox - 6)) + "px";
+    box.style.left = Math.max(6, Math.min(r.left, window.innerWidth - wBox - 6)) + "px";
+    box.style.width = wBox + "px";
+  };
   const close = () => { box.hidden = true; start = -1; };
   const draw = () => box.replaceChildren(...items.map((p, i) => h("button", { type: "button", class: "mention-item" + (i === idx ? " on" : ""), role: "option",
     onmousedown: e => { e.preventDefault(); pick(p); } }, avatar(p.id, "sm"), h("span", {}, p.full_name), h("small", {}, p.vertical || p.title || ""))));
@@ -3032,20 +3126,21 @@ function attachMentions(ta){
     if (!m) { close(); return; }
     start = pos - m[2].length - 1;
     const q = m[2].toLowerCase();
-    items = activePeople().filter(p => !q || p.full_name.toLowerCase().startsWith(q) || p.full_name.toLowerCase().split(/\s+/).some(w => w.startsWith(q))).slice(0, 6);
+    items = activePeople().filter(p => p.id !== S.me.id && (!q || p.full_name.toLowerCase().startsWith(q) || p.full_name.toLowerCase().split(/\s+/).some(w => w.startsWith(q)))).slice(0, 6);
     if (!items.length) { close(); return; }
-    if (!placed && ta.parentNode) { ta.parentNode.style.position = "relative"; ta.after(box); placed = true; }
-    idx = 0; draw(); box.hidden = false;
+    idx = 0; draw(); box.hidden = false; place();
   };
   ta.addEventListener("input", query);
   ta.addEventListener("keydown", e => {
     if (box.hidden) return;
     if (e.key === "ArrowDown") { idx = (idx + 1) % items.length; draw(); e.preventDefault(); }
     else if (e.key === "ArrowUp") { idx = (idx - 1 + items.length) % items.length; draw(); e.preventDefault(); }
-    else if (e.key === "Enter" || e.key === "Tab") { pick(items[idx]); e.preventDefault(); }
+    else if (e.key === "Enter" || e.key === "Tab") { pick(items[idx]); e.preventDefault(); e.stopImmediatePropagation(); }
     else if (e.key === "Escape") { close(); e.preventDefault(); e.stopPropagation(); }
   });
   ta.addEventListener("blur", () => setTimeout(close, 150));
+  window.addEventListener("resize", place);
+  document.addEventListener("scroll", place, true);
   return ta;
 }
 // text -> nodes, with @people highlighted, TC-123 task links and web links clickable
@@ -3485,12 +3580,16 @@ function badgeInfo(route){
       const onLeave = rows("leave_requests").some(r => r.user_id === me && r.status === "Approved" && r.start_date <= t0 && r.end_date >= t0 && r.type !== "Work from home");
       if (working && !onLeave && !rows("attendance").some(a => a.user_id === me && a.day === t0)) { due += 1; why.push("you haven’t checked in today"); return { due, fresh, why, bang: true }; }
     } break;
+    case "chat": if (C.ready) { const t = chatTotals(); add(t.due, "unread direct messages and mentions", "due"); add(t.fresh, "unread in channels", "new"); } break;
     case "emails": if (L("emails")) {
       add(rows("emails").filter(e => e.user_id === me && e.direction === "in" && !e.read_at).length, "new " + "replies", "due");
     } break;
     case "announcements": if (L("announcements")) add(rows("announcements").filter(a => a.created_by !== me && isNewer(a.created_at, route)).length, "new", "new"); break;
     case "documents": if (L("documents")) add(rows("documents").filter(d => byOthers(d) && isNewer(d.updated_at, route)).length, "new or updated", "new"); break;
-    case "admin-users": if (L("google_links") && googleOn()) add(rows("google_links").filter(l => l.last_error).length, "Google sync problems", "due"); break;
+    case "admin-users": {
+      if (L("google_links") && googleOn()) add(rows("google_links").filter(l => l.last_error).length, "Google sync problems", "due");
+      if (L("problem_reports")) { const open = new Set(allRows("problem_reports").filter(r => r.status === "Open").map(r => r.kind === "auto" ? r.fingerprint : r.id)); add(open.size, "open problem" + (open.size === 1 ? "" : "s") + " to look at", "due"); }
+    } break;
   }
   return { due, fresh, why };
 }
@@ -4317,7 +4416,11 @@ async function renderEmails(el){
   q.addEventListener("input", () => { u.q = q.value; draw(); });
   const unread = mine.filter(e => e.direction === "in" && !e.read_at && e.user_id === S.me.id).length;
   el.append(h("div", { class: "tb" }, q, segmented([["replies", "Replies" + (unread ? " (" + unread + " new)" : "")], ["sent", "Sent"], ...(isAdmin() ? [["templates", "Templates"]] : [])], u.view, v => { u.view = v; rerender(); }),
-    canEmail() ? h("button", { type: "button", class: "btn", onclick: async () => { try { const r = await callGoogle("check_replies"); await load("emails", true); toast(r && r.replies ? r.replies + " new " + (r.replies === 1 ? "reply" : "replies") + "." : "No new replies."); rerender(); } catch (e) { fail(e, "Couldn’t check"); } } }, "Check for replies") : null));
+    canEmail() ? h("button", { type: "button", class: "btn", onclick: async ev => { const b = ev.currentTarget; b.disabled = true; b.textContent = "Checking…";
+      try { const r = await callGoogle("check_replies"); await Promise.all([load("emails", true), load("google_links", true)]);
+        if (r && r.problem) openDialog("Replies couldn’t be checked", [h("p", {}, r.problem)], [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Close"), h("button", { type: "button", class: "btn pri", onclick: () => { closeDlg(); connectGoogle(); } }, "Reconnect Google")], true);
+        else toast(r && r.replies ? r.replies + " new " + (r.replies === 1 ? "reply" : "replies") + "." : "No new replies" + (r && r.checked ? " (checked " + r.checked + " conversation" + (r.checked === 1 ? "" : "s") + ")." : "."));
+        rerender(); } catch (e) { fail(e, "Couldn’t check"); b.disabled = false; b.textContent = "Check for replies"; } } }, "Check for replies") : null));
   if (u.view === "templates") { el.append(templatesEditor()); return; }
   el.append(listBox); draw();
 }
@@ -4401,6 +4504,472 @@ function openMarkAttendance(userId, day){
   fill();
 }
 /* ---------------------------------------------------------------------
+   Online and last-active status
+   --------------------------------------------------------------------- */
+let ONLINE = new Set(), presenceCh = null, presenceTimer = null;
+function startPresence(){
+  stopPresence();
+  try {
+    presenceCh = sb.channel("ws-online", { config: { presence: { key: S.me.id } } });
+    presenceCh.on("presence", { event: "sync" }, () => {
+      try { ONLINE = new Set(Object.keys(presenceCh.presenceState() || {})); } catch (e) {}
+      paintPresence();
+    });
+    presenceCh.subscribe(st => { if (st === "SUBSCRIBED") { try { presenceCh.track({ at: Date.now() }); } catch (e) {} } });
+  } catch (e) { console.warn("presence", e); }
+  heartbeat();
+  presenceTimer = setInterval(heartbeat, 60000);
+}
+function stopPresence(){
+  if (presenceTimer) { clearInterval(presenceTimer); presenceTimer = null; }
+  if (presenceCh) { try { presenceCh.untrack && presenceCh.untrack(); sb.removeChannel(presenceCh); } catch (e) {} presenceCh = null; }
+  ONLINE = new Set();
+}
+async function heartbeat(){
+  if (!S.me || document.visibilityState === "hidden") return;
+  try { await sb.from("presence").upsert({ user_id: S.me.id, last_seen_at: new Date().toISOString() }, { onConflict: "user_id" }); } catch (e) {}
+  if (!heartbeat.n || ++heartbeat.n % 2 === 0) { heartbeat.n = heartbeat.n || 1; await load("presence", true); paintPresence(); }
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && S.me) heartbeat(); });
+const isOnline = id => ONLINE.has(id);
+function lastActive(id){
+  if (isOnline(id)) return "Online";
+  const p = allRows("presence").find(x => x.user_id === id);
+  if (!p) return "Not seen yet";
+  const mins = (Date.now() - new Date(p.last_seen_at)) / 60000;
+  return mins < 2 ? "Online" : "Active " + fmtAgo(p.last_seen_at);
+}
+function paintPresence(){
+  document.querySelectorAll(".av[data-u]").forEach(a => a.classList.toggle("on", ONLINE.has(a.dataset.u)));
+  document.querySelectorAll("[data-last]").forEach(el => { el.textContent = lastActive(el.dataset.last); el.classList.toggle("is-on", isOnline(el.dataset.last)); });
+}
+const statusLine = id => h("span", { class: "lastact" + (isOnline(id) ? " is-on" : ""), "data-last": id }, lastActive(id));
+
+/* ---------------------------------------------------------------------
+   Team chat: channels and direct messages (text only, kept permanently)
+   --------------------------------------------------------------------- */
+const C = { ready: false, channels: [], reads: {}, msgs: {}, more: {}, unread: {}, mentions: {}, last: {}, active: null, drafts: {}, loading: null };
+const dmKey = (a, b) => [a, b].sort().join(":");
+const dmOther = ch => (ch.members || []).find(x => x !== S.me.id) || S.me.id;
+const chName = ch => ch.kind === "dm" ? (pname(dmOther(ch)) || "Someone") : ch.kind === "group" ? (ch.name || groupLabel(ch)) : "# " + ch.name;
+const groupLabel = ch => (ch.members || []).filter(x => x !== S.me.id).map(x => (pname(x) || "").split(" ")[0]).filter(Boolean).slice(0, 4).join(", ") || "Group";
+function groupDialog(ch){
+  const editing = !!ch;
+  const name = h("input", { class: "in", value: ch ? ch.name : "", maxlength: "60", placeholder: "e.g. Launch squad" });
+  const set = new Set(ch ? ch.members : [S.me.id]);
+  const boxes = activePeople().filter(p => p.id !== S.me.id).sort((a, b) => a.full_name.localeCompare(b.full_name))
+    .map(p => [p.id, h("input", { type: "checkbox", value: p.id, checked: set.has(p.id) })]);
+  const err = h("p", { class: "err", hidden: true });
+  const save = h("button", { type: "button", class: "btn pri" }, editing ? "Save" : "Create group");
+  save.addEventListener("click", async () => {
+    const members = [S.me.id, ...boxes.filter(([, c]) => c.checked).map(([id]) => id)];
+    if (members.length < 3 && !editing) { err.textContent = "Pick at least two people. For one person, use a direct message."; err.hidden = false; return; }
+    if (members.length < 2) { err.textContent = "A group needs at least one other person."; err.hidden = false; return; }
+    save.disabled = true;
+    try {
+      let row;
+      if (editing) row = ok(await sb.from("chat_channels").update({ name: name.value.trim(), members }).eq("id", ch.id).select().single());
+      else row = ok(await sb.from("chat_channels").insert({ kind: "group", name: name.value.trim(), members, created_by: S.me.id }).select().single());
+      const i = C.channels.findIndex(c => c.id === row.id); if (i >= 0) C.channels[i] = row; else { C.channels.push(row); C.reads[row.id] = 0; C.unread[row.id] = 0; }
+      const added = members.filter(x => x !== S.me.id && !(ch && ch.members.includes(x)));
+      if (added.length) notify(added, pname(S.me.id) + " added you to the group " + (row.name || groupLabel(row)), "", "", null);
+      closeDlg(); await openChannel(row.id); if (S.route !== "chat") go("chat"); else rerender();
+    } catch (e) { err.textContent = friendly(e); err.hidden = false; save.disabled = false; }
+  });
+  openDialog(editing ? "Group settings" : "New group", [h("div", { class: "form" }, h("label", { class: "fl full" }, "Name (optional)", name),
+    h("div", { class: "fl full" }, "People", h("div", { class: "multi", style: "max-height:260px" }, boxes.map(([id, c]) => h("label", {}, c, avatar(id, "sm"), " ", pname(id))))), err)],
+    [editing ? h("button", { type: "button", class: "btn danger sm", onclick: () => leaveGroup(ch) }, "Leave group") : null, h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), save], true);
+}
+async function leaveGroup(ch){
+  if (!confirm("Leave “" + chName(ch) + "”? You won’t see its messages any more.")) return;
+  try { ok(await sb.rpc("leave_chat", { cid: ch.id })); C.channels = C.channels.filter(c => c.id !== ch.id); if (C.active === ch.id) C.active = null; closeDlg(); toast("You left the group."); rerender(); }
+  catch (e) { fail(e, "Couldn’t leave"); }
+}
+async function loadChat(force){
+  if (C.loading && !force) return C.loading;
+  C.loading = (async () => {
+    try {
+      C.channels = ok(await sb.from("chat_channels").select("*").order("created_at")) || [];
+      const reads = ok(await sb.from("chat_reads").select("*").eq("user_id", S.me.id)) || [];
+      C.reads = {}; for (const r of reads) C.reads[r.channel_id] = +r.last_read_id || 0;
+      await Promise.all(C.channels.map(async ch => {
+        const latest = ok(await sb.from("chat_messages").select("id,author_id,body,created_at").eq("channel_id", ch.id).order("id", { ascending: false }).limit(1)) || [];
+        C.last[ch.id] = latest[0] || null;
+        if (C.reads[ch.id] === undefined){
+          // first time: everything already there counts as read
+          C.reads[ch.id] = latest[0] ? latest[0].id : 0;
+          try { await sb.from("chat_reads").upsert({ user_id: S.me.id, channel_id: ch.id, last_read_id: C.reads[ch.id] }, { onConflict: "user_id,channel_id" }); } catch (e) {}
+        }
+        const un = latest[0] && latest[0].id > C.reads[ch.id] ? (ok(await sb.from("chat_messages").select("id,author_id,mentions").eq("channel_id", ch.id).gt("id", C.reads[ch.id]).order("id", { ascending: false }).limit(100)) || []).filter(m => m.author_id !== S.me.id) : [];
+        C.unread[ch.id] = un.length; C.mentions[ch.id] = un.filter(m => (m.mentions || []).includes(S.me.id)).length;
+      }));
+      C.ready = true;
+    } catch (e) { console.warn("chat", e); }
+    C.loading = null;
+  })();
+  return C.loading;
+}
+function chatTotals(){
+  let dm = 0, mention = 0, other = 0;
+  for (const ch of C.channels){ const u = C.unread[ch.id] || 0; if (!u) continue; if (ch.kind !== "channel") dm += u; else { mention += C.mentions[ch.id] || 0; other += u - (C.mentions[ch.id] || 0); } }
+  return { due: dm + mention, fresh: other };
+}
+async function openChannel(id){
+  C.active = id;
+  if (!C.msgs[id]){
+    const rs = ok(await sb.from("chat_messages").select("*").eq("channel_id", id).order("id", { ascending: false }).limit(60)) || [];
+    C.msgs[id] = rs.reverse(); C.more[id] = rs.length === 60;
+  }
+  markChatRead(id);
+}
+async function loadEarlier(id){
+  const first = (C.msgs[id] || [])[0]; if (!first) return;
+  const rs = ok(await sb.from("chat_messages").select("*").eq("channel_id", id).lt("id", first.id).order("id", { ascending: false }).limit(60)) || [];
+  C.msgs[id] = [...rs.reverse(), ...C.msgs[id]]; C.more[id] = rs.length === 60;
+}
+async function markChatRead(id){
+  const list = C.msgs[id] || []; const maxId = list.length ? list[list.length - 1].id : (C.last[id] ? C.last[id].id : 0);
+  if (!maxId || (C.reads[id] || 0) >= maxId) { C.unread[id] = 0; C.mentions[id] = 0; return; }
+  C.reads[id] = maxId; C.unread[id] = 0; C.mentions[id] = 0;
+  try { await sb.from("chat_reads").upsert({ user_id: S.me.id, channel_id: id, last_read_id: maxId }, { onConflict: "user_id,channel_id" }); } catch (e) {}
+  renderShell();
+}
+async function openDM(userId){
+  const key = dmKey(S.me.id, userId);
+  let ch = C.channels.find(c => c.kind === "dm" && c.dm_key === key);
+  if (!ch){
+    try { ch = ok(await sb.from("chat_channels").insert({ kind: "dm", members: [S.me.id, userId], dm_key: key }).select().single()); }
+    catch (e) { ch = (ok(await sb.from("chat_channels").select("*").eq("dm_key", key)) || [])[0]; if (!ch) { fail(e, "Couldn’t start the conversation"); return; } }
+    C.channels.push(ch); C.reads[ch.id] = 0; C.unread[ch.id] = 0;
+  }
+  await openChannel(ch.id);
+  if (S.route !== "chat") go("chat"); else rerender();
+}
+function chatOnChange(payload){
+  if (!C.ready) return;
+  const m = payload.new; if (!m || !m.channel_id) return;
+  if (payload.table === "chat_channels"){ if (!C.channels.find(c => c.id === m.id)) { C.channels.push(m); C.reads[m.id] = C.reads[m.id] || 0; } if (S.route === "chat") rerender(); return; }
+  const list = C.msgs[m.channel_id];
+  if (payload.eventType === "UPDATE"){ if (list){ const i = list.findIndex(x => x.id === m.id); if (i >= 0) list[i] = m; } if (S.route === "chat" && C.active === m.channel_id) drawChatMessages(); return; }
+  if (list && !list.find(x => x.id === m.id)) list.push(m);
+  C.last[m.channel_id] = m;
+  if (!C.channels.find(c => c.id === m.channel_id)) { loadChat(true).then(() => { renderShell(); if (S.route === "chat") rerender(); }); return; }
+  if (m.author_id === S.me.id) return;
+  if (S.route === "chat" && C.active === m.channel_id && document.visibilityState === "visible"){ drawChatMessages(true); markChatRead(m.channel_id); }
+  else {
+    C.unread[m.channel_id] = (C.unread[m.channel_id] || 0) + 1;
+    if ((m.mentions || []).includes(S.me.id)) C.mentions[m.channel_id] = (C.mentions[m.channel_id] || 0) + 1;
+    const ch = C.channels.find(c => c.id === m.channel_id);
+    if (ch && (ch.kind !== "channel" || (m.mentions || []).includes(S.me.id))) toast((ch.kind === "dm" ? "Message from " + pname(m.author_id) : ch.kind === "group" ? pname(m.author_id) + " in " + chName(ch) : pname(m.author_id) + " mentioned you in " + chName(ch)) + ": " + m.body.slice(0, 60));
+    renderShell(); if (S.route === "chat") drawChatList(); if (S.route === "dashboard") rerender();
+  }
+}
+
+/* ---------- the Chat page ---------- */
+let chatEls = null;
+async function renderChat(el){
+  if (!C.ready) { el.append(h("div", { class: "loading" }, "Loading chat…")); await loadChat(); if (S.route !== "chat") return; el.replaceChildren(); }
+  if (!C.active){ const g = C.channels.find(c => c.kind === "channel" && c.name === "general") || C.channels[0]; if (g) await openChannel(g.id); }
+  const list = h("div", { class: "chat-list" }), head = h("div", { class: "chat-head" }), msgs = h("div", { class: "chat-msgs", role: "log", "aria-live": "polite" });
+  const ta = h("textarea", { class: "in", rows: 2, maxlength: "4000", placeholder: "Write a message… type @ to tag someone. Enter to send, Shift + Enter for a new line." });
+  attachMentions(ta);
+  const sendBtn = h("button", { type: "button", class: "btn pri" }, "Send");
+  const foot = h("div", { class: "chat-foot" }, ta, sendBtn);
+  chatEls = { list, head, msgs, ta };
+  el.append(h("div", { class: "chat" }, list, h("div", { class: "chat-main" }, head, msgs, foot,
+    h("p", { class: "muted", style: "font-size:12px;margin:4px 14px 10px" }, "Text and links only. To send a file, use ✉️ Send by email. Messages are kept permanently."))));
+  ta.value = C.drafts[C.active] || "";
+  ta.addEventListener("input", () => { C.drafts[C.active] = ta.value; });
+  ta.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing && !(ta.parentNode.querySelector(".mention-pop:not([hidden])") || document.querySelector(".mention-pop:not([hidden])"))) { e.preventDefault(); send(); } });
+  sendBtn.addEventListener("click", send);
+  async function send(){
+    const body = ta.value.trim(); if (!body || !C.active) return;
+    const ch = C.channels.find(c => c.id === C.active);
+    const mentions = mentionIds(body);
+    sendBtn.disabled = true;
+    try {
+      const m = ok(await sb.from("chat_messages").insert({ channel_id: C.active, body, mentions, author_id: S.me.id }).select().single());
+      (C.msgs[C.active] = C.msgs[C.active] || []).push(m); C.last[C.active] = m; C.reads[C.active] = m.id;
+      sb.from("chat_reads").upsert({ user_id: S.me.id, channel_id: C.active, last_read_id: m.id }, { onConflict: "user_id,channel_id" }).then(() => {}, () => {});
+      ta.value = ""; C.drafts[C.active] = "";
+      const tagged = mentions.filter(x => x !== S.me.id && (ch.kind === "channel" || (ch.members || []).includes(x)));
+      if (tagged.length && ch.kind !== "dm") notify(tagged, pname(S.me.id) + " mentioned you in " + chName(ch), body.slice(0, 140), "", null);
+      drawChatMessages(true); drawChatList();
+    } catch (e) { fail(e, "Not sent"); }
+    sendBtn.disabled = false; ta.focus();
+  }
+  drawChatList(); drawChatHead(); drawChatMessages(true);
+  setTimeout(() => ta.focus(), 50);
+}
+function drawChatList(){
+  if (!chatEls) return;
+  const { list } = chatEls;
+  const q = (C.q || "").toLowerCase();
+  const item = (id, label, sub, unread, mention, extra) => h("button", { type: "button", class: "chat-item" + (C.active === id ? " on" : "") + (unread ? " unread" : ""), onclick: async () => { await openChannel(id); rerender(); } },
+    extra || null, h("span", { class: "x" }, h("b", {}, label), sub ? h("br") : null, sub || null), unread ? h("span", { class: "cnt " + (mention ? "due" : "new") }, String(unread > 99 ? "99+" : unread)) : null);
+  const search = h("input", { class: "in", type: "search", placeholder: "Find a person", value: C.q || "" });
+  search.addEventListener("input", () => { C.q = search.value; drawChatList(); const s = chatEls.list.querySelector("input"); s.focus(); s.setSelectionRange(s.value.length, s.value.length); });
+  const channels = C.channels.filter(c => c.kind === "channel");
+  const groups = C.channels.filter(c => c.kind === "group").sort((a, b) => String((C.last[b.id] || {}).created_at || b.created_at).localeCompare(String((C.last[a.id] || {}).created_at || a.created_at)));
+  const dms = C.channels.filter(c => c.kind === "dm");
+  const people = activePeople().filter(p => p.id !== S.me.id && (!q || p.full_name.toLowerCase().includes(q)))
+    .map(p => { const ch = dms.find(c => c.dm_key === dmKey(S.me.id, p.id)); return { p, ch, t: ch && C.last[ch.id] ? C.last[ch.id].created_at : "" }; })
+    .sort((a, b) => (b.ch && C.unread[b.ch.id] ? 1 : 0) - (a.ch && C.unread[a.ch.id] ? 1 : 0) || String(b.t).localeCompare(String(a.t)) || (isOnline(b.p.id) - isOnline(a.p.id)) || a.p.full_name.localeCompare(b.p.full_name));
+  list.replaceChildren(search,
+    h("h4", {}, "Channels"), ...channels.map(c => item(c.id, "# " + c.name, c.vertical ? c.vertical + " team" : "Everyone", C.unread[c.id], C.mentions[c.id])),
+    h("h4", { style: "display:flex;align-items:center" }, "Groups", h("button", { type: "button", class: "linkbtn", style: "margin-left:auto;text-transform:none;letter-spacing:0", onclick: () => groupDialog(null) }, "+ New group")),
+    ...(groups.length ? groups.map(c => item(c.id, chName(c), (c.members || []).length + " people", C.unread[c.id], true, h("span", { class: "gicon", "aria-hidden": "true" }, "👥")))
+      : [h("p", { class: "muted", style: "font-size:12.5px;margin:2px 8px 6px" }, "Private chats with a few people.")]),
+    h("h4", {}, "Direct messages"), ...people.map(({ p, ch }) => h("button", { type: "button", class: "chat-item" + (ch && C.active === ch.id ? " on" : "") + (ch && C.unread[ch.id] ? " unread" : ""), onclick: () => openDM(p.id) },
+      avatar(p.id, "sm"), h("span", { class: "x" }, h("b", {}, p.full_name), h("br"), statusLine(p.id)), ch && C.unread[ch.id] ? h("span", { class: "cnt due" }, String(C.unread[ch.id])) : null)));
+}
+function drawChatHead(){
+  if (!chatEls) return;
+  const ch = C.channels.find(c => c.id === C.active);
+  if (!ch) { chatEls.head.replaceChildren(h("b", {}, "Pick a conversation")); return; }
+  if (ch.kind === "group"){
+    const members = (ch.members || []).map(person).filter(Boolean);
+    const on = members.filter(p => isOnline(p.id)).length;
+    chatEls.head.replaceChildren(h("span", { class: "gicon", "aria-hidden": "true" }, "👥"), h("span", { class: "x" }, h("b", {}, chName(ch)), h("br"), h("span", { class: "muted", style: "font-size:12.5px" }, members.length + " people · " + on + " online · private")),
+      h("span", { class: "stack" }, members.slice(0, 6).map(p => avatar(p.id, "sm"))),
+      ch.created_by === S.me.id || isAdmin() ? h("button", { type: "button", class: "btn sm", onclick: () => groupDialog(ch) }, "Manage") : h("button", { type: "button", class: "btn sm ghost", onclick: () => leaveGroup(ch) }, "Leave"));
+    return;
+  }
+  if (ch.kind === "dm"){
+    const other = person(dmOther(ch));
+    chatEls.head.replaceChildren(avatar(other && other.id), h("span", { class: "x" }, h("b", {}, other ? other.full_name : "Someone"), h("br"), other ? statusLine(other.id) : null),
+      other && other.email ? h("button", { type: "button", class: "btn sm", onclick: () => openComposer({ to: other.email, name: other.full_name, templateFor: "any", tbl: "", entity_id: null }) }, "✉️ Send by email") : null);
+  } else {
+    const members = activePeople().filter(p => !ch.vertical || p.vertical === ch.vertical || p.is_admin);
+    const on = members.filter(p => isOnline(p.id)).length;
+    chatEls.head.replaceChildren(h("span", { class: "x" }, h("b", {}, "# " + ch.name), h("br"), h("span", { class: "muted", style: "font-size:12.5px" }, (ch.vertical ? ch.vertical + " team" : "Everyone") + " · " + members.length + " people · " + on + " online")),
+      h("span", { class: "stack" }, members.slice(0, 6).map(p => avatar(p.id, "sm"))));
+  }
+}
+function drawChatMessages(toBottom){
+  if (!chatEls) return;
+  const { msgs } = chatEls;
+  const atBottom = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 60;
+  const list = C.msgs[C.active] || [];
+  msgs.replaceChildren();
+  if (C.more[C.active]) msgs.append(h("div", { style: "text-align:center;margin:6px 0" }, h("button", { type: "button", class: "btn sm ghost", onclick: async () => { const h0 = msgs.scrollHeight; await loadEarlier(C.active); drawChatMessages(); msgs.scrollTop = msgs.scrollHeight - h0; } }, "Load earlier messages")));
+  if (!list.length) msgs.append(h("div", { class: "empty", style: "margin:auto" }, h("b", {}, "No messages yet"), "Say hello 👋"));
+  let lastDay = "", lastAuthor = null, lastT = 0;
+  for (const m of list){
+    const day = String(m.created_at).slice(0, 10), t = new Date(m.created_at).getTime();
+    if (day !== lastDay){ msgs.append(h("div", { class: "chat-day" }, h("span", {}, day === today() ? "Today" : day === addDays(today(), -1) ? "Yesterday" : fmtDate(day, true)))); lastDay = day; lastAuthor = null; }
+    const grouped = lastAuthor === m.author_id && t - lastT < 5 * 60000;
+    const mine = m.author_id === S.me.id;
+    const bodyEl = h("div", { class: "cb" }, renderRich(m.body), m.edited_at ? h("span", { class: "muted", style: "font-size:11.5px" }, " (edited)") : null);
+    const row = h("div", { class: "cmsg" + (grouped ? " g" : "") + ((m.mentions || []).includes(S.me.id) && !mine ? " me" : "") },
+      grouped ? h("span", { class: "ct" }, new Date(m.created_at).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })) : avatar(m.author_id, "sm"),
+      h("div", { class: "cc" }, grouped ? null : h("div", { class: "ch" }, h("b", {}, pname(m.author_id) || "Someone"), h("span", { class: "muted" }, new Date(m.created_at).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }))), bodyEl),
+      mine ? h("button", { type: "button", class: "cedit", title: "Edit", onclick: () => editMessage(m, bodyEl) }, "Edit") : null);
+    msgs.append(row); lastAuthor = m.author_id; lastT = t;
+  }
+  if (toBottom || atBottom) msgs.scrollTop = msgs.scrollHeight;
+}
+function editMessage(m, bodyEl){
+  const ta = h("textarea", { class: "in", rows: 2, maxlength: "4000" }); ta.value = m.body;
+  const save = async () => {
+    const v = ta.value.trim(); if (!v || v === m.body) { drawChatMessages(); return; }
+    try { const r = ok(await sb.from("chat_messages").update({ body: v, mentions: mentionIds(v) }).eq("id", m.id).select().single()); Object.assign(m, r); drawChatMessages(); }
+    catch (e) { fail(e, "Not saved"); }
+  };
+  ta.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); save(); } if (e.key === "Escape") { e.preventDefault(); drawChatMessages(); } });
+  bodyEl.replaceChildren(ta, h("div", { style: "display:flex;gap:6px;margin-top:4px" }, h("button", { type: "button", class: "btn sm pri", onclick: save }, "Save"), h("button", { type: "button", class: "btn sm ghost", onclick: () => drawChatMessages() }, "Cancel")));
+  ta.focus();
+}
+
+/* ---------- on Home: unread conversations ---------- */
+function messagesPanel(){
+  const items = C.channels.filter(c => C.unread[c.id]).sort((a, b) => String((C.last[b.id] || {}).created_at).localeCompare(String((C.last[a.id] || {}).created_at)));
+  const replies = rows("emails").filter(e => e.user_id === S.me.id && e.direction === "in" && !e.read_at).sort((a, b) => String(b.sent_at).localeCompare(String(a.sent_at)));
+  const online = activePeople().filter(p => p.id !== S.me.id && isOnline(p.id));
+  return h("div", { class: "panel" }, h("h2", {}, "Messages", h("button", { type: "button", class: "link", onclick: () => go("chat") }, "Open chat")),
+    items.length ? items.slice(0, 5).map(c => h("button", { type: "button", class: "row", onclick: async () => { await openChannel(c.id); go("chat"); } },
+      c.kind === "dm" ? avatar(dmOther(c), "sm") : h("span", { class: "tkey" }, c.kind === "group" ? "👥" : "#"),
+      h("span", { class: "x" }, h("b", {}, chName(c)), h("br"), h("span", { class: "muted", style: "font-size:13px" }, C.last[c.id] ? (pname(C.last[c.id].author_id).split(" ")[0] + ": " + C.last[c.id].body.slice(0, 60)) : "")),
+      h("span", { class: "cnt " + (c.kind !== "channel" || C.mentions[c.id] ? "due" : "new") }, String(C.unread[c.id]))))
+      : replies.length ? null : h("p", { class: "nothing" }, "You’re all caught up."),
+    replies.slice(0, 4).map(e => h("button", { type: "button", class: "row", onclick: () => openEmail(e) }, h("span", { class: "tkey" }, "✉️"),
+      h("span", { class: "x" }, h("b", {}, (e.from_email.replace(/<.*>/, "").trim() || e.from_email)), h("br"), h("span", { class: "muted", style: "font-size:13px" }, (e.subject + " · " + e.snippet).slice(0, 70))),
+      h("span", { class: "cnt due" }, "Reply"))),
+    replies.length > 4 ? h("button", { type: "button", class: "linkbtn", onclick: () => go("emails") }, "All " + replies.length + " email replies") : null,
+    online.length ? h("div", { style: "margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap" }, h("span", { class: "muted", style: "font-size:12.5px" }, online.length + " online:"),
+      online.slice(0, 10).map(p => h("button", { type: "button", class: "avbtn", title: "Message " + p.full_name, onclick: () => openDM(p.id) }, avatar(p.id, "sm")))) : null);
+}
+/* ---------------------------------------------------------------------
+   Problem reporting: automatic error capture, a "Report a problem" button,
+   and Admin panel › Problems (with "Copy for Claude")
+   --------------------------------------------------------------------- */
+const APP_VERSION = "2026-11j";
+const CRUMBS = [];                                   // the last things this person did, sent with a report
+function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
+window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
+document.addEventListener("click", e => {
+  const el = e.target && e.target.closest && e.target.closest("button, a, [role=button], .card, tr.click");
+  if (!el || el.closest(".bugdlg")) return;
+  const label = (el.getAttribute("aria-label") || el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 50);
+  if (label) crumb("clicked “" + label + "”");
+}, true);
+const ERR_SEEN = new Set(); let errCount = 0; const RECENT_ERRORS = [];
+function browserInfo(){
+  const ua = navigator.userAgent;
+  const b = /Edg\//.test(ua) ? "Edge" : /Chrome\//.test(ua) ? "Chrome" : /Firefox\//.test(ua) ? "Firefox" : /Safari\//.test(ua) ? "Safari" : "Browser";
+  const v = (ua.match(/(?:Edg|Chrome|Firefox|Version)\/(\d+)/) || [])[1] || "";
+  const os = /Mac OS X/.test(ua) ? (/iPhone|iPad/.test(ua) ? "iOS" : "macOS") : /Android/.test(ua) ? "Android" : /Windows/.test(ua) ? "Windows" : /Linux/.test(ua) ? "Linux" : "";
+  return { browser: b + (v ? " " + v : "") + (os ? " on " + os : ""), screen: innerWidth + "×" + innerHeight, ua };
+}
+async function captureError(message, stack, extra){
+  try {
+    const msg = String(message || "Unknown error").slice(0, 1500);
+    // ignore noise we can't fix: browser extensions, cancelled network requests, ResizeObserver chatter
+    if (/ResizeObserver loop|chrome-extension:|moz-extension:|Script error\.?$|AbortError|The user aborted|Load failed$|NetworkError when attempting/i.test(msg + " " + (stack || ""))) return;
+    RECENT_ERRORS.push({ t: new Date().toISOString(), m: msg.slice(0, 300) }); if (RECENT_ERRORS.length > 10) RECENT_ERRORS.shift();
+    if (!S.me || typeof sb === "undefined") return;
+    const fp = (msg.replace(/[0-9a-f]{8}-[0-9a-f-]{27}/g, "#").replace(/\d+/g, "#").slice(0, 160) + "|" + S.route).slice(0, 300);
+    if (ERR_SEEN.has(fp) || errCount >= 15) return;
+    ERR_SEEN.add(fp); errCount++;
+    await sb.from("problem_reports").insert({ user_id: S.me.id, kind: "auto", status: "Open", page: S.route || "", message: msg, fingerprint: fp,
+      details: { stack: String(stack || "").slice(0, 3000), steps: CRUMBS.slice(-12), version: APP_VERSION, ...browserInfo(), online: navigator.onLine, extra: extra || null } });
+  } catch (e) { /* never let reporting cause more trouble */ }
+}
+window.addEventListener("error", e => captureError(e.message || (e.error && e.error.message), e.error && e.error.stack, { file: (e.filename || "").split("/").pop(), line: e.lineno }));
+window.addEventListener("unhandledrejection", e => { const r = e.reason || {}; captureError("Unhandled: " + (r.message || String(r)), r.stack); });
+{ // problems loading data are worth knowing about too
+  const warn = console.warn.bind(console);
+  console.warn = (...a) => { warn(...a); if (typeof a[0] === "string" && /^(load |chat|google sync|mark read|presence)/.test(a[0])) captureError(a[0] + ": " + (a[1] && a[1].message ? a[1].message : String(a[1] || "")), a[1] && a[1].stack); };
+}
+
+/* ---------- the floating button ---------- */
+function bugButton(){
+  let b = document.getElementById("bugBtn");
+  if (!b){
+    b = h("button", { type: "button", id: "bugBtn", class: "bugbtn", "aria-label": "Report a problem", title: "Report a problem", onclick: () => openReportDialog() }, h("span", { class: "bi", "aria-hidden": "true" }, "🐞"), h("span", { class: "bt" }, "Report a problem"));
+    document.body.append(b);
+  }
+  b.hidden = !S.me;
+}
+function openReportDialog(){
+  crumb("opened Report a problem");
+  const note = h("textarea", { class: "in", rows: 5, maxlength: "4000", placeholder: "What went wrong? What were you trying to do, and what did you expect to happen?" });
+  let shot = null;
+  const prev = h("div", { class: "shotprev" });
+  const showShot = f => { shot = f; prev.replaceChildren(f ? h("img", { src: URL.createObjectURL(f), alt: "Screenshot" }) : "", f ? h("button", { type: "button", class: "btn sm ghost", onclick: () => showShot(null) }, "Remove") : ""); };
+  const fileIn = h("input", { type: "file", accept: "image/*", hidden: true, onchange: () => { const f = fileIn.files[0]; if (f && f.size > 8 * 1048576) { toast("That image is over 8 MB."); return; } showShot(f || null); } });
+  const err = h("p", { class: "err", hidden: true });
+  const send = h("button", { type: "button", class: "btn pri" }, "Send report");
+  const box = h("div", { class: "bugdlg" },
+    h("label", { class: "fl full" }, "What happened?", note),
+    h("div", { class: "fl full" }, h("span", { style: "display:flex;gap:8px;align-items:center" }, "Screenshot (optional)", h("button", { type: "button", class: "btn sm soft", onclick: () => fileIn.click() }, "Choose an image")), fileIn, prev,
+      h("span", { class: "hint" }, "Tip: take a screenshot (Cmd + Shift + 4 on a Mac, Windows + Shift + S on Windows), then paste it here with Cmd/Ctrl + V.")),
+    h("p", { class: "muted", style: "font-size:12.5px;margin:8px 0 0" }, "We also send this page (" + (S.route || "Home") + "), your browser, your last few clicks and any recent errors, so it can be fixed quickly. Only admins can see reports."),
+    err);
+  box.addEventListener("paste", e => { const it = [...(e.clipboardData ? e.clipboardData.items : [])].find(x => x.type.startsWith("image/")); if (it) { e.preventDefault(); showShot(it.getAsFile()); } });
+  send.addEventListener("click", async () => {
+    err.hidden = true;
+    if (!note.value.trim() && !shot) { err.textContent = "Add a short description or a screenshot."; err.hidden = false; return; }
+    send.disabled = true; send.textContent = "Sending…";
+    try {
+      const rep = ok(await sb.from("problem_reports").insert({ user_id: S.me.id, kind: "user", status: "Open", page: S.route || "", message: (RECENT_ERRORS.length ? "Recent error: " + RECENT_ERRORS[RECENT_ERRORS.length - 1].m : ""), note: note.value.trim(),
+        details: { steps: CRUMBS.slice(-15), recent_errors: RECENT_ERRORS.slice(-5), version: APP_VERSION, ...browserInfo(), online: navigator.onLine } }).select().single());
+      if (shot){
+        const path = "problem_reports/" + rep.id + "/" + Date.now() + "-" + (shot.name || "screenshot.png").replace(/[^\w.\-]+/g, "_");
+        try { ok(await sb.storage.from(FILE_BUCKET).upload(path, shot, { contentType: shot.type || "image/png", upsert: false }));
+          ok(await sb.from("files").insert({ tbl: "problem_reports", entity_id: rep.id, name: shot.name || "screenshot.png", path, size: shot.size, mime: shot.type || "image/png", uploaded_by: S.me.id })); }
+        catch (e) { console.warn("screenshot upload", e); }
+      }
+      notify(activePeople().filter(p => p.is_admin && p.id !== S.me.id).map(p => p.id), "Problem reported by " + S.me.full_name, (note.value.trim() || "Screenshot attached").slice(0, 140), "", null);
+      closeDlg(); toast("Thanks, your report was sent. An admin will look at it.");
+    } catch (e) { err.textContent = friendly(e); err.hidden = false; send.disabled = false; send.textContent = "Send report"; }
+  });
+  openDialog("Report a problem", [box], [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), send], true);
+  setTimeout(() => note.focus(), 30);
+}
+
+/* ---------- Admin panel › Problems ---------- */
+async function renderAdminProblems(el){
+  adminHeader(el, "Problems", "Errors the workspace caught automatically, and problems people reported with the 🐞 button.");
+  await load("problem_reports", true);
+  if (S.route !== "admin-problems") return;
+  if (!S.ui.problems) S.ui.problems = { view: "Open" };
+  const u = S.ui.problems;
+  const all = allRows("problem_reports");
+  // automatic errors with the same cause are grouped
+  const groupsOf = list => {
+    const g = new Map();
+    for (const r of list){ const k = r.kind === "auto" ? "auto|" + r.fingerprint : "user|" + r.id; if (!g.has(k)) g.set(k, []); g.get(k).push(r); }
+    return [...g.values()].map(rs => rs.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))).sort((a, b) => String(b[0].created_at).localeCompare(String(a[0].created_at)));
+  };
+  const shown = groupsOf(all.filter(r => u.view === "All" || r.status === u.view));
+  const openGroups = groupsOf(all.filter(r => r.status === "Open"));
+  el.append(statStrip([["Open", openGroups.length, openGroups.length ? "var(--bad)" : null], ["Reported by people", all.filter(r => r.kind === "user" && r.status === "Open").length], ["Caught automatically", openGroups.filter(g => g[0].kind === "auto").length], ["Fixed", groupsOf(all.filter(r => r.status === "Fixed")).length, "var(--ok)"]]));
+  el.append(h("div", { class: "tb" }, segmented([["Open","Open"], ["Fixed","Fixed"], ["Ignored","Ignored"], ["All","All"]], u.view, v => { u.view = v; rerender(); }),
+    h("button", { type: "button", class: "btn pri", disabled: !openGroups.length, onclick: () => copyForClaude(openGroups) }, "📋 Copy for Claude"),
+    h("button", { type: "button", class: "btn", disabled: !openGroups.length, onclick: () => downloadText("tcipher-problems-" + today() + ".txt", claudeText(openGroups), "text/plain;charset=utf-8") }, "Download as a file")));
+  if (!shown.length){ el.append(h("div", { class: "panel empty" }, h("b", {}, u.view === "Open" ? "No open problems 🎉" : "Nothing here"), u.view === "Open" ? "Anything someone reports, or any error the workspace catches, shows up here." : "")); return; }
+  for (const g of shown){
+    const r = g[0];
+    const card = h("div", { class: "panel prob" });
+    const files = (await sb.from("files").select("*").eq("tbl", "problem_reports").eq("entity_id", r.id)).data || [];
+    const det = r.details || {};
+    card.append(h("div", { class: "ph1" },
+      pill(r.kind === "user" ? "Reported" : "Automatic", r.kind === "user" ? "info" : "warn"), pill(r.status, r.status === "Open" ? "bad" : r.status === "Fixed" ? "ok" : "grey"),
+      h("b", {}, r.note ? r.note.slice(0, 90) + (r.note.length > 90 ? "…" : "") : r.message.slice(0, 110)),
+      h("span", { class: "grow" }), h("span", { class: "muted", style: "font-size:12.5px;white-space:nowrap" }, fmtAgo(r.created_at))),
+      h("div", { class: "muted", style: "font-size:13px;margin:4px 0 6px" }, (pname(r.user_id) || "Someone") + " · page: " + (r.page || "Home") + (g.length > 1 ? " · happened " + g.length + " times (" + [...new Set(g.map(x => pname(x.user_id).split(" ")[0]))].join(", ") + ")" : "") + (det.browser ? " · " + det.browser : "") + (det.version ? " · v" + det.version : "")));
+    if (r.note && r.note.length > 90) card.append(h("p", { style: "white-space:pre-wrap;margin:0 0 6px" }, r.note));
+    if (r.message && r.kind === "user") card.append(h("p", { class: "muted", style: "font-size:13px;margin:0 0 6px" }, r.message));
+    if (r.kind === "auto") card.append(h("p", { class: "code", style: "display:block;white-space:pre-wrap;margin:0 0 6px" }, r.message));
+    for (const f of files){
+      try { const { data } = await sb.storage.from(FILE_BUCKET).createSignedUrl(f.path, 3600); if (data && data.signedUrl) card.append(h("a", { href: data.signedUrl, target: "_blank", rel: "noopener" }, h("img", { src: data.signedUrl, alt: "Screenshot", class: "probshot" }))); } catch (e) {}
+    }
+    const more = h("div", { hidden: true, class: "probmore" },
+      (det.steps || []).length ? [h("b", {}, "What they did before"), h("ol", {}, det.steps.map(s => h("li", {}, s.s + " (" + new Date(s.t).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", second: "2-digit" }) + ")")))] : null,
+      (det.recent_errors || []).length ? [h("b", {}, "Recent errors"), h("ul", {}, det.recent_errors.map(x => h("li", {}, x.m)))] : null,
+      det.stack ? [h("b", {}, "Technical details"), h("pre", { class: "code", style: "white-space:pre-wrap;max-height:200px;overflow:auto" }, det.stack)] : null,
+      h("p", { class: "muted", style: "font-size:12px" }, "Screen " + (det.screen || "?") + " · " + (det.ua || "")));
+    const ids = g.map(x => x.id);
+    const setStatus = async (status) => {
+      let fixed_note = "";
+      if (status === "Fixed") { const v = prompt("How was it fixed? (optional, e.g. “Fixed in version 2026-11k”)", ""); if (v === null) return; fixed_note = v.trim(); }
+      try { ok(await sb.from("problem_reports").update({ status, fixed_note }).in("id", ids)); for (const x of g) Object.assign(x, { status, fixed_note });
+        if (status === "Fixed") { const reporters = [...new Set(g.filter(x => x.kind === "user" && x.user_id && x.user_id !== S.me.id).map(x => x.user_id))]; notify(reporters, "The problem you reported was fixed", (r.note || r.message).slice(0, 100) + (fixed_note ? " · " + fixed_note : ""), "", null); }
+        toast(status === "Open" ? "Reopened." : "Marked " + status.toLowerCase() + "."); rerender(); } catch (e) { fail(e, "Couldn’t update"); }
+    };
+    card.append(h("div", { style: "display:flex;gap:6px;flex-wrap:wrap;margin-top:8px" },
+      h("button", { type: "button", class: "btn sm ghost", onclick: ev => { more.hidden = !more.hidden; ev.currentTarget.textContent = more.hidden ? "Show details" : "Hide details"; } }, "Show details"),
+      h("span", { class: "grow", style: "flex:1" }),
+      r.status !== "Fixed" ? h("button", { type: "button", class: "btn sm ok", onclick: () => setStatus("Fixed") }, "Mark fixed") : null,
+      r.status === "Open" ? h("button", { type: "button", class: "btn sm", onclick: () => setStatus("Ignored") }, "Ignore") : h("button", { type: "button", class: "btn sm", onclick: () => setStatus("Open") }, "Reopen")),
+      ...[r.fixed_note ? h("p", { class: "muted", style: "font-size:12.5px;margin:6px 0 0" }, "Note: " + r.fixed_note) : null, more].filter(Boolean));
+    el.append(card);
+  }
+}
+function claudeText(groups){
+  const lines = ["Tcipher Workspace problems: " + groups.length + " open · workspace version " + APP_VERSION + " · copied " + new Date().toLocaleString("en-IN"), "",
+    "Please fix these. Screenshots, if any, are in Admin panel › Problems (I can attach them here).", ""];
+  groups.forEach((g, i) => {
+    const r = g[0], det = r.details || {}, who = person(r.user_id) || {};
+    lines.push("### " + (i + 1) + ". " + (r.kind === "user" ? "Reported by " + (who.full_name || "someone") : "Caught automatically") + (who.vertical ? " (" + who.vertical + (who.is_admin ? ", admin" : "") + ")" : who.is_admin ? " (admin)" : ""));
+    lines.push("When: " + new Date(r.created_at).toLocaleString("en-IN") + (g.length > 1 ? " · happened " + g.length + " times, to " + [...new Set(g.map(x => pname(x.user_id)))].join(", ") : ""));
+    lines.push("Page: " + (r.page || "Home") + " · " + (det.browser || "") + " · screen " + (det.screen || "?") + " · version " + (det.version || "?"));
+    if (r.note) lines.push("What they said: " + r.note);
+    if (r.message) lines.push("Error: " + r.message);
+    if ((det.recent_errors || []).length) lines.push("Recent errors: " + det.recent_errors.map(x => x.m).join(" | "));
+    if ((det.steps || []).length) lines.push("Steps before: " + det.steps.slice(-10).map(s => s.s).join(" → "));
+    if (det.stack) lines.push("Stack:\n" + String(det.stack).split("\n").slice(0, 8).join("\n"));
+    lines.push("");
+  });
+  return lines.join("\n");
+}
+async function copyForClaude(groups){
+  const text = claudeText(groups);
+  try { await navigator.clipboard.writeText(text); toast("Copied " + groups.length + " problem" + (groups.length === 1 ? "" : "s") + ". Paste it into your chat with Claude."); }
+  catch (e) { openDialog("Copy for Claude", [h("p", {}, "Select all and copy this text, then paste it into your chat with Claude."), h("textarea", { class: "in", rows: 14, readonly: true }, text)], [h("span", { class: "sp" }), h("button", { type: "button", class: "btn", onclick: closeDlg }, "Close")]); }
+}
+/* ---------------------------------------------------------------------
    Admin panel
    --------------------------------------------------------------------- */
 async function callAdmin(body){
@@ -4416,7 +4985,7 @@ async function callAdmin(body){
 }
 
 function adminHeader(el, title, desc, actions){
-  const tabs = [["admin-users","Users"], ["admin-roles","Roles & permissions"], ["admin-tasks","Task rules"], ["admin-google","Google"], ["admin-settings","Company settings"], ["admin-activity","Activity log"]];
+  const tabs = [["admin-users","Users"], ["admin-roles","Roles & permissions"], ["admin-tasks","Task rules"], ["admin-google","Google"], ["admin-problems","Problems"], ["admin-settings","Company settings"], ["admin-activity","Activity log"]];
   el.append(h("div", { class: "ph" }, h("div", {}, h("h1", {}, title), h("p", {}, desc)), actions ? h("div", { class: "acts" }, actions) : null));
   el.append(h("div", { class: "tb" }, h("div", { class: "seg", role: "tablist" }, tabs.map(([r, l]) => h("button", { type: "button", "aria-pressed": String(S.route === r), onclick: () => go(r) }, l)))));
 }
@@ -4705,23 +5274,35 @@ async function renderAdminActivity(el){
 const NAV = [
   ["", [["dashboard","Home"], ["overview","Company overview"], ["tasks","Tasks"], ["notes","Notes"], ["calendar","Calendar"], ["team-calendar","Team calendar"]]],
   ["Development", [["dev","Dev dashboard"], ["projects","Projects"], ["sprints","Sprints"], ["releases","Releases"], ["tickets","Support tickets"]]],
-  ["Sales", [["sales","Sales dashboard"], ["deals","Pipeline"], ["leads","Leads"], ["ig_leads","Instagram leads"], ["clients","Clients"], ["contacts","Contacts"], ["activities","Activities"], ["proposals","Proposals"], ["targets","Targets"], ["emails","Emails"], ["crm-analytics","Analytics"]]],
-  ["Marketing", [["marketing","Marketing dashboard"], ["leads","Leads"], ["ig_leads","Instagram leads"], ["campaigns","Campaigns"], ["content","Content calendar"], ["seo_keywords","SEO keywords"], ["social_stats","Social media"], ["emails","Emails"], ["crm-analytics","Analytics"]]],
-  ["Company", [["people","People"], ["leave_requests","Leave"], ["holidays","Holidays"], ["attendance","Attendance"], ["meetings","Meetings"], ["announcements","Announcements"], ["documents","Documents"]]],
+  ["Communication", [["chat","Chat"], ["emails","Emails"], ["announcements","Announcements"]]],
+  ["Sales", [["sales","Sales dashboard"], ["deals","Pipeline"], ["leads","Leads"], ["ig_leads","Instagram leads"], ["clients","Clients"], ["contacts","Contacts"], ["activities","Activities"], ["proposals","Proposals"], ["targets","Targets"], ["crm-analytics","Analytics"]]],
+  ["Marketing", [["marketing","Marketing dashboard"], ["leads","Leads"], ["ig_leads","Instagram leads"], ["campaigns","Campaigns"], ["content","Content calendar"], ["seo_keywords","SEO keywords"], ["social_stats","Social media"], ["crm-analytics","Analytics"]]],
+  ["Company", [["people","People"], ["leave_requests","Leave"], ["holidays","Holidays"], ["attendance","Attendance"], ["meetings","Meetings"], ["documents","Documents"]]],
   ["Admin", [["admin-users","Admin panel"]]]
 ];
 function canSee(route){
-  if (["dashboard","calendar","team-calendar","people","attendance","tasks","holidays"].includes(route)) return true;
+  if (["dashboard","calendar","team-calendar","people","attendance","tasks","holidays","chat"].includes(route)) return true;
   if (route === "overview") return isAdmin();
   if (route === "dev") return isAdmin() || S.me.vertical === "Development" || lvl("projects") >= 1;
   if (route === "sales") return isAdmin() || S.me.vertical === "Sales" || lvl("sales") >= 1;
   if (route === "marketing") return isAdmin() || S.me.vertical === "Marketing" || lvl("marketing") >= 1;
   if (route.startsWith("admin-")) return !!S.me.is_admin;
-  if (route === "crm-analytics" || route === "emails") return lvl("sales") >= 1 || lvl("leads") >= 1 || lvl("marketing") >= 1;
+  if (route === "crm-analytics") return lvl("sales") >= 1 || lvl("leads") >= 1 || lvl("marketing") >= 1;
+  if (route === "emails") return true;
   const M = MOD[route]; if (!M) return false;
   return access(M).canView;
 }
+// which menu sections are open (per person, per browser); your own team's section starts open
+function navState(){ try { return JSON.parse(localStorage.getItem("tc_nav_" + (S.me ? S.me.id : "")) || "{}"); } catch (e) { return {}; } }
+function navOpen(group, hasCurrent){
+  const st = navState();
+  if (hasCurrent) return true;
+  if (group in st) return !!st[group];
+  return group === "Communication" || group === S.me.vertical || (group === "Company" && !S.me.vertical && !isAdmin());
+}
+function setNavOpen(group, open){ const st = navState(); st[group] = open; try { localStorage.setItem("tc_nav_" + S.me.id, JSON.stringify(st)); } catch (e) {} }
 function renderShell(){
+  bugButton();
   const side = $("side");
   const label0 = (NAV.flatMap(([, i]) => i).find(([r]) => r === S.route) || [null, S.route.startsWith("admin-") ? "Admin panel" : ""])[1];
   $("crumb").textContent = label0 || "";
@@ -4731,7 +5312,7 @@ function renderShell(){
   // rebuild the sidebar only when something in it actually changed
   const role = byId("roles", S.me.role_id);
   const key = JSON.stringify([S.route, S.me.full_name, S.me.vertical, S.me.is_admin, role && role.permissions, S.settings.company,
-    NAV.flatMap(([, i]) => i).map(([r]) => { const b = badgeInfo(r); return [b.due, b.fresh, b.bang ? 1 : 0]; })]);
+    NAV.flatMap(([, i]) => i).map(([r]) => { const b = badgeInfo(r); return [b.due, b.fresh, b.bang ? 1 : 0]; }), JSON.stringify(navState())]);
   if (key === shellKey && side.children.length) return;
   shellKey = key;
   const oldNav = side.querySelector(".nav");
@@ -4741,15 +5322,27 @@ function renderShell(){
   const nav = h("nav", { class: "nav", "aria-label": "Main" });
   for (const [group, items] of NAV){
     // items shared by Sales and Marketing show under your own team only (admins see them under both)
-    const shared = ["leads","ig_leads","crm-analytics","emails"];
+    const shared = ["leads","ig_leads","crm-analytics"];
     const visible = items.filter(([r]) => canSee(r) && !(shared.includes(r) && ((group === "Sales" && !(isAdmin() || lvl("sales") >= 1)) || (group === "Marketing" && !(isAdmin() || lvl("marketing") >= 1)))));
     if (!visible.length) continue;
-    nav.append(h("div", { class: "nav-group" }, group ? h("h4", {}, group) : null, visible.map(([r, l]) => {
+    const links = visible.map(([r, l]) => {
       const badge = navBadge(r);
       const on = S.route === r || (r === "admin-users" && S.route.startsWith("admin-"));
       return h("a", { href: "#" + r, class: on ? "on" : null, onclick: () => side.classList.remove("open") }, l, badge);
-    })));
+    });
+    if (!group || group === "Admin") { nav.append(h("div", { class: "nav-group" }, group ? h("h4", {}, group) : null, links)); continue; }
+    // collapsible section: remembers open/closed, and shows the section's totals when closed
+    const hasCurrent = visible.some(([r]) => r === S.route);
+    const open = navOpen(group, hasCurrent);
+    let due = 0, fresh = 0, bang = false;
+    for (const [r] of visible){ if (group !== "Sales" && group !== "Marketing" || !["leads","ig_leads"].includes(r) || !(group === "Marketing" && (isAdmin() || lvl("sales") >= 1))) { const b = badgeInfo(r); due += b.due; fresh += b.fresh; bang = bang || !!b.bang; } }
+    const sum = !open && (due || fresh || bang) ? h("span", { class: "cnt " + (due || bang ? "due" : "new") }, due ? String(due > 99 ? "99+" : due) : bang ? "!" : (fresh > 99 ? "99+" : fresh) + " new") : null;
+    const body = h("div", { class: "nav-items", hidden: !open }, links);
+    const head = h("button", { type: "button", class: "nav-head", "aria-expanded": String(open), onclick: () => { const now = body.hidden; body.hidden = !now; head.setAttribute("aria-expanded", String(now)); setNavOpen(group, now); shellKey = ""; renderShell(); } },
+      h("span", { class: "chev", "aria-hidden": "true" }, "›"), h("span", { class: "gl" }, group), sum);
+    nav.append(h("div", { class: "nav-group coll" + (open ? " open" : "") }, head, body));
   }
+  nav.append(h("div", { class: "nav-group bugnav" }, h("a", { href: "#" + S.route, onclick: e => { e.preventDefault(); side.classList.remove("open"); openReportDialog(); } }, "🐞 Report a problem")));
   side.append(nav, h("div", { class: "foot" }, avatar(S.me.id),
     h("button", { type: "button", class: "who", style: "background:none;border:0;text-align:left;padding:0;cursor:pointer", onclick: openMyProfile, title: "My profile" },
       h("b", {}, S.me.full_name), h("span", {}, S.me.is_admin ? "Admin, all verticals" : [S.me.vertical, refLabel("roles", S.me.role_id)].filter(Boolean).join(" · ") || "Employee")),
@@ -4763,7 +5356,8 @@ let renderSeq = 0;
 async function rerender(){
   const seq = ++renderSeq;
   const route = (location.hash.replace(/^#/, "") || "dashboard");
-  if (S.route && S.route !== route && S.me) markSeen(S.route);   // leaving a tab: everything you saw there is no longer "new"
+  if (S.route && S.route !== route && S.me) markSeen(S.route);
+  if (route !== "chat") chatEls = null;   // leaving a tab: everything you saw there is no longer "new"
   S.route = route;
   if (S.me) markSeen(route);
   renderShell();
@@ -4794,11 +5388,13 @@ async function rerender(){
     else if (route === "admin-settings") renderAdminSettings(page);
     else if (route === "admin-tasks") renderAdminTaskRules(page);
     else if (route === "admin-google") await renderAdminGoogle(page);
+    else if (route === "admin-problems") await renderAdminProblems(page);
     else if (route === "team-calendar") await renderTeamCalendar(page);
     else if (route === "holidays") renderHolidays(page);
     else if (route === "admin-activity") await renderAdminActivity(page);
     else if (route === "crm-analytics") await renderCrmAnalytics(page);
     else if (route === "emails") await renderEmails(page);
+    else if (route === "chat") await renderChat(page);
     else if (MOD[route]) await renderModule(route, page);
     else page.append(h("div", { class: "panel empty" }, h("b", {}, "Page not found"), h("a", { href: "#dashboard" }, "Go to the dashboard")));
   } catch (e) {
@@ -4833,6 +5429,7 @@ function drawNotifications(){
       p.hidden = true;
       if (!n.is_read) { try { await sb.from("notifications").update({ is_read: true }).eq("id", n.id); n.is_read = true; renderShell(); } catch (e) {} }
       if (n.tbl === "connect-google") { if (googleConnected()) toast("Google is already connected."); else connectGoogle(); return; }
+      if (n.tbl === "emails") { (async () => { await load("emails", true); const e = byId("emails", n.entity_id); if (e) openEmail(e); else go("emails"); })(); return; }
       const key = Object.keys(MOD).find(k => MOD[k].table === n.tbl);
       if (key && n.entity_id) openRecord(key, n.entity_id);
     } }, h("b", {}, n.title), n.body ? h("span", {}, n.body) : null, h("span", {}, fmtAgo(n.created_at))));
@@ -4849,6 +5446,7 @@ function drawNotifications(){
 const pendingTables = new Set(); let liveT;
 function onChange(payload){
   const t = payload.table;
+  if (t === "chat_messages" || t === "chat_channels") { chatOnChange(payload); return; }
   if (t === "notifications") { loadNotifications(); if (payload.eventType === "INSERT" && payload.new && payload.new.user_id === S.me.id) toast(payload.new.title); return; }
   if (t === "comments" || t === "files"){
     const r = payload.new && payload.new.entity_id ? payload.new : payload.old;
@@ -4897,7 +5495,9 @@ async function startSession(session){
     showScreen("app");
     loadNotifications();
     setTimeout(prefetch, 1200);
-    if (googleOn()) { loadGoogle().catch(() => {}); autoSyncGoogle(); }   // Google ready before anyone clicks; calendar synced if it's been a while
+    if (googleOn()) { loadGoogle().catch(() => {}); autoSyncGoogle(); }
+    startPresence(); loadChat().then(() => { renderShell(); if (S.route === "dashboard") rerender(); });
+    if (isAdmin()) load("problem_reports").then(() => renderShell());   // Google ready before anyone clicks; calendar synced if it's been a while
     if (!channel){
       channel = sb.channel("ws-live").on("postgres_changes", { event: "*", schema: "public" }, onChange).subscribe();
     }
@@ -4910,13 +5510,14 @@ async function startSession(session){
 }
 // Quietly load every section this person can open, so switching pages is instant.
 async function prefetch(){
-  const want = new Set(["attendance","leave_requests","meetings","announcements","tasks","meeting_joins","calendar_events","google_links","notes","emails"]);
+  const want = new Set(["attendance","leave_requests","meetings","announcements","tasks","meeting_joins","calendar_events","google_links","notes","emails","presence"]);
   for (const M of Object.values(MOD)) if (access(M).canView) { want.add(M.table); (M.needs || []).forEach(t => want.add(t)); }
   for (const t of want){ if (!S.me) return; if (!S.loaded.has(t)) await load(t); }
   if (S.me) renderShell();            // menu highlights now have everything they need
 }
 function endSession(){
-  shellKey = ""; resetSeenCache();
+  { const b = document.getElementById("bugBtn"); if (b) b.hidden = true; }
+  shellKey = ""; resetSeenCache(); stopPresence(); Object.assign(C, { ready: false, channels: [], reads: {}, msgs: {}, more: {}, unread: {}, mentions: {}, last: {}, active: null, drafts: {} }); chatEls = null;
   if (channel) { sb.removeChannel(channel); channel = null; }
   S.me = null; S.cache = {}; S.loaded = new Set(); S.notifications = []; S.ui = {};
   closeDlg(); showScreen("login");

@@ -111,7 +111,7 @@ async function syncUserInner(userId: string) {
   must(await db.from("calendar_events").delete().eq("user_id", userId).gte("start_date", fromDay));
   for (let i = 0; i < rows.length; i += 200) must(await db.from("calendar_events").upsert(rows.slice(i, i + 200), { onConflict: "user_id,google_event_id" }));
   await db.from("google_links").update({ last_sync_at: new Date().toISOString(), last_error: "" }).eq("user_id", userId);
-  try { await syncReplies(userId); } catch (e) { console.warn("replies", userId, e); }
+  try { await syncReplies(userId); } catch (e) { await db.from("google_links").update({ last_error: "Reply check failed: " + String((e as Error)?.message || e).slice(0, 200) }).eq("user_id", userId); }
   return rows.length;
 }
 
@@ -232,10 +232,12 @@ function fromB64url(data: string): string {
 const escHtml = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const toHtml = (t: string) => "<div style=\"font-family:Arial,sans-serif;font-size:14px;line-height:1.5\">" +
   escHtml(t).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1">$1</a>').replace(/\n/g, "<br>") + "</div>";
-async function hasGmail(userId: string) {
+async function gmailScopes(userId: string) {
   const l = must(await db.from("google_links").select("scopes").eq("user_id", userId).maybeSingle());
-  return !!(l && String(l.scopes || "").includes("gmail.send"));
+  const sc = String((l && l.scopes) || "");
+  return { send: sc.includes("gmail.send"), read: sc.includes("gmail.readonly") };
 }
+async function hasGmail(userId: string) { return (await gmailScopes(userId)).send; }
 async function sendEmail(me: Any, body: Any) {
   if (!(await hasGmail(me.id))) throw new Error("Email isn’t allowed yet. In My profile, click Reconnect Google and tick the Gmail boxes.");
   const to = String(body.to || "").split(/[,;]/).map((x: string) => x.trim()).filter(Boolean);
@@ -306,37 +308,90 @@ function plainBody(payload: Any): string {
   return "";
 }
 // Only conversations started from the workspace are read; nothing else in the inbox is touched.
+// read one workspace conversation and record anything new in it
+async function readThread(userId: string, token: string, tid: string, origin: Any): Promise<{ found: number; checked: boolean; problem: string; stop: boolean }> {
+  let th: Any;
+  try { th = await g(token, GMAIL + "threads/" + tid + "?format=full"); }
+  catch (e) {
+    const msg = String((e as Error)?.message || e);
+    if (/insufficient|scope|permission|forbidden|403/i.test(msg)) return { found: 0, checked: false, stop: true, problem: "Replies can’t be checked: Gmail reading isn’t allowed for this account. In My profile, click Reconnect Google and tick every box." };
+    return { found: 0, checked: false, stop: false, problem: /not found|404/i.test(msg) ? "" : "Some conversations couldn’t be checked: " + msg.slice(0, 160) };
+  }
+  let found = 0;
+  const ids = (th.messages || []).map((m: Any) => m.id);
+  const known = new Set(((must(await db.from("emails").select("gmail_message_id").in("gmail_message_id", ids)) || []) as Any[]).map((r) => r.gmail_message_id));
+  for (const m of th.messages || []) {
+    if (known.has(m.id) || (m.labelIds || []).includes("DRAFT")) continue;
+    const hd = (n: string) => ((m.payload && m.payload.headers) || []).find((x: Any) => x.name.toLowerCase() === n)?.value || "";
+    const mine = (m.labelIds || []).includes("SENT");
+    const text = plainBody(m.payload).slice(0, 100000);
+    const row = { user_id: userId, direction: mine ? "out" : "in", tbl: origin.tbl, entity_id: origin.entity_id, from_email: hd("from"), to_email: hd("to"), cc: hd("cc"),
+      subject: hd("subject") || origin.subject, body: text, snippet: String(m.snippet || "").slice(0, 160), gmail_message_id: m.id, gmail_thread_id: tid, rfc_message_id: hd("message-id"),
+      sent_at: new Date(+m.internalDate || Date.now()).toISOString() };
+    const ins = await db.from("emails").insert(row).select("id").single();
+    if (ins.error) continue;
+    if (!mine) {
+      found++;
+      await logEmailActivity(userId, origin.tbl, origin.entity_id, "Inbound", row.subject, text);
+      // the notification opens the conversation
+      await db.from("notifications").insert({ user_id: userId, title: "Email reply from " + (row.from_email.replace(/<.*>/, "").trim() || row.from_email), body: (row.subject + " · " + String(m.snippet || "")).slice(0, 200), tbl: "emails", entity_id: ins.data.id });
+    }
+  }
+  return { found, checked: true, problem: "", stop: false };
+}
+// Quick check (every minute): ask Gmail only for what's new since the last check, then open just the
+// threads that were started from the workspace. Nothing else in the mailbox is read.
+async function quickReplies(userId: string): Promise<number> {
+  const sc = await gmailScopes(userId); if (!sc.read) return 0;
+  const link = must(await db.from("google_links").select("history_id").eq("user_id", userId).maybeSingle());
+  const token = await accessFor(userId);
+  const resetBookmark = async () => { const prof = await g(token, GMAIL + "profile"); await db.from("google_links").update({ history_id: String(prof.historyId || "") }).eq("user_id", userId); };
+  if (!link || !link.history_id) { await resetBookmark(); return 0; }
+  let page = "", latest = String(link.history_id); const threadIds = new Set<string>();
+  try {
+    for (let i = 0; i < 5; i++) {
+      const r = await g(token, GMAIL + "history?historyTypes=messageAdded&maxResults=500&startHistoryId=" + encodeURIComponent(link.history_id) + (page ? "&pageToken=" + encodeURIComponent(page) : ""));
+      for (const hh of r.history || []) for (const ma of hh.messagesAdded || []) if (ma.message && ma.message.threadId) threadIds.add(ma.message.threadId);
+      latest = String(r.historyId || latest); page = r.nextPageToken; if (!page) break;
+    }
+  } catch (_) {
+    // Gmail no longer has that bookmark (e.g. after a long break): start again, the 10-minute check covers the gap
+    await resetBookmark(); return 0;
+  }
+  await db.from("google_links").update({ history_id: latest }).eq("user_id", userId);
+  if (!threadIds.size) return 0;
+  const ours = must(await db.from("emails").select("gmail_thread_id,tbl,entity_id,subject").eq("user_id", userId).eq("direction", "out").in("gmail_thread_id", [...threadIds].slice(0, 300))) || [];
+  const map = new Map<string, Any>(); for (const o of ours) if (!map.has(o.gmail_thread_id)) map.set(o.gmail_thread_id, o);
+  let found = 0;
+  for (const [tid, origin] of map) found += (await readThread(userId, token, tid, origin)).found;
+  return found;
+}
 async function syncReplies(userId: string) {
-  if (!(await hasGmail(userId))) return 0;
+  const r = await checkReplies(userId);
+  return r.found;
+}
+async function checkReplies(userId: string): Promise<{ found: number; checked: number; problem: string }> {
+  const sc = await gmailScopes(userId);
+  if (!sc.send && !sc.read) return { found: 0, checked: 0, problem: "" };
+  if (!sc.read) {
+    const problem = "Replies can’t be checked: Google’s “View your email messages” box wasn’t ticked. In My profile, click Reconnect Google and tick every box.";
+    await db.from("google_links").update({ last_error: problem }).eq("user_id", userId);
+    return { found: 0, checked: 0, problem };
+  }
   const since = new Date(Date.now() - 60 * 864e5).toISOString();
   const outs = must(await db.from("emails").select("gmail_thread_id,tbl,entity_id,subject").eq("user_id", userId).eq("direction", "out").gte("sent_at", since).order("sent_at", { ascending: false }).limit(300)) || [];
   const threads = new Map<string, Any>(); for (const o of outs) if (o.gmail_thread_id && !threads.has(o.gmail_thread_id)) threads.set(o.gmail_thread_id, o);
-  if (!threads.size) return 0;
+  if (!threads.size) return { found: 0, checked: 0, problem: "" };
   const token = await accessFor(userId);
-  let found = 0;
+  let found = 0, checked = 0, problem = "";
   for (const [tid, origin] of [...threads.entries()].slice(0, 150)) {
-    let th: Any;
-    try { th = await g(token, GMAIL + "threads/" + tid + "?format=full"); } catch (_) { continue; }
-    const ids = (th.messages || []).map((m: Any) => m.id);
-    const known = new Set(((must(await db.from("emails").select("gmail_message_id").in("gmail_message_id", ids)) || []) as Any[]).map((r) => r.gmail_message_id));
-    for (const m of th.messages || []) {
-      if (known.has(m.id) || (m.labelIds || []).includes("DRAFT")) continue;
-      const hd = (n: string) => ((m.payload && m.payload.headers) || []).find((x: Any) => x.name.toLowerCase() === n)?.value || "";
-      const mine = (m.labelIds || []).includes("SENT");
-      const text = plainBody(m.payload).slice(0, 100000);
-      const row = { user_id: userId, direction: mine ? "out" : "in", tbl: origin.tbl, entity_id: origin.entity_id, from_email: hd("from"), to_email: hd("to"), cc: hd("cc"),
-        subject: hd("subject") || origin.subject, body: text, snippet: String(m.snippet || "").slice(0, 160), gmail_message_id: m.id, gmail_thread_id: tid, rfc_message_id: hd("message-id"),
-        sent_at: new Date(+m.internalDate || Date.now()).toISOString() };
-      const ins = await db.from("emails").insert(row);
-      if (ins.error) continue;
-      if (!mine) {
-        found++;
-        await logEmailActivity(userId, origin.tbl, origin.entity_id, "Inbound", row.subject, text);
-        await db.from("notifications").insert({ user_id: userId, title: "Reply from " + row.from_email.replace(/<.*>/, "").trim(), body: row.subject, tbl: origin.tbl === "profiles" ? "" : origin.tbl, entity_id: origin.tbl === "profiles" ? null : origin.entity_id });
-      }
-    }
+    const r = await readThread(userId, token, tid, origin);
+    if (r.checked) checked++;
+    found += r.found;
+    if (r.problem) { problem = r.problem; if (r.stop) break; }
   }
-  return found;
+  await db.from("google_links").update({ last_error: problem }).eq("user_id", userId);
+  return { found, checked, problem };
 }
 
 /* ---------------- handler ---------------- */
@@ -349,6 +404,13 @@ Deno.serve(async (req) => {
     const action = String(body.action || "");
 
     // Scheduled job: sync everyone + import today's and yesterday's Meet joins
+    if (action === "replies_all") {
+      if (!CRON || req.headers.get("x-cron-secret") !== CRON) return json({ error: "Not allowed." }, 403);
+      const links = must(await db.from("google_links").select("user_id,scopes")) || [];
+      let replies = 0, failed = 0;
+      for (const l of links.filter((x: Any) => String(x.scopes || "").includes("gmail.readonly"))) { try { replies += await quickReplies(l.user_id); } catch (_) { failed++; } }
+      return json({ ok: true, replies, failed });
+    }
     if (action === "sync_all") {
       if (!CRON || req.headers.get("x-cron-secret") !== CRON) return json({ error: "Not allowed." }, 403);
       const links = must(await db.from("google_links").select("user_id"));
@@ -401,7 +463,7 @@ Deno.serve(async (req) => {
       const full = must(await db.from("profiles").select("id,email,full_name,is_admin").eq("id", me.id).single());
       return json({ ok: true, email: await sendEmail(full, body) });
     }
-    if (action === "check_replies") return json({ ok: true, replies: await syncReplies(me.id) });
+    if (action === "check_replies") { let q = 0; try { q = await quickReplies(me.id); } catch (_) { /* the full check below still runs */ } const r = await checkReplies(me.id); return json({ ok: true, replies: q + r.found, checked: r.checked, problem: r.problem }); }
 
     const meetingId = String(body.meeting_id || "");
     if (!meetingId) return json({ error: "Missing meeting." }, 400);

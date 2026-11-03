@@ -1,6 +1,29 @@
 # Tcipher Workspace – changelog
 
-## Ready to go live: version 2026-11h (this folder)
+## Ready to go live: version 2026-11j (this folder)
+Needs:
+1. Run `upgrade-2026-11i.sql` in Supabase.
+2. Redeploy `google-sync-function.ts`.
+3. Run `google-sync-schedule.sql` again (adds the every-minute reply check).
+4. Upload `index.html`.
+- **Chat**, under the new **Communication** menu with Emails and Announcements: channels, direct messages and group chats; @mentions; editing; kept permanently; text only, with **Send by email** for files.
+- **Online dots and last active** for everyone; **Home › Messages** with unread chats and email replies.
+- **Collapsible menu sections**, which show their totals when closed and remember what you opened.
+- **Admins mark leave** for anyone, approved straight away.
+- **Email replies** checked every minute (only conversations started from the workspace).
+- **Problem reporting:** automatic error capture, the **🐞 Report a problem** button, and **Admin panel › Problems** with **Copy for Claude**.
+- **Fixes:**
+  - @ tagging list hidden at the bottom of dialogs
+  - admin-added leave saved under the wrong person
+  - starting a direct message failed
+  - dashboards scrolling sideways on laptops
+  - phone layout of the report button and attendance check-in
+- White logo in the menu and on the sign-in screen.
+- The @ name list opens above the box you’re typing in.
+- Fix: a stray “null” on Problems cards.
+- Tested: all 17 automated suites; every page as all 7 roles at phone, tablet, laptop and large-monitor sizes; very long names, titles and links.
+
+## Version 2026-11h (live 3 Nov 2026)
 Needs:
 1. Run `upgrade-2026-11h.sql` in Supabase.
 2. In Google Cloud, enable the Gmail API and add the Gmail scopes.
