@@ -407,6 +407,18 @@ button.busy:not(.btn):not(.iconbtn):not(.linkbtn):not(.link){opacity:.6;cursor:p
 .chat-unread::before,.chat-unread::after{content:"";flex:1;height:1px;background:#F3B5B7}
 .chat-jump{position:absolute;right:16px;bottom:10px;z-index:3;border:0;border-radius:999px;background:var(--p);color:#fff;font:inherit;font-size:12.5px;font-weight:700;padding:6px 12px;box-shadow:0 4px 14px rgba(27,20,80,.25);cursor:pointer}
 .chat-jump[hidden]{display:none}
+/* chat polish: their picture sits beside their last bubble (not beside the time), tighter spacing */
+.chat-msgs .cmsg.theirs.last > .av{margin-bottom:17px}
+.chat-msgs .cmsg.first{margin-top:6px}
+.chat-msgs .bmeta{margin:2px 6px 0;line-height:15px}
+.chat-msgs .bub{padding:7px 12px}
+/* the report tab: just the bug icon until you point at it, so it doesn't cover content */
+.bugbtn{padding:10px 0;width:28px;justify-content:center;align-items:center;opacity:.75;line-height:1}
+.bugbtn .bi{font-size:13px;line-height:1;display:block}
+.bugbtn .bt{max-height:0;overflow:hidden;transition:max-height .2s ease}
+.bugbtn:hover,.bugbtn:focus-visible{opacity:1}
+.bugbtn:hover .bt,.bugbtn:focus-visible .bt{max-height:160px}
+.chat-debug{position:fixed;left:12px;bottom:12px;z-index:2000;max-width:560px;max-height:46vh;overflow:auto;margin:0;padding:10px 12px;background:rgba(20,16,60,.92);color:#E9E6FF;font:11.5px/1.45 ui-monospace,Menlo,monospace;border-radius:10px;white-space:pre-wrap}
 .hday{flex:none;width:44px;height:44px;border-radius:10px;background:var(--tint);color:var(--p-ink);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
 .hday b{font-size:16px}
 .hday small{font-size:11px;font-weight:600;text-transform:uppercase;margin-top:2px}
@@ -4771,6 +4783,10 @@ async function openDM(userId){
   if (S.route !== "chat") go("chat"); else rerender();
 }
 function chatOnChange(payload){
+  try { chatOnChange0(payload); }
+  catch (e) { chatLog("error showing a message: " + (e && e.message)); captureError("Chat: error showing a message: " + (e && e.message), e && e.stack); if (S.route === "chat") rerender(); }
+}
+function chatOnChange0(payload){
   if (!C.ready) return;
   const m = payload.new; if (!m || !m.channel_id) return;
   if (payload.table === "chat_messages" && payload.eventType !== "UPDATE"){
@@ -4783,6 +4799,7 @@ function chatOnChange(payload){
   const list = C.msgs[m.channel_id];
   if (payload.eventType === "UPDATE"){ if (list){ const i = list.findIndex(x => x.id === m.id); if (i >= 0) list[i] = m; } if (S.route === "chat" && C.active === m.channel_id) drawChatMessages(); return; }
   if (list && !list.find(x => x.id === m.id)) list.push(m);
+  chatLog("message " + m.id + " from " + (pname(m.author_id) || "?").split(" ")[0] + (C.active === m.channel_id ? " (this chat)" : " (another chat)") + (S.route === "chat" ? "" : " · not on Chat"));
   C.last[m.channel_id] = m;
   if (!C.channels.find(c => c.id === m.channel_id)) { loadChat(true).then(() => { renderShell(); if (S.route === "chat") rerender(); }); return; }
   if (m.author_id === S.me.id){
@@ -4822,7 +4839,8 @@ async function renderChat(el){
   msgs.addEventListener("scroll", () => { if (chatEls) chatEls.pinned = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 40; drawJump(); }, { passive: true });
   // if the area grows (fonts, the typing line, the box below), stay at the newest message
   try { const ro = new ResizeObserver(() => { if (chatEls && chatEls.msgs === msgs && chatEls.pinned) msgs.scrollTop = msgs.scrollHeight; }); ro.observe(msgs); } catch (e) {}
-  chatEls = { list, head, msgs, ta, typing, live, jump };
+  chatEls = { list, head, msgs, ta, typing, live, jump, pending: true };   // being drawn off-screen, about to be shown
+  el._chatEls = chatEls;           // so the chat can always find the copy that's actually on screen
   el.append(h("div", { class: "chat" }, list, h("div", { class: "chat-main" }, head, h("div", { class: "chat-msgwrap" }, msgs, jump), typing, foot,
     h("p", { class: "muted", style: "font-size:12px;margin:4px 14px 10px" }, "Text and links only. To send a file, use ✉️ Email or 💬 WhatsApp at the top of a direct chat. Messages are kept permanently."))));
   ta.value = C.drafts[C.active] || "";
@@ -4851,6 +4869,7 @@ async function renderChat(el){
   setTimeout(() => ta.focus(), 50);
 }
 function drawChatList(){
+  if (!visibleChat()) return;
   if (!chatEls) return;
   const { list } = chatEls;
   const q = (C.q || "").toLowerCase();
@@ -4901,6 +4920,7 @@ function drawChatHead0(){
   }
 }
 function drawChatMessages(toBottom){
+  if (!visibleChat()) return;
   if (!chatEls) return;
   const { msgs } = chatEls;
   const atBottom = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 80;
@@ -4952,6 +4972,7 @@ function stickBottom(){
 }
 // "Jump to latest" when you've scrolled up (shows "New message" if one arrived meanwhile)
 function drawJump(){
+  if (!visibleChat()) return;
   if (!chatEls || !chatEls.jump) return;
   const m = chatEls.msgs, away = m.scrollHeight - m.scrollTop - m.clientHeight > 250;
   chatEls.jump.hidden = !away;
@@ -4999,6 +5020,7 @@ async function chatPoll(){
   if (!C.maxId) C.maxId = Math.max(0, ...Object.values(C.last).filter(Boolean).map(x => x.id), ...Object.values(C.msgs).flat().map(x => x.id));
   try {
     const rs = ok(await sb.from("chat_messages").select("*").gt("id", C.maxId || 0).order("id", { ascending: true }).limit(100)) || [];
+    if (rs.length) chatLog("backup check found " + rs.length + " new message" + (rs.length === 1 ? "" : "s"));
     for (const m of rs) chatOnChange({ table: "chat_messages", eventType: "INSERT", new: m });
     if (rs.length) C.maxId = Math.max(C.maxId, ...rs.map(x => x.id));
   } catch (e) { /* the next check tries again */ }
@@ -5073,7 +5095,9 @@ function stopChatLive(){
 }
 function liveConnected(){ const a = liveSubs[C.active]; return S.userLive === "SUBSCRIBED" && (!C.active || (a && a.st === "SUBSCRIBED")); }
 function drawLiveStatus(){
+  if (chatEls) visibleChat();
   const el = chatEls && chatEls.live; if (!el) return;
+  if (/debug/.test(location.hash)) drawChatDebug();
   const on = liveConnected();
   el.className = "live-dot" + (on ? " on" : "");
   el.textContent = on ? "Live" : "Connecting…";
@@ -5092,6 +5116,7 @@ async function onLiveNotif(p){
 }
 function liveSend(event, payload){ try { const sub = payload && liveSubs[payload.cid]; if (sub && sub.st === "SUBSCRIBED") sub.ch.send({ type: "broadcast", event, payload }); } catch (e) {} }
 async function onLiveMsg(p){
+  chatLog("live signal: message " + (p && p.mid) + (p && p.edit ? " (edited)" : ""));
   if (!p || !p.cid || !p.mid || !C.ready) return;
   if (!C.channels.find(c => c.id === p.cid)) { await loadChat(true); if (!C.channels.find(c => c.id === p.cid)) return; renderShell(); }   // a new chat someone started with you
   try {
@@ -5099,7 +5124,7 @@ async function onLiveMsg(p){
     if (!m) return;
     if (p.edit) chatOnChange({ table: "chat_messages", eventType: "UPDATE", new: m });
     else { chatOnChange({ table: "chat_messages", eventType: "INSERT", new: m }); delete typingAt[p.cid + "|" + m.author_id]; drawTyping(); }
-  } catch (e) {}
+  } catch (e) { chatLog("couldn’t show message " + p.mid + ": " + (e && e.message)); captureError("Chat: couldn’t show a new message: " + (e && e.message), e && e.stack); }
 }
 function onLiveTyping(p){
   if (!p || !p.cid || p.uid === S.me.id || !C.channels.find(c => c.id === p.cid)) return;
@@ -5112,6 +5137,7 @@ function onLiveRead(p){
   if ((C.othersRead[p.cid][p.uid] || 0) < p.last) { C.othersRead[p.cid][p.uid] = p.last; if (S.route === "chat" && C.active === p.cid) drawChatMessages(); }
 }
 function drawTyping(){
+  if (!visibleChat()) return;
   if (!chatEls || !chatEls.typing) return;
   const now = Date.now();
   const who = Object.entries(typingAt).filter(([k, t]) => k.startsWith(C.active + "|") && now - t < 4000).map(([k]) => pname(k.split("|")[1]).split(" ")[0]);
@@ -5139,11 +5165,42 @@ async function checkVersion(){
 setInterval(checkVersion, 5 * 60000);
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkVersion(); });
 setTimeout(checkVersion, 20000);
+
+/* ---------- always draw onto the chat that's on screen ----------
+   Pages are drawn off-screen and then swapped in. If two drafts of Chat finish out of order,
+   the chat could keep updating the one that was thrown away; this finds the visible one instead,
+   or redraws Chat if there isn't one. */
+let chatRedrawT = null;
+function visibleChat(){
+  if (chatEls && chatEls.msgs && (chatEls.msgs.isConnected || chatEls.pending)) return true;
+  const content = document.getElementById("content");
+  const cur = content && content.firstElementChild;
+  if (cur && cur._chatEls && cur._chatEls.msgs && cur._chatEls.msgs.isConnected) { chatEls = cur._chatEls; chatLog("switched to the chat on screen"); return true; }
+  if (S.route === "chat" && !chatRedrawT) { chatLog("chat not on screen: redrawing"); chatRedrawT = setTimeout(() => { chatRedrawT = null; if (S.route === "chat") rerender(); }, 30); }
+  return false;
+}
+/* ---------- diagnostics: open #chat/debug to watch live signals, backup checks and redraws ---------- */
+const CHATLOG = [];
+function chatLog(t){
+  CHATLOG.push(new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) + "  " + t);
+  if (CHATLOG.length > 40) CHATLOG.shift();
+  if (/debug/.test(location.hash)) drawChatDebug();
+}
+function drawChatDebug(){
+  let p = document.getElementById("chatDebug");
+  if (!/debug/.test(location.hash)) { if (p) p.remove(); return; }
+  if (!p) { p = h("pre", { id: "chatDebug", class: "chat-debug" }); document.body.append(p); }
+  const subs = Object.entries(liveSubs || {}).map(([id, x]) => (C.channels.find(c => c.id === id) || {}).name || id.slice(0, 6)).length;
+  p.textContent = "Chat diagnostics (version " + APP_VERSION + ")\n" +
+    "personal channel: " + (S.userLive || "–") + " · this chat: " + ((liveSubs[C.active] || {}).st || "–") + " · data feed: " + (S.live || "–") + " · chats listened to: " + subs + "\n" +
+    "on screen: " + !!(chatEls && chatEls.msgs && chatEls.msgs.isConnected) + " · newest message seen: " + (C.maxId || 0) + "\n\n" + CHATLOG.slice(-18).join("\n");
+}
+window.addEventListener("hashchange", drawChatDebug);
 /* ---------------------------------------------------------------------
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11n";
+const APP_VERSION = "2026-11o";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -5694,7 +5751,7 @@ function go(route){ if (location.hash !== "#" + route) location.hash = route; el
 let renderSeq = 0;
 async function rerender(){
   const seq = ++renderSeq;
-  const route = (location.hash.replace(/^#/, "") || "dashboard");
+  const route = (location.hash.replace(/^#/, "").replace(/\/debug$/, "") || "dashboard");
   if (S.route && S.route !== route && S.me) markSeen(S.route);
   if (route !== "chat") { chatEls = null; if (typeof C !== "undefined") { C.unreadFrom = {}; C.scrollToUnread = null; } }   // leaving Chat: the "New messages" line is redrawn fresh next time   // leaving a tab: everything you saw there is no longer "new"
   S.route = route;
@@ -5740,9 +5797,10 @@ async function rerender(){
     console.error(e);
     page.replaceChildren(h("div", { class: "panel empty" }, h("b", {}, "Something went wrong showing this page"), friendly(e)));
   }
-  if (seq !== renderSeq) return;
+  if (seq !== renderSeq) { if (page._chatEls) page._chatEls.pending = false; if (route === "chat" && typeof visibleChat === "function") visibleChat(); return; }   // a newer draft won: follow the one on screen
   clearTimeout(loadingT);
   el.replaceChildren(page);
+  if (route === "chat" && page._chatEls) { page._chatEls.pending = false; chatEls = page._chatEls; }
   if (lastRoute === route) window.scrollTo(0, sy);
   else window.scrollTo(0, 0);
   lastRoute = route;
