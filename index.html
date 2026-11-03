@@ -1129,15 +1129,35 @@ async function renderAdminStorage(el){
     meter("Files still in Supabase", u.supabase_bytes || 0, 1024 * 1048576, (u.supabase_files || 0) + " file" + ((u.supabase_files || 0) === 1 ? "" : "s") + ". The free plan allows 1 GB, so these are best moved to Google Drive.")];
   if (st.quota && st.quota.limit) parts.push(meter("Google Drive (your company’s shared storage)", +st.quota.usage || 0, +st.quota.limit, (u.drive_files || 0) + " workspace file" + ((u.drive_files || 0) === 1 ? "" : "s") + ", " + fmt(u.drive_bytes || 0) + ". Everything else in the meter is your company’s other Drive files."));
 
+  // what's happening with "Connect Google Drive", kept on the card until it's done
+  const setupNote = () => {
+    const d = S.ui.driveSetup; if (!d) return null;
+    if (d.state === "connecting") return h("p", { class: "muted" }, "Waiting for Google… finish signing in in the pop-up.");
+    if (d.state === "setting-up") return h("p", { class: "muted" }, "Connected to Google. Creating the two folders in your Drive…");
+    return h("div", { class: "err", style: "margin:0 0 10px;padding:10px 12px;border:1px solid var(--bad);border-radius:8px;background:#FFF5F6" },
+      h("b", {}, "Google Drive isn’t set up yet."), d.fix ? h("p", { style: "margin:4px 0 0" }, d.fix) : null,
+      h("p", { class: "muted", style: "margin:4px 0 0;font-size:12px" }, "Google said: " + d.message));
+  };
   // the Google Drive card
   const card = h("div", { class: "panel", style: "margin-bottom:12px" }, h("b", {}, "Google Drive"));
   const connectBtn = h("button", { type: "button", class: st.setup ? "btn ghost" : "btn pri" }, st.setup ? "Reconnect Google Drive" : "Connect Google Drive");
   connectBtn.addEventListener("click", async () => {
     if (!googleOn()) { toast("Google isn’t set up for this workspace yet."); return; }
+    S.ui.driveSetup = { state: "connecting" };
     const okc = await connectGoogle(DRIVE_SCOPE);
-    if (!okc) return;
-    try { await filesFn("setup", ""); toast("Google Drive is ready. The two workspace folders are in your Drive."); }
-    catch (e) { fail(e, "Google Drive not set up"); }
+    if (!okc) { S.ui.driveSetup = { state: "error", message: "Google sign-in didn’t finish. Click Connect Google Drive again; if a pop-up was blocked, allow pop-ups for this site." }; rerender(); return; }
+    S.ui.driveSetup = { state: "setting-up" }; rerender();
+    try { await filesFn("setup", ""); S.ui.driveSetup = null; toast("Google Drive is ready. The two workspace folders are in your Drive."); }
+    catch (e) {
+      const m = friendly(e);
+      // say what to do, and keep it on the card (a toast is easy to miss)
+      const fix = /has not been used|is disabled|accessNotConfigured|SERVICE_DISABLED/i.test(m) ? "The Google Drive API isn’t switched on yet. In console.cloud.google.com (project Tcipher Workspace), search for Google Drive API and click Enable. Wait 2 minutes, then click Connect Google Drive again."
+        : /tick the Google Drive box|permission is missing|insufficient|scope/i.test(m) ? "Google didn’t give Drive access. Click Connect Google Drive again, and on Google’s screen tick every box, including Google Drive."
+        : /isn’t deployed|404/i.test(m) ? "The files function isn’t deployed yet (setup guide, part 2)."
+        : "";
+      S.ui.driveSetup = { state: "error", message: m, fix };
+      captureError("Google Drive setup failed: " + m, fix);
+    }
     rerender();
   });
   if (!st.setup){
@@ -1146,7 +1166,7 @@ async function renderAdminStorage(el){
         h("li", {}, "Click Connect Google Drive and sign in with your tcipher.com account."),
         h("li", {}, "On Google’s screen, tick every box, including Google Drive (“See, edit, create and delete only the specific Google Drive files you use with this app”)."),
         h("li", {}, "Two folders appear in your Drive: Tcipher Workspace files and Tcipher Workspace backups.")),
-      st.message && !/Not set up/.test(st.message) ? h("p", { class: "err" }, st.message) : null, connectBtn);
+      ...[st.message && !/Not set up/.test(st.message) ? h("p", { class: "err" }, st.message) : null, setupNote(), connectBtn].filter(Boolean));
   } else {
     const on = useDrive();
     const toggle = h("input", { type: "checkbox", checked: on, disabled: !st.ok && !on });
@@ -1171,7 +1191,7 @@ async function renderAdminStorage(el){
       if (failed.length) progress.after(h("ul", { class: "muted", style: "font-size:12.5px" }, failed.slice(0, 20).map(x => h("li", {}, x.name + ": " + x.error))));
     });
     const f1 = st.folder || {}, f2 = st.backup_folder || {};
-    card.append(
+    card.append(...[setupNote(),
       h("p", { style: "margin:6px 0 0" }, pill(st.ok ? "Connected" : "Problem", st.ok ? "ok" : "bad"), " ", st.ok ? "Using " + (st.account || "your Google account") + "." : st.message),
       h("div", { class: "drive-folders" },
         h("div", {}, "📁 ", f1.link ? h("a", { href: f1.link, target: "_blank", rel: "noopener" }, f1.name || "Tcipher Workspace files") : (f1.name || "Tcipher Workspace files"), f1.shared_drive ? h("span", { class: "pill ok", style: "margin-left:6px" }, "In a Shared drive") : null),
@@ -1181,7 +1201,7 @@ async function renderAdminStorage(el){
       h("label", { class: "chk", style: "margin-top:10px" }, toggle, "Store new uploads in Google Drive"),
       h("div", { style: "margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap" }, moveBtn,
         h("span", { class: "muted", style: "font-size:12.5px" }, u.supabase_files > 0 ? u.supabase_files + " file" + (u.supabase_files === 1 ? "" : "s") + " still in Supabase" : "Nothing left in Supabase."), connectBtn),
-      progress);
+      progress].filter(Boolean));
   }
   // the nightly backup card
   const backup = h("div", { class: "panel", style: "margin-bottom:12px" }, h("b", {}, "Nightly backup"),
@@ -5756,7 +5776,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11u";
+const APP_VERSION = "2026-11v";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
