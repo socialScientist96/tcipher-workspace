@@ -16,6 +16,7 @@ The internal workspace for Tcipher's three verticals, **Development**, **Sales**
 | `upgrade-2026-11g.sql` | Sales and Marketing CRM: lead numbers, Instagram pipeline, form answers, call outcomes, history | Supabase › SQL Editor |
 | `upgrade-2026-11h.sql` | Email from your Gmail, and admin-marked attendance | Supabase › SQL Editor |
 | `upgrade-2026-11i.sql` | Chat (channels, direct messages, groups), online status, problem reports | Supabase › SQL Editor |
+| `upgrade-2026-11k.sql` | Chat notifications, live updates for chat, “Seen” | Supabase › SQL Editor |
 | `lead-capture-function.ts` | Optional: website forms post leads straight into the workspace | Supabase › Edge Functions, named `lead-capture` |
 | `CHANGELOG.md` | What’s in each version, and what still needs doing to go live | Keep with the files |
 
@@ -86,10 +87,12 @@ Each person then clicks **Connect Google** on their Home page, or in My profile,
   - Start a group with **+ New group**. The person who creates it can rename it and add or remove people; anyone can leave.
   - Type **@** to tag someone; they’re notified. Press **Enter** to send, **Shift + Enter** for a new line.
   - Edit your own messages (they show “edited”). Messages can’t be deleted and are kept permanently.
-  - Text and links only. To send a file, use **✉️ Send by email** in a direct message.
+  - Text and links only. To send a file, use **✉️ Email** or **💬 WhatsApp** at the top of a direct chat (WhatsApp needs the person’s phone number in My profile).
+  - Messages appear **instantly**, with no refresh: your messages on the right, others’ on the left. You’ll see **“… is typing”**, and **Seen** under your last message in a direct chat.
+  - Direct and group messages, and @mentions, create a **notification** (one per conversation, updated until you read it).
 - **Online and last active:** a green dot on anyone who’s online, and “Active 5 min ago” when they’re not. This shows on People, in chat, and wherever photos appear.
 - **Home › Messages:** your unread chats and new email replies, and who’s online.
-- **Menu sections open and close.** A closed section still shows its red (due) and “new” counts. Your own team’s section, and the page you’re on, stay open.
+- **Menu sections open and close.** They all start closed; click a section’s name to open or close it, and keep several open at once. The workspace remembers how you left them, and a closed section shows its red (due) and “new” counts.
 
 ## Problem reporting
 

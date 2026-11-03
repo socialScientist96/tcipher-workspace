@@ -360,6 +360,42 @@ button.row{max-width:calc(100% + 12px);min-width:0}
 .panel,.section,.grid>*{min-width:0}
 .panel h2{min-width:0;flex-wrap:wrap}
 .att{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}
+/* button loaders */
+@keyframes tc-spin{to{transform:rotate(360deg)}}
+.btn.busy,.iconbtn.busy,.linkbtn.busy,.link.busy{cursor:progress;opacity:.85}
+.btn.busy::before,.linkbtn.busy::before,.link.busy::before{content:"";display:inline-block;width:13px;height:13px;margin-right:7px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;vertical-align:-2px;animation:tc-spin .7s linear infinite;flex:none}
+.iconbtn.busy{color:transparent;position:relative}
+.iconbtn.busy::after{content:"";position:absolute;inset:0;margin:auto;width:14px;height:14px;border:2px solid var(--p);border-right-color:transparent;border-radius:50%;animation:tc-spin .7s linear infinite}
+button.busy:not(.btn):not(.iconbtn):not(.linkbtn):not(.link){opacity:.6;cursor:progress}
+@media (prefers-reduced-motion:reduce){.btn.busy::before,.linkbtn.busy::before,.link.busy::before,.iconbtn.busy::after{animation-duration:2s}}
+/* chat bubbles: yours on the right, everyone else on the left */
+.chat-msgs .cmsg{display:flex;align-items:flex-end;gap:8px;padding:1px 0;margin:0;background:none;grid-template-columns:none}
+.chat-msgs .cmsg.first{margin-top:8px}
+.chat-msgs .cmsg:hover{background:none}
+.chat-msgs .cmsg.mine{justify-content:flex-end}
+.chat-msgs .cmsg .avspace{width:28px;flex:none}
+.chat-msgs .cmsg .av{flex:none}
+.chat-msgs .bcol{display:flex;flex-direction:column;max-width:min(72%,560px);min-width:0}
+.chat-msgs .cmsg.mine .bcol{align-items:flex-end}
+.chat-msgs .bname{font-size:12px;font-weight:700;color:var(--ink2);margin:0 0 2px 12px}
+.chat-msgs .bub{padding:8px 12px;border-radius:18px;background:#EEEEF6;color:var(--ink);font-size:14px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}
+.chat-msgs .cmsg.theirs .bub{border-bottom-left-radius:6px}
+.chat-msgs .cmsg.theirs:not(.last) .bub{border-bottom-left-radius:18px;border-top-left-radius:6px}
+.chat-msgs .cmsg.theirs.first:not(.last) .bub{border-top-left-radius:18px;border-bottom-left-radius:6px}
+.chat-msgs .cmsg.mine .bub{background:var(--p);color:#fff;border-bottom-right-radius:6px}
+.chat-msgs .cmsg.mine:not(.last) .bub{border-bottom-right-radius:18px;border-top-right-radius:6px}
+.chat-msgs .cmsg.mine.first:not(.last) .bub{border-top-right-radius:18px;border-bottom-right-radius:6px}
+.chat-msgs .cmsg.mine .bub a{color:#fff;text-decoration:underline}
+.chat-msgs .cmsg.mine .bub .mention{background:rgba(255,255,255,.22);color:#fff}
+.chat-msgs .cmsg.mine .bub .tkey{background:rgba(255,255,255,.2);color:#fff}
+.chat-msgs .bub.tagged{box-shadow:0 0 0 2px #F5B700 inset}
+.chat-msgs .bmeta{font-size:11px;color:var(--ink3);margin:3px 6px 0}
+.chat-msgs .seen.on{color:var(--p);font-weight:600}
+.chat-msgs .cedit{align-self:center;visibility:hidden;background:none;border:0;color:var(--ink3);font-size:12px;cursor:pointer;padding:2px 4px}
+.chat-msgs .cmsg:hover .cedit{visibility:visible}
+.chat-msgs .bub textarea{color:var(--ink);background:#fff;min-width:220px}
+.chat-typing{min-height:18px;font-size:12.5px;color:var(--ink3);padding:0 16px 4px;font-style:italic}
+.chat-head .chat-acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .hday{flex:none;width:44px;height:44px;border-radius:10px;background:var(--tint);color:var(--p-ink);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
 .hday b{font-size:16px}
 .hday small{font-size:11px;font-weight:600;text-transform:uppercase;margin-top:2px}
@@ -556,6 +592,34 @@ const LOGO_WHITE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAM4AAABICAYAAA
    Small helpers
    --------------------------------------------------------------------- */
 const $ = id => document.getElementById(id);
+/* ---------------------------------------------------------------------
+   Loaders on every button: if a click starts something that takes time (it returns a promise),
+   the button ignores further clicks until it's done, and shows a spinner if it takes more than a moment.
+   --------------------------------------------------------------------- */
+(() => {
+  const add = EventTarget.prototype.addEventListener, remove = EventTarget.prototype.removeEventListener;
+  const wrapped = new WeakMap();
+  const done = btn => { clearTimeout(btn._busyT); clearTimeout(btn._busyMax); delete btn.dataset.busy; btn.removeAttribute("aria-busy"); btn.classList.remove("busy"); };
+  HTMLButtonElement.prototype.addEventListener = function(type, fn, opts){
+    if (type !== "click" || typeof fn !== "function") return add.call(this, type, fn, opts);
+    const btn = this;
+    const w = function(e){
+      if (btn.dataset.busy) { e.preventDefault(); e.stopImmediatePropagation(); return; }   // already working: ignore double clicks
+      const r = fn.call(this, e);
+      if (r && typeof r.then === "function"){
+        btn.dataset.busy = "1"; btn.setAttribute("aria-busy", "true");
+        btn._busyT = setTimeout(() => btn.classList.add("busy"), 120);            // no flicker for quick actions
+        btn._busyMax = setTimeout(() => done(btn), 60000);                         // never stuck for good
+        r.then(() => done(btn), () => done(btn));
+      }
+      return r;
+    };
+    wrapped.set(fn, w);
+    return add.call(this, type, w, opts);
+  };
+  HTMLButtonElement.prototype.removeEventListener = function(type, fn, opts){ return remove.call(this, type, (type === "click" && wrapped.get(fn)) || fn, opts); };
+})();
+
 function h(tag, attrs, ...kids){
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs || {})){
@@ -4616,6 +4680,7 @@ function chatTotals(){
 }
 async function openChannel(id){
   C.active = id;
+  const chx = C.channels.find(c => c.id === id); if (chx && chx.kind === "dm") loadOthersRead(id).then(() => { if (S.route === "chat" && C.active === id) drawChatMessages(); });
   if (!C.msgs[id]){
     const rs = ok(await sb.from("chat_messages").select("*").eq("channel_id", id).order("id", { ascending: false }).limit(60)) || [];
     C.msgs[id] = rs.reverse(); C.more[id] = rs.length === 60;
@@ -4632,6 +4697,7 @@ async function markChatRead(id){
   if (!maxId || (C.reads[id] || 0) >= maxId) { C.unread[id] = 0; C.mentions[id] = 0; return; }
   C.reads[id] = maxId; C.unread[id] = 0; C.mentions[id] = 0;
   try { await sb.from("chat_reads").upsert({ user_id: S.me.id, channel_id: id, last_read_id: maxId }, { onConflict: "user_id,channel_id" }); } catch (e) {}
+  liveSend("read", { cid: id, uid: S.me.id, last: maxId });
   renderShell();
 }
 async function openDM(userId){
@@ -4648,6 +4714,12 @@ async function openDM(userId){
 function chatOnChange(payload){
   if (!C.ready) return;
   const m = payload.new; if (!m || !m.channel_id) return;
+  if (payload.table === "chat_messages" && payload.eventType !== "UPDATE"){
+    C.seen = C.seen || new Set();
+    if (C.seen.has(m.id)) return;               // already handled (live update and the backup check can both deliver it)
+    C.seen.add(m.id);
+    if (m.id > (C.maxId || 0)) C.maxId = m.id;
+  }
   if (payload.table === "chat_channels"){ if (!C.channels.find(c => c.id === m.id)) { C.channels.push(m); C.reads[m.id] = C.reads[m.id] || 0; } if (S.route === "chat") rerender(); return; }
   const list = C.msgs[m.channel_id];
   if (payload.eventType === "UPDATE"){ if (list){ const i = list.findIndex(x => x.id === m.id); if (i >= 0) list[i] = m; } if (S.route === "chat" && C.active === m.channel_id) drawChatMessages(); return; }
@@ -4675,11 +4747,12 @@ async function renderChat(el){
   attachMentions(ta);
   const sendBtn = h("button", { type: "button", class: "btn pri" }, "Send");
   const foot = h("div", { class: "chat-foot" }, ta, sendBtn);
-  chatEls = { list, head, msgs, ta };
-  el.append(h("div", { class: "chat" }, list, h("div", { class: "chat-main" }, head, msgs, foot,
-    h("p", { class: "muted", style: "font-size:12px;margin:4px 14px 10px" }, "Text and links only. To send a file, use ✉️ Send by email. Messages are kept permanently."))));
+  const typing = h("div", { class: "chat-typing", "aria-live": "polite" });
+  chatEls = { list, head, msgs, ta, typing };
+  el.append(h("div", { class: "chat" }, list, h("div", { class: "chat-main" }, head, msgs, typing, foot,
+    h("p", { class: "muted", style: "font-size:12px;margin:4px 14px 10px" }, "Text and links only. To send a file, use ✉️ Email or 💬 WhatsApp at the top of a direct chat. Messages are kept permanently."))));
   ta.value = C.drafts[C.active] || "";
-  ta.addEventListener("input", () => { C.drafts[C.active] = ta.value; });
+  ta.addEventListener("input", () => { C.drafts[C.active] = ta.value; if (ta.value.trim() && Date.now() - typingSentAt > 2000) { typingSentAt = Date.now(); liveSend("typing", { cid: C.active, uid: S.me.id }); } });
   ta.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing && !(ta.parentNode.querySelector(".mention-pop:not([hidden])") || document.querySelector(".mention-pop:not([hidden])"))) { e.preventDefault(); send(); } });
   sendBtn.addEventListener("click", send);
   async function send(){
@@ -4690,10 +4763,12 @@ async function renderChat(el){
     try {
       const m = ok(await sb.from("chat_messages").insert({ channel_id: C.active, body, mentions, author_id: S.me.id }).select().single());
       (C.msgs[C.active] = C.msgs[C.active] || []).push(m); C.last[C.active] = m; C.reads[C.active] = m.id;
+      C.seen = C.seen || new Set(); C.seen.add(m.id); if (m.id > (C.maxId || 0)) C.maxId = m.id;
+      liveSend("msg", { cid: C.active, mid: m.id });
       sb.from("chat_reads").upsert({ user_id: S.me.id, channel_id: C.active, last_read_id: m.id }, { onConflict: "user_id,channel_id" }).then(() => {}, () => {});
       ta.value = ""; C.drafts[C.active] = "";
       const tagged = mentions.filter(x => x !== S.me.id && (ch.kind === "channel" || (ch.members || []).includes(x)));
-      if (tagged.length && ch.kind !== "dm") notify(tagged, pname(S.me.id) + " mentioned you in " + chName(ch), body.slice(0, 140), "", null);
+      // notifications for this message are created by the database (no double notifications)
       drawChatMessages(true); drawChatList();
     } catch (e) { fail(e, "Not sent"); }
     sendBtn.disabled = false; ta.focus();
@@ -4738,7 +4813,11 @@ function drawChatHead(){
   if (ch.kind === "dm"){
     const other = person(dmOther(ch));
     chatEls.head.replaceChildren(avatar(other && other.id), h("span", { class: "x" }, h("b", {}, other ? other.full_name : "Someone"), h("br"), other ? statusLine(other.id) : null),
-      other && other.email ? h("button", { type: "button", class: "btn sm", onclick: () => openComposer({ to: other.email, name: other.full_name, templateFor: "any", tbl: "", entity_id: null }) }, "✉️ Send by email") : null);
+      h("span", { class: "chat-acts" },
+        other && other.phone
+          ? h("button", { type: "button", class: "btn sm", title: "Opens WhatsApp with " + other.full_name.split(" ")[0], onclick: () => window.open("https://wa.me/" + waNumber(other.phone) + "?text=" + encodeURIComponent("Hi " + other.full_name.split(" ")[0] + ", "), "_blank", "noopener") }, "💬 WhatsApp")
+          : other ? h("button", { type: "button", class: "btn sm", disabled: true, title: other.full_name.split(" ")[0] + " hasn’t added a phone number in My profile yet" }, "💬 WhatsApp") : null,
+        other && other.email ? h("button", { type: "button", class: "btn sm", onclick: () => openComposer({ to: other.email, name: other.full_name, templateFor: "any", tbl: "", entity_id: null }) }, "✉️ Email") : null));
   } else {
     const members = activePeople().filter(p => !ch.vertical || p.vertical === ch.vertical || p.is_admin);
     const on = members.filter(p => isOnline(p.id)).length;
@@ -4749,31 +4828,44 @@ function drawChatHead(){
 function drawChatMessages(toBottom){
   if (!chatEls) return;
   const { msgs } = chatEls;
-  const atBottom = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 60;
+  const atBottom = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 80;
   const list = C.msgs[C.active] || [];
+  const ch = C.channels.find(c => c.id === C.active) || {};
+  const showNames = ch.kind !== "dm";
   msgs.replaceChildren();
   if (C.more[C.active]) msgs.append(h("div", { style: "text-align:center;margin:6px 0" }, h("button", { type: "button", class: "btn sm ghost", onclick: async () => { const h0 = msgs.scrollHeight; await loadEarlier(C.active); drawChatMessages(); msgs.scrollTop = msgs.scrollHeight - h0; } }, "Load earlier messages")));
   if (!list.length) msgs.append(h("div", { class: "empty", style: "margin:auto" }, h("b", {}, "No messages yet"), "Say hello 👋"));
+  // "Seen": in a direct chat, the other person has read up to here
+  const other = ch.kind === "dm" ? dmOther(ch) : null;
+  const seenUpTo = other ? ((C.othersRead[C.active] || {})[other] || 0) : 0;
+  const myLast = [...list].reverse().find(m => m.author_id === S.me.id);
   let lastDay = "", lastAuthor = null, lastT = 0;
-  for (const m of list){
+  list.forEach((m, i) => {
     const day = String(m.created_at).slice(0, 10), t = new Date(m.created_at).getTime();
     if (day !== lastDay){ msgs.append(h("div", { class: "chat-day" }, h("span", {}, day === today() ? "Today" : day === addDays(today(), -1) ? "Yesterday" : fmtDate(day, true)))); lastDay = day; lastAuthor = null; }
-    const grouped = lastAuthor === m.author_id && t - lastT < 5 * 60000;
+    const next = list[i + 1];
+    const first = !(lastAuthor === m.author_id && t - lastT < 5 * 60000);                         // first of a run from this person
+    const lastOfRun = !(next && next.author_id === m.author_id && new Date(next.created_at) - t < 5 * 60000 && String(next.created_at).slice(0, 10) === day);
     const mine = m.author_id === S.me.id;
-    const bodyEl = h("div", { class: "cb" }, renderRich(m.body), m.edited_at ? h("span", { class: "muted", style: "font-size:11.5px" }, " (edited)") : null);
-    const row = h("div", { class: "cmsg" + (grouped ? " g" : "") + ((m.mentions || []).includes(S.me.id) && !mine ? " me" : "") },
-      grouped ? h("span", { class: "ct" }, new Date(m.created_at).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })) : avatar(m.author_id, "sm"),
-      h("div", { class: "cc" }, grouped ? null : h("div", { class: "ch" }, h("b", {}, pname(m.author_id) || "Someone"), h("span", { class: "muted" }, new Date(m.created_at).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }))), bodyEl),
-      mine ? h("button", { type: "button", class: "cedit", title: "Edit", onclick: () => editMessage(m, bodyEl) }, "Edit") : null);
+    const time = new Date(m.created_at).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
+    const bubble = h("div", { class: "bub" + ((m.mentions || []).includes(S.me.id) && !mine ? " tagged" : "") }, renderRich(m.body));
+    const meta = lastOfRun ? h("div", { class: "bmeta" }, time, m.edited_at ? " · edited" : "",
+      mine && myLast && m.id === myLast.id && other ? h("span", { class: "seen" + (seenUpTo >= m.id ? " on" : "") }, seenUpTo >= m.id ? " · Seen" : " · Sent") : null) : (m.edited_at ? h("div", { class: "bmeta" }, "edited") : null);
+    const col = h("div", { class: "bcol" }, !mine && showNames && first ? h("div", { class: "bname" }, pname(m.author_id) || "Someone") : null, bubble, meta);
+    const row = h("div", { class: "cmsg " + (mine ? "mine" : "theirs") + (first ? " first" : "") + (lastOfRun ? " last" : "") },
+      !mine ? (lastOfRun ? avatar(m.author_id, "sm") : h("span", { class: "avspace" })) : null,
+      col,
+      mine ? h("button", { type: "button", class: "cedit", title: "Edit", "aria-label": "Edit message", onclick: () => editMessage(m, bubble) }, "Edit") : null);
+    if (mine) row.prepend(row.lastChild);            // edit button sits to the left of your bubble
     msgs.append(row); lastAuthor = m.author_id; lastT = t;
-  }
+  });
   if (toBottom || atBottom) msgs.scrollTop = msgs.scrollHeight;
 }
 function editMessage(m, bodyEl){
   const ta = h("textarea", { class: "in", rows: 2, maxlength: "4000" }); ta.value = m.body;
   const save = async () => {
     const v = ta.value.trim(); if (!v || v === m.body) { drawChatMessages(); return; }
-    try { const r = ok(await sb.from("chat_messages").update({ body: v, mentions: mentionIds(v) }).eq("id", m.id).select().single()); Object.assign(m, r); drawChatMessages(); }
+    try { const r = ok(await sb.from("chat_messages").update({ body: v, mentions: mentionIds(v) }).eq("id", m.id).select().single()); Object.assign(m, r); drawChatMessages(); liveSend("msg", { cid: m.channel_id, mid: m.id, edit: true }); }
     catch (e) { fail(e, "Not saved"); }
   };
   ta.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); save(); } if (e.key === "Escape") { e.preventDefault(); drawChatMessages(); } });
@@ -4799,11 +4891,86 @@ function messagesPanel(){
     online.length ? h("div", { style: "margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap" }, h("span", { class: "muted", style: "font-size:12.5px" }, online.length + " online:"),
       online.slice(0, 10).map(p => h("button", { type: "button", class: "avbtn", title: "Message " + p.full_name, onclick: () => openDM(p.id) }, avatar(p.id, "sm")))) : null);
 }
+
+/* ---------- backup for live updates ---------- */
+let chatPollT = null, notifPollT = null, lastChatPoll = 0;
+async function chatPoll(){
+  if (!S.me || !C.ready || document.visibilityState === "hidden") return;
+  const now = Date.now(), every = S.route === "chat" ? 4000 : 15000;
+  if (now - lastChatPoll < every - 200) return;
+  lastChatPoll = now;
+  if (!C.maxId) C.maxId = Math.max(0, ...Object.values(C.last).filter(Boolean).map(x => x.id), ...Object.values(C.msgs).flat().map(x => x.id));
+  try {
+    const rs = ok(await sb.from("chat_messages").select("*").gt("id", C.maxId || 0).order("id", { ascending: true }).limit(100)) || [];
+    for (const m of rs) chatOnChange({ table: "chat_messages", eventType: "INSERT", new: m });
+    if (rs.length) C.maxId = Math.max(C.maxId, ...rs.map(x => x.id));
+  } catch (e) { /* the next check tries again */ }
+}
+function startChatPolling(){
+  stopChatPolling();
+  chatPollT = setInterval(chatPoll, 2000);
+  notifPollT = setInterval(async () => {
+    if (!S.me || document.visibilityState === "hidden") return;
+    const before = new Set(S.notifications.map(n => n.id + "|" + n.created_at));
+    try { await loadNotifications(); } catch (e) { return; }
+    const fresh = S.notifications.filter(n => !n.is_read && !before.has(n.id + "|" + n.created_at) && before.size);
+    if (fresh.length) { toast(fresh[0].title); renderShell(); }
+  }, 20000);
+}
+function stopChatPolling(){ if (chatPollT) clearInterval(chatPollT); if (notifPollT) clearInterval(notifPollT); chatPollT = notifPollT = null; }
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { lastChatPoll = 0; chatPoll(); } });
+
+/* ---------- instant updates over the live connection ----------
+   A short signal ("new message in conversation X", never the text) goes to everyone online;
+   each browser then fetches the message through the normal access rules. */
+let liveCh = null; const typingAt = {}; let typingSentAt = 0;
+C.othersRead = C.othersRead || {};
+function startChatLive(){
+  stopChatLive();
+  try {
+    liveCh = sb.channel("ws-chat-live", { config: { broadcast: { self: false } } });
+    liveCh.on("broadcast", { event: "msg" }, ({ payload }) => onLiveMsg(payload));
+    liveCh.on("broadcast", { event: "typing" }, ({ payload }) => onLiveTyping(payload));
+    liveCh.on("broadcast", { event: "read" }, ({ payload }) => onLiveRead(payload));
+    liveCh.subscribe(st => { S.chatLive = st; if (st === "CHANNEL_ERROR" || st === "TIMED_OUT") captureError("Instant chat not connected: " + st, "", { realtime: st }); });
+  } catch (e) { console.warn("chat live", e); }
+}
+function stopChatLive(){ if (liveCh) { try { sb.removeChannel(liveCh); } catch (e) {} liveCh = null; } }
+function liveSend(event, payload){ try { if (liveCh) liveCh.send({ type: "broadcast", event, payload }); } catch (e) {} }
+async function onLiveMsg(p){
+  if (!p || !p.cid || !p.mid || !C.ready) return;
+  if (!C.channels.find(c => c.id === p.cid)) { await loadChat(true); if (!C.channels.find(c => c.id === p.cid)) return; renderShell(); }   // a new chat someone started with you
+  try {
+    const m = ok(await sb.from("chat_messages").select("*").eq("id", p.mid).maybeSingle());
+    if (!m) return;
+    if (p.edit) chatOnChange({ table: "chat_messages", eventType: "UPDATE", new: m });
+    else { chatOnChange({ table: "chat_messages", eventType: "INSERT", new: m }); delete typingAt[p.cid + "|" + m.author_id]; drawTyping(); }
+  } catch (e) {}
+}
+function onLiveTyping(p){
+  if (!p || !p.cid || p.uid === S.me.id || !C.channels.find(c => c.id === p.cid)) return;
+  typingAt[p.cid + "|" + p.uid] = Date.now(); drawTyping();
+  setTimeout(drawTyping, 4200);
+}
+function onLiveRead(p){
+  if (!p || !p.cid || !p.uid) return;
+  C.othersRead[p.cid] = C.othersRead[p.cid] || {};
+  if ((C.othersRead[p.cid][p.uid] || 0) < p.last) { C.othersRead[p.cid][p.uid] = p.last; if (S.route === "chat" && C.active === p.cid) drawChatMessages(); }
+}
+function drawTyping(){
+  if (!chatEls || !chatEls.typing) return;
+  const now = Date.now();
+  const who = Object.entries(typingAt).filter(([k, t]) => k.startsWith(C.active + "|") && now - t < 4000).map(([k]) => pname(k.split("|")[1]).split(" ")[0]);
+  chatEls.typing.textContent = who.length ? (who.length === 1 ? who[0] + " is typing…" : who.slice(0, 2).join(" and ") + (who.length > 2 ? " and others" : "") + " are typing…") : "";
+}
+async function loadOthersRead(cid){
+  try { const rs = ok(await sb.from("chat_reads").select("user_id,last_read_id").eq("channel_id", cid)) || []; C.othersRead[cid] = {}; for (const r of rs) if (r.user_id !== S.me.id) C.othersRead[cid][r.user_id] = +r.last_read_id || 0; } catch (e) {}
+}
 /* ---------------------------------------------------------------------
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11j";
+const APP_VERSION = "2026-11l";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -5292,13 +5459,12 @@ function canSee(route){
   const M = MOD[route]; if (!M) return false;
   return access(M).canView;
 }
-// which menu sections are open (per person, per browser); your own team's section starts open
+// which menu sections are open (per person, per browser)
 function navState(){ try { return JSON.parse(localStorage.getItem("tc_nav_" + (S.me ? S.me.id : "")) || "{}"); } catch (e) { return {}; } }
-function navOpen(group, hasCurrent){
+// sections start closed; each one stays the way you left it (several can be open at once)
+function navOpen(group){
   const st = navState();
-  if (hasCurrent) return true;
-  if (group in st) return !!st[group];
-  return group === "Communication" || group === S.me.vertical || (group === "Company" && !S.me.vertical && !isAdmin());
+  return group in st ? !!st[group] : false;
 }
 function setNavOpen(group, open){ const st = navState(); st[group] = open; try { localStorage.setItem("tc_nav_" + S.me.id, JSON.stringify(st)); } catch (e) {} }
 function renderShell(){
@@ -5429,6 +5595,7 @@ function drawNotifications(){
       p.hidden = true;
       if (!n.is_read) { try { await sb.from("notifications").update({ is_read: true }).eq("id", n.id); n.is_read = true; renderShell(); } catch (e) {} }
       if (n.tbl === "connect-google") { if (googleConnected()) toast("Google is already connected."); else connectGoogle(); return; }
+      if (n.tbl === "chat" && n.entity_id) { (async () => { if (!C.ready) await loadChat(); if (!C.channels.find(c => c.id === n.entity_id)) await loadChat(true); await openChannel(n.entity_id); go("chat"); rerender(); })(); return; }
       if (n.tbl === "emails") { (async () => { await load("emails", true); const e = byId("emails", n.entity_id); if (e) openEmail(e); else go("emails"); })(); return; }
       const key = Object.keys(MOD).find(k => MOD[k].table === n.tbl);
       if (key && n.entity_id) openRecord(key, n.entity_id);
@@ -5496,10 +5663,14 @@ async function startSession(session){
     loadNotifications();
     setTimeout(prefetch, 1200);
     if (googleOn()) { loadGoogle().catch(() => {}); autoSyncGoogle(); }
-    startPresence(); loadChat().then(() => { renderShell(); if (S.route === "dashboard") rerender(); });
+    startPresence(); startChatLive(); loadChat().then(() => { renderShell(); if (S.route === "dashboard") rerender(); startChatPolling(); });
     if (isAdmin()) load("problem_reports").then(() => renderShell());   // Google ready before anyone clicks; calendar synced if it's been a while
     if (!channel){
-      channel = sb.channel("ws-live").on("postgres_changes", { event: "*", schema: "public" }, onChange).subscribe();
+      channel = sb.channel("ws-live").on("postgres_changes", { event: "*", schema: "public" }, onChange).subscribe((status, err) => {
+        S.live = status;
+        // if live updates can't connect, the backup checks keep things current, and the problem is recorded for an admin
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") captureError("Live updates not connected: " + status + (err && err.message ? " (" + err.message + ")" : ""), "", { realtime: status });
+      });
     }
     rerender();
   } catch (e) {
@@ -5516,6 +5687,7 @@ async function prefetch(){
   if (S.me) renderShell();            // menu highlights now have everything they need
 }
 function endSession(){
+  stopChatPolling(); stopChatLive();
   { const b = document.getElementById("bugBtn"); if (b) b.hidden = true; }
   shellKey = ""; resetSeenCache(); stopPresence(); Object.assign(C, { ready: false, channels: [], reads: {}, msgs: {}, more: {}, unread: {}, mentions: {}, last: {}, active: null, drafts: {} }); chatEls = null;
   if (channel) { sb.removeChannel(channel); channel = null; }

@@ -1,6 +1,20 @@
 # Tcipher Workspace – changelog
 
-## Ready to go live: version 2026-11j (this folder)
+## Ready to go live: version 2026-11l (this folder; includes everything in 2026-11k, which was never uploaded)
+Needs: run `upgrade-2026-11k.sql` in Supabase, then upload `index.html`.
+- **Menu:** sections all start closed; clicking a section’s name always opens or closes it (including the one you’re on); several can be open at once; remembered.
+- **💬 WhatsApp in direct chats**, next to ✉️ Email: opens WhatsApp with that person’s number (from My profile).
+- Fixes the live problem where chat messages only appeared after a click.
+
+### Also in this release (from 2026-11k)
+- **Instant chat:** new messages, edits, “… is typing” and “Seen” arrive over the live connection, with no refresh. A backup check every few seconds covers a dropped connection.
+- **Chat bubbles:** yours on the right in purple, everyone else on the left with their picture, and names in groups and channels.
+- **Chat notifications:** direct and group messages and @mentions notify people. The database creates them, one per conversation, updated until read; opening the chat clears it.
+- **Loaders on every button:** a click that starts something slow shows a spinner, and double clicks are ignored, so nothing is saved twice.
+- If live updates can’t connect, it’s recorded automatically in Admin panel › Problems.
+- Tested: all 19 automated suites, plus real-browser checks at laptop and phone size.
+
+## Version 2026-11j (live 3 Nov 2026)
 Needs:
 1. Run `upgrade-2026-11i.sql` in Supabase.
 2. Redeploy `google-sync-function.ts`.
