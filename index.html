@@ -5756,7 +5756,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11t";
+const APP_VERSION = "2026-11u";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -6346,6 +6346,8 @@ const QA_COLS = {
     severity: ["severity"],
     module: ["module", "feature"],
     page: ["page", "section / screen", "section"],
+    app: ["app", "platform"],
+    time: ["time", "load time", "measured time"],
     url: ["url", "url / evidence"],
     steps: ["steps to reproduce", "steps"],
     expected: ["expected", "expected result"],
@@ -6553,11 +6555,21 @@ async function renderQAImport(el){
       const s = mapBugStatus(get("status"));
       let url = get("url"), evidence = "";
       if (url && !looksLikeUrl(url)) { evidence = url; url = ""; }
-      const title = get("title") || get("actual").slice(0, 140) || "Bug from " + t.name;
+      // a row with nothing in it but a date is not a bug
+      if (!get("external_id") && !get("title") && !get("notes") && !get("actual") && !get("steps")) return {};
+      const firstLine = v => String(v || "").split(/\n/).map(x => x.trim()).find(Boolean) || "";
+      const cut = v => v.length > 140 ? v.slice(0, 137).replace(/\s+\S*$/, "") + "…" : v;
+      const fromNotes = !get("title") && !get("actual") && !!get("notes");
+      const page = [get("app"), get("page")].filter(Boolean).join(" › ");
+      const title = get("title") || cut(firstLine(get("actual"))) || cut(firstLine(get("notes"))) || (page ? "Problem on " + page : "Bug from " + t.name);
+      const retest = get("retest");
+      if (/^pass/i.test(retest)) { s.status = "Done"; s.qa_state = "Passed"; }   // retested and passed: verified fixed
+      const details = [get("notes") && (fromNotes ? get("notes") : "Notes: " + get("notes")), get("time") && "Measured time: " + get("time"),
+        retest && !/^pass/i.test(retest) && "Retest: " + retest, get("date") && "Reported: " + get("date").slice(0, 10)].filter(Boolean).join("\n\n");
       return { external_id: get("external_id").slice(0, 80), title: title.slice(0, 300), _module: module, type: "Bug", vertical: "Development", bug_type: mapBugType(get("bug_type")) || "Bug",
-        severity: mapSeverity(get("severity")), priority: mapSeverity(get("severity")) || "Medium", page: get("page"), url, steps: get("steps"), expected_result: get("expected"), actual_result: get("actual"),
+        severity: mapSeverity(get("severity")), priority: mapSeverity(get("severity")) || "Medium", page: page.slice(0, 200), url, steps: get("steps"), expected_result: get("expected"), actual_result: get("actual"),
         suggested_fix: get("suggested_fix"), evidence, status: s.status, qa_state: s.qa_state || "", reopen_count: parseInt(get("reopen"), 10) || 0,
-        assignee_id: guessPerson(get("owner")) || null, tester_id: guessPerson(get("tester")) || t.tester || null, description: get("notes"), source: (st.file || "") + " › " + t.name };
+        assignee_id: guessPerson(get("owner")) || null, tester_id: guessPerson(get("tester")) || t.tester || null, description: details, source: (st.file || "") + " › " + t.name };
     }
     const H = t.header, get = (...names) => { for (const n of names){ const i = H.findIndex(c => c.startsWith(n)); if (i >= 0 && String(r[i] || "").trim()) return String(r[i]).trim(); } return ""; };
     if (kind === "ux_jobs"){
@@ -6615,7 +6627,17 @@ async function renderQAImport(el){
         const flush = async () => {
           if (!batch.length) return;
           const chunk = batch.splice(0, batch.length);
-          const saved = ok(await sb.from(table).insert(chunk.map(x => x.row)).select()) || [];
+          let saved;
+          try { saved = ok(await sb.from(table).insert(chunk.map(x => x.row)).select()) || []; }
+          catch (e) {
+            // one bad row refuses the whole batch: save them one at a time, so only that row is skipped
+            saved = []; const kept = [];
+            for (const c of chunk) {
+              try { const one = ok(await sb.from(table).insert(c.row).select().single()); saved.push(one); kept.push(c); }
+              catch (e1) { out.errors.push(t.name + " › " + (String(c.row.external_id || "").split("/").pop() || c.row.title.slice(0, 40)) + ": " + friendly(e1)); }
+            }
+            chunk.splice(0, chunk.length, ...kept);
+          }
           saved.forEach((s, i) => { upsertCache(table, s); const c = chunk[i]; if (c.comment) addComment("tasks", s.id, "Tester comments (imported): " + c.comment); if (c.forRow) backendFor[c.forRow] = s.id; });
           if (table === "test_cases") out.tc_new += saved.length; else if (t.kind === "bug") out.bug_new += saved.length; else out.jobs += saved.length;
         };
@@ -6632,7 +6654,8 @@ async function renderQAImport(el){
           for (const k of Object.keys(row)) if (k.startsWith("_")) delete row[k];
           if (t.kind === "ux_jobs") row.feature_id = featureOfRow[String(o.external_id || "").toUpperCase()] || null;
           else if (t.kind !== "ux_backend") {
-            row.feature_id = await featureFor(t.project, module, t);
+            try { row.feature_id = await featureFor(t.project, module, t); }
+            catch (e) { row.feature_id = null; out.errors.push(t.name + ": couldn’t create the feature “" + String(module).slice(0, 60) + "” (" + friendly(e) + "); its rows were imported without a feature"); }
             // a rare module that didn't become its own feature is kept with the row
             if (module && t.featureMode === "module" && qnorm(featureNameFor(t, module)) !== qnorm(module) && module !== t.name) {
               if (t.kind === "tc") row.notes = ["Module: " + module, row.notes].filter(Boolean).join("\n");
@@ -6647,7 +6670,7 @@ async function renderQAImport(el){
             try { const s = await updateRow(table, ex.id, upd); if (table === "test_cases") out.tc_upd++; else out.bug_upd++; if (forRow) backendFor[forRow] = s.id; }
             catch (e) { out.errors.push(t.name + " " + ext + ": " + friendly(e)); }
           } else batch.push({ row, comment, forRow });
-          if (batch.length >= 200) { try { await flush(); } catch (e) { out.errors.push(t.name + ": " + friendly(e)); } }
+          if (batch.length >= 200) { try { await flush(); } catch (e) { out.errors.push(t.name + ": " + friendly(e)); } tick(); }
           if (done % 25 === 0) tick();
         }
         try { await flush(); } catch (e) { out.errors.push(t.name + ": " + friendly(e)); }
@@ -6659,11 +6682,15 @@ async function renderQAImport(el){
         if (job && be && be.status !== "Done" && !(job.blocked_by || []).includes(beId)) { try { await updateRow("tasks", job.id, { blocked_by: [...(job.blocked_by || []), beId], blocked: false }); } catch (e) {} }
       }
       prog.replaceChildren(...[h("b", {}, "Done. "), [out.tc_new && out.tc_new + " test cases added", out.tc_upd && out.tc_upd + " updated", out.bug_new && out.bug_new + " bugs added", out.bug_upd && out.bug_upd + " bugs updated", out.jobs && out.jobs + " development tasks added", out.feats && out.feats + " features created", out.skipped && out.skipped + " empty rows skipped"].filter(Boolean).join(" · "),
-        out.errors.length ? h("div", { class: "err" }, out.errors.length + " row(s) couldn’t be saved: " + out.errors.slice(0, 5).join(" | ")) : null,
+        out.errors.length ? h("div", { class: "err", style: "margin-top:6px" }, h("b", {}, out.errors.length + " problem" + (out.errors.length === 1 ? "" : "s") + " (everything else was imported):"),
+          h("ul", { style: "margin:4px 0 0 18px;padding:0" }, out.errors.slice(0, 12).map(x => h("li", {}, x))), out.errors.length > 12 ? h("p", {}, "…and " + (out.errors.length - 12) + " more, listed in Admin panel › Problems.") : null) : null,
         h("div", { style: "margin-top:8px;display:flex;gap:8px" }, h("button", { type: "button", class: "btn sm", onclick: () => go("test_cases") }, "Open test cases"), h("button", { type: "button", class: "btn sm", onclick: () => go("bugs") }, "Open bugs"), h("button", { type: "button", class: "btn sm ghost", onclick: () => go("qa") }, "QA dashboard"))].filter(Boolean));
       toast("Import finished.");
-      if (out.errors.length) captureError("QA import: " + out.errors.length + " rows failed", out.errors.slice(0, 10).join("\n"));
-    } catch (e) { prog.replaceChildren(h("span", { class: "err" }, "Import stopped: " + friendly(e) + ". Rows already imported are kept; importing again carries on (matched by ID)."), " "); btn.disabled = false; }
+      if (out.errors.length) captureError("QA import: " + out.errors.length + " problems importing " + (st.file || "a sheet"), out.errors.slice(0, 50).join("\n"));
+    } catch (e) {
+      captureError("QA import stopped: " + friendly(e), "File: " + (st.file || "") + "\nRows done: " + done + " of " + total + "\n" + out.errors.slice(0, 20).join("\n"));
+      prog.replaceChildren(h("span", { class: "err" }, "Import stopped: " + friendly(e) + ". Rows already imported are kept; importing again carries on (matched by ID). This has been recorded in Admin panel › Problems."), " "); btn.disabled = false;
+    }
   }
 }
 // which features a tab would create from its Module column: modules used at least 3 times, not ID-like
@@ -6709,7 +6736,7 @@ async function callAdmin(body){
 }
 
 function adminHeader(el, title, desc, actions){
-  const tabs = [["admin-users","Users"], ["admin-roles","Roles & permissions"], ["admin-tasks","Task rules"], ["admin-google","Google"], ["admin-day","Day history"], ["admin-problems","Problems"], ["admin-settings","Company settings"], ["admin-activity","Activity log"]];
+  const tabs = [["admin-users","Users"], ["admin-roles","Roles & permissions"], ["admin-tasks","Task rules"], ["admin-google","Google"], ["admin-day","Day history"], ["admin-problems","Problems"], ["admin-storage","Storage"], ["admin-settings","Company settings"], ["admin-activity","Activity log"]];
   el.append(h("div", { class: "ph" }, h("div", {}, h("h1", {}, title), h("p", {}, desc)), actions ? h("div", { class: "acts" }, actions) : null));
   el.append(h("div", { class: "tb" }, h("div", { class: "seg", role: "tablist" }, tabs.map(([r, l]) => h("button", { type: "button", "aria-pressed": String(S.route === r), onclick: () => go(r) }, l)))));
 }
