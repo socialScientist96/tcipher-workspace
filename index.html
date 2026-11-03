@@ -454,6 +454,9 @@ button.busy:not(.btn):not(.iconbtn):not(.linkbtn):not(.link){opacity:.6;cursor:p
 .hbar .n{text-align:right;font-weight:700}
 tr.muted-row td{opacity:.55}
 select.in.sm{padding:4px 6px;font-size:13px;min-width:120px}
+/* @all */
+.mention.all{background:#FFF3D6;color:#8A5A00}
+.mention-item .allav{display:inline-flex;align-items:center;justify-content:center;background:#FFF3D6;font-size:13px}
 /* files in chat */
 .chat-attach{font-size:18px;padding:6px 10px;align-self:flex-end}
 .chat-main.drop{outline:2px dashed var(--p);outline-offset:-6px;background:var(--tint)}
@@ -478,7 +481,7 @@ select.in.sm{padding:4px 6px;font-size:13px;min-width:120px}
 /* status */
 .av.away::after{content:"";position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border-radius:50%;background:#F5A524;border:2px solid #fff}
 .lastact.st-away{color:#B45309} .lastact.st-bad{color:var(--bad)} .lastact.st-leave{color:var(--p)} .lastact.st-recent{color:var(--ink2)}
-.mystatus-slot{padding:0 12px 10px}
+.mystatus-slot{padding:10px 12px 12px}
 .mystatus{display:flex;align-items:center;gap:7px;width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);color:#DCDDFB;border-radius:8px;padding:6px 9px;font:inherit;font-size:12px;cursor:pointer;text-align:left}
 .mystatus:hover{background:rgba(255,255,255,.12)}
 .mystatus .dot{width:8px;height:8px;border-radius:50%;background:#9A9CC8;flex:none}
@@ -1444,7 +1447,7 @@ const MOD = {
       if (d.status === "Done" && (!prev || prev.status !== "Done")) { d.completed_at = new Date().toISOString(); d.blocked = false; }
       if (d.status && d.status !== "Done") d.completed_at = null;
       if (d.vertical && d.vertical !== "Development") { d.project_id = null; d.sprint_id = null; d.release_id = null; }
-      if (d.description !== undefined) d.mentions = [...new Set([...((prev && prev.mentions) || []), ...mentionIds(d.description)])];
+      if (d.description !== undefined) d.mentions = [...new Set([...((prev && prev.mentions) || []), ...mentionIds(d.description, { tbl: "tasks", rec: Object.assign({}, prev || {}, d) })])];
     },
     after: (rec, prev) => {
       const k = taskKey(rec) ? taskKey(rec) + " " : "";
@@ -1926,7 +1929,7 @@ const MOD = {
     ],
     render: (el, A) => notesBoard(el, A),
     before: (d, prev) => {
-      if (d.body !== undefined) d.mentions = [...new Set([...((prev && prev.mentions) || []), ...mentionIds(d.body)])];
+      if (d.body !== undefined) d.mentions = [...new Set([...((prev && prev.mentions) || []), ...mentionIds(d.body, { tbl: "notes", rec: Object.assign({ owner_id: S.me.id }, prev || {}, d) })])];
       if (!prev) d.owner_id = S.me.id;
       d.vertical = (prev && prev.vertical) || S.me.vertical || null;
       if (d.visibility && d.visibility !== "People") d.shared_with = [];
@@ -2427,7 +2430,7 @@ function commentsSection(tbl, id){
     const body = ta.value.trim(); if (!body) return;
     post.disabled = true;
     try {
-      const mentioned = mentionIds(body);
+      const mentioned = mentionIds(body, { tbl, rec: byId(tbl, id) || {} });
       ok(await sb.from("comments").insert({ tbl, entity_id: id, body, author_id: S.me.id, mentions: mentioned, ...(withKinds ? { kind } : {}) }));
       if (withKinds && kind === "Escalation"){ const rec0 = byId(tbl, id) || {}; notify(peopleWith(tbl === "deals" ? "sales" : "leads", 3).map(p => p.id).filter(x => x !== S.me.id), "Escalation on " + (rec0.lead_number ? rec0.lead_number + " " : "") + (rec0.name || rec0.title || ""), body.slice(0, 140), tbl, id); }
       ta.value = "";
@@ -3411,8 +3414,26 @@ function googleCard(){
 function escRe(s){ return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
 // Who is tagged in this text? Full names first (longest first, so "@Harshita" never also tags "Harsh"),
 // then a unique first name like "@Ankit".
-function mentionIds(text){
+// @all: who "everyone" means depends on where it's typed — always the people who can see that thing
+const AT_ALL = /(^|[^\p{L}\p{N}])@all(?![\p{L}\p{N}])/iu;
+function allAudience(ctx){
+  const people = activePeople(), ids = list => list.filter(Boolean);
+  if (!ctx) return ids(people.map(p => p.id));
+  if (ctx.channel) { const c = ctx.channel;
+    return c.kind === "channel" ? ids(people.filter(p => !c.vertical || p.vertical === c.vertical || p.is_admin).map(p => p.id)) : ids(c.members || []); }
+  const r = ctx.rec || {};
+  if (ctx.tbl === "notes") {
+    if (r.visibility === "Company") return ids(people.map(p => p.id));
+    if (r.visibility === "Vertical") return ids(people.filter(p => p.vertical === r.vertical || p.is_admin).map(p => p.id));
+    if (r.visibility === "People") return ids([...(r.shared_with || []), r.owner_id]);
+    return ids([r.owner_id]);   // a private note: nobody else to tell
+  }
+  if (r.vertical) return ids(people.filter(p => p.vertical === r.vertical || p.is_admin || [r.assignee_id, r.reviewer_id, r.created_by].includes(p.id) || (r.collaborators || []).includes(p.id)).map(p => p.id));
+  return ids(people.map(p => p.id));
+}
+function mentionIds(text, ctx){
   const t = String(text || ""); if (!t.includes("@")) return [];
+  if (AT_ALL.test(t)) return [...new Set([...allAudience(ctx).filter(id => id !== (S.me && S.me.id)), ...mentionIds(t.replace(new RegExp(AT_ALL.source, "giu"), "$1"), ctx)])];
   const people = activePeople().slice().sort((a, b) => b.full_name.length - a.full_name.length);
   const found = new Set(); let rest = t;
   for (const p of people){
@@ -3427,7 +3448,8 @@ function mentionIds(text){
   }
   return [...found];
 }
-function attachMentions(ta){
+function attachMentions(ta, opts){
+  opts = opts || {};
   // The list floats on top of everything (inside the open dialog, if any) and is placed where it fits:
   // below the box if there's room, otherwise above it. It used to open inside the scrolling area and get cut off.
   const box = h("div", { class: "mention-pop", role: "listbox", hidden: true });
@@ -3446,8 +3468,8 @@ function attachMentions(ta){
     box.style.width = wBox + "px";
   };
   const close = () => { box.hidden = true; start = -1; };
-  const draw = () => box.replaceChildren(...items.map((p, i) => h("button", { type: "button", class: "mention-item" + (i === idx ? " on" : ""), role: "option",
-    onmousedown: e => { e.preventDefault(); pick(p); } }, avatar(p.id, "sm"), h("span", {}, p.full_name), h("small", {}, p.vertical || p.title || ""))));
+  const draw = () => box.replaceChildren(...items.map((p, i) => h("button", { type: "button", class: "mention-item" + (i === idx ? " on" : "") + (p.all ? " all" : ""), role: "option",
+    onmousedown: e => { e.preventDefault(); pick(p); } }, p.all ? h("span", { class: "av sm allav", "aria-hidden": "true" }, "👥") : avatar(p.id, "sm"), h("span", {}, p.full_name), h("small", {}, p.all ? p.title : (p.vertical || p.title || "")))));
   const pick = p => {
     const pos = ta.selectionStart;
     ta.value = ta.value.slice(0, start) + "@" + p.full_name + " " + ta.value.slice(pos);
@@ -3461,6 +3483,8 @@ function attachMentions(ta){
     start = pos - m[2].length - 1;
     const q = m[2].toLowerCase();
     items = activePeople().filter(p => p.id !== S.me.id && (!q || p.full_name.toLowerCase().startsWith(q) || p.full_name.toLowerCase().split(/\s+/).some(w => w.startsWith(q)))).slice(0, 6);
+    // @all comes first when it matches what's typed
+    if ("all".startsWith(q)) items.unshift({ id: "__all", all: true, full_name: "all", title: typeof opts.allLabel === "function" ? opts.allLabel() : (opts.allLabel || "Everyone who can see this") });
     if (!items.length) { close(); return; }
     idx = 0; draw(); box.hidden = false; place();
   };
@@ -3486,6 +3510,7 @@ function renderRich(text){
   while ((m = re.exec(t))){
     if (m.index > last) out.push(t.slice(last, m.index));
     const tok = m[0];
+    if (tok[0] === "@" && /^@all$/i.test(tok)) { out.push(h("span", { class: "mention all", title: "Everyone" }, tok)); last = m.index + tok.length; continue; }
     if (tok[0] === "@"){
       const ids = mentionIds(tok);
       out.push(ids.length ? h("span", { class: "mention", title: pname(ids[0]) }, tok) : tok);
@@ -3707,6 +3732,9 @@ function notesBoard(el, A){
   el.append(h("div", { class: "tb" }, q, segmented([["all","All I can see"], ["mine","Mine"], ["shared","Shared with me"]], u.scope, v => { u.scope = v; draw(); })), grid);
   draw();
 }
+
+// for the preview's automated tests only
+window.__tagTest = { mentionIds: (t, c) => mentionIds(t, c), allAudience: c => allAudience(c), people: () => activePeople().map(p => p.full_name + ":" + p.vertical) };
 /* ---------------------------------------------------------------------
    Team calendar: everyone's day, side by side
    --------------------------------------------------------------------- */
@@ -5100,7 +5128,7 @@ async function renderChat(el){
   if (!C.active){ const g = C.channels.find(c => c.kind === "channel" && c.name === "general") || C.channels[0]; if (g) await openChannel(g.id); }
   const list = h("div", { class: "chat-list" }), head = h("div", { class: "chat-head" }), msgs = h("div", { class: "chat-msgs", role: "log", "aria-live": "polite" });
   const ta = h("textarea", { class: "in", rows: 2, maxlength: "4000", placeholder: "Write a message… type @ to tag someone. Enter to send, Shift + Enter for a new line." });
-  attachMentions(ta);
+  attachMentions(ta, { allLabel: () => { const c = C.channels.find(x => x.id === C.active); return !c ? "Everyone here" : c.kind === "channel" ? (c.vertical ? "Everyone in the " + c.vertical + " team" : "Everyone in the company") : "Everyone in this conversation"; } });
   const sendBtn = h("button", { type: "button", class: "btn pri" }, "Send");
   const fileIn = h("input", { type: "file", multiple: true, hidden: true });
   const attachBtn = h("button", { type: "button", class: "btn ghost chat-attach", title: "Attach files (up to 100 MB each)", "aria-label": "Attach files" }, "📎");
@@ -5141,7 +5169,7 @@ async function renderChat(el){
     const ready = ups.filter(u => u.state === "ready");
     if (!body && !ready.length) return;
     const ch = C.channels.find(c => c.id === C.active);
-    const mentions = mentionIds(body);
+    const mentions = mentionIds(body, { channel: ch });
     sendBtn.disabled = true;
     try {
       const m = ok(await sb.from("chat_messages").insert(Object.assign({ channel_id: C.active, body, mentions, author_id: S.me.id }, ready.length ? { attachments: ready.map(u => ({ id: u.file.id })) } : {})).select().single());
@@ -5158,6 +5186,7 @@ async function renderChat(el){
     sendBtn.disabled = false; ta.focus();
   }
   drawChatList(); drawChatHead(); drawChatMessages(true);
+  fitChat(); requestAnimationFrame(fitChat);
   setTimeout(() => ta.focus(), 50);
 }
 function drawChatList(){
@@ -5290,7 +5319,7 @@ function editMessage(m, bodyEl){
   const ta = h("textarea", { class: "in", rows: 2, maxlength: "4000" }); ta.value = m.body;
   const save = async () => {
     const v = ta.value.trim(); if (!v || v === m.body) { drawChatMessages(); return; }
-    try { const r = ok(await sb.from("chat_messages").update({ body: v, mentions: mentionIds(v) }).eq("id", m.id).select().single()); Object.assign(m, r); drawChatMessages(); }
+    try { const r = ok(await sb.from("chat_messages").update({ body: v, mentions: mentionIds(v, { channel: C.channels.find(c => c.id === m.channel_id) }) }).eq("id", m.id).select().single()); Object.assign(m, r); drawChatMessages(); }
     catch (e) { fail(e, "Not saved"); }
   };
   ta.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); save(); } if (e.key === "Escape") { e.preventDefault(); drawChatMessages(); } });
@@ -5518,6 +5547,14 @@ document.addEventListener("visibilitychange", () => {
   if (S.route === "chat" && C.active && (C.unread[C.active] || 0) > 0) { markChatRead(C.active); drawChatList(); }
   updateTabTitle();
 });
+
+// the chat fills the window down to the bottom, whatever the screen size
+function fitChat(){
+  const el = document.querySelector("#content .chat"); if (!el) return;
+  const top = el.getBoundingClientRect().top;
+  if (top > 0) el.style.height = Math.max(420, Math.floor(window.innerHeight - top - 16)) + "px";
+}
+window.addEventListener("resize", () => { if (S.route === "chat") fitChat(); });
 /* ---------------------------------------------------------------------
    Files in chat: up to 100 MB each, kept in Google Drive.
    The browser sends each file straight to Google through a one-time upload slot the "files"
@@ -5948,7 +5985,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11w";
+const APP_VERSION = "2026-11x";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
