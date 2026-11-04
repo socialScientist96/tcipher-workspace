@@ -700,6 +700,9 @@ dialog[open]::backdrop{animation:fadeIn .16s ease-out}
 .side{scroll-behavior:auto;overscroll-behavior:contain}
 .content{min-height:calc(100vh - 60px)}
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{transition:none !important;animation:none !important}}
+
+/* replies sent by email */
+.viaemail{color:var(--ink3);font-size:11.5px;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -2509,6 +2512,7 @@ function commentsSection(tbl, id){
       if (!cs.length) list.append(h("p", { class: "nothing" }, "No comments yet."));
       for (const c of cs) list.append(h("div", { class: "cmt" }, avatar(c.author_id, "sm"),
         h("div", { class: "bd" }, h("div", { class: "hd" }, h("b", {}, pname(c.author_id) || "Someone"), c.kind && c.kind !== "Info" ? h("span", { class: "pill " + (c.kind === "Escalation" ? "bad" : "ok"), style: "font-size:11px" }, c.kind === "Action" ? "Action needed" : c.kind) : null, fmtAgo(c.created_at),
+          c.via_email ? h("span", { class: "viaemail", title: "Posted by replying to an email" }, " · ✉️ via email") : null,
           ((c.author_id === S.me.id && tbl !== "tasks") || S.me.is_admin) ? h("button", { type: "button", class: "del", onclick: async () => { try { ok(await sb.from("comments").delete().eq("id", c.id)); refresh(); } catch (e) { fail(e); } } }, " · Delete") : null),
           h("p", {}, renderRich(c.body)))));
     } catch (e) { list.replaceChildren(h("p", { class: "nothing" }, "Comments couldn’t be loaded.")); }
@@ -5560,9 +5564,12 @@ function drawChatMessages(toBottom){
     const time = new Date(m.created_at).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
     const bubble = m.unsent_at ? h("div", { class: "bub unsent" }, mine ? "You deleted this message" : "This message was deleted")
       : h("div", { class: "bub" + ((m.mentions || []).includes(S.me.id) && !mine ? " tagged" : "") + (m.body ? "" : " files-only") }, replyQuote(m), m.body ? renderRich(m.body) : null, meetCard(m), chatAttachments(m));
-    const meta = lastOfRun ? h("div", { class: "bmeta" }, time, m.edited_at ? " · edited" : "",
+    // a reply someone sent by answering a notification email
+    const via = m.via_email && !m.unsent_at ? h("span", { class: "viaemail", title: "Sent by replying to an email" }, "✉️ via email") : null;
+    const meta = lastOfRun ? h("div", { class: "bmeta" }, time, m.edited_at ? " · edited" : "", via ? " · " : "", via,
       mine && myLast && m.id === myLast.id && other ? h("span", { class: "seen" + (seenUpTo >= m.id ? " on" : "") }, seenUpTo >= m.id ? " · Seen" : " · Sent") : null,
-      mine && myLast && m.id === myLast.id && !other && !m.unsent_at ? groupSeenLabel(m) : null) : (m.edited_at ? h("div", { class: "bmeta" }, "edited") : null);
+      mine && myLast && m.id === myLast.id && !other && !m.unsent_at ? groupSeenLabel(m) : null)
+      : (m.edited_at || via ? h("div", { class: "bmeta" }, m.edited_at ? "edited" : "", m.edited_at && via ? " · " : "", via) : null);
     const col = h("div", { class: "bcol" }, !mine && showNames && first ? h("div", { class: "bname" }, pname(m.author_id) || "Someone") : null, bubble, reactionsRow(m), meta);
     const row = h("div", { class: "cmsg " + (mine ? "mine" : "theirs") + (first ? " first" : "") + (lastOfRun ? " last" : ""), "data-mid": m.id },
       !mine ? (lastOfRun ? avatar(m.author_id, "sm") : h("span", { class: "avspace" })) : null,
@@ -6594,7 +6601,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11aa";
+const APP_VERSION = "2026-11ab";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
