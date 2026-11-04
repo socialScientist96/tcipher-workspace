@@ -454,6 +454,24 @@ button.busy:not(.btn):not(.iconbtn):not(.linkbtn):not(.link){opacity:.6;cursor:p
 .hbar .n{text-align:right;font-weight:700}
 tr.muted-row td{opacity:.55}
 select.in.sm{padding:4px 6px;font-size:13px;min-width:120px}
+/* chat: message info */
+.seen.linkish{background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer} .seen.linkish:hover{text-decoration:underline}
+.minfo-msg{background:var(--tint);border-radius:8px;padding:8px 10px;font-size:13.5px;margin-bottom:6px}
+.minfo-h{display:flex;align-items:center;gap:8px;font-size:13.5px;margin:14px 0 6px} .minfo-h span{font-size:12px;color:var(--ink3);font-weight:600}
+.minfo-list{display:flex;flex-direction:column;gap:6px}
+.minfo-row{display:flex;align-items:center;gap:8px;font-size:13.5px} .minfo-emoji{margin-left:auto;font-size:18px}
+/* profile photos */
+.av img{width:100%;height:100%;object-fit:cover;border-radius:50%;display:block}
+.av:has(img){background:#E8E6F5!important}
+.photo-pick{display:flex;align-items:center;gap:14px}
+.photo-big .av{width:64px;height:64px;font-size:22px}
+/* chat: Google Meet */
+.chat-meet{margin-left:auto}
+.meetcard{display:flex;align-items:center;gap:10px;margin-top:6px;padding:8px 10px;border-radius:10px;background:#fff;border:1px solid var(--line);color:var(--ink);text-decoration:none;min-width:240px}
+.meetcard .mic{font-size:22px} .meetcard .mx{flex:1;display:flex;flex-direction:column;font-size:12.5px;min-width:0}
+.meetcard,.meetcard *{text-decoration:none!important}
+.meetcard .mx b,.cmsg.mine .meetcard .mx b{font-size:13.5px;color:var(--ink)!important}
+.cmsg.mine .meetcard{color:var(--ink)} .meetcard .mx span{color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* chat: replies, reactions, emoji */
 .cmsg .macts{display:flex;gap:2px;align-self:center;opacity:0;transition:opacity .12s}
 .cmsg:hover .macts,.cmsg:focus-within .macts{opacity:1}
@@ -975,7 +993,19 @@ const pname = id => { const p = person(id); return p ? p.full_name : ""; };
 function avatar(id, size){
   const p = person(id);
   if (!p) return h("span", { class: "av" + (size ? " " + size : ""), style: "background:#C8C8DE", title: "Unassigned" }, "–");
-  return h("span", { class: "av" + (size ? " " + size : "") + (typeof isOnline === "function" && isOnline(p.id) ? " on" : ""), "data-u": p.id, style: "background:" + (p.color && p.color !== "#5B2BA6" && p.color !== "#6450F5" ? p.color : colorFor(p.id)), title: p.full_name + (typeof lastActive === "function" ? " · " + lastActive(p.id) : "") }, initials(p.full_name));
+  return h("span", { class: "av" + (size ? " " + size : "") + (typeof isOnline === "function" && isOnline(p.id) ? " on" : ""), "data-u": p.id, style: "background:" + (p.color && p.color !== "#5B2BA6" && p.color !== "#6450F5" ? p.color : colorFor(p.id)), title: p.full_name + (typeof lastActive === "function" ? " · " + lastActive(p.id) : "") }, p.avatar_url ? avatarImg(p) : initials(p.full_name));
+}
+// someone's photo changed: update every avatar of theirs already on the page
+function refreshAvatars(id){
+  document.querySelectorAll('.av[data-u="' + id + '"]').forEach(a => {
+    const size = ["sm", "lg", "xs"].find(c => a.classList.contains(c));
+    const fresh = avatar(id, size); fresh.className = a.className; a.replaceWith(fresh);
+  });
+}
+function avatarImg(p){
+  const img = h("img", { src: p.avatar_url, alt: "", loading: "lazy", decoding: "async" });
+  img.addEventListener("error", () => { const av = img.parentNode; if (av) { av.classList.remove("photo"); img.replaceWith(document.createTextNode(initials(p.full_name))); } });
+  return img;
 }
 function personChip(id, empty){
   const p = person(id);
@@ -2967,6 +2997,7 @@ function openMyProfile(){
   });
   openDialog("My profile", [
     h("div", { class: "form" },
+      h("div", { class: "fl full" }, "Photo", photoPicker()),
       h("label", { class: "fl full" }, "Full name", name), h("label", { class: "fl" }, "Job title", title), h("label", { class: "fl" }, "Phone", phone),
       h("div", { class: "fl full" }, "Email", h("div", { class: "ro" }, p.email)),
       h("div", { class: "full section", style: "margin-top:4px" }, h("h3", {}, "Change password")),
@@ -3292,6 +3323,59 @@ async function renderOverview(el){
         return h("div", { class: "row", style: "cursor:default" }, avatar(p.id, "sm"), h("span", { class: "x" }, p.full_name), pill(st, st === "Working" || st === "Checked out" ? "ok" : st === "On leave" ? "warn" : st === "WFH" ? "info" : "grey"));
       }) : h("p", { class: "nothing" }, "No one in this vertical yet."));
   })));
+}
+
+/* ---------- profile photo: cropped to a square, shrunk to 256 px, kept in the public "avatars" store ---------- */
+function photoPicker(){
+  const box = h("div", { class: "photo-pick" });
+  const input = h("input", { type: "file", accept: "image/png,image/jpeg,image/webp,image/gif", hidden: true });
+  const draw = () => {
+    const me = S.me;
+    box.replaceChildren(h("span", { class: "photo-big" }, avatar(me.id)),
+      h("span", { class: "photo-acts" },
+        h("button", { type: "button", class: "btn sm", onclick: () => input.click() }, me.avatar_url ? "Change photo" : "Add a photo"),
+        me.avatar_url ? h("button", { type: "button", class: "btn sm ghost", onclick: () => setPhoto(null) }, "Remove") : null,
+        h("span", { class: "muted", style: "font-size:12px;display:block;margin-top:4px" }, "A square crop of your picture is shown to everyone.")), input);
+  };
+  input.addEventListener("change", () => { const f = input.files[0]; input.value = ""; if (f) setPhoto(f); });
+  async function setPhoto(file){
+    const old = S.me.avatar_url || "";
+    try {
+      let url = "";
+      if (file) {
+        if (!/^image\//.test(file.type)) throw new Error("Choose a picture (PNG, JPG, WebP or GIF).");
+        if (file.size > 15 * 1048576) throw new Error("That picture is over 15 MB.");
+        box.querySelector(".photo-acts").replaceChildren(h("span", { class: "muted" }, "Saving your photo…"));
+        const blob = await squarePhoto(file, 256);
+        const path = S.me.id + "/" + Date.now() + ".jpg";
+        const up = await sb.storage.from("avatars").upload(path, blob, { contentType: "image/jpeg", upsert: false, cacheControl: "31536000" });
+        if (up.error) throw up.error;
+        url = sb.storage.from("avatars").getPublicUrl(path).data.publicUrl;
+      }
+      const row = await updateRow("profiles", S.me.id, { avatar_url: url });
+      S.me = Object.assign({}, S.me, row); upsertCache("profiles", S.me);
+      // the old picture isn't needed any more
+      const m = old.match(/\/avatars\/(.+)$/); if (m) sb.storage.from("avatars").remove([decodeURIComponent(m[1])]).catch(() => {});
+      draw(); renderShell(); refreshAvatars(S.me.id); toast(url ? "Photo updated." : "Photo removed.");
+    } catch (e) { draw(); fail(e, "Photo not saved"); }
+  }
+  draw();
+  return box;
+}
+// centre-crop to a square and shrink, so every photo is small and the same shape
+function squarePhoto(file, size){
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      const s = Math.min(img.naturalWidth, img.naturalHeight), sx = (img.naturalWidth - s) / 2, sy = (img.naturalHeight - s) / 2;
+      const c = document.createElement("canvas"); c.width = size; c.height = size;
+      const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, size, size); g.drawImage(img, sx, sy, s, s, 0, 0, size, size);
+      URL.revokeObjectURL(url);
+      c.toBlob(b => b ? resolve(b) : reject(new Error("That picture couldn’t be read.")), "image/jpeg", 0.86);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("That picture couldn’t be read. Try a JPG or PNG.")); };
+    img.src = url;
+  });
 }
 /* ---------------------------------------------------------------------
    Meetings: repeats, joining, morning scrum check-in
@@ -5136,7 +5220,7 @@ async function openChannel(id){
   const switching = C.active !== id;
   C.active = id;
   const lastRead = C.reads[id] || 0, hadUnread = (C.unread[id] || 0) > 0;
-  const chx = C.channels.find(c => c.id === id); if (chx && chx.kind === "dm") loadOthersRead(id).then(() => { if (S.route === "chat" && C.active === id) drawChatMessages(); });
+  const chx = C.channels.find(c => c.id === id); if (chx) loadOthersRead(id).then(() => { if (S.route === "chat" && C.active === id) drawChatMessages(); });
   if (!C.msgs[id]){
     const rs = ok(await sb.from("chat_messages").select("*").eq("channel_id", id).order("id", { ascending: false }).limit(60)) || [];
     C.msgs[id] = rs.reverse(); C.more[id] = rs.length === 60;
@@ -5336,6 +5420,7 @@ function drawChatHead(){
   if (chatEls && chatEls.head) {
     // ‹ Back to the list of chats (phones only)
     chatEls.head.prepend(h("button", { type: "button", class: "m-back", "aria-label": "Back to chats", onclick: () => { C.mobileView = "list"; const c = chatEls.msgs.closest(".chat"); if (c) c.classList.remove("m-conv"); drawChatList(); } }, "‹"));
+    if (C.channels.some(c => c.id === C.active)) chatEls.head.append(chatMeetButton());
     if (chatEls.live) { chatEls.head.append(chatEls.live); drawLiveStatus(); }
   }
 }
@@ -5393,9 +5478,10 @@ function drawChatMessages(toBottom){
     const mine = m.author_id === S.me.id;
     const time = new Date(m.created_at).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
     const bubble = m.unsent_at ? h("div", { class: "bub unsent" }, mine ? "You deleted this message" : "This message was deleted")
-      : h("div", { class: "bub" + ((m.mentions || []).includes(S.me.id) && !mine ? " tagged" : "") + (m.body ? "" : " files-only") }, replyQuote(m), m.body ? renderRich(m.body) : null, chatAttachments(m));
+      : h("div", { class: "bub" + ((m.mentions || []).includes(S.me.id) && !mine ? " tagged" : "") + (m.body ? "" : " files-only") }, replyQuote(m), m.body ? renderRich(m.body) : null, meetCard(m), chatAttachments(m));
     const meta = lastOfRun ? h("div", { class: "bmeta" }, time, m.edited_at ? " · edited" : "",
-      mine && myLast && m.id === myLast.id && other ? h("span", { class: "seen" + (seenUpTo >= m.id ? " on" : "") }, seenUpTo >= m.id ? " · Seen" : " · Sent") : null) : (m.edited_at ? h("div", { class: "bmeta" }, "edited") : null);
+      mine && myLast && m.id === myLast.id && other ? h("span", { class: "seen" + (seenUpTo >= m.id ? " on" : "") }, seenUpTo >= m.id ? " · Seen" : " · Sent") : null,
+      mine && myLast && m.id === myLast.id && !other && !m.unsent_at ? groupSeenLabel(m) : null) : (m.edited_at ? h("div", { class: "bmeta" }, "edited") : null);
     const col = h("div", { class: "bcol" }, !mine && showNames && first ? h("div", { class: "bname" }, pname(m.author_id) || "Someone") : null, bubble, reactionsRow(m), meta);
     const row = h("div", { class: "cmsg " + (mine ? "mine" : "theirs") + (first ? " first" : "") + (lastOfRun ? " last" : ""), "data-mid": m.id },
       !mine ? (lastOfRun ? avatar(m.author_id, "sm") : h("span", { class: "avspace" })) : null,
@@ -5960,6 +6046,7 @@ function messageActions(m, bubble){
   return h("div", { class: "macts" },
     h("button", { type: "button", class: "mact", title: "Reply", "aria-label": "Reply to this message", onclick: () => setReplyTo(m) }, "↩"),
     reactBtn,
+    mine ? h("button", { type: "button", class: "mact", title: "Info", "aria-label": "Who has seen it, and who reacted", onclick: () => openMessageInfo(m) }, "ⓘ") : null,
     mine ? h("button", { type: "button", class: "mact", title: "Edit", "aria-label": "Edit message", onclick: () => editMessage(m, bubble) }, "✎") : null,
     del);
 }
@@ -6033,6 +6120,97 @@ function playMarimba(){
       }
     });
   } catch (e) {}
+}
+
+/* ---------- Google Meet from the chat ---------- */
+// who's in this conversation (for a channel: everyone who can see it)
+function conversationPeople(ch){
+  if (!ch) return [];
+  if (ch.kind === "channel") return activePeople().filter(p => !ch.vertical || p.vertical === ch.vertical || p.is_admin).map(p => p.id);
+  return (ch.members || []).filter(id => person(id));
+}
+function chatMeetButton(){
+  const b = h("button", { type: "button", class: "btn sm chat-meet", title: "Start or schedule a Google Meet with this conversation" }, "📹 Meet");
+  b.addEventListener("click", e => {
+    e.stopPropagation();
+    const menu = h("div", { class: "status-menu", role: "menu" },
+      h("button", { type: "button", role: "menuitem", onclick: () => { menu.remove(); startMeetNow(); } }, "📹 Start a meeting now"),
+      h("button", { type: "button", role: "menuitem", onclick: () => { menu.remove(); scheduleMeet(); } }, "🗓 Schedule a meeting…"));
+    document.body.append(menu);
+    const r = b.getBoundingClientRect(); menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 240)) + "px"; menu.style.top = (r.bottom + 6) + "px";
+    setTimeout(() => document.addEventListener("click", () => menu.remove(), { once: true }), 0);
+  });
+  return b;
+}
+const meetTitle = ch => ch.kind === "dm" ? "Call: " + [S.me.full_name, (person(dmOther(ch)) || {}).full_name].filter(Boolean).map(n => n.split(" ")[0]).join(" & ") : "Call: #" + String(chName(ch)).replace(/^#\s*/, "");
+let meetBusy = false;
+async function startMeetNow(){
+  const ch = C.channels.find(c => c.id === C.active); if (!ch || meetBusy) return;
+  if (typeof googleOn === "function" && !googleOn()) { toast("Google isn’t set up for this workspace yet."); return; }
+  const g = typeof myGoogle === "function" ? myGoogle() : null;
+  // not connected, or connected without calendar access: connect, then carry on
+  if (!g || (g.scopes && !String(g.scopes).includes("calendar"))) {
+    toast("Connect your Google account first, so the Meet is created in your calendar.");
+    if (typeof connectGoogle === "function" && await connectGoogle()) return startMeetNow();
+    return;
+  }
+  meetBusy = true; toast("Creating a Google Meet…");
+  // open the tab now (browsers block tabs opened later), and send it to the Meet once the link is ready
+  const tab = window.open("about:blank", "_blank");
+  try {
+    const now = new Date(), hhmm = String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0");
+    const m = await insertRow("meetings", { title: meetTitle(ch), meeting_date: today(), start_time: hhmm, duration_min: 30, kind: "Internal",
+      attendees: [...new Set([S.me.id, ...conversationPeople(ch)])], agenda: "Started from chat (" + chName(ch) + ")." });
+    const saved = await syncMeetingToGoogle(m);
+    const url = saved && saved.link;
+    if (!url || !/meet\.google\.com/.test(url)) throw new Error("Google didn’t return a Meet link. Try again, or use Schedule a meeting.");
+    const msg = ok(await sb.from("chat_messages").insert({ channel_id: ch.id, author_id: S.me.id, body: "📹 Started a Google Meet: " + url, mentions: [] }).select().single());
+    (C.msgs[ch.id] = C.msgs[ch.id] || []).push(msg); C.last[ch.id] = msg; if (msg.id > (C.maxId || 0)) C.maxId = msg.id;
+    drawChatMessages(true); markChatRead(ch.id);
+    if (tab) tab.location.href = url; else window.open(url, "_blank", "noopener");
+    toast("Meet started. Everyone here got a calendar invite too.");
+  } catch (e) { try { if (tab) tab.close(); } catch (x) {} fail(e, "Couldn’t start the Meet"); }
+  meetBusy = false;
+}
+function scheduleMeet(){
+  const ch = C.channels.find(c => c.id === C.active); if (!ch) return;
+  openRecord("meetings", null, { title: ch.kind === "dm" ? meetTitle(ch).replace(/^Call: /, "Meeting: ") : "Meeting: #" + String(chName(ch)).replace(/^#\s*/, ""), meeting_date: today(), kind: "Internal", duration_min: 30, attendees: [...new Set([S.me.id, ...conversationPeople(ch)])] });
+}
+// a message with a Google Meet link gets a Join card
+function meetCard(m){
+  const x = String(m.body || "").match(/https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}/i);
+  if (!x) return null;
+  return h("a", { class: "meetcard", href: x[0], target: "_blank", rel: "noopener" }, h("span", { class: "mic", "aria-hidden": "true" }, "📹"),
+    h("span", { class: "mx" }, h("b", {}, "Google Meet"), h("span", {}, x[0].replace("https://", ""))), h("span", { class: "btn sm pri" }, "Join"));
+}
+
+/* ---------- message info: who has seen your message, who hasn't, who reacted ---------- */
+function seenSplit(m){
+  const ch = C.channels.find(c => c.id === m.channel_id);
+  const reads = (C.othersRead || {})[m.channel_id] || {};
+  const people = conversationPeople(ch).filter(id => id !== S.me.id && person(id) && person(id).is_active !== false);
+  return { seen: people.filter(id => (reads[id] || 0) >= m.id), notSeen: people.filter(id => !((reads[id] || 0) >= m.id)), total: people.length };
+}
+// under your latest message in a group or channel: "Seen by 3 of 5"
+function groupSeenLabel(m){
+  const s = seenSplit(m); if (!s.total) return null;
+  const txt = s.seen.length === s.total ? " · Seen by everyone" : s.seen.length ? " · Seen by " + s.seen.length + " of " + s.total : " · Sent";
+  return h("button", { type: "button", class: "seen linkish" + (s.seen.length ? " on" : ""), title: "See who has seen it", onclick: () => openMessageInfo(m) }, txt);
+}
+async function openMessageInfo(m){
+  await loadOthersRead(m.channel_id);
+  const s = seenSplit(m), rx = ((C.reacts || {})[m.id]) || [];
+  const who = (ids, empty) => ids.length ? h("div", { class: "minfo-list" }, ids.map(id => h("div", { class: "minfo-row" }, avatar(id, "sm"), h("span", {}, pname(id) || "Someone"))))
+    : h("p", { class: "muted", style: "margin:4px 0 0" }, empty);
+  const groups = []; for (const r of rx) { let g = groups.find(x => x.e === r.emoji); if (!g) groups.push(g = { e: r.emoji, ids: [] }); g.ids.push(r.user_id); }
+  openDialog("Message info", [
+    h("div", { class: "minfo-msg" }, chatText(m).slice(0, 200) || "📎 Files", h("span", { class: "muted" }, " · sent " + new Date(m.created_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }))),
+    h("h3", { class: "minfo-h" }, "✓ Seen by", h("span", {}, String(s.seen.length))), who(s.seen, "Nobody yet."),
+    h("h3", { class: "minfo-h" }, "Not seen yet", h("span", {}, String(s.notSeen.length))), who(s.notSeen, "Everyone has seen it."),
+    h("h3", { class: "minfo-h" }, "Reactions", h("span", {}, String(rx.length))),
+    groups.length ? h("div", { class: "minfo-list" }, groups.flatMap(g => g.ids.map(id => h("div", { class: "minfo-row" }, avatar(id, "sm"), h("span", {}, id === S.me.id ? "You" : (pname(id) || "Someone")), h("span", { class: "minfo-emoji" }, g.e)))))
+      : h("p", { class: "muted", style: "margin:4px 0 0" }, "No reactions yet.")],
+    [h("span", { class: "sp" }), h("button", { type: "button", class: "btn", onclick: closeDlg }, "Close")], true);
 }
 /* ---------------------------------------------------------------------
    Activity and status: online / active X ago / lunch / out of office / leave / back tomorrow,
@@ -7788,6 +7966,7 @@ function onChange(payload){
   const t = payload.table;
   if (t === "chat_messages" || t === "chat_channels") { chatOnChange(payload); return; }
   // someone's status changed: update their status line without redrawing the page
+  if (t === "profiles" && payload.new && payload.old !== undefined && payload.new.avatar_url !== undefined) { upsertCache("profiles", payload.new); if (typeof refreshAvatars === "function") refreshAvatars(payload.new.id); }
   if (t === "user_status") { if (payload.new && payload.new.user_id) upsertCache("user_status", payload.new); if (typeof paintStatus === "function") paintStatus(); return; }
   if (t === "notifications") { loadNotifications(); if (payload.eventType === "INSERT" && payload.new && payload.new.user_id === S.me.id && payload.new.tbl !== "chat") { toast(payload.new.title); playSound("chime"); } return; }
   if (t === "comments" || t === "files"){
