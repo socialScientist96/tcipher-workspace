@@ -454,6 +454,23 @@ button.busy:not(.btn):not(.iconbtn):not(.linkbtn):not(.link){opacity:.6;cursor:p
 .hbar .n{text-align:right;font-weight:700}
 tr.muted-row td{opacity:.55}
 select.in.sm{padding:4px 6px;font-size:13px;min-width:120px}
+/* files & media */
+.files-sec.drop{outline:2px dashed var(--p);outline-offset:4px;border-radius:10px;background:var(--tint)}
+.files-sec .fhint{display:block;font-size:12px;margin-top:6px}
+.fgal{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin:8px 0}
+.fgal:empty{display:none}
+.ftile{margin:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff;display:flex;flex-direction:column}
+.ftile.video{grid-column:1/-1;max-width:640px}
+.ftile.audio{grid-column:1/-1;max-width:640px;padding:8px}
+.fthumb{padding:0;border:0;background:#F1F0F8;cursor:zoom-in;display:block;aspect-ratio:4/3}
+.fthumb img{width:100%;height:100%;object-fit:cover;display:block}
+.fvideo{width:100%;max-height:360px;background:#000;display:block}
+.faudio{width:100%}
+.ftile figcaption{display:flex;flex-direction:column;gap:2px;padding:6px 8px;font-size:12.5px}
+.ftile figcaption .fn{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ftile figcaption .fs{color:var(--ink3);font-size:11.5px}
+.ftile .fact{display:flex;gap:4px;margin-top:2px}
+.files-sec .file .upic{font-size:16px;margin-right:2px}
 /* @all */
 .mention.all{background:#FFF3D6;color:#8A5A00}
 .mention-item .allav{display:inline-flex;align-items:center;justify-content:center;background:#FFF3D6;font-size:13px}
@@ -1232,7 +1249,19 @@ async function renderAdminStorage(el){
     st.last_backup_at
       ? h("p", { style: "margin:6px 0 0" }, pill(Date.now() - new Date(st.last_backup_at) < 36 * 3600e3 ? "Up to date" : "Missed", Date.now() - new Date(st.last_backup_at) < 36 * 3600e3 ? "ok" : "bad"), " Last backup " + fmtAgo(st.last_backup_at) + " (" + fmt(st.last_backup_bytes) + "), encrypted, in Tcipher Workspace backups. 30 daily backups are kept, plus one per month for good.")
       : h("p", { class: "muted", style: "margin:6px 0 0" }, st.setup ? "No backup yet. Once the nightly backup job is set up (see the setup guide), a backup arrives here every night at about 2 am." : "Set up Google Drive first; the nightly backup is saved there."));
-  box.replaceChildren(...parts, card, backup);
+  // who can view attachments on work items
+  const vis = h("select", { class: "in", style: "max-width:420px" },
+    h("option", { value: "all" }, "Everyone in the company"), h("option", { value: "item" }, "Only people who can open that item"));
+  vis.value = (S.settings.files_visible_all === false) ? "item" : "all";
+  vis.addEventListener("change", async () => {
+    const data = { ...S.settings, files_visible_all: vis.value === "all" };
+    try { ok(await sb.from("settings").upsert({ id: 1, data, updated_at: new Date().toISOString() })); S.settings = data; toast("Saved."); } catch (e) { fail(e, "Not saved"); vis.value = vis.value === "all" ? "item" : "all"; }
+  });
+  const visCard = h("div", { class: "panel" }, h("h2", {}, "Who can see attachments"),
+    h("p", { class: "muted", style: "margin:0 0 10px;font-size:13px" }, "Files, images and videos on tasks, bugs, test cases, features, projects, releases and support tickets."),
+    vis,
+    h("p", { class: "muted", style: "margin:10px 0 0;font-size:12.5px" }, "Always private, whatever this says: files in chats (only that conversation), email attachments, problem-report screenshots, leads and deals (Sales and Marketing), and notes that aren’t shared with the whole company."));
+  box.replaceChildren(...parts, card, visCard, backup);
 }
 /* ---------------------------------------------------------------------
    Module definitions
@@ -2453,39 +2482,84 @@ function commentsSection(tbl, id){
 /* files */
 function filesSection(tbl, id, canUpload){
   const input = h("input", { type: "file", multiple: true, hidden: true });
-  const btn = h("button", { type: "button", class: "btn sm soft", onclick: () => input.click() }, "Attach files");
-  const sec = h("div", { class: "section" }, h("h3", {}, "Files", canUpload ? btn : null), input);
-  const list = h("div", {}, h("p", { class: "nothing" }, "Loading…"));
-  sec.append(list);
+  const btn = h("button", { type: "button", class: "btn sm soft", onclick: () => input.click() }, "📎 Add files");
+  const limit = () => driveReady() ? 100 : MAX_FILE_MB;
+  const hint = h("span", { class: "muted fhint" }, "");
+  const sec = h("div", { class: "section files-sec" }, h("h3", {}, "Files & media", canUpload ? btn : null), input);
+  const ups = h("div", { class: "chat-uploads", hidden: true });
+  const gal = h("div", { class: "fgal" }), list = h("div", {}, h("p", { class: "nothing" }, "Loading…"));
+  sec.append(ups, gal, list);
+  if (canUpload) sec.append(hint);
   const uploading = [];
+  const drawUps = () => {
+    ups.hidden = !uploading.length;
+    ups.replaceChildren(...uploading.map(u => h("div", { class: "upitem " + u.state }, h("span", { class: "upic" }, fileIcon(u.mime, u.name)),
+      h("span", { class: "upx" }, h("b", {}, u.name), h("span", { class: "muted" }, " · " + chatSize(u.size)),
+        u.state === "uploading" ? h("span", { class: "upbar" }, h("span", { style: "width:" + Math.round(u.progress * 100) + "%" })) : null,
+        u.state === "error" ? h("span", { class: "err", style: "display:block;font-size:12px" }, u.error) : null),
+      u.state === "uploading" ? h("span", { class: "uppc muted" }, Math.round(u.progress * 100) + "%") : null,
+      h("button", { type: "button", class: "upclose", title: "Cancel", onclick: () => { u.state = "cancelled"; try { u.xhr && u.xhr.abort(); } catch (e) {} uploading.splice(uploading.indexOf(u), 1); drawUps(); } }, "✕"))));
+  };
+  const canDelete = f => f.uploaded_by === S.me.id || S.me.is_admin;
+  const delBtn = f => canDelete(f) ? h("button", { type: "button", class: "btn sm ghost danger", title: "Delete", onclick: async () => {
+    if (!confirm("Delete “" + f.name + "”?")) return;
+    try { await storeDelete(f); refresh(); } catch (e) { fail(e, "File not deleted"); } } }, "Delete") : null;
   async function refresh(){
+    hint.textContent = "Drag files here, or click Add files · images and videos play right here · up to " + limit() + " MB each";
     try {
       const fs = ok(await sb.from("files").select("*").eq("tbl", tbl).eq("entity_id", id).order("created_at")) || [];
-      list.replaceChildren();
-      for (const f of fs) list.append(h("div", { class: "file" },
-        h("span", { class: "fn", title: f.name }, f.name), h("span", { class: "fs" }, fmtSize(f.size || 0) + ", " + (pname(f.uploaded_by) || "someone")),
-        h("button", { type: "button", class: "btn sm", onclick: () => downloadFile(f) }, "Download"),
-        (f.uploaded_by === S.me.id || S.me.is_admin) ? h("button", { type: "button", class: "btn sm danger", onclick: async () => {
-          if (!confirm("Delete “" + f.name + "”?")) return;
-          try { await storeDelete(f); refresh(); } catch (e) { fail(e, "File not deleted"); }
-        } }, "Delete") : null));
-      for (const n of uploading) list.append(h("div", { class: "file" }, h("span", { class: "fn" }, n), h("span", { class: "fs" }, "Uploading…")));
-      if (!list.children.length) list.append(h("p", { class: "nothing" }, "No files yet."));
+      const ready = fs.filter(f => !String(f.path || "").startsWith("pending-"));
+      const kind = f => /^image\/(png|jpe?g|gif|webp|svg\+xml)$/.test(f.mime || "") ? "image" : /^video\//.test(f.mime || "") ? "video" : /^audio\//.test(f.mime || "") ? "audio" : "file";
+      gal.replaceChildren(); list.replaceChildren();
+      for (const f of ready) {
+        const k = kind(f), who = (pname(f.uploaded_by) || "someone") + " · " + chatSize(f.size || 0);
+        if (k === "image") {
+          const img = h("img", { alt: f.name, loading: "lazy" });
+          mediaLink(f).then(u => { img.src = u; }, () => {});
+          gal.append(h("figure", { class: "ftile" }, h("button", { type: "button", class: "fthumb", title: "Open " + f.name, onclick: () => openStored(f) }, img),
+            h("figcaption", {}, h("span", { class: "fn", title: f.name }, f.name), h("span", { class: "fs" }, who), h("span", { class: "fact" }, h("button", { type: "button", class: "btn sm ghost", onclick: () => downloadFile(f) }, "Download"), delBtn(f)))));
+        } else if (k === "video" || k === "audio") {
+          const media = h(k, { controls: true, preload: "metadata", playsinline: true, class: k === "video" ? "fvideo" : "faudio" });
+          mediaLink(f, true).then(u => { media.src = u; }, () => { media.replaceWith(h("p", { class: "err" }, "This " + k + " couldn’t be loaded.")); });
+          gal.append(h("figure", { class: "ftile " + k }, media,
+            h("figcaption", {}, h("span", { class: "fn", title: f.name }, f.name), h("span", { class: "fs" }, who), h("span", { class: "fact" }, h("button", { type: "button", class: "btn sm ghost", onclick: () => downloadFile(f) }, "Download"), delBtn(f)))));
+        } else {
+          list.append(h("div", { class: "file" }, h("span", { class: "upic" }, fileIcon(f.mime || "", f.name)),
+            h("span", { class: "fn", title: f.name }, f.name), h("span", { class: "fs" }, who),
+            h("button", { type: "button", class: "btn sm", onclick: () => openStored(f) }, "Open"),
+            h("button", { type: "button", class: "btn sm", onclick: () => downloadFile(f) }, "Download"), delBtn(f)));
+        }
+      }
+      if (!ready.length && !uploading.length) list.append(h("p", { class: "nothing" }, canUpload ? "No files yet. Add images, videos, documents or screenshots." : "No files yet."));
     } catch (e) { list.replaceChildren(h("p", { class: "nothing" }, "Files couldn’t be loaded.")); }
   }
-  input.addEventListener("change", async () => {
-    const files = [...input.files]; input.value = "";
-    for (const file of files){
-      if (file.size > MAX_FILE_MB * 1048576) { toast(file.name + " is over " + MAX_FILE_MB + " MB."); continue; }
-      uploading.push(file.name); refresh();
-      try { await storeUpload(tbl, id, file); } catch (e) { fail(e, file.name + " not uploaded"); }
-      uploading.splice(uploading.indexOf(file.name), 1);
+  async function add(files){
+    for (const file of files) {
+      if (!file || !file.size) continue;
+      if (file.size > limit() * 1048576) { toast(file.name + " is " + chatSize(file.size) + ". Files can be up to " + limit() + " MB" + (driveReady() ? "." : " (100 MB once Google Drive is connected).")); continue; }
+      const u = { name: file.name, size: file.size, mime: file.type || "", progress: 0, state: "uploading" };
+      uploading.push(u); drawUps();
+      try {
+        if (driveReady()) await uploadDirect(tbl, id, file, p => { u.progress = p; drawUps(); }, x => { u.xhr = x; }, () => u.state === "cancelled");
+        else { u.progress = 0.5; drawUps(); await storeUpload(tbl, id, file); }
+        uploading.splice(uploading.indexOf(u), 1);
+      } catch (e) { if (u.state !== "cancelled") { u.state = "error"; u.error = friendly(e); } }
+      drawUps(); refresh();
     }
-    refresh();
-  });
+  }
+  input.addEventListener("change", () => { const fs = [...input.files]; input.value = ""; add(fs); });
+  if (canUpload) {
+    sec.addEventListener("dragover", e => { if ([...(e.dataTransfer && e.dataTransfer.types || [])].includes("Files")) { e.preventDefault(); sec.classList.add("drop"); } });
+    sec.addEventListener("dragleave", e => { if (!sec.contains(e.relatedTarget)) sec.classList.remove("drop"); });
+    sec.addEventListener("drop", e => { sec.classList.remove("drop"); const fs = [...((e.dataTransfer && e.dataTransfer.files) || [])]; if (fs.length) { e.preventDefault(); add(fs); } });
+  }
   sec._refresh = refresh; sec.dataset.live = "files";
   refresh();
   return sec;
+}
+// open a stored file in a new tab (images and PDFs show in the browser)
+async function openStored(f){
+  try { const u = await mediaLink(f, (f.size || 0) > 20 * 1048576); const w = window.open(u, "_blank", "noopener"); if (!w) location.href = u; } catch (e) { fail(e, "Couldn’t open the file"); }
 }
 async function downloadFile(f){
   try {
@@ -5580,14 +5654,22 @@ function addChatFiles(files){
   }
   drawUploads();
 }
+// up to 100 MB, straight from the browser to Google Drive; the server opens the slot and checks it arrived
+const driveReady = () => !!(S.settings && S.settings.drive_folder);
+async function uploadDirect(tbl, entity, file, onProgress, keep, isCancelled){
+  const mime = file.type || "application/octet-stream";
+  const start = await filesFn("start_upload", "", { body: JSON.stringify({ tbl, entity_id: entity, name: file.name || "file", size: file.size, mime }), headers: { "Content-Type": "application/json" } });
+  if (isCancelled && isCancelled()) return null;
+  const g = await putToDrive(start.upload_url, file, mime, onProgress, keep || (() => {}));
+  if (isCancelled && isCancelled()) return null;
+  const done = await filesFn("finish_upload", "", { body: JSON.stringify({ file_id: start.file_id, drive_id: g.id }), headers: { "Content-Type": "application/json" } });
+  return done.file;
+}
 async function uploadChatFile(u, file){
   try {
-    const start = await filesFn("start_upload", "", { body: JSON.stringify({ tbl: "chat", entity_id: u.cid, name: u.name, size: u.size, mime: u.mime }), headers: { "Content-Type": "application/json" } });
-    if (u.state === "cancelled") return;
-    const g = await putToDrive(start.upload_url, file, u.mime, p => { u.progress = p; drawUploads(true); }, x => { u.xhr = x; });
-    if (u.state === "cancelled") return;
-    const done = await filesFn("finish_upload", "", { body: JSON.stringify({ file_id: start.file_id, drive_id: g.id }), headers: { "Content-Type": "application/json" } });
-    u.file = done.file; u.state = "ready"; u.progress = 1;
+    const f = await uploadDirect("chat", u.cid, file, p => { u.progress = p; drawUploads(true); }, x => { u.xhr = x; }, () => u.state === "cancelled");
+    if (!f || u.state === "cancelled") return;
+    u.file = f; u.state = "ready"; u.progress = 1;
   } catch (e) {
     if (u.state === "cancelled") return;
     u.state = "error"; u.error = friendly(e);
@@ -5683,6 +5765,12 @@ function toastProgress(text){
   const el = h("div", { class: "dlprog", role: "status" }, h("span", {}, text), h("span", { class: "upbar" }, h("span", { style: "width:0%" })));
   document.body.append(el);
   return { set: p => { el.querySelector(".upbar span").style.width = Math.round(p * 100) + "%"; }, done: msg => { el.remove(); toast(msg); } };
+}
+
+// a viewable link for a stored file (Drive or the older Supabase storage)
+async function mediaLink(f, long){
+  if (f.storage === "drive") return fileLink(f.id, long);
+  return storeLink(f, false);
 }
 /* ---------------------------------------------------------------------
    Activity and status: online / active X ago / lunch / out of office / leave / back tomorrow,
@@ -5985,7 +6073,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11x";
+const APP_VERSION = "2026-11y";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
