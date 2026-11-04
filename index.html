@@ -5304,7 +5304,7 @@ function chatOnChange0(payload){
     C.unread[m.channel_id] = (C.unread[m.channel_id] || 0) + 1;
     if ((m.mentions || []).includes(S.me.id)) C.mentions[m.channel_id] = (C.mentions[m.channel_id] || 0) + 1;
     const ch = C.channels.find(c => c.id === m.channel_id);
-    if (ch && (ch.kind !== "channel" || (m.mentions || []).includes(S.me.id))) playMarimba();
+    if (ch) playMarimba();   // every new message has the sound, channels included (a burst plays it once)
     if (ch && (ch.kind !== "channel" || (m.mentions || []).includes(S.me.id))) toast((ch.kind === "dm" ? "Message from " + pname(m.author_id) : ch.kind === "group" ? pname(m.author_id) + " in " + chName(ch) : pname(m.author_id) + " mentioned you in " + chName(ch)) + ": " + chatText(m).slice(0, 60));
     renderShell(); if (S.route === "chat") drawChatList(); if (S.route === "dashboard") rerender();
     updateTabTitle();
@@ -6513,7 +6513,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11z";
+const APP_VERSION = "2026-11z.1";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
