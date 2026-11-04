@@ -2968,6 +2968,16 @@ function openPerson(id){
       h("span", { class: "sp" }), S.me.is_admin ? h("button", { type: "button", class: "btn soft", onclick: () => { closeDlg(); openUserEditor(p.id); } }, "Edit in admin") : null, h("button", { type: "button", class: "btn", onclick: closeDlg }, "Close")], true);
 }
 
+/* emails when you're away: preference and personal email (profile_private: only the person and admins) */
+const EMAIL_PREFS = [["all", "Unread messages and notifications"], ["direct", "Only direct and group messages, and @tags"], ["off", "Nothing"]];
+const validEmail = v => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(v || "").trim());
+async function loadPersonalEmail(uid){
+  const r = ok(await sb.from("profile_private").select("personal_email").eq("user_id", uid).maybeSingle());
+  return (r && r.personal_email) || "";
+}
+async function savePersonalEmail(uid, value){
+  ok(await sb.from("profile_private").upsert({ user_id: uid, personal_email: String(value || "").trim().toLowerCase() }, { onConflict: "user_id" }));
+}
 /* my profile + password */
 function openMyProfile(){
   const p = S.me;
@@ -2976,19 +2986,28 @@ function openMyProfile(){
   const phone = h("input", { class: "in", type: "tel", value: p.phone, maxlength: "30" });
   const pw1 = h("input", { class: "in", type: "password", autocomplete: "new-password" });
   const pw2 = h("input", { class: "in", type: "password", autocomplete: "new-password" });
+  const emailPref = h("select", { class: "in", id: "emailPref" }, EMAIL_PREFS.map(([v, l]) => h("option", { value: v }, l)));
+  emailPref.value = EMAIL_PREFS.some(([v]) => v === p.email_notifications) ? p.email_notifications : "all";
+  const personal = h("input", { class: "in", type: "email", id: "personalEmail", maxlength: "200", placeholder: "Optional, e.g. name@gmail.com", disabled: true });
+  let personalWas = null;
+  loadPersonalEmail(p.id).then(v => { personalWas = v; personal.value = v; personal.disabled = false; }).catch(() => { personal.placeholder = "Not available yet"; });
   const err = h("p", { class: "err", hidden: true });
   const save = h("button", { type: "button", class: "btn pri" }, "Save");
   save.addEventListener("click", async () => {
     err.hidden = true;
     if (!name.value.trim()) { err.textContent = "Enter your name."; err.hidden = false; return; }
+    const pe = personal.value.trim().toLowerCase();
+    if (pe && !validEmail(pe)) { err.textContent = "The personal email doesn’t look right. Check it, or leave it empty."; err.hidden = false; return; }
+    if (pe && pe === String(p.email).toLowerCase()) { err.textContent = "That’s your work email. Enter a different address, or leave it empty."; err.hidden = false; return; }
     if (pw1.value || pw2.value){
       if (pw1.value.length < 8) { err.textContent = "Passwords need at least 8 characters."; err.hidden = false; return; }
       if (pw1.value !== pw2.value) { err.textContent = "The two passwords don’t match."; err.hidden = false; return; }
     }
     save.disabled = true;
     try {
-      const row = await updateRow("profiles", p.id, { full_name: name.value.trim(), title: title.value.trim(), phone: phone.value.trim() });
+      const row = await updateRow("profiles", p.id, { full_name: name.value.trim(), title: title.value.trim(), phone: phone.value.trim(), email_notifications: emailPref.value });
       S.me = row;
+      if (personalWas !== null && pe !== personalWas) { await savePersonalEmail(p.id, pe); personalWas = pe; }
       if (pw1.value){ const { error } = await sb.auth.updateUser({ password: pw1.value }); if (error) throw error; }
       toast(pw1.value ? "Profile and password updated." : "Profile updated.");
       closeDlg(); renderShell();
@@ -3002,6 +3021,9 @@ function openMyProfile(){
       h("div", { class: "fl full" }, "Email", h("div", { class: "ro" }, p.email)),
       h("div", { class: "full section", style: "margin-top:4px" }, h("h3", {}, "Change password")),
       h("label", { class: "fl" }, "New password", pw1, h("span", { class: "hint" }, "At least 8 characters")), h("label", { class: "fl" }, "Repeat new password", pw2),
+      h("div", { class: "full section", style: "margin-top:4px" }, h("h3", {}, "Emails when you’re away")),
+      h("label", { class: "fl full" }, "Email me", emailPref, h("span", { class: "hint" }, "When you’re offline and haven’t read it for 2 minutes. From notifications@tcipher.com.")),
+      h("label", { class: "fl" }, "Also send to my personal email", personal, h("span", { class: "hint" }, "Optional. Only you and admins can see it.")),
       h("div", { class: "full section", style: "margin-top:4px" }, h("h3", {}, "Google Calendar and Meet"), googleCard()),
       h("div", { class: "full section", style: "margin-top:4px" }, h("h3", {}, "Sounds"),
         h("div", { style: "display:flex;align-items:center;gap:12px;flex-wrap:wrap" },
@@ -3595,6 +3617,65 @@ function googleCard(){
     h("button", { type: "button", class: "btn sm ghost", onclick: () => { closeDlg(); disconnectGoogle(); } }, "Disconnect"));
   return h("div", { style: "display:flex;align-items:center;gap:10px;flex-wrap:wrap" }, h("button", { type: "button", class: "btn soft", onclick: () => { closeDlg(); connectGoogle(); } }, "Connect Google"),
     h("span", { class: "muted", style: "font-size:13px" }, "Connect once. Your Google Calendar then syncs automatically. Works with tcipher.com and personal Gmail."));
+}
+
+/* ---------------------------------------------------------------------
+   The sending mailbox for notification emails (Admin panel › Company settings).
+   An admin signs in once as notifications@tcipher.com; from then on the server sends
+   emails for unread messages and notifications from that mailbox.
+   --------------------------------------------------------------------- */
+const SENDER_SCOPES = "openid email https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly";
+const SENDER_HINT = "notifications@tcipher.com";
+// Must be called straight from a click, so Google's pop-up isn't blocked.
+function connectSender(after){
+  if (!googleOn()) { toast("Google isn’t set up yet (no Google client ID)."); return; }
+  if (!G.ready) { loadGoogle(); toast("Getting Google ready… click again in a moment."); return; }
+  const client = window.google.accounts.oauth2.initCodeClient({
+    client_id: GOOGLE_CLIENT_ID, scope: SENDER_SCOPES, include_granted_scopes: false, ux_mode: "popup", prompt: "consent select_account", hint: SENDER_HINT,
+    callback: async r => {
+      if (r.error) { fail(new Error(r.error_description || r.error), "Mailbox not connected"); return; }
+      try { const res = await callGoogle("connect_sender", { code: r.code }); toast("Connected. Emails now go out from " + res.email + "."); if (after) after(); }
+      catch (e) { toast(e.message); if (after) after(e.message); }
+    },
+    error_callback: e => toast(e && e.type === "popup_failed_to_open" ? "Your browser blocked the Google pop-up. Allow pop-ups for this site and try again." : "Google sign-in was closed before finishing.")
+  });
+  client.requestCode();
+}
+function mailSenderPanel(){
+  const box = h("div", { class: "panel", id: "mailSender", style: "margin-bottom:14px" }, h("h2", {}, "Notification emails"), h("p", { class: "muted" }, "Checking…"));
+  let problem = "";
+  async function draw(){
+    let st = null;
+    try { st = ok(await sb.rpc("mail_sender_status")); } catch (e) { box.replaceChildren(h("h2", {}, "Notification emails"), h("p", { class: "err" }, "Couldn’t check the sending mailbox: " + friendly(e) + " (Has upgrade-2026-11aa.sql been run?)")); return; }
+    const kids = [h("h2", {}, "Notification emails"),
+      h("p", { class: "muted", style: "margin-top:0" }, "When someone is offline and hasn’t read a message or notification for 2 minutes, it’s emailed to them. Each person chooses what they get in My profile.")];
+    if (!st || !st.email){
+      kids.push(h("p", {}, pill("Not sending", "bad"), " No sending mailbox is connected, so no emails go out."),
+        h("ol", { class: "muted", style: "font-size:13.5px;margin:6px 0 10px;padding-left:20px" },
+          h("li", {}, "Click the button below. Google opens a pop-up."),
+          h("li", {}, "Sign in as ", h("b", {}, SENDER_HINT), " (not your own account)."),
+          h("li", {}, "Tick every box on Google’s screen, then click Continue.")),
+        h("button", { type: "button", class: "btn pri", id: "connectSender", onclick: () => connectSender(err => { problem = err || ""; draw(); }) }, "Connect sending mailbox"));
+    } else {
+      const facts = ["Connected " + (st.connected_by ? "by " + st.connected_by + " " : "") + (st.connected_at ? fmtAgo(st.connected_at) : ""),
+        st.last_sent_at ? "last email " + fmtAgo(st.last_sent_at) : "no emails sent yet", (st.sent_today || 0) + " sent today"];
+      kids.push(h("p", {}, pill("Sending", "ok"), " From ", h("b", {}, st.email)), h("p", { class: "muted", style: "font-size:13px;margin-top:-4px" }, facts.join(" · ")));
+      if (st.last_error) kids.push(h("p", { class: "err" }, st.last_error));
+      if (!st.can_read) kids.push(h("p", { class: "muted", style: "font-size:13px" }, "Reading replies wasn’t allowed. That’s fine for now; it will be needed for replying by email. Click Reconnect and tick every box."));
+      kids.push(h("div", { style: "display:flex;gap:8px;flex-wrap:wrap" },
+        h("button", { type: "button", class: "btn soft", onclick: async e => { e.target.disabled = true; try { const r = await callGoogle("test_sender"); toast("Test email sent to " + r.to + ". Check that inbox."); } catch (x) { toast(x.message); } e.target.disabled = false; draw(); } }, "Send me a test email"),
+        h("button", { type: "button", class: "btn ghost", onclick: () => connectSender(err => { problem = err || ""; draw(); }) }, "Reconnect"),
+        h("button", { type: "button", class: "btn ghost", onclick: async () => {
+          if (!confirm("Stop sending notification emails? Nobody will get emails until a mailbox is connected again.")) return;
+          try { await callGoogle("disconnect_sender"); toast("Notification emails stopped."); } catch (x) { fail(x); } draw();
+        } }, "Disconnect")));
+    }
+    if (problem) kids.push(h("p", { class: "err" }, problem));
+    box.replaceChildren(...kids);
+  }
+  loadGoogle().catch(() => {});
+  draw();
+  return box;
 }
 /* ---------------------------------------------------------------------
    @tagging: suggestions while typing, reliable matching, highlighted text
@@ -6513,7 +6594,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11z.1";
+const APP_VERSION = "2026-11aa";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -7529,6 +7610,7 @@ function openUserEditor(id){
     password: h("input", { class: "in", type: "text", autocomplete: "new-password", placeholder: p ? "Leave empty to keep the current password" : "At least 8 characters" }),
     title: h("input", { class: "in", value: p ? p.title : "", maxlength: "80", placeholder: "e.g. App Developer" }),
     phone: h("input", { class: "in", type: "tel", value: p ? p.phone : "", maxlength: "30" }),
+    personal: h("input", { class: "in", type: "email", maxlength: "200", placeholder: "Optional, e.g. name@gmail.com", id: "userPersonalEmail" }),
     vertical: h("select", { class: "in" }, h("option", { value: "" }, "None (sees only their own items)"), VERTICALS.map(v => h("option", { value: v }, v))),
     role_id: h("select", { class: "in" }, h("option", { value: "" }, "No role"), rows("roles").map(r => h("option", { value: r.id }, r.name))),
     joined_on: h("input", { class: "in", type: "date", value: p && p.joined_on ? p.joined_on : today() }),
@@ -7551,6 +7633,8 @@ function openUserEditor(id){
   const genBtn = h("button", { type: "button", class: "btn sm soft", onclick: () => { f.password.value = genPassword(); } }, "Generate");
   const err = h("p", { class: "err", hidden: true });
   const self = p && p.id === S.me.id;
+  let personalWas = p ? null : "";
+  if (p) { f.personal.disabled = true; loadPersonalEmail(p.id).then(v => { personalWas = v; f.personal.value = v; f.personal.disabled = false; }).catch(() => { f.personal.placeholder = "Not available yet"; }); }
 
   const save = h("button", { type: "button", class: "btn pri" }, p ? "Save changes" : "Create user");
   save.addEventListener("click", async () => {
@@ -7559,17 +7643,21 @@ function openUserEditor(id){
     if (!name) { err.textContent = "Enter the person’s name."; err.hidden = false; return; }
     if (!p && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email.value.trim())) { err.textContent = "Enter a valid email address."; err.hidden = false; return; }
     if ((!p || pw) && pw.length < 8) { err.textContent = "Passwords need at least 8 characters."; err.hidden = false; return; }
+    const pe = f.personal.value.trim().toLowerCase();
+    if (pe && !validEmail(pe)) { err.textContent = "The personal email doesn’t look right. Check it, or leave it empty."; err.hidden = false; return; }
     const prof = { full_name: name, title: f.title.value.trim(), phone: f.phone.value.trim(), vertical: f.vertical.value || null, role_id: f.role_id.value || null, joined_on: f.joined_on.value || null, is_admin: self ? true : f.is_admin.checked };
     save.disabled = true;
     try {
       if (!p){
         const res = await callAdmin({ action: "create", email: f.email.value.trim(), password: pw, ...prof });
+        if (pe && res && res.id) { try { await savePersonalEmail(res.id, pe); } catch (e) { toast("Account created, but the personal email wasn’t saved: " + friendly(e)); } }
         await load("profiles", true);
         if (res && res.warning) toast(res.warning); else toast(name + " can now sign in.");
         closeDlg();
         showCredentials(name, f.email.value.trim(), pw);
       } else {
         await updateRow("profiles", p.id, prof);
+        if (personalWas !== null && pe !== personalWas) await savePersonalEmail(p.id, pe);
         if (pw) await callAdmin({ action: "set_password", id: p.id, password: pw });
         const wantActive = self ? true : f.is_active.checked;
         if (wantActive !== p.is_active){
@@ -7598,6 +7686,7 @@ function openUserEditor(id){
       h("label", { class: "fl" }, "Email (their login) " + (p ? "" : "*"), f.email),
       h("label", { class: "fl" }, p ? "New password" : "Password *", h("div", { style: "display:flex;gap:6px" }, f.password, genBtn)),
       h("label", { class: "fl" }, "Job title", f.title), h("label", { class: "fl" }, "Phone", f.phone),
+      h("label", { class: "fl" }, "Personal email", f.personal, h("span", { class: "hint" }, "Optional. Notification emails go here too.")),
       h("label", { class: "fl" }, "Vertical", f.vertical), h("label", { class: "fl" }, "Role (what they can access)", f.role_id, roleHint),
       h("label", { class: "fl" }, "Joined on", f.joined_on),
       h("div", { class: "fl" }, "\u00a0", h("label", { class: "chk" }, f.is_admin, "Admin: full access to everything, including this panel")),
@@ -7709,7 +7798,8 @@ function renderAdminTaskRules(el){
 }
 
 function renderAdminSettings(el){
-  adminHeader(el, "Company settings", "Name, currency, working days, leave rules and holidays.");
+  adminHeader(el, "Company settings", "Name, currency, working days, leave rules, holidays and notification emails.");
+  el.append(mailSenderPanel());
   el.append(activitySettingsPanel());
   const s = clone(S.settings);
   const company = h("input", { class: "in", value: s.company || "", maxlength: "80" });
@@ -7866,6 +7956,7 @@ function go(route){ if (location.hash !== "#" + route) location.hash = route; el
 let renderSeq = 0;
 async function rerender(){
   const seq = ++renderSeq;
+  if (S.me) takeDeepLink();
   const route = (location.hash.replace(/^#/, "").replace(/\/debug$/, "") || "dashboard");
   if (S.route && S.route !== route && S.me) markSeen(S.route);
   if (route !== "chat") { chatEls = null; if (typeof C !== "undefined") { C.unreadFrom = {}; C.scrollToUnread = null; } }   // leaving Chat: the "New messages" line is redrawn fresh next time   // leaving a tab: everything you saw there is no longer "new"
@@ -7936,6 +8027,24 @@ async function loadNotifications(){
   renderShell();
   if (!$("npanel").hidden) drawNotifications();
 }
+// open a record, chat or email by its table and id (from a notification, or a link in an email)
+function openTarget(tbl, id){
+  if (tbl === "chat" && id) { C.mobileView = "conv"; (async () => { if (!C.ready) await loadChat(); if (!C.channels.find(c => c.id === id)) await loadChat(true);
+    if (!C.channels.find(c => c.id === id)) { toast("That conversation isn’t available to you."); go("chat"); return; }
+    await openChannel(id); go("chat"); rerender(); })(); return; }
+  if (tbl === "emails") { (async () => { await load("emails", true); const e = byId("emails", id); if (e) openEmail(e); else go("emails"); })(); return; }
+  const key = Object.keys(MOD).find(k => MOD[k].table === tbl);
+  if (key && id) { openRecord(key, id); return; }
+}
+// a link like internal.tcipher.com/#open/tasks/<id> opens that item once signed in
+function takeDeepLink(){
+  const m = location.hash.match(/^#open\/([a-z_-]+)\/([A-Za-z0-9_-]+)$/);
+  if (!m) return false;
+  const tbl = decodeURIComponent(m[1]), id = decodeURIComponent(m[2]);
+  history.replaceState(null, "", location.pathname + location.search + (tbl === "chat" ? "#chat" : "#dashboard"));
+  setTimeout(() => openTarget(tbl, id), 0);
+  return true;
+}
 function drawNotifications(){
   const p = $("npanel");
   const list = h("div", { class: "nl" });
@@ -7946,10 +8055,7 @@ function drawNotifications(){
       if (!n.is_read) { try { await sb.from("notifications").update({ is_read: true }).eq("id", n.id); n.is_read = true; renderShell(); } catch (e) {} }
       if (n.tbl === "connect-google") { if (googleConnected()) toast("Google is already connected."); else connectGoogle(); return; }
       if (n.tbl === "team-day") { S.ui.day = { day: (n.created_at || new Date().toISOString()).slice(0, 10), user: n.entity_id || "" }; go("admin-day"); return; }
-      if (n.tbl === "chat" && n.entity_id) { C.mobileView = "conv"; (async () => { if (!C.ready) await loadChat(); if (!C.channels.find(c => c.id === n.entity_id)) await loadChat(true); await openChannel(n.entity_id); go("chat"); rerender(); })(); return; }
-      if (n.tbl === "emails") { (async () => { await load("emails", true); const e = byId("emails", n.entity_id); if (e) openEmail(e); else go("emails"); })(); return; }
-      const key = Object.keys(MOD).find(k => MOD[k].table === n.tbl);
-      if (key && n.entity_id) openRecord(key, n.entity_id);
+      openTarget(n.tbl, n.entity_id);
     } }, h("b", {}, n.title), n.body ? h("span", {}, n.body) : null, h("span", {}, fmtAgo(n.created_at))));
   }
   p.replaceChildren(h("div", { class: "nh" }, h("b", {}, "Notifications"),
