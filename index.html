@@ -905,6 +905,18 @@ dialog.dv-wide .dh .iconbtn{flex:none}
 
 /* a button whose action is still running (one click, one action) */
 button.is-busy{opacity:.6;cursor:progress;pointer-events:none}
+
+/* the voice note player (2026-11af) */
+.vp{gap:10px;padding:6px 8px 6px 12px;min-width:260px}
+.vp-play{width:36px;height:36px;border-radius:50%;border:0;background:var(--p);color:#fff;font-size:14px;cursor:pointer;flex:none;display:inline-flex;align-items:center;justify-content:center}
+.vp-play:disabled{opacity:.6}
+.vp-bar{position:relative;flex:1;height:6px;border-radius:999px;background:#DFE1E6;cursor:pointer;min-width:90px}
+.vp-bar:focus-visible{outline:2px solid var(--p);outline-offset:3px}
+.vp-fill{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:var(--p);width:0}
+.vp-knob{position:absolute;top:50%;width:12px;height:12px;border-radius:50%;background:var(--p);transform:translate(-50%,-50%);left:0;box-shadow:0 0 0 2px #fff}
+.vp-time{font-size:12px;color:var(--ink2);font-variant-numeric:tabular-nums;min-width:74px;text-align:right}
+.vp-speed{border:1px solid var(--line);background:#fff;border-radius:999px;font:inherit;font-size:11.5px;font-weight:700;padding:2px 8px;cursor:pointer;color:var(--ink2)}
+.vp-speed{white-space:nowrap;min-width:42px;text-align:center;flex:none}
 </style>
 </head>
 <body>
@@ -6197,13 +6209,8 @@ function chatAttachments(m){
   const atts = m.attachments || []; if (!atts.length) return null;
   return h("div", { class: "catts" }, atts.map(a => {
     const isImg = /^image\/(png|jpe?g|gif|webp)$/.test(a.mime || "") && a.size <= 15 * 1048576;
-    // voice notes (and other sound files) play right in the chat
-    if (/^audio\//.test(a.mime || "")) {
-      const au = h("audio", { controls: true, preload: "none", class: "cvoice-audio" });
-      fileLink(a.id, true).then(u => { au.src = u; }, () => {});
-      return h("div", { class: "cvoice" }, h("span", { class: "cvoice-ic", "aria-hidden": "true" }, /^Voice note/.test(a.name || "") ? "🎤" : "🎵"), au,
-        h("button", { type: "button", class: "btn sm ghost", title: "Download", "aria-label": "Download " + a.name, onclick: () => openChatFile(a, true) }, "⬇"));
-    }
+    // voice notes (and other sound files) play right in the chat, with an easy player
+    if (/^audio\//.test(a.mime || "")) return voicePlayer(a);
     if (isImg) {
       const img = h("img", { class: "cimg", alt: a.name, loading: "lazy" });
       fileLink(a.id).then(u => { img.src = u; }, () => { img.replaceWith(fileCard(a)); });
@@ -6279,6 +6286,90 @@ function toastProgress(text){
 async function mediaLink(f, long){
   if (f.storage === "drive") return fileLink(f.id, long);
   return storeLink(f, false);
+}
+
+
+/* ---------- the voice note player (2026-11af) ----------
+   Big play button, a bar you can tap to jump, the time and a speed button. The recording is fetched whole
+   (voice notes are small), so it starts at once and can be skipped through; Chrome's recordings don't say
+   how long they are, so the length is worked out here. Only one voice note plays at a time. */
+let voiceNow = null;
+// decode a recording and write it out as 16 kHz mono WAV (a 5-minute voice note is about 9 MB in memory)
+async function toWav(arrayBuf){
+  const AC = window.OfflineAudioContext || window.webkitOfflineAudioContext; if (!AC) return null;
+  const ctx = new AC(1, 16000, 16000);
+  const ab = await new Promise((res, rej) => { const pr = ctx.decodeAudioData(arrayBuf, res, rej); if (pr && pr.then) pr.then(res, rej); });
+  const ch = ab.numberOfChannels > 1 ? ab.getChannelData(0).map((v, i) => (v + ab.getChannelData(1)[i]) / 2) : ab.getChannelData(0);
+  const rate = ab.sampleRate, n = ch.length, out = new DataView(new ArrayBuffer(44 + n * 2));
+  const str = (o, t) => { for (let i = 0; i < t.length; i++) out.setUint8(o + i, t.charCodeAt(i)); };
+  str(0, "RIFF"); out.setUint32(4, 36 + n * 2, true); str(8, "WAVE"); str(12, "fmt "); out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 1, true);
+  out.setUint32(24, rate, true); out.setUint32(28, rate * 2, true); out.setUint16(32, 2, true); out.setUint16(34, 16, true); str(36, "data"); out.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) { const v = Math.max(-1, Math.min(1, ch[i])); out.setInt16(44 + i * 2, v < 0 ? v * 0x8000 : v * 0x7fff, true); }
+  return new Blob([out], { type: "audio/wav" });
+}
+const voiceSecs = name => { const m = String(name || "").match(/\((\d+):(\d\d)\)/); return m ? +m[1] * 60 + +m[2] : 0; };
+const mmss = s => !isFinite(s) || s < 0 ? "0:00" : Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0");
+function voicePlayer(a){
+  const au = new Audio(); au.preload = "none";
+  const playBtn = h("button", { type: "button", class: "vp-play", "aria-label": "Play voice note", "data-multi": "1" }, "▶");
+  const fill = h("span", { class: "vp-fill" }), knob = h("span", { class: "vp-knob" });
+  const bar = h("span", { class: "vp-bar", role: "slider", tabindex: "0", "aria-label": "Position", "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": "0" }, fill, knob);
+  const time = h("span", { class: "vp-time" }, mmss(voiceSecs(a.name)) || "0:00");
+  const speeds = [1, 1.5, 2]; let sp = 0;
+  const speedBtn = h("button", { type: "button", class: "vp-speed", "aria-label": "Playback speed", "data-multi": "1" }, "1×");
+  const box = h("div", { class: "cvoice vp", "data-file": a.id },
+    h("span", { class: "cvoice-ic", "aria-hidden": "true" }, /^Voice note/.test(a.name || "") ? "🎤" : "🎵"), playBtn, bar, time, speedBtn,
+    h("button", { type: "button", class: "btn sm ghost vp-dl", title: "Download", "aria-label": "Download " + a.name, onclick: () => openChatFile(a, true) }, "⬇"));
+  let loaded = null, total = voiceSecs(a.name);
+  const draw = () => {
+    const d = isFinite(au.duration) && au.duration > 0 ? au.duration : total, t = au.currentTime || 0, pct = d ? Math.min(100, t / d * 100) : 0;
+    fill.style.width = pct + "%"; knob.style.left = pct + "%"; bar.setAttribute("aria-valuenow", String(Math.round(pct)));
+    time.textContent = au.paused && !t ? mmss(d) : mmss(t) + " / " + mmss(d);
+    playBtn.textContent = au.paused ? "▶" : "⏸"; playBtn.setAttribute("aria-label", au.paused ? "Play voice note" : "Pause voice note");
+    box.classList.toggle("playing", !au.paused);
+  };
+  // fetch the whole recording once; if that's not possible, play it straight from the link
+  const load = () => loaded || (loaded = (async () => {
+    playBtn.textContent = "…"; playBtn.disabled = true;
+    try {
+      const url = await fileLink(a.id, true);
+      if (au.canPlayType && !au.canPlayType(a.mime) && /webm/.test(a.mime)) throw new Error("cantplay");
+      // best: turn it into a plain WAV on this device (exact length, skippable, plays everywhere);
+      // if that isn't possible, play the recording as it is
+      try {
+        const r = await fetch(url); if (!r.ok) throw new Error(String(r.status));
+        const buf = await r.arrayBuffer();
+        let wav = null; try { wav = await toWav(buf.slice(0)); } catch (e) { wav = null; }
+        au.src = URL.createObjectURL(wav || new Blob([buf], { type: a.mime }));
+      }
+      catch (e) { au.src = url; }
+      await new Promise(res => { if (au.readyState >= 1) return res(); au.addEventListener("loadedmetadata", res, { once: true }); au.addEventListener("error", res, { once: true }); au.load(); });
+      if (!isFinite(au.duration)) {   // Chrome's recordings: ask for the end once to learn the length
+        await new Promise(res => { const done = () => { au.removeEventListener("timeupdate", done); au.currentTime = 0; res(); }; au.addEventListener("timeupdate", done); au.currentTime = 1e7; setTimeout(done, 1500); });
+      }
+      if (isFinite(au.duration) && au.duration > 0) total = au.duration;
+    } catch (e) {
+      loaded = null; playBtn.disabled = false; playBtn.textContent = "▶";
+      if (e && e.message === "cantplay") { toast("This device can’t play this recording here. Use ⬇ to download it."); throw e; }
+      toast("Couldn’t load the voice note. Check your connection and try again."); throw e;
+    }
+    playBtn.disabled = false; draw();
+  })());
+  const play = async () => {
+    try { await load(); } catch (e) { return; }
+    if (voiceNow && voiceNow !== au) voiceNow.pause();
+    voiceNow = au; au.playbackRate = speeds[sp];
+    try { await au.play(); } catch (e) { toast("Tap ▶ again to play."); }
+  };
+  playBtn.addEventListener("click", () => { if (au.paused) play(); else au.pause(); });
+  speedBtn.addEventListener("click", () => { sp = (sp + 1) % speeds.length; au.playbackRate = speeds[sp]; speedBtn.textContent = speeds[sp] + "×"; });
+  const seekTo = async x => { const r = bar.getBoundingClientRect(); const f = Math.max(0, Math.min(1, (x - r.left) / (r.width || 1)));
+    try { await load(); } catch (e) { return; } const d = isFinite(au.duration) && au.duration > 0 ? au.duration : total; if (d) au.currentTime = f * d; draw(); };
+  bar.addEventListener("click", e => seekTo(e.clientX));
+  bar.addEventListener("keydown", async e => { if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return; e.preventDefault(); try { await load(); } catch (x) { return; } au.currentTime = Math.max(0, (au.currentTime || 0) + (e.key === "ArrowRight" ? 5 : -5)); draw(); });
+  for (const ev of ["timeupdate", "play", "pause", "ended", "loadedmetadata"]) au.addEventListener(ev, draw);
+  au.addEventListener("ended", () => { au.currentTime = 0; draw(); });
+  return box;
 }
 /* ---------------------------------------------------------------------
    Chat: reply to a message, emoji reactions, an emoji picker (with :shortcodes),
@@ -6629,7 +6720,8 @@ async function toggleChatMute(ch){
 const VOICE_MAX_S = 300;
 function voiceType(){
   const ok2 = t => window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t);
-  for (const [t, ext] of [["audio/webm;codecs=opus", "webm"], ["audio/webm", "webm"], ["audio/mp4", "m4a"], ["audio/ogg;codecs=opus", "ogg"]]) if (ok2(t)) return { type: t, ext };
+  // MP4 first: it plays on every phone and computer (iPhones can't play Chrome's WebM); WebM where MP4 isn't offered
+  for (const [t, ext] of [["audio/mp4;codecs=mp4a.40.2", "m4a"], ["audio/mp4", "m4a"], ["audio/webm;codecs=opus", "webm"], ["audio/webm", "webm"], ["audio/ogg;codecs=opus", "ogg"]]) if (ok2(t)) return { type: t, ext };
   return null;
 }
 function voiceNoteButton(getSend){
@@ -7000,7 +7092,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ae";
+const APP_VERSION = "2026-11af";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
