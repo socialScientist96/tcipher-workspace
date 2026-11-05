@@ -6904,11 +6904,32 @@ function loadShotLib(){
 }
 async function capturePage(){
   await loadShotLib();
-  const hide = [document.getElementById("bugBtn"), document.getElementById("toast"), dlg && dlg().open ? dlg() : null].filter(Boolean);
+  // leave out only the Report box itself (and the 🐞 button and messages): a task or other popup that's open is part of the problem
+  const hide = [document.getElementById("bugBtn"), document.getElementById("toast"), dlg && dlg().open && dlg().querySelector(".bugdlg") ? dlg() : null].filter(Boolean);
   hide.forEach(el => { el.dataset.vis = el.style.visibility; el.style.visibility = "hidden"; });
   try {
-    const canvas = await Promise.race([window.html2canvas(document.body, { backgroundColor: "#ffffff", scale: Math.min(2, window.devicePixelRatio || 1), useCORS: true, logging: false,
-      x: window.scrollX, y: window.scrollY, width: window.innerWidth, height: window.innerHeight }), new Promise((_, rej) => setTimeout(() => rej(new Error("The screenshot took too long.")), 10000))]);
+    // The screenshot tool can't see an open popup (it sits in the browser's top layer). So the page is photographed
+    // without it, the popup on its own, and the popup is laid over the dimmed page where it was on screen.
+    const live = document.getElementById("dlg");
+    const popup = live && live.open && !live.querySelector(".bugdlg") ? live : null;
+    const scale = Math.min(2, window.devicePixelRatio || 1);
+    const shot = (el, opts) => Promise.race([window.html2canvas(el, Object.assign({ backgroundColor: "#ffffff", scale, useCORS: true, logging: false }, opts)),
+      new Promise((_, rej) => setTimeout(() => rej(new Error("The screenshot took too long.")), 10000))]);
+    const canvas = await shot(document.body, { x: window.scrollX, y: window.scrollY, width: window.innerWidth, height: window.innerHeight, ignoreElements: el => el.id === "dlg" });
+    if (popup) {
+      const r = popup.getBoundingClientRect();
+      const keep = popup.querySelector(".db") ? popup.querySelector(".db").scrollTop : 0;
+      const pc = await shot(popup, { backgroundColor: getComputedStyle(popup).backgroundColor || "#ffffff", onclone: doc => {
+        const d = doc.getElementById("dlg"); if (!d) return;
+        d.style.cssText += ";position:fixed;margin:0;left:0;top:0;width:" + r.width + "px;height:" + r.height + "px;max-height:none;transform:none";
+        const db = d.querySelector(".db"); if (db) db.scrollTop = keep;
+      } });
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "rgba(15,12,45,.45)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.save(); const rad = 16 * scale, x = r.left * scale, y = r.top * scale, w = r.width * scale, hh = r.height * scale;
+      ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, w, hh, rad); else ctx.rect(x, y, w, hh); ctx.clip();
+      ctx.drawImage(pc, x, y, w, hh); ctx.restore();
+    }
     return await new Promise(r => canvas.toBlob(b => r(b ? new File([b], "screenshot.png", { type: "image/png" }) : null), "image/png"));
   } finally { hide.forEach(el => { el.style.visibility = el.dataset.vis || ""; }); }
 }
