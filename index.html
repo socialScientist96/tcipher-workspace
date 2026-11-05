@@ -703,6 +703,169 @@ dialog[open]::backdrop{animation:fadeIn .16s ease-out}
 
 /* replies sent by email */
 .viaemail{color:var(--ink3);font-size:11.5px;white-space:nowrap}
+
+/* ---------- Development board, backlog and work item view (jsdev.js), styled after Jira ---------- */
+.dv-top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:6px}
+.dv-crumb{font-size:13px;color:var(--ink2)}
+.dv-space{font-size:24px;margin:2px 0 0}
+.dv-tabsbar{display:flex;gap:22px;border-bottom:1px solid var(--line);margin:0 0 16px}
+.dv-tabsbar a{padding:10px 0;color:var(--ink2);text-decoration:none;font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px}
+.dv-tabsbar a.on{color:var(--p);border-bottom-color:var(--p)}
+.dv-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.dv-toolbar .grow,.dv-foot .grow,.dv-brow .grow,.dv-bh .grow,.dv-crow .grow{flex:1}
+.dv-search{max-width:220px}
+.dv-faces{display:flex}
+.dv-face{border:2px solid var(--white);border-radius:50%;padding:0;background:var(--white);cursor:pointer;line-height:0;margin-left:-4px}
+.dv-face:first-child{margin-left:0}
+.dv-face.on{border-color:var(--p);z-index:1}
+.dv-fbtn.on{border-color:var(--p);color:var(--p)}
+.dv-fpanel{display:flex;align-items:center;gap:16px;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:-4px 0 14px;background:var(--white)}
+.dv-sprintinfo{display:flex;align-items:center;gap:12px;font-size:13.5px;color:var(--ink2)}
+.dv-boardwrap{overflow-x:auto;padding-bottom:6px}
+.dv-board{display:grid;grid-template-columns:repeat(4,minmax(250px,1fr));gap:14px;min-width:1040px;align-items:start}
+.dv-col{background:#F4F5F7;border-radius:10px;padding:8px}
+.dv-col.drop{outline:2px solid var(--p);outline-offset:-2px;background:#EEF0FF}
+.dv-colh{display:flex;gap:8px;align-items:center;font-size:13px;font-weight:600;color:#44546F;padding:6px 6px 10px}
+.dv-n{font-weight:400}
+.dv-cards{display:flex;flex-direction:column;gap:8px}
+.dv-card{display:flex;flex-direction:column;gap:8px;width:100%;text-align:left;background:#fff;border:0;border-radius:8px;padding:12px;font:inherit;cursor:pointer;color:#172B4D;box-shadow:0 1px 1px rgba(9,30,66,.25),0 0 1px rgba(9,30,66,.31)}
+.dv-card:hover{background:#F7F8F9}
+.dv-card.dragging{opacity:.5}
+.dv-title{font-size:14px;line-height:1.4}
+.dv-flag{font-size:12px;color:#AE2E24;font-weight:600}
+.dv-parent{font-size:12px;color:#44546F;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dv-due{font-size:13px;color:#44546F}
+.dv-due.late,.dv-late{color:#AE2E24;font-weight:600}
+.dv-foot{display:flex;align-items:center;gap:6px}
+.dv-key{font-size:12.5px;color:#44546F;font-weight:600;letter-spacing:.01em;white-space:nowrap}
+.dv-ti{display:inline-flex;line-height:0;flex:none}
+.dv-epic{background:#F3F0FF;color:#5E4DB2;border-radius:4px;padding:1px 6px;font-size:12px;font-weight:600;white-space:nowrap;align-self:flex-start;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.dv-pts{background:#DFE1E6;color:#172B4D;border-radius:999px;min-width:22px;padding:1px 6px;text-align:center;font-size:12px}
+.dv-pts.empty{background:none;color:var(--ink3)}
+.dv-noone{width:24px;height:24px;border-radius:50%;background:#DFE1E6;color:#626F86;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.dv-colnew{width:100%;margin-top:8px;border:1px dashed #B3B9C4;background:none;border-radius:8px;padding:7px;color:#44546F;font:inherit;font-size:13px;cursor:pointer}
+.dv-colnew:hover{background:#EBECF0}
+.dv-newin{margin-top:8px}
+.dv-bbox{background:#F4F5F7;border-radius:10px;padding:8px 8px 6px;margin-bottom:14px}
+.dv-bbox.active{background:#EEF0FF}
+.dv-bbox.drop{outline:2px solid var(--p);outline-offset:-2px}
+.dv-bh{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:4px 4px 8px;font-size:14px}
+.dv-caret{border:0;background:none;cursor:pointer;font-size:13px;color:#44546F;padding:0 2px}
+.dv-counts{display:flex;gap:4px}
+.dv-counts span{border-radius:999px;min-width:22px;padding:1px 7px;text-align:center;font-size:12px;font-weight:600}
+.dv-counts .c-todo{background:#DFE1E6;color:#172B4D}.dv-counts .c-prog{background:#CCE0FF;color:#0055CC}.dv-counts .c-done{background:#DCFFF1;color:#216E4E}
+.dv-blist{display:flex;flex-direction:column;gap:1px;background:var(--line);border-radius:6px;overflow:hidden}
+.dv-brow{display:flex;align-items:center;gap:8px;background:#fff;padding:8px 10px;font-size:14px;cursor:pointer;color:#172B4D}
+.dv-brow:hover{background:#F7F8F9}
+.dv-brow.dragging{opacity:.5}
+.dv-rt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dv-rt.done{text-decoration:line-through;color:var(--ink3)}
+.dv-bempty{background:#fff;padding:14px;text-align:center;color:#626F86;font-size:13.5px;margin:0}
+.dv-rownew{background:#fff;border:0;text-align:left;padding:9px 12px;color:#44546F;font:inherit;font-size:13.5px;cursor:pointer}
+.dv-rownew:hover{background:#F7F8F9}
+.dv-blist .dv-newin{margin:0;border-radius:0}
+.dv-loz{display:inline-block;border-radius:4px;padding:2px 6px;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;border:0;white-space:nowrap;background:#DFE1E6;color:#44546F}
+select.dv-loz{cursor:pointer;font-family:inherit;appearance:auto}
+.dv-loz.s-in-progress{background:#CCE0FF;color:#0055CC}
+.dv-loz.s-in-review{background:#F8E6A0;color:#7F5F01}
+.dv-loz.s-done{background:#BAF3DB;color:#216E4E}
+.dv-epics{margin-bottom:14px}
+.dv-epicgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+.dv-epiccard{display:flex;flex-direction:column;gap:7px;text-align:left;background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font:inherit;font-size:13.5px;cursor:pointer;color:#172B4D}
+.dv-epiccard:hover{border-color:#904EE2}
+.dv-bar{display:block;height:6px;border-radius:999px;background:#DFE1E6;overflow:hidden;flex:1}
+.dv-bar.small{max-width:120px}
+.dv-bar>span{display:block;height:100%;background:#22A06B}
+.dv-bar.over>span{background:#E2B203}
+.dv-two{display:inline-flex;align-items:center;gap:8px;min-width:0}
+/* the work item view */
+dialog.dv-wide{width:min(1120px,calc(100vw - 20px))}
+dialog.dv-wide .dh{align-items:center;gap:6px}
+.dv-crumbs{display:flex;align-items:center;gap:6px;font-size:13.5px;color:#44546F;flex:1;min-width:0}
+.dv-crumbs .linkbtn{display:inline-flex;align-items:center;gap:4px}
+.dv-epiclink{color:#5E4DB2}
+.dv-menuwrap{position:relative}
+.dv-menu{position:absolute;right:0;top:36px;z-index:20;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(15,12,45,.15);padding:4px;min-width:170px;display:flex;flex-direction:column}
+.dv-menu[hidden]{display:none}
+.dv-menuitem{border:0;background:none;text-align:left;padding:8px 12px;border-radius:6px;font:inherit;font-size:14px;cursor:pointer;color:#172B4D}
+.dv-menuitem:hover{background:#F1F2F4}
+.dv-view{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(280px,1fr);gap:28px;align-items:start}
+.dv-h{font-size:24px;font-weight:600;margin:0 0 18px;line-height:1.3;border-radius:6px;padding:2px 6px;margin-left:-6px;color:#172B4D}
+.dv-h.edit:hover{background:#F1F2F4;cursor:text}
+.dv-hin{font-size:21px;font-weight:600;margin:0 0 18px}
+.dv-sec{margin:0 0 22px}
+.dv-sect{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.dv-sect b{font-size:15px;color:#172B4D}
+.dv-desc{font-size:14px;line-height:1.6;white-space:pre-wrap;color:#172B4D;border-radius:6px;padding:6px;margin-left:-6px}
+.dv-desc.edit:hover{background:#F1F2F4;cursor:text}
+.dv-desc.empty{color:#626F86}
+.dv-btns{display:flex;gap:8px;margin-top:8px}
+.dv-bugrow{display:grid;grid-template-columns:140px 1fr;gap:8px;font-size:14px;padding:4px 0}
+.dv-clist{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-bottom:6px}
+.dv-crow{display:flex;align-items:center;gap:8px;padding:7px 10px;border-top:1px solid var(--line);font-size:14px;cursor:pointer;background:#fff}
+.dv-crow:first-child{border-top:0}
+.dv-crow:hover{background:#F7F8F9}
+.dv-sub{font-size:12.5px;color:#626F86;margin:0 0 4px}
+.dv-addline{border:0;background:none;padding:6px;margin-left:-6px;border-radius:6px;color:#626F86;font:inherit;font-size:14px;cursor:pointer;text-align:left}
+.dv-addline:hover{background:#F1F2F4;color:#172B4D}
+.dv-ph{color:#626F86;font-size:14px;margin:0}
+.dv-tabs{display:flex;gap:6px;margin-bottom:14px}
+.dv-tabs button{border:1px solid #DFE1E6;background:#fff;font:inherit;font-size:13.5px;padding:4px 12px;cursor:pointer;color:#44546F;border-radius:6px}
+.dv-tabs button.on{background:#E9F2FF;border-color:#0C66E4;color:#0C66E4}
+.dv-right{position:sticky;top:0;display:flex;flex-direction:column;gap:12px}
+.dv-statusrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.dv-statusbtn{font:inherit;font-weight:600;font-size:14px;border:0;border-radius:6px;padding:7px 10px;cursor:pointer;background:#DFE1E6;color:#172B4D}
+.dv-statusbtn.s-in-progress{background:#0C66E4;color:#fff}
+.dv-statusbtn.s-in-review{background:#E2B203;color:#172B4D}
+.dv-statusbtn.s-done{background:#1F845A;color:#fff}
+.dv-statusbtn:disabled{opacity:.8;cursor:default}
+.dv-note{font-size:12.5px;color:#626F86;margin:0}
+.dv-details{border:1px solid #DFE1E6;border-radius:8px}
+.dv-dh{display:flex;gap:6px;align-items:center;width:100%;border:0;background:none;text-align:left;font:inherit;font-weight:600;font-size:15px;padding:12px 14px;cursor:pointer;color:#172B4D;border-bottom:1px solid transparent}
+.dv-dh[aria-expanded="true"]{border-bottom-color:#DFE1E6}
+.dv-details>div{padding:6px 14px 10px}
+.dv-drow{display:grid;grid-template-columns:118px minmax(0,1fr);gap:10px;align-items:start;padding:5px 0;font-size:14px}
+.dv-dl{color:#44546F;font-weight:600;font-size:13.5px;padding-top:5px}
+.dv-val{min-height:30px;padding:4px 6px;border-radius:4px;margin-left:-6px;display:flex;flex-direction:column;justify-content:center;gap:2px;color:#172B4D}
+.dv-val.edit{cursor:pointer}
+.dv-val.edit:hover{background:#F1F2F4}
+.dv-val.editing{padding:0;background:none}
+.dv-ph{color:#626F86}
+.dv-link{color:#0C66E4}
+.dv-assignme{align-self:flex-start;font-size:13px}
+.dv-labels{display:flex;flex-wrap:wrap;gap:4px}
+.dv-label{background:#F1F2F4;border:1px solid #DFE1E6;border-radius:4px;padding:0 6px;font-size:12.5px}
+.dv-prio{font-weight:700;width:14px;text-align:center}
+.dv-prio.p-critical{color:#C9372C}.dv-prio.p-high{color:#E2483D}.dv-prio.p-medium{color:#E2B203}.dv-prio.p-low{color:#0C66E4}
+.dv-in{min-height:0;height:32px;padding:4px 8px;font-size:14px;width:100%}
+.dv-time{display:flex;flex-direction:column;gap:5px;width:100%;font-size:13px}
+.dv-code{margin-top:6px}
+.dv-stamp{display:flex;flex-direction:column;gap:3px;font-size:12.5px;color:#626F86;padding:0 2px}
+.dv-stamp .linkbtn{align-self:flex-start;margin-top:4px}
+.dv-wlform{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.dv-wlform .in:nth-child(3){flex:1;min-width:170px}
+.dv-wlist{display:flex;flex-direction:column;gap:12px;margin-top:6px}
+.dv-wl{display:flex;gap:10px;align-items:flex-start;font-size:14px}
+/* reports */
+.dv-stack{display:flex;height:14px;border-radius:999px;overflow:hidden;background:#DFE1E6;margin:10px 0}
+.dv-stack span.s-to-do{background:#8590A2}.dv-stack span.s-in-progress{background:#0C66E4}.dv-stack span.s-in-review{background:#E2B203}.dv-stack span.s-done{background:#22A06B}
+.dv-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:#44546F}
+.dv-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.dv-legend i.s-to-do{background:#8590A2}.dv-legend i.s-in-progress{background:#0C66E4}.dv-legend i.s-in-review{background:#E2B203}.dv-legend i.s-done{background:#22A06B}
+.dv-vel{display:flex;align-items:flex-end;gap:18px;height:190px;padding-top:10px}
+.dv-velcol{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;max-width:80px}
+.dv-velbar{display:block;width:100%;background:#0C66E4;border-radius:4px 4px 0 0}
+.dv-velv{font-size:13px;font-weight:600}
+.dv-vell{font-size:12px;color:#626F86;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px}
+@media (max-width:820px){.dv-view{grid-template-columns:1fr}.dv-right{position:static}.dv-board{min-width:0;grid-template-columns:1fr}}
+.dv-card>*{max-width:100%;min-width:0}
+.dv-foot{width:100%}
+.dv-parent{display:block}
+dialog.dv-wide .dh{flex-direction:row;justify-content:space-between;align-items:center;padding:14px 20px 0}
+dialog.dv-wide .dh .iconbtn{flex:none}
+.dv-desc,.dv-ph,.dv-addline,.dv-view{text-align:left}
+.dv-stackcol{display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+.dv-time .dv-bar{flex:none;width:100%}
 </style>
 </head>
 <body>
@@ -916,7 +1079,7 @@ async function load(t, force){
       const max = LIMIT[t] || 50000, PAGE = 1000;
       let all = [];
       for (let from = 0; from < max; from += PAGE){
-        let q = sb.from(t).select("*").order(o[0], { ascending: o[1], nullsFirst: false }).order(["google_links","presence"].includes(t) ? "user_id" : "id", { ascending: true });
+        let q = sb.from(t).select("*").order(o[0], { ascending: o[1], nullsFirst: false }).order(KEYED_BY_USER.has(t) ? "user_id" : "id", { ascending: true });
         if (t === "notifications") q = q.eq("user_id", S.me.id);
         const chunk = ok(await q.range(from, Math.min(from + PAGE, max) - 1)) || [];
         all = all.concat(chunk);
@@ -933,6 +1096,8 @@ async function load(t, force){
   S.loading[t] = p;
   return p;
 }
+// tables whose key is the person, not an id (sorting by "id" on these fails, and the whole list didn't load)
+const KEYED_BY_USER = new Set(["google_links", "presence", "user_status", "profile_private"]);
 const ensure = list => Promise.all([...new Set(list.filter(Boolean))].map(t => load(t)));
 
 async function insertRow(t, data){
@@ -1345,7 +1510,7 @@ const LABEL_SUGGESTIONS = {
   Marketing: ["linkedin","instagram","blog","seo","ads","design","video","newsletter"]
 };
 const WORK_MODES = ["Remote", "Client site", "On-site"];
-const TASK_TYPES = ["Feature","Bug","Testing","Improvement","Research","Design","DevOps","Content","Campaign","SEO","Social media","Follow-up","Proposal","Admin","Other"];
+const TASK_TYPES = ["Feature","Bug","Testing","Improvement","Research","Design","DevOps","Epic","Subtask","Content","Campaign","SEO","Social media","Follow-up","Proposal","Admin","Other"];
 const LEAD_STATUS = ["New","Contacted","Qualified","Sent to sales","Converted","Not a fit"];
 const LEAD_SOURCES = ["Website","Referral","LinkedIn","Instagram","Google Ads","Meta Ads","SEO","Upwork","Fiverr","Clutch","Cold outreach","Event","WhatsApp","Other"];
 const SERVICES = ["Mobile app","Web app","Website","Backend / API","UI/UX design","QA / testing","Maintenance","Staff augmentation","Consulting","Other"];
@@ -1616,7 +1781,7 @@ const MOD = {
       { k: "repeat", l: "Repeats", t: "select", o: REPEATS, req: true, def: "Does not repeat" },
       { k: "repeat_days", l: "On these days", t: "days", full: true, def: () => (S.settings.working_days || [1,2,3,4,5,6]).slice(), show: r => r.repeat === "Selected days" },
       { k: "meeting_date", l: "Date (first day, if it repeats)", t: "date", req: true, def: () => today() },
-      { k: "start_time", l: "Start time", t: "time", def: "10:00" },
+      { k: "start_time", l: "Start time", t: "time", def: () => { const n = new Date(Math.ceil((Date.now() + 5 * 60000) / 1800000) * 1800000); return n.getHours() >= 21 || n.getHours() < 7 ? "10:00" : String(n.getHours()).padStart(2, "0") + ":" + String(n.getMinutes()).padStart(2, "0"); } },
       { k: "duration_min", l: "Duration (minutes)", t: "int", def: 30, min: 5 },
       { k: "project_id", l: "Project", t: "ref", ref: "projects" },
       { k: "client_id", l: "Client", t: "ref", ref: "clients" },
@@ -2349,15 +2514,15 @@ function closeDlg(){ const d = dlg(); if (d.open) d.close(); S.dlg = null; }
 function openDialog(title, bodyNodes, footNodes, narrow){
   const d = dlg();
   d.className = narrow ? "narrow" : "";
-  d.replaceChildren(
+  d.replaceChildren(...[
     h("div", { class: "dh" }, h("h2", {}, title), h("button", { type: "button", class: "iconbtn", "aria-label": "Close", onclick: closeDlg }, "✕")),
     h("div", { class: "db" }, bodyNodes),
-    footNodes ? h("div", { class: "df" }, footNodes) : null);
+    footNodes ? h("div", { class: "df" }, footNodes) : null].filter(Boolean));   // (a missing footer used to show the word "null")
   if (!d.open) d.showModal();
   return d;
 }
 
-async function openRecord(key, id, preset){
+async function openRecord(key, id, preset, opts){
   const M = MOD[key];
   await ensure([M.table, ...(M.needs || [])]);
   let rec = id ? byId(M.table, id) : null;
@@ -2365,6 +2530,8 @@ async function openRecord(key, id, preset){
     try { rec = ok(await sb.from(M.table).select("*").eq("id", id).maybeSingle()); if (rec) upsertCache(M.table, rec); } catch (e) {}
     if (!rec) { toast("That " + M.one + " isn’t available any more."); return; }
   }
+  // Development tasks open in the simpler, Jira-style view (the full form is one click away from there)
+  if (key === "tasks" && rec && rec.vertical === "Development" && !(opts && opts.form) && typeof openDevTask === "function") { openDevTask(rec.id); return; }
   const A = access(M, rec);
   const editable = rec ? A.canEdit : A.canCreate;
   const values = rec ? clone(rec) : {};
@@ -2621,7 +2788,9 @@ function filesSection(tbl, id, canUpload){
 }
 // open a stored file in a new tab (images and PDFs show in the browser)
 async function openStored(f){
-  try { const u = await mediaLink(f, (f.size || 0) > 20 * 1048576); const w = window.open(u, "_blank", "noopener"); if (!w) location.href = u; } catch (e) { fail(e, "Couldn’t open the file"); }
+  try { const u = await mediaLink(f, (f.size || 0) > 20 * 1048576); const a = { mime: f.mime || f.mime_type || "", name: f.name || f.file_name || "" };
+    if (typeof viewable === "function" && !viewable(a)) { saveFrom(u + (u.includes("?") ? "&" : "?") + "dl=1", a.name); toast("Downloading " + (a.name || "the file") + "…"); return; }
+    const w = window.open(u, "_blank", "noopener"); if (!w) location.href = u; } catch (e) { fail(e, "Couldn’t open the file"); }
 }
 async function downloadFile(f){
   try {
@@ -2828,9 +2997,20 @@ function announcementsFeed(el, A){
    --------------------------------------------------------------------- */
 function myToday(){ return rows("attendance").find(r => r.user_id === S.me.id && r.day === today()); }
 async function checkIn(mode){
-  try { await insertRow("attendance", { user_id: S.me.id, day: today(), check_in: new Date().toISOString(), mode: mode || "Office" }); toast("Checked in at " + fmtTime(new Date()) + "."); }
+  try {
+    // today's row may exist already (another tab, or checked out earlier): never make a second one
+    const ex = myToday() || ok(await sb.from("attendance").select("*").eq("user_id", S.me.id).eq("day", today()).maybeSingle());
+    if (ex && ex.check_in && !ex.check_out) { upsertCache("attendance", ex); toast("You’re already checked in (since " + fmtTime(ex.check_in) + ")."); }
+    else if (ex && ex.check_out) { await updateRow("attendance", ex.id, { check_out: null }); toast("Checked in again at " + fmtTime(new Date()) + "."); }
+    else { await insertRow("attendance", { user_id: S.me.id, day: today(), check_in: new Date().toISOString(), mode: mode || "Office" }); toast("Checked in at " + fmtTime(new Date()) + "."); }
+    if (typeof closeIdleWarning === "function") closeIdleWarning();
+  }
   catch (e) { fail(e, "Couldn’t check in"); }
   rerender();
+}
+// my own check-in for today, straight from the server (the popup and the Home card rely on it)
+async function loadMyToday(){
+  try { const r = ok(await sb.from("attendance").select("*").eq("user_id", S.me.id).eq("day", today()).maybeSingle()); if (r) upsertCache("attendance", r); return r; } catch (e) { return null; }
 }
 async function checkOut(){
   const r = myToday(); if (!r) return;
@@ -2865,7 +3045,8 @@ function attendanceWidget(light){
   } else if (!r.check_out){
     wrap.append(h("span", {}, "Checked in at " + fmtTime(r.check_in) + " (" + r.mode + ")"), h("button", { type: "button", class: "btn", onclick: checkOut }, "Check out"));
   } else {
-    wrap.append(h("span", {}, "Worked " + hoursOf(r).toFixed(1) + " h today (" + fmtTime(r.check_in) + " – " + fmtTime(r.check_out) + ")"));
+    wrap.append(h("span", {}, "Worked " + hoursOf(r).toFixed(1) + " h today (" + fmtTime(r.check_in) + " – " + fmtTime(r.check_out) + ")"),
+      r.marked_by ? null : h("button", { type: "button", class: "btn", id: "checkInAgain", onclick: () => checkIn(r.mode) }, "Check in again"));
   }
   return wrap;
 }
@@ -5704,7 +5885,8 @@ function syncChatSubs(){
 }
 function liveTrouble(st, err){
   if (st !== "CHANNEL_ERROR" && st !== "TIMED_OUT") return;
-  if (!liveReported) { liveReported = true; captureError("Instant chat not connected: " + st + (err && err.message ? " (" + err.message + ")" : ""), "", { realtime: st }); }
+  // short drops are normal (laptop sleep, Wi-Fi); report only after repeated failures, about 3 minutes of trying
+  if (!liveReported && liveRetry >= 6 && navigator.onLine !== false) { liveReported = true; captureError("Instant chat has been down for several minutes: " + st + (err && err.message ? " (" + err.message + ")" : ""), "", { realtime: st }); }
   // try again with growing pauses; the 2-second backup check keeps messages coming meanwhile
   if (S.me && !liveStopping && !liveRetryT) { const wait = Math.min(30000, 3000 * Math.pow(2, liveRetry++)); liveRetryT = setTimeout(() => { liveRetryT = null; if (S.me) startChatLive(); }, wait); }
 }
@@ -5950,15 +6132,20 @@ function chatAttachments(m){
 function fileCard(a){
   return h("div", { class: "cfile" }, h("span", { class: "cficon", "aria-hidden": "true" }, fileIcon(a.mime || "", a.name)),
     h("span", { class: "cfx" }, h("b", {}, a.name), h("span", { class: "muted" }, chatSize(a.size))),
-    h("button", { type: "button", class: "btn sm ghost", onclick: () => openChatFile(a, false) }, "Open"),
+    viewable(a) ? h("button", { type: "button", class: "btn sm ghost", onclick: () => openChatFile(a, false) }, "Open") : null,
     h("button", { type: "button", class: "btn sm ghost", onclick: () => openChatFile(a, true) }, "Download"));
 }
-// small files open in a new tab; big downloads come in pieces, so slow connections don't time out
+// files a browser can show (pictures, video, sound, PDF, text) open in a new tab; anything else just downloads.
+// One click does one thing: no blank tab that then downloads too.
+const viewable = a => /^(image|video|audio|text)\//.test(a.mime || "") || a.mime === "application/pdf" || /\.(pdf|png|jpe?g|gif|webp|mp4|webm|mp3|wav|txt)$/i.test(a.name || "");
+function saveFrom(url, name){ const link = h("a", { href: url, download: name || "" }); document.body.append(link); link.click(); link.remove(); }
 async function openChatFile(a, download){
   try {
+    if (!download && !viewable(a)) download = true;
     if (a.size <= 20 * 1048576 || !download) {
       const u = await fileLink(a.id, a.size > 20 * 1048576);
-      const w = window.open(u + (download ? "&dl=1" : ""), "_blank", "noopener"); if (!w) location.href = u + (download ? "&dl=1" : "");
+      if (download) { saveFrom(u + "&dl=1", a.name); toast("Downloading " + a.name + "…"); return; }
+      const w = window.open(u, "_blank", "noopener"); if (!w) location.href = u;
       return;
     }
     const url = await fileLink(a.id, true), piece = 8 * 1048576, parts = [];
@@ -6262,7 +6449,9 @@ async function startMeetNow(){
 }
 function scheduleMeet(){
   const ch = C.channels.find(c => c.id === C.active); if (!ch) return;
-  openRecord("meetings", null, { title: ch.kind === "dm" ? meetTitle(ch).replace(/^Call: /, "Meeting: ") : "Meeting: #" + String(chName(ch)).replace(/^#\s*/, ""), meeting_date: today(), kind: "Internal", duration_min: 30, attendees: [...new Set([S.me.id, ...conversationPeople(ch)])] });
+  const nx = new Date(Math.ceil((Date.now() + 5 * 60000) / 1800000) * 1800000), late = nx.getHours() >= 21 || nx.toDateString() !== new Date().toDateString();
+  const when = late ? { meeting_date: addDays(today(), 1), start_time: "10:00" } : { meeting_date: today(), start_time: String(nx.getHours()).padStart(2, "0") + ":" + String(nx.getMinutes()).padStart(2, "0") };
+  openRecord("meetings", null, { title: ch.kind === "dm" ? meetTitle(ch).replace(/^Call: /, "Meeting: ") : "Meeting: #" + String(chName(ch)).replace(/^#\s*/, ""), ...when, kind: "Internal", duration_min: 30, attendees: [...new Set([S.me.id, ...conversationPeople(ch)])] });
 }
 // a message with a Google Meet link gets a Join card
 function meetCard(m){
@@ -6308,7 +6497,7 @@ async function openMessageInfo(m){
 const WH = () => {
   const s = S.settings || {};
   return { start: s.work_start || "10:00", end: s.work_end || "18:00", days: s.working_days || [1, 2, 3, 4, 5, 6],
-    warn: +s.idle_warn_min || 30, grace: +s.offline_grace_min || 5, alert: +s.admin_alert_min || 60,
+    warn: Math.max(+s.idle_warn_min || 120, 5), grace: +s.offline_grace_min || 5, alert: +s.admin_alert_min || 60,
     remind: +s.checkin_remind_min || 30, lunch: +s.lunch_min || 45, watchAdmins: !!s.watch_admins };
 };
 const hm = t => { const [a, b] = String(t).split(":").map(Number); return a * 60 + (b || 0); };
@@ -6358,7 +6547,28 @@ function paintStatus(){
 /* ---------- my activity ---------- */
 let lastInput = Date.now(), lastSent = 0, warnState = null, watchT = null;
 const ACT_EVENTS = ["pointerdown", "keydown", "wheel", "touchstart", "scroll"];
-function noteActivity(){ lastInput = Date.now(); if (warnState === "warning") return; }
+// activity in any open workspace tab counts for all of them (people often have two tabs open)
+const actChannel = typeof BroadcastChannel === "function" ? new BroadcastChannel("tcipher-activity") : null;
+let lastShared = 0;
+function noteActivity(){
+  lastInput = Date.now();
+  if (actChannel && lastInput - lastShared > 15000) { lastShared = lastInput; try { actChannel.postMessage({ at: lastInput }); } catch (e) {} }
+  if (warnState === "warning" && warnEl && warnEl.dataset.kind === "idle") closeIdleWarning();
+}
+if (actChannel) actChannel.onmessage = e => { const at = e && e.data && +e.data.at; if (at && at > lastInput) { lastInput = at; if (warnState === "warning" && warnEl && warnEl.dataset.kind === "idle") closeIdleWarning(); } };
+// before any popup: ask the server, since another tab or device may have checked in or been used
+let lastVerify = 0;
+async function verifyBeforeWarning(){
+  if (Date.now() - lastVerify < 60000) return;
+  lastVerify = Date.now();
+  try {
+    const [att, st] = await Promise.all([
+      sb.from("attendance").select("*").eq("user_id", S.me.id).eq("day", today()).maybeSingle(),
+      sb.from("user_status").select("*").eq("user_id", S.me.id).maybeSingle()]);
+    if (att.data) upsertCache("attendance", att.data);
+    if (st.data) upsertCache("user_status", st.data);
+  } catch (e) {}
+}
 ACT_EVENTS.forEach(ev => document.addEventListener(ev, noteActivity, { passive: true, capture: true }));
 document.addEventListener("mousemove", (() => { let t = 0; return () => { const n = Date.now(); if (n - t > 20000) { t = n; noteActivity(); } }; })(), { passive: true });
 async function saveMyStatus(patch){
@@ -6390,25 +6600,29 @@ function stopActivity(){ if (watchT) clearInterval(watchT); watchT = null; close
 /* ---------- the warning ---------- */
 let warnEl = null, warnStart = 0, warnTimer = null;
 function watched(){ return !(S.me.is_admin && !WH().watchAdmins) && inWorkHours() && !onLeaveToday(S.me.id); }
-function checkIdleWarning(){
-  if (!S.me || !watched()) return;
+async function checkIdleWarning(){
+  if (!S.me || !watched() || warnState) return;
+  if (needsWarning()) { await verifyBeforeWarning(); if (!warnState && needsWarning()) showIdleWarning(needsWarning()); }
+}
+// "checkin" or "idle" if a popup is due, judged from what's known now
+function needsWarning(){
+  if (!S.me || !watched()) return null;
   const st = ustatus(S.me.id) || {}, me = typeof myToday === "function" ? myToday() : null;
   if (st.checked_out_at && new Date(st.checked_out_at).toDateString() === new Date().toDateString()) return;
   if (me && me.check_out) return;
   if (["lunch", "ooo"].includes(st.state) && st.until && new Date(st.until) > Date.now()) return;
   const idleMin = (Date.now() - Math.max(lastInput, st.last_active_at ? +new Date(st.last_active_at) : 0)) / 60000;
-  if (!me || !me.check_in) {
-    if (nowMin() >= hm(WH().start) + WH().remind && !warnState && idleMin >= 0) showIdleWarning("checkin");
-    return;
-  }
-  if (idleMin >= WH().warn && !warnState) showIdleWarning("idle");
+  // checked in today, as recorded on my status (it follows attendance on every device)
+  const inToday = st.checked_in_at && new Date(st.checked_in_at).toDateString() === new Date().toDateString() && !st.checked_out_at;
+  if ((!me || !me.check_in) && !inToday) return nowMin() >= hm(WH().start) + WH().remind ? "checkin" : null;
+  return idleMin >= WH().warn ? "idle" : null;
 }
 function showIdleWarning(kind){
   warnState = "warning"; warnStart = Date.now();
   playSound("chime");
   document.title = "(!) Still there? · " + document.title.replace(/^\(!\) Still there\? · /, "");
   if (kind === "idle") sb.from("status_events").insert({ user_id: S.me.id, kind: "warned" }).then(() => {}, () => {});
-  warnEl = h("div", { class: "idle-warn", role: "alertdialog", "aria-live": "assertive" });
+  warnEl = h("div", { class: "idle-warn", role: "alertdialog", "aria-live": "assertive", "data-kind": kind });
   const body = h("div", { class: "iw-box" });
   warnEl.append(body); document.body.append(warnEl);
   const draw = () => {
@@ -6601,7 +6815,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ab";
+const APP_VERSION = "2026-11ac";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -7566,6 +7780,625 @@ async function pageAll(table, project){
   return out;
 }
 /* ---------------------------------------------------------------------
+   Development › Board and Backlog, and the Jira-style task view for Development tasks.
+   Kept deliberately simple: the board first, a few filters, and a task view where every
+   change saves the moment it's made. Everything else is one click away ("More details").
+   Epics are tasks of type Epic (a task's parent_id is its epic); subtasks are tasks of
+   type Subtask under a task. Time spent is kept in work_logs.
+   --------------------------------------------------------------------- */
+const DEV_TYPES = ["Feature", "Bug", "Improvement", "Testing", "Research", "Design", "DevOps", "Epic", "Subtask"];
+const DEV_COLUMNS = ["To do", "In progress", "In review", "Done"];
+const DEV_DONE_DAYS = 14;
+const TYPE_MARK = { Bug: ["●", "var(--bad)"], Epic: ["◆", "#6450F5"], Subtask: ["↳", "var(--info)"] };
+const devTasks = () => rows("tasks").filter(t => t.vertical === "Development" && !t.archived);
+const epicsList = () => devTasks().filter(t => t.type === "Epic").sort((a, b) => (a.status === "Done") - (b.status === "Done") || String(a.title).localeCompare(b.title));
+const childrenOf = id => devTasks().filter(t => t.parent_id === id);
+const typeMark = t => { const m = TYPE_MARK[t.type] || ["■", t.type === "Feature" ? "var(--ok)" : "var(--ink3)"]; return h("span", { class: "dv-type", style: "color:" + m[1], title: t.type }, m[0]); };
+const epicChip = t => { const e = t.parent_id && t.type !== "Subtask" ? byId("tasks", t.parent_id) : null; return e ? h("span", { class: "dv-epic", title: "Epic: " + e.title }, e.title.length > 22 ? e.title.slice(0, 21) + "…" : e.title) : null; };
+const pointsChip = t => t.story_points != null && t.story_points !== "" ? h("span", { class: "dv-pts", title: "Story points" }, String(t.story_points)) : null;
+const hoursText = min => { const hh = Math.floor(min / 60), mm = Math.round(min % 60); return (hh ? hh + "h" : "") + (mm || !hh ? (hh ? " " : "") + mm + "m" : ""); };
+// "1.5", "1h 30m", "90m", "2h" → minutes
+function parseHours(v){
+  const s = String(v || "").trim().toLowerCase(); if (!s) return 0;
+  const hm = s.match(/^(?:(\d+(?:\.\d+)?)\s*h)?\s*(?:(\d+)\s*m)?$/);
+  if (hm && (hm[1] || hm[2])) return Math.round((+hm[1] || 0) * 60 + (+hm[2] || 0));
+  return /^\d+(\.\d+)?$/.test(s) ? Math.round(+s * 60) : NaN;
+}
+
+function devMatch(u){
+  const s = (u.q || "").toLowerCase();
+  return t => (!s || (taskKey(t) + " " + t.title + " " + (t.labels || []).join(" ")).toLowerCase().includes(s))
+    && (!u.who || t.assignee_id === u.who || (t.collaborators || []).includes(u.who))
+    && (!u.mine || t.assignee_id === S.me.id || t.tester_id === S.me.id || (t.collaborators || []).includes(S.me.id))
+    && (!u.bugs || t.type === "Bug")
+    && (!u.epic || t.parent_id === u.epic || (t.type === "Subtask" && (byId("tasks", t.parent_id) || {}).parent_id === u.epic));
+}
+
+const COL_LABEL = { "To do": "To Do", "In progress": "In Progress", "In review": "In Review", "Done": "Done" };
+const canRunSprints = () => isAdmin() || isTaskHandler("Development") || lvl("projects") >= 2;
+const activeSprint = () => rows("sprints").find(s => s.status === "Active") || null;
+// small Jira-like type icons
+const TYPE_SVG = {
+  Bug: ["#E5493A", '<circle cx="8" cy="8" r="3.2" fill="#fff"/>'],
+  Epic: ["#904EE2", '<path d="M9.2 3 5 8.8h2.6L6.8 13 11 7.2H8.4z" fill="#fff"/>'],
+  Subtask: ["#4BADE8", '<rect x="4" y="4" width="4" height="4" rx=".8" fill="#fff"/><rect x="8" y="8" width="4" height="4" rx=".8" fill="none" stroke="#fff" stroke-width="1.3"/>'],
+  Feature: ["#63BA3C", '<path d="M5.5 4h5v8l-2.5-1.8L5.5 12z" fill="#fff"/>'],
+  _: ["#4BADE8", '<path d="m5 8.2 2 2 4-4.2" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>']
+};
+function typeIcon(type){
+  const [bg, inner] = TYPE_SVG[type] || TYPE_SVG._;
+  const s = h("span", { class: "dv-ti", title: type, "aria-label": type });
+  s.innerHTML = '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect width="16" height="16" rx="3" fill="' + bg + '"/>' + inner + "</svg>";
+  return s;
+}
+const lozenge = (status) => h("span", { class: "dv-loz s-" + String(status).replace(/\s+/g, "-").toLowerCase() }, COL_LABEL[status] || status);
+const noone = () => { const s = h("span", { class: "dv-noone", title: "Unassigned" }); s.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" fill="none" stroke="currentColor" stroke-width="2"/></svg>'; return s; };
+const who = id => id ? avatar(id, "sm") : noone();
+
+/* ---------- page frame: title, tabs, toolbar ---------- */
+function devFrame(el, tab){
+  el.append(h("div", { class: "dv-top" },
+    h("div", {}, h("div", { class: "dv-crumb" }, "Spaces"), h("h1", { class: "dv-space" }, "Development")),
+    access(MOD.tasks).canCreate ? h("button", { type: "button", class: "btn pri", id: "devCreate", onclick: () => devCreate() }, "+ Create") : null));
+  el.append(h("nav", { class: "dv-tabsbar", "aria-label": "Development" }, [["dev-backlog", "Backlog"], ["dev-board", "Board"], ["dev-reports", "Reports"]].map(([r, l]) =>
+    h("a", { href: "#" + r, class: tab === r ? "on" : "", "aria-current": tab === r ? "page" : null }, l))));
+}
+function devToolbar(u, redraw, right){
+  const people = activePeople().filter(p => p.vertical === "Development" || devTasks().some(t => t.assignee_id === p.id && t.status !== "Done"));
+  const q = h("input", { class: "in dv-search", type: "search", placeholder: "Search board", value: u.q || "", id: "devSearch", "aria-label": "Search board" });
+  q.addEventListener("input", () => { u.q = q.value; redraw(); });
+  const faces = h("div", { class: "dv-faces", role: "group", "aria-label": "Show one person’s work" }, people.slice(0, 10).map(p =>
+    h("button", { type: "button", class: "dv-face" + (u.who === p.id ? " on" : ""), title: p.full_name, "aria-pressed": String(u.who === p.id), onclick: () => { u.who = u.who === p.id ? "" : p.id; redraw(true); } }, avatar(p.id, "sm"))));
+  const count = ["mine", "bugs", "epic"].filter(k => u[k]).length;
+  const fbtn = h("button", { type: "button", class: "btn dv-fbtn" + (count ? " on" : ""), id: "devFilterBtn", "aria-expanded": String(!!u.fopen), onclick: () => { u.fopen = !u.fopen; redraw(true); } }, "Filter" + (count ? " (" + count + ")" : ""));
+  const bar = h("div", { class: "dv-toolbar" }, q, faces, fbtn, h("span", { class: "grow" }), right || null);
+  if (!u.fopen) return bar;
+  const cb = (k, label) => { const c = h("input", { type: "checkbox", checked: !!u[k], onchange: e => { u[k] = e.target.checked; redraw(true); } }); return h("label", { class: "chk" }, c, label); };
+  const epics = epicsList().filter(e => e.status !== "Done");
+  const epicSel = h("select", { class: "in", style: "width:auto", "aria-label": "Epic" }, h("option", { value: "" }, "Any epic"), epics.map(e => h("option", { value: e.id }, e.title)));
+  epicSel.value = u.epic || ""; epicSel.addEventListener("change", () => { u.epic = epicSel.value; redraw(true); });
+  return h("div", {}, bar, h("div", { class: "dv-fpanel", id: "devFilterPanel" }, cb("mine", "Only my work"), cb("bugs", "Only bugs"), epics.length ? epicSel : null,
+    h("button", { type: "button", class: "linkbtn", onclick: () => { Object.assign(u, { q: "", who: "", mine: false, bugs: false, epic: "" }); redraw(true); } }, "Clear filters")));
+}
+
+/* ---------- Board ---------- */
+async function renderDevBoard(el){
+  await ensure(["tasks", "projects", "sprints", "profiles"]);
+  if (S.route !== "dev-board") return;
+  const u = S.ui.dev = S.ui.dev || {};
+  devFrame(el, "dev-board");
+  const sp = activeSprint();
+  const right = sp ? h("div", { class: "dv-sprintinfo" }, h("span", {}, h("b", {}, sp.name), sp.end_date ? " · " + daysLeft(sp.end_date) : ""),
+    canRunSprints() ? h("button", { type: "button", class: "btn pri", id: "devCompleteSprint", onclick: () => completeSprintDialog(sp) }, "Complete sprint") : null) : null;
+  const body = h("div", {});
+  const draw = full => { if (full) { rerender(); return; } body.replaceChildren(devBoard(u)); };
+  el.append(devToolbar(u, draw, right), body);
+  draw();
+}
+function daysLeft(end){ const n = Math.round((new Date(end + "T23:59:59") - new Date()) / 864e5); return n < 0 ? "ended " + (-n) + (n === -1 ? " day ago" : " days ago") : n === 0 ? "ends today" : n + (n === 1 ? " day left" : " days left"); }
+function devBoard(u){
+  const since = Date.now() - DEV_DONE_DAYS * 864e5;
+  const list = devTasks().filter(t => t.type !== "Epic" && (t.status !== "Done" || +new Date(t.completed_at || t.updated_at || 0) >= since)).filter(devMatch(u)).sort(sortByPrioDue);
+  const board = h("div", { class: "dv-board" });
+  for (const st of DEV_COLUMNS){
+    const items = list.filter(t => t.status === st);
+    const cards = h("div", { class: "dv-cards" }, items.slice(0, 150).map(devCard));
+    const col = h("section", { class: "dv-col", "aria-label": COL_LABEL[st], "data-status": st },
+      h("div", { class: "dv-colh" }, h("span", {}, COL_LABEL[st]), h("span", { class: "dv-n" }, String(items.length))), cards);
+    if (access(MOD.tasks).canCreate) col.append(inlineCreate("dv-colnew", t => ({ status: st }), "What needs to be done?"));
+    col.addEventListener("dragover", e => { if (!devDrag) return; e.preventDefault(); col.classList.add("drop"); });
+    col.addEventListener("dragleave", e => { if (!col.contains(e.relatedTarget)) col.classList.remove("drop"); });
+    col.addEventListener("drop", async e => {
+      e.preventDefault(); col.classList.remove("drop");
+      const id = devDrag; devDrag = null; const t = id && byId("tasks", id);
+      if (t && t.status !== st) await devSave(t, { status: st }, "Moved to " + COL_LABEL[st] + ".");
+    });
+    board.append(col);
+  }
+  return h("div", { class: "dv-boardwrap" }, board);
+}
+let devDrag = null;
+function devCard(t){
+  const can = access(MOD.tasks, t).canEdit;
+  const parent = t.type === "Subtask" ? byId("tasks", t.parent_id) : null;
+  const overdue = t.due_date && t.status !== "Done" && t.due_date < today();
+  const card = h("button", { type: "button", class: "dv-card", draggable: can ? "true" : "false", "data-id": t.id, onclick: () => openDevTask(t.id) },
+    t.blocked ? h("span", { class: "dv-flag" }, "⚑ Blocked") : null,
+    h("span", { class: "dv-title" }, t.title),
+    parent ? h("span", { class: "dv-parent" }, taskKey(parent) + " " + parent.title) : epicChip(t),
+    t.due_date ? h("span", { class: "dv-due" + (overdue ? " late" : "") }, fmtDate(t.due_date)) : null,
+    h("span", { class: "dv-foot" }, typeIcon(t.type), h("span", { class: "dv-key" }, taskKey(t)), h("span", { class: "grow" }), pointsChip(t), who(t.assignee_id)));
+  card.addEventListener("dragstart", e => { if (!can) { e.preventDefault(); return; } devDrag = t.id; card.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", t.id); });
+  card.addEventListener("dragend", () => { devDrag = null; card.classList.remove("dragging"); });
+  return card;
+}
+// the "+" at the bottom of a column or list: type a title, press Enter
+function inlineCreate(cls, extra, ph){
+  const btn = h("button", { type: "button", class: cls, "aria-label": "Create" }, "+ Create");
+  btn.addEventListener("click", () => {
+    const ta = h("input", { class: "in dv-newin", placeholder: ph || "What needs to be done?", maxlength: "200", "aria-label": "Title of the new work item" });
+    const done = () => ta.replaceWith(btn);
+    ta.addEventListener("keydown", async e => {
+      if (e.key === "Escape") { done(); return; }
+      if (e.key !== "Enter" || !ta.value.trim()) return;
+      ta.disabled = true;
+      try { const t = await devInsert({ type: "Feature", title: ta.value.trim(), ...extra() }); toast(taskKey(t) + " created."); rerender(); }
+      catch (err) { fail(err, "Not created"); ta.disabled = false; }
+    });
+    ta.addEventListener("blur", () => { if (!ta.value.trim()) done(); });
+    btn.replaceWith(ta); ta.focus();
+  });
+  return btn;
+}
+
+/* ---------- Backlog: sprints, then the backlog ---------- */
+async function renderDevBacklog(el){
+  await ensure(["tasks", "projects", "sprints", "profiles"]);
+  if (S.route !== "dev-backlog") return;
+  const u = S.ui.devb = S.ui.devb || {};
+  devFrame(el, "dev-backlog");
+  const body = h("div", {});
+  const draw = full => { if (full) { rerender(); return; } body.replaceChildren(...devBacklog(u)); };
+  el.append(devToolbar(u, draw, canRunSprints() ? h("button", { type: "button", class: "btn", id: "devNewSprint", onclick: newSprint }, "Create sprint") : null), body);
+  draw();
+}
+async function newSprint(){
+  try { const r = ok(await sb.rpc("create_sprint", { p_name: "" })); await load("sprints", true); toast((r && r.name ? r.name : "Sprint") + " created."); rerender(); }
+  catch (e) { fail(e, "Sprint not created"); }
+}
+function devBacklog(u){
+  const open = devTasks().filter(t => t.type !== "Epic" && t.type !== "Subtask").filter(devMatch(u)).sort(sortByPrioDue);
+  const sprints = rows("sprints").filter(s => s.status !== "Completed").sort((a, b) => (b.status === "Active") - (a.status === "Active") || String(a.created_at || "").localeCompare(String(b.created_at || "")));
+  const C = S.ui.devCollapsed = S.ui.devCollapsed || {};
+  const box = (key, title, sub, items, sp) => {
+    const counts = DEV_COLUMNS.map(st => items.filter(t => t.status === st).length);
+    const collapsed = !!C[key];
+    const head = h("div", { class: "dv-bh" },
+      h("button", { type: "button", class: "dv-caret", "aria-expanded": String(!collapsed), "aria-label": collapsed ? "Show" : "Hide", onclick: () => { C[key] = !collapsed; rerender(); } }, collapsed ? "▸" : "▾"),
+      h("b", {}, title), sub ? h("span", { class: "muted" }, sub) : null, h("span", { class: "muted" }, "(" + items.length + (items.length === 1 ? " work item)" : " work items)")),
+      h("span", { class: "grow" }),
+      h("span", { class: "dv-counts", title: "To Do · In Progress · Done" }, h("span", { class: "c-todo" }, counts[0]), h("span", { class: "c-prog" }, counts[1] + counts[2]), h("span", { class: "c-done" }, counts[3])),
+      sp && canRunSprints() ? (sp.status === "Planned" ? h("button", { type: "button", class: "btn sm", onclick: () => startSprintDialog(sp, items) }, "Start sprint")
+        : h("button", { type: "button", class: "btn sm", onclick: () => completeSprintDialog(sp) }, "Complete sprint")) : null,
+      sp && canRunSprints() ? h("button", { type: "button", class: "btn sm ghost", title: "Edit sprint", "aria-label": "Edit " + sp.name, onclick: () => openRecord("sprints", sp.id) }, "•••") : null);
+    const list = h("div", { class: "dv-blist" }, collapsed ? null : [items.length ? items.map(t => devRow(t)) : h("div", { class: "dv-bempty" }, sp ? "Plan a sprint by dragging work items here." : "Your backlog is empty."),
+      access(MOD.tasks).canCreate ? inlineCreate("dv-rownew", () => ({ sprint_id: sp ? sp.id : null }), "What needs to be done?") : null]);
+    const wrap = h("section", { class: "dv-bbox" + (sp && sp.status === "Active" ? " active" : ""), "data-sprint": sp ? sp.id : "" }, head, list);
+    wrap.addEventListener("dragover", e => { if (!devDrag) return; e.preventDefault(); wrap.classList.add("drop"); });
+    wrap.addEventListener("dragleave", e => { if (!wrap.contains(e.relatedTarget)) wrap.classList.remove("drop"); });
+    wrap.addEventListener("drop", async e => {
+      e.preventDefault(); wrap.classList.remove("drop");
+      const id = devDrag; devDrag = null; const t = id && byId("tasks", id); const to = sp ? sp.id : null;
+      if (t && (t.sprint_id || null) !== to) await devSave(t, { sprint_id: to }, sp ? "Moved to " + sp.name + "." : "Moved to the backlog.");
+    });
+    return wrap;
+  };
+  const out = [devEpicsStrip()];
+  for (const sp of sprints){
+    const items = open.filter(t => t.sprint_id === sp.id && (t.status !== "Done" || sp.status === "Active"));
+    const dates = sp.start_date ? [sp.start_date, sp.end_date].filter(Boolean).map(d => fmtDate(d)).join(" – ") : "";
+    out.push(box(sp.id, sp.name, dates, items, sp));
+  }
+  out.push(box("backlog", "Backlog", "", open.filter(t => t.status !== "Done" && (!t.sprint_id || !sprints.some(s => s.id === t.sprint_id))), null));
+  return out;
+}
+function devRow(t){
+  const can = devCanEdit(t, "status");
+  const st = can ? h("select", { class: "dv-loz sel s-" + String(t.status).replace(/\s+/g, "-").toLowerCase(), "aria-label": "Status of " + taskKey(t) }, TASK_STATUS.map(s => h("option", { value: s }, COL_LABEL[s] || s))) : lozenge(t.status);
+  if (can) { st.value = t.status; st.addEventListener("click", e => e.stopPropagation()); st.addEventListener("change", () => devSave(t, { status: st.value }, "Status: " + COL_LABEL[st.value] + ".")); }
+  const row = h("div", { class: "dv-brow", tabindex: "0", role: "button", draggable: devCanEdit(t, "sprint_id") ? "true" : "false", "data-id": t.id, onclick: () => openDevTask(t.id), onkeydown: e => { if (e.key === "Enter") openDevTask(t.id); } },
+    typeIcon(t.type), h("span", { class: "dv-key" }, taskKey(t)), h("span", { class: "dv-rt" }, t.title), epicChip(t), h("span", { class: "grow" }), st, pointsChip(t) || h("span", { class: "dv-pts empty" }, "–"), who(t.assignee_id));
+  row.addEventListener("dragstart", e => { if (row.getAttribute("draggable") !== "true") { e.preventDefault(); return; } devDrag = t.id; row.classList.add("dragging"); e.dataTransfer.setData("text/plain", t.id); });
+  row.addEventListener("dragend", () => { devDrag = null; row.classList.remove("dragging"); });
+  return row;
+}
+function devEpicsStrip(){
+  const epics = epicsList().filter(e => e.status !== "Done");
+  return h("section", { class: "dv-epics" }, h("div", { class: "dv-bh" }, h("b", {}, "Epics"), h("span", { class: "muted" }, "Big goals that group work items"), h("span", { class: "grow" }),
+      access(MOD.tasks).canCreate ? h("button", { type: "button", class: "btn sm", onclick: () => devCreate({ type: "Epic" }) }, "+ Create epic") : null),
+    epics.length ? h("div", { class: "dv-epicgrid" }, epics.map(e => { const c = childrenOf(e.id), d = c.filter(x => x.status === "Done").length;
+      return h("button", { type: "button", class: "dv-epiccard", onclick: () => openDevTask(e.id) }, h("span", { class: "dv-two" }, typeIcon("Epic"), h("b", {}, e.title)),
+        h("span", { class: "dv-bar" }, h("span", { style: "width:" + (c.length ? Math.round(d / c.length * 100) : 0) + "%" })), h("span", { class: "muted" }, c.length ? d + " of " + c.length + " done" : "No work items yet")); }))
+      : h("p", { class: "dv-bempty" }, "No epics yet."));
+}
+
+/* ---------- sprint dialogs ---------- */
+function startSprintDialog(sp, items){
+  const name = h("input", { class: "in", value: sp.name, maxlength: "80", id: "spName" });
+  const weeks = h("select", { class: "in", id: "spWeeks" }, [["1", "1 week"], ["2", "2 weeks"], ["3", "3 weeks"], ["4", "4 weeks"], ["0", "Custom"]].map(([v, l]) => h("option", { value: v }, l)));
+  weeks.value = "2";
+  const start = h("input", { class: "in", type: "date", value: today(), id: "spStart" });
+  const end = h("input", { class: "in", type: "date", value: addDays(today(), 13), id: "spEnd" });
+  const goal = h("textarea", { class: "in", rows: 3, id: "spGoal", placeholder: "What should this sprint achieve?" }); goal.value = sp.goal || "";
+  const fit = () => { if (+weeks.value) end.value = addDays(start.value || today(), 7 * +weeks.value - 1); };
+  weeks.addEventListener("change", fit); start.addEventListener("change", fit); end.addEventListener("change", () => { weeks.value = "0"; });
+  const err = h("p", { class: "err", hidden: true });
+  const goBtn = h("button", { type: "button", class: "btn pri", id: "spGo", onclick: async () => {
+    err.hidden = true;
+    if (!start.value || !end.value || end.value < start.value) { err.textContent = "Choose a start date and an end date after it."; err.hidden = false; return; }
+    goBtn.disabled = true;
+    try { ok(await sb.rpc("start_sprint", { p_sprint: sp.id, p_name: name.value.trim(), p_start: start.value, p_end: end.value, p_goal: goal.value.trim() }));
+      await load("sprints", true); closeDlg(); toast(name.value.trim() + " started."); go("dev-board"); rerender(); }
+    catch (e) { err.textContent = friendly(e); err.hidden = false; goBtn.disabled = false; }
+  } }, "Start");
+  openDialog("Start sprint", [h("p", { class: "muted", style: "margin-top:0" }, (items || []).length + " work items will be included in this sprint."),
+    h("div", { class: "form" }, h("label", { class: "fl full" }, "Sprint name", name), h("label", { class: "fl" }, "Duration", weeks), h("span", {}),
+      h("label", { class: "fl" }, "Start date", start), h("label", { class: "fl" }, "End date", end), h("label", { class: "fl full" }, "Sprint goal", goal)), err],
+    [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), goBtn], true);
+}
+function completeSprintDialog(sp){
+  const inSprint = devTasks().filter(t => t.sprint_id === sp.id && t.type !== "Epic");
+  const done = inSprint.filter(t => t.status === "Done").length, open = inSprint.length - done;
+  const next = rows("sprints").filter(s => s.status === "Planned" && s.id !== sp.id);
+  const to = h("select", { class: "in", id: "spMoveTo" }, next.map(s => h("option", { value: s.id }, s.name)), h("option", { value: "new" }, "New sprint"), h("option", { value: "" }, "Backlog"));
+  const err = h("p", { class: "err", hidden: true });
+  const goBtn = h("button", { type: "button", class: "btn pri", id: "spComplete", onclick: async () => {
+    err.hidden = true; goBtn.disabled = true;
+    try { const r = ok(await sb.rpc("complete_sprint", { p_sprint: sp.id, p_move_to: to.value && to.value !== "new" ? to.value : null, p_new: to.value === "new" }));
+      await Promise.all([load("sprints", true), load("tasks", true)]); closeDlg();
+      toast(sp.name + " completed." + (r && r.moved ? " " + r.moved + " open work item" + (r.moved === 1 ? "" : "s") + " moved." : "")); rerender(); }
+    catch (e) { err.textContent = friendly(e); err.hidden = false; goBtn.disabled = false; }
+  } }, "Complete sprint");
+  openDialog("Complete " + sp.name, [h("p", { style: "margin-top:0" }, "This sprint has ", h("b", {}, done + " completed"), " and ", h("b", {}, open + " open"), " work items."),
+    open ? h("label", { class: "fl" }, "Move open work items to", to) : h("p", { class: "muted" }, "Everything is done. Nice work."), err],
+    [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), goBtn], true);
+}
+
+/* ---------- Reports: the active sprint and velocity ---------- */
+async function renderDevReports(el){
+  await ensure(["tasks", "sprints", "profiles"]);
+  if (S.route !== "dev-reports") return;
+  devFrame(el, "dev-reports");
+  const pts = list => list.reduce((s, t) => s + (+t.story_points || 0), 0);
+  const sp = activeSprint();
+  const cards = [];
+  if (sp){
+    const items = devTasks().filter(t => t.sprint_id === sp.id && t.type !== "Epic");
+    const by = DEV_COLUMNS.map(st => [st, items.filter(t => t.status === st)]);
+    const total = items.length || 1;
+    cards.push(h("div", { class: "panel" }, h("h2", {}, sp.name + (sp.end_date ? " · " + daysLeft(sp.end_date) : "")), sp.goal ? h("p", { class: "muted" }, sp.goal) : null,
+      h("div", { class: "dv-stack" }, by.map(([st, l]) => l.length ? h("span", { class: "s-" + st.replace(/\s+/g, "-").toLowerCase(), style: "width:" + (l.length / total * 100) + "%", title: COL_LABEL[st] + ": " + l.length }) : null)),
+      h("div", { class: "dv-legend" }, by.map(([st, l]) => h("span", {}, h("i", { class: "s-" + st.replace(/\s+/g, "-").toLowerCase() }), COL_LABEL[st] + ": " + l.length + (pts(l) ? " (" + pts(l) + " pts)" : "")))),
+      h("p", { class: "muted", style: "margin-bottom:0" }, pts(by[3][1]) + " of " + pts(items) + " story points done.")));
+  } else cards.push(h("div", { class: "panel empty" }, h("b", {}, "No sprint is running"), "Start one in the Backlog."));
+  const past = rows("sprints").filter(s => s.status === "Completed").sort((a, b) => String(a.end_date || "").localeCompare(String(b.end_date || ""))).slice(-6);
+  const vel = past.map(s => [s, pts(devTasks().filter(t => t.sprint_id === s.id && t.status === "Done"))]);
+  const max = Math.max(1, ...vel.map(v => v[1]));
+  cards.push(h("div", { class: "panel" }, h("h2", {}, "Velocity"), h("p", { class: "muted" }, "Story points completed in each finished sprint."),
+    vel.length ? h("div", { class: "dv-vel" }, vel.map(([s, v]) => h("div", { class: "dv-velcol" }, h("span", { class: "dv-velv" }, String(v)), h("span", { class: "dv-velbar", style: "height:" + Math.max(4, v / max * 140) + "px" }), h("span", { class: "dv-vell" }, s.name))))
+      : h("p", { class: "dv-bempty" }, "Finish a sprint to see velocity here."),
+    vel.length ? h("p", { class: "muted", style: "margin-bottom:0" }, "Average: " + Math.round(vel.reduce((a, v) => a + v[1], 0) / vel.length) + " points per sprint.") : null));
+  el.append(h("div", { class: "grid g2" }, cards));
+}
+
+/* ---------- saving one change at a time ---------- */
+const devCanEdit = (t, k) => access(MOD.tasks, t).canEdit && (!MOD.tasks.fieldEditable || MOD.tasks.fieldEditable({ k }, t));
+async function devSave(t, patch, okMsg){
+  const M = MOD.tasks, prev = { ...t }, d = { ...patch };
+  if (M.before) M.before(d, prev);
+  Object.assign(t, d); devRefresh();
+  try { const saved = await updateRow("tasks", t.id, d); Object.assign(t, saved); if (M.after) M.after(saved, prev); toast(okMsg || "Saved."); }
+  catch (e) { Object.assign(t, prev); fail(e, "Not saved"); }
+  devRefresh();
+}
+function devRefresh(){
+  if (S.devOpen && dlg().open && S.dlg && S.dlg.id === S.devOpen) drawDevTask(S.devOpen);
+  if (["dev-board", "dev-backlog", "dev-reports", "tasks"].includes(S.route)) rerender();
+}
+
+/* ---------- Create ---------- */
+function devCreate(preset){
+  preset = preset || {};
+  const type = h("select", { class: "in", id: "devNewType" }, DEV_TYPES.filter(x => x !== "Subtask").map(x => h("option", { value: x }, x)));
+  type.value = preset.type || "Feature";
+  const title = h("input", { class: "in", id: "devNewTitle", maxlength: "200", placeholder: "What needs to be done?" });
+  const epics = epicsList().filter(e => e.status !== "Done");
+  const epic = h("select", { class: "in", id: "devNewEpic" }, h("option", { value: "" }, "None"), epics.map(e => h("option", { value: e.id }, e.title)));
+  epic.value = preset.parent_id || "";
+  const epicWrap = h("label", { class: "fl" }, "Epic", epic);
+  const showEpic = () => { epicWrap.hidden = type.value === "Epic" || !epics.length; };
+  type.addEventListener("change", showEpic); showEpic();
+  const err = h("p", { class: "err", hidden: true });
+  const go2 = h("button", { type: "button", class: "btn pri", id: "devNewGo" }, "Create");
+  const submit = async () => {
+    err.hidden = true;
+    if (!title.value.trim()) { err.textContent = "Write a short summary."; err.hidden = false; title.focus(); return; }
+    go2.disabled = true;
+    try { const t = await devInsert({ type: type.value, title: title.value.trim(), parent_id: type.value === "Epic" ? null : (epic.value || null), sprint_id: preset.sprint_id || null });
+      closeDlg(); toast(taskKey(t) + " created."); rerender(); openDevTask(t.id); }
+    catch (e) { err.textContent = "Not created: " + friendly(e); err.hidden = false; }
+    go2.disabled = false;
+  };
+  go2.addEventListener("click", submit); title.addEventListener("keydown", e => { if (e.key === "Enter") submit(); });
+  openDialog("Create", [h("div", { class: "form" }, h("label", { class: "fl" }, "Work type", type), epicWrap, h("label", { class: "fl full" }, "Summary", title)), err],
+    [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), go2], true);
+  setTimeout(() => title.focus(), 30);
+}
+async function devInsert(over){
+  const M = MOD.tasks, v = {};
+  for (const f of M.fields) if (f.def !== undefined && !f.virtual) v[f.k] = typeof f.def === "function" ? f.def() : f.def;
+  Object.assign(v, { vertical: "Development", status: "To do", priority: v.priority || "Medium" }, over);
+  if (v.type === "Epic") { v.reviewer_id = null; v.parent_id = null; }
+  if (M.before) M.before(v, null);
+  const t = await insertRow("tasks", v);
+  if (M.after) M.after(t, null);
+  return t;
+}
+
+/* ---------- the work item view ---------- */
+async function openDevTask(id){
+  await ensure(["tasks", "projects", "sprints", "releases", "profiles", "notes"]);
+  if (!byId("tasks", id)) { try { const r = ok(await sb.from("tasks").select("*").eq("id", id).maybeSingle()); if (r) upsertCache("tasks", r); } catch (e) {} }
+  const t = byId("tasks", id);
+  if (!t) { toast("That work item isn’t available any more."); return; }
+  if (t.vertical !== "Development") { openRecord("tasks", id, null, { form: true }); return; }
+  if (S.devOpen !== id) { S.devTab = "comments"; S.devMoreOpen = false; }
+  S.devOpen = id;
+  drawDevTask(id);
+  loadWorkLogs(id).then(() => { if (S.devOpen === id && dlg().open) drawDevTask(id); });
+}
+const WORKLOGS = {};
+async function loadWorkLogs(id){ try { WORKLOGS[id] = ok(await sb.from("work_logs").select("*").eq("task_id", id).order("work_date", { ascending: false })) || []; } catch (e) { WORKLOGS[id] = WORKLOGS[id] || []; } }
+const loggedMin = id => (WORKLOGS[id] || []).reduce((s, w) => s + (+w.minutes || 0), 0);
+
+function drawDevTask(id){
+  const t = byId("tasks", id); if (!t) return;
+  const M = MOD.tasks, A = access(M, t);
+  const keepScroll = dlg().open ? (dlg().querySelector(".db") || {}).scrollTop : 0;
+  const parent = t.parent_id ? byId("tasks", t.parent_id) : null;
+  const all = M.actions ? (M.actions(t, A) || []) : [];
+  const buttons = all.flatMap(n => n && n.tagName === "BUTTON" ? [n] : (n && n.querySelectorAll ? [...n.querySelectorAll("button")] : []));
+  const menuWords = /^(Archive|Restore|Copy ID|Duplicate)$/;
+  const topBtns = buttons.filter(b => !menuWords.test(b.textContent.trim()));
+  const menuBtns = buttons.filter(b => menuWords.test(b.textContent.trim()));
+  // Delete, for people allowed to (same rules and confirmation as the full form)
+  if (A.canDelete) menuBtns.push(h("button", { type: "button", id: "devDelete", style: "color:var(--bad)", onclick: async () => {
+    if (!confirm(M.deleteConfirm ? M.deleteConfirm(t) : "Delete this task? This can’t be undone.")) return;
+    if (M.beforeDelete) { try { await M.beforeDelete(t); } catch (e) { console.warn(e); } }
+    try { await deleteRow(M.table, t.id); S.devOpen = null; closeDlg(); toast("Deleted."); rerender(); } catch (e) { fail(e, "Couldn’t delete"); }
+  } }, "Delete"));
+
+  const left = h("div", { class: "dv-left" },
+    devTitle(t), devDescription(t), t.type === "Bug" ? devBugBlock(t) : null,
+    t.type === "Epic" ? devEpicWork(t) : null,
+    t.type !== "Epic" && t.type !== "Subtask" ? devSubtasks(t) : null,
+    devLinked(t),
+    (t.checklist || []).length || S.devChecklist === t.id ? checklistSection(t, A.canEdit) : null,
+    h("div", { class: "dv-sec" }, h("div", { class: "dv-sect" }, h("b", {}, "Attachments")), filesSection("tasks", t.id, A.canEdit || A.L >= 1 || isMine(t))),
+    devActivity(t));
+
+  const status = h("select", { class: "dv-statusbtn s-" + String(t.status).replace(/\s+/g, "-").toLowerCase(), id: "devStatus", disabled: !devCanEdit(t, "status"), "aria-label": "Status" }, TASK_STATUS.map(s => h("option", { value: s }, COL_LABEL[s] || s)));
+  status.value = t.status; status.addEventListener("change", () => devSave(t, { status: status.value }, "Status: " + COL_LABEL[status.value] + "."));
+  const right = h("div", { class: "dv-right" },
+    h("div", { class: "dv-statusrow" }, status, topBtns.map(b => { b.className = "btn sm"; return b; })),
+    !A.canEdit ? h("p", { class: "dv-note" }, "View only. You can comment and attach files.") : null,
+    devDetails(t), devMoreFields(t),
+    h("div", { class: "dv-stamp" }, h("span", {}, "Created " + fmtAgo(t.created_at)), t.updated_at ? h("span", {}, "Updated " + fmtAgo(t.updated_at)) : null,
+      h("button", { type: "button", class: "linkbtn", id: "devMore", onclick: () => openRecord("tasks", t.id, null, { form: true }) }, "Open full form")));
+
+  openDialog("", [h("div", { class: "dv-view" }, left, right)], null);
+  const d = dlg(); d.classList.add("dv-wide");
+  // header like Jira: epic / key on the left, a ••• menu next to close
+  const crumbs = h("div", { class: "dv-crumbs" },
+    t.type === "Subtask" && parent ? h("button", { type: "button", class: "linkbtn", onclick: () => openDevTask(parent.id) }, typeIcon(parent.type), " " + taskKey(parent)) :
+    t.type === "Epic" ? null : parent ? h("button", { type: "button", class: "linkbtn dv-epiclink", onclick: () => openDevTask(parent.id) }, typeIcon("Epic"), " " + parent.title) :
+      devCanEdit(t, "parent_id") ? h("button", { type: "button", class: "linkbtn muted", id: "devAddEpic", onclick: () => { const el = document.getElementById("dv-val-parent_id"); if (el) el.click(); } }, "✎ Add epic") : null,
+    t.type === "Epic" ? null : h("span", { class: "muted" }, "/"), typeIcon(t.type), h("span", { class: "dv-key" }, taskKey(t)), t.archived ? h("span", { class: "pill bad" }, "Archived") : null);
+  const dh = d.querySelector(".dh"); const h2 = dh && dh.querySelector("h2");
+  if (h2) h2.replaceWith(crumbs);
+  if (dh && menuBtns.length){
+    const menu = h("div", { class: "dv-menu", hidden: true }, menuBtns.map(b => { b.className = "dv-menuitem"; b.addEventListener("click", () => { menu.hidden = true; }); return b; }));
+    const mb = h("button", { type: "button", class: "iconbtn", "aria-label": "More actions", id: "devMenuBtn", onclick: e => { e.stopPropagation(); menu.hidden = !menu.hidden; } }, "•••");
+    dh.insertBefore(h("div", { class: "dv-menuwrap" }, mb, menu), dh.lastChild);
+  }
+  S.dlg = { tbl: "tasks", id: t.id };
+  const db = d.querySelector(".db"); if (db && keepScroll) db.scrollTop = keepScroll;
+}
+// a value you click to change (Jira's Details panel)
+function editRow(t, k, label, shown, editor){
+  const can = devCanEdit(t, k);
+  const val = h("div", { class: "dv-val" + (can ? " edit" : ""), id: "dv-val-" + k, tabindex: can ? "0" : null, role: can ? "button" : null, "aria-label": can ? "Change " + label : null }, shown);
+  if (can){
+    const open = () => { const ed = editor(() => drawDevTask(t.id)); val.replaceChildren(ed); val.classList.add("editing"); val.onclick = null; const f = ed.matches("input,select,textarea") ? ed : ed.querySelector("input,select,textarea"); if (f) { f.focus(); if (f.showPicker && f.tagName === "SELECT") { try { f.showPicker(); } catch (e) {} } } };
+    val.onclick = open; val.addEventListener("keydown", e => { if (e.key === "Enter" && !val.classList.contains("editing")) open(); });
+  }
+  return h("div", { class: "dv-drow" }, h("span", { class: "dv-dl" }, label), val);
+}
+const placeholder = text => h("span", { class: "dv-ph" }, text);
+function selEditor(t, k, options, none, msg){
+  return cancel => {
+    const s = h("select", { class: "in dv-in" }, none !== null ? h("option", { value: "" }, none) : null, options.map(([v, l]) => h("option", { value: v }, l)));
+    s.value = t[k] || "";
+    s.addEventListener("change", () => devSave(t, { [k]: s.value || null }, msg));
+    s.addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== s && s.isConnected) cancel(); }, 150));
+    s.addEventListener("keydown", e => { if (e.key === "Escape") cancel(); });
+    return s;
+  };
+}
+function inputEditor(t, k, type, conv, msg, ph){
+  return cancel => {
+    const i = h("input", { class: "in dv-in", type, value: t[k] == null ? "" : (Array.isArray(t[k]) ? t[k].join(", ") : String(t[k])), placeholder: ph || "", min: type === "number" ? "0" : null });
+    let saved = false;
+    const save = () => { if (saved) return; const v = conv ? conv(i.value) : (i.value || null); if (v === undefined) { toast("That value doesn’t look right."); cancel(); return; } saved = true;
+      if (JSON.stringify(v) === JSON.stringify(t[k] == null ? null : t[k])) { cancel(); return; } devSave(t, { [k]: v }, msg); };
+    i.addEventListener("keydown", e => { if (e.key === "Enter") save(); if (e.key === "Escape") { saved = true; cancel(); } });
+    i.addEventListener("blur", save);
+    if (type === "date") i.addEventListener("change", save);
+    return i;
+  };
+}
+function devDetails(t){
+  const people = activePeople().map(p => [p.id, p.full_name]);
+  const name = id => id ? h("span", { class: "dv-two" }, avatar(id, "sm"), pname(id)) : null;
+  const sp = t.sprint_id ? byId("sprints", t.sprint_id) : null;
+  const sprints = rows("sprints").filter(s => s.status !== "Completed" || s.id === t.sprint_id).map(s => [s.id, s.name + (s.status === "Active" ? " (active)" : "")]);
+  const epics = epicsList().filter(e => e.status !== "Done" || e.id === t.parent_id).map(e => [e.id, e.title]);
+  const parent = t.parent_id ? byId("tasks", t.parent_id) : null;
+  const est = +t.estimate_hours ? Math.round(+t.estimate_hours * 60) : 0, logged = loggedMin(t.id);
+  const C = S.ui.devDetails = S.ui.devDetails || { open: true };
+  const rowsEl = !C.open ? null : h("div", {},
+    editRow(t, "assignee_id", "Assignee", h("div", { class: "dv-stackcol" }, name(t.assignee_id) || h("span", { class: "dv-two" }, noone(), "Unassigned"),
+      devCanEdit(t, "assignee_id") && t.assignee_id !== S.me.id ? h("button", { type: "button", class: "linkbtn dv-assignme", id: "devAssignMe", onclick: e => { e.stopPropagation(); devSave(t, { assignee_id: S.me.id }, "Assigned to you."); } }, "Assign to me") : null),
+      selEditor(t, "assignee_id", people, "Unassigned", "Assignee saved.")),
+    t.type === "Epic" ? null : t.type === "Subtask"
+      ? h("div", { class: "dv-drow" }, h("span", { class: "dv-dl" }, "Parent"), h("div", { class: "dv-val" }, parent ? h("button", { type: "button", class: "linkbtn", onclick: () => openDevTask(parent.id) }, taskKey(parent) + " " + parent.title) : placeholder("None")))
+      : editRow(t, "parent_id", "Parent", parent ? h("span", { class: "dv-epic" }, parent.title) : placeholder("Add parent"), selEditor(t, "parent_id", epics, "None", "Parent saved.")),
+    editRow(t, "sprint_id", "Sprint", sp ? h("span", { class: "dv-link" }, sp.name) : placeholder("None"), selEditor(t, "sprint_id", sprints, "None (backlog)", "Sprint saved.")),
+    editRow(t, "priority", "Priority", t.priority ? h("span", { class: "dv-two" }, h("span", { class: "dv-prio p-" + t.priority.toLowerCase() }, t.priority === "Critical" ? "⇈" : t.priority === "High" ? "↑" : t.priority === "Low" ? "↓" : "="), t.priority) : placeholder("None"),
+      selEditor(t, "priority", PRIORITY.map(x => [x, x]), null, "Priority saved.")),
+    editRow(t, "labels", "Labels", (t.labels || []).length ? h("span", { class: "dv-labels" }, t.labels.map(x => h("span", { class: "dv-label" }, x))) : placeholder("Add labels"),
+      inputEditor(t, "labels", "text", v => [...new Set(v.split(",").map(x => x.trim()).filter(Boolean))], "Labels saved.", "Comma separated, e.g. android, api")),
+    editRow(t, "due_date", "Due date", t.due_date ? h("span", { class: t.status !== "Done" && t.due_date < today() ? "dv-late" : "" }, fmtDate(t.due_date)) : placeholder("Add date"), inputEditor(t, "due_date", "date", null, "Due date saved.")),
+    editRow(t, "start_date", "Start date", t.start_date ? fmtDate(t.start_date) : placeholder("Add date"), inputEditor(t, "start_date", "date", null, "Start date saved.")),
+    editRow(t, "story_points", "Story point estimate", t.story_points != null ? String(t.story_points) : placeholder("Add story points"),
+      inputEditor(t, "story_points", "number", v => v === "" ? null : (/^\d+$/.test(v) ? +v : undefined), "Story points saved.")),
+    h("div", { class: "dv-drow" }, h("span", { class: "dv-dl" }, "Time tracking"), h("div", { class: "dv-val edit", role: "button", tabindex: "0", id: "devTimeLink", onclick: () => { S.devTab = "worklog"; drawDevTask(t.id); setTimeout(() => { const x = document.getElementById("wlHours"); if (x) x.focus(); }, 50); } },
+      logged || est ? h("div", { class: "dv-time" }, h("span", { class: "dv-bar" + (est && logged > est ? " over" : "") }, h("span", { style: "width:" + (est ? Math.min(100, Math.round(logged / est * 100)) : 100) + "%" })),
+        h("span", { class: "muted" }, (logged ? hoursText(logged) + " logged" : "No time logged") + (est ? " · " + hoursText(Math.max(0, est - logged)) + " remaining" : ""))) : placeholder("No time logged"))),
+    h("div", { class: "dv-drow" }, h("span", { class: "dv-dl" }, "Reporter"), h("div", { class: "dv-val" }, name(t.created_by) || placeholder("None"))));
+  return h("div", { class: "dv-details" }, h("button", { type: "button", class: "dv-dh", "aria-expanded": String(C.open), onclick: () => { C.open = !C.open; drawDevTask(t.id); } }, h("span", {}, C.open ? "▾" : "▸"), " Details"), rowsEl);
+}
+function devMoreFields(t){
+  const people = activePeople().map(p => [p.id, p.full_name]);
+  const name = id => id ? h("span", { class: "dv-two" }, avatar(id, "sm"), pname(id)) : null;
+  const open = !!S.devMoreOpen;
+  const body = !open ? null : h("div", {},
+    editRow(t, "type", "Work type", h("span", { class: "dv-two" }, typeIcon(t.type), t.type), selEditor(t, "type", DEV_TYPES.filter(x => x === t.type || (t.type !== "Subtask" && x !== "Subtask")).map(x => [x, x]), null, "Work type saved.")),
+    t.type !== "Epic" ? editRow(t, "tester_id", "Tester", name(t.tester_id) || placeholder("Feature’s tester or QA lead"), selEditor(t, "tester_id", people, "Feature’s tester or QA lead", "Tester saved.")) : null,
+    t.type !== "Epic" ? editRow(t, "reviewer_id", "Reviewer", name(t.reviewer_id) || placeholder("No review needed"), selEditor(t, "reviewer_id", people, "No review needed", "Reviewer saved.")) : null,
+    editRow(t, "project_id", "Project", t.project_id ? refLabel("projects", t.project_id) : placeholder("None"), selEditor(t, "project_id", rows("projects").map(p => [p.id, p.name]), "None", "Project saved.")),
+    editRow(t, "estimate_hours", "Original estimate", +t.estimate_hours ? hoursText(Math.round(+t.estimate_hours * 60)) : placeholder("Add estimate"),
+      inputEditor(t, "estimate_hours", "text", v => { if (!v.trim()) return null; const m = parseHours(v); return isNaN(m) ? undefined : Math.round(m / 6) / 10; }, "Estimate saved.", "e.g. 4h or 1h 30m")),
+    codeSection(t) ? h("div", { class: "dv-code" }, codeSection(t)) : null);
+  return h("div", { class: "dv-details" }, h("button", { type: "button", class: "dv-dh", id: "devMoreFields", "aria-expanded": String(open), onclick: () => { S.devMoreOpen = !open; drawDevTask(t.id); } }, h("span", {}, open ? "▾" : "▸"), " More fields"), body);
+}
+function devTitle(t){
+  const can = devCanEdit(t, "title");
+  const el = h("h1", { class: "dv-h" + (can ? " edit" : ""), tabindex: can ? "0" : null, id: "devTitle" }, t.title);
+  if (!can) return el;
+  const start = () => {
+    const inp = h("input", { class: "in dv-hin", value: t.title, maxlength: "200", "aria-label": "Summary" });
+    let doneOnce = false;
+    const done = save => { if (doneOnce) return; doneOnce = true; if (save && inp.value.trim() && inp.value.trim() !== t.title) devSave(t, { title: inp.value.trim() }, "Saved."); else drawDevTask(t.id); };
+    inp.addEventListener("keydown", e => { if (e.key === "Enter") done(true); if (e.key === "Escape") done(false); });
+    inp.addEventListener("blur", () => done(true));
+    el.replaceWith(inp); inp.focus(); inp.select();
+  };
+  el.addEventListener("click", start); el.addEventListener("keydown", e => { if (e.key === "Enter") start(); });
+  return el;
+}
+function devDescription(t){
+  const can = devCanEdit(t, "description");
+  const shown = t.description ? h("div", { class: "dv-desc" + (can ? " edit" : ""), id: "devDesc" }, renderRich(t.description))
+    : h("div", { class: "dv-desc empty" + (can ? " edit" : ""), id: "devDesc" }, can ? "Add a description…" : "No description.");
+  const box = h("div", { class: "dv-sec" }, h("div", { class: "dv-sect" }, h("b", {}, "Description")), shown);
+  if (can) shown.addEventListener("click", e => {
+    if (e.target.closest("a")) return;
+    const ta = h("textarea", { class: "in", rows: 7, id: "devDescIn" }); ta.value = t.description || "";
+    attachMentions(ta, { tbl: "tasks", rec: t });
+    box.replaceChildren(h("div", { class: "dv-sect" }, h("b", {}, "Description")), ta,
+      h("div", { class: "dv-btns" }, h("button", { type: "button", class: "btn pri sm", id: "devDescSave", onclick: () => devSave(t, { description: ta.value }, "Saved.") }, "Save"),
+        h("button", { type: "button", class: "btn ghost sm", onclick: () => drawDevTask(t.id) }, "Cancel")));
+    ta.focus();
+  });
+  return box;
+}
+function devBugBlock(t){
+  const parts = [["Steps to reproduce", t.steps], ["Expected result", t.expected_result], ["Actual result", t.actual_result], ["Found in", [t.environment, t.device, t.build_version].filter(Boolean).join(" · ")]].filter(x => x[1]);
+  if (!parts.length) return null;
+  return h("div", { class: "dv-sec" }, h("div", { class: "dv-sect" }, h("b", {}, "Bug report"), t.severity ? pill(t.severity, t.severity === "Blocker" ? "bad" : "warn") : null),
+    parts.map(([l, v]) => h("div", { class: "dv-bugrow" }, h("span", { class: "muted" }, l), h("span", { style: "white-space:pre-wrap" }, v))));
+}
+function childRow(k){
+  return h("div", { class: "dv-crow", tabindex: "0", role: "button", onclick: () => openDevTask(k.id), onkeydown: e => { if (e.key === "Enter") openDevTask(k.id); } },
+    typeIcon(k.type), h("span", { class: "dv-key" }, taskKey(k)), h("span", { class: "dv-rt" + (k.status === "Done" ? " done" : "") }, k.title), h("span", { class: "grow" }), pointsChip(k), who(k.assignee_id), lozenge(k.status));
+}
+function addLine(label, id, onEnter){
+  const btn = h("button", { type: "button", class: "dv-addline", id: id + "Btn" }, label);
+  btn.addEventListener("click", () => {
+    const inp = h("input", { class: "in", id, maxlength: "200", placeholder: "What needs to be done?" });
+    inp.addEventListener("keydown", async e => { if (e.key === "Escape") { inp.replaceWith(btn); return; } if (e.key !== "Enter" || !inp.value.trim()) return; inp.disabled = true; try { await onEnter(inp.value.trim()); } catch (err) { fail(err, "Not added"); inp.disabled = false; } });
+    inp.addEventListener("blur", () => { if (!inp.value.trim()) inp.replaceWith(btn); });
+    btn.replaceWith(inp); inp.focus();
+  });
+  return btn;
+}
+function devSubtasks(t){
+  const kids = childrenOf(t.id).filter(x => x.type === "Subtask");
+  const done = kids.filter(x => x.status === "Done").length;
+  const canAdd = access(MOD.tasks).canCreate && !t.archived;
+  return h("div", { class: "dv-sec" }, h("div", { class: "dv-sect" }, h("b", {}, "Subtasks"), kids.length ? h("span", { class: "dv-bar small" }, h("span", { style: "width:" + Math.round(done / kids.length * 100) + "%" })) : null, kids.length ? h("span", { class: "muted" }, done + " of " + kids.length + " done") : null),
+    kids.length ? h("div", { class: "dv-clist" }, kids.map(childRow)) : null,
+    canAdd ? addLine("Add subtask", "devAddSub", async title => { await devInsert({ type: "Subtask", title, parent_id: t.id, project_id: t.project_id || null, sprint_id: t.sprint_id || null, assignee_id: t.assignee_id || S.me.id, priority: t.priority || "Medium", tester_id: t.tester_id || null }); toast("Subtask added."); devRefresh(); })
+      : (!kids.length ? h("p", { class: "dv-ph" }, "No subtasks.") : null));
+}
+function devEpicWork(t){
+  const kids = childrenOf(t.id), done = kids.filter(x => x.status === "Done").length;
+  return h("div", { class: "dv-sec" }, h("div", { class: "dv-sect" }, h("b", {}, "Child work items"), kids.length ? h("span", { class: "dv-bar small" }, h("span", { style: "width:" + Math.round(done / kids.length * 100) + "%" })) : null, kids.length ? h("span", { class: "muted" }, done + " of " + kids.length + " done") : null),
+    kids.length ? h("div", { class: "dv-clist" }, kids.sort(sortByPrioDue).map(childRow)) : null,
+    access(MOD.tasks).canCreate ? addLine("Add child work item", "devAddChild", async title => { await devInsert({ type: "Feature", title, parent_id: t.id, project_id: t.project_id || null }); toast("Added to this epic."); devRefresh(); }) : null);
+}
+// Jira's "Linked work items": the tasks this one waits on
+function devLinked(t){
+  const ids = t.blocked_by || [];
+  const linked = ids.map(id => byId("tasks", id)).filter(Boolean);
+  const can = devCanEdit(t, "blocked_by");
+  const cands = devTasks().filter(x => x.id !== t.id && x.type !== "Epic" && x.status !== "Done" && !ids.includes(x.id));
+  let adder = null;
+  if (can && cands.length){
+    adder = h("button", { type: "button", class: "dv-addline", id: "devAddLinkBtn" }, "Add linked work item");
+    adder.addEventListener("click", () => {
+      const s = h("select", { class: "in", id: "devAddLink", "aria-label": "Work item this one is blocked by" }, h("option", { value: "" }, "Is blocked by…"), cands.sort(sortByPrioDue).map(x => h("option", { value: x.id }, taskKey(x) + " " + x.title)));
+      s.addEventListener("change", () => { if (s.value) devSave(t, { blocked_by: [...ids, s.value] }, "Linked."); });
+      s.addEventListener("blur", () => setTimeout(() => { if (s.isConnected && !s.value) s.replaceWith(adder); }, 150));
+      adder.replaceWith(s); s.focus();
+    });
+  }
+  return h("div", { class: "dv-sec" }, h("div", { class: "dv-sect" }, h("b", {}, "Linked work items")),
+    linked.length ? h("div", {}, h("p", { class: "dv-sub" }, "is blocked by"), h("div", { class: "dv-clist" }, linked.map(k => { const r = childRow(k);
+      if (can) r.append(h("button", { type: "button", class: "iconbtn", "aria-label": "Remove link to " + taskKey(k), onclick: e => { e.stopPropagation(); devSave(t, { blocked_by: ids.filter(x => x !== k.id) }, "Link removed."); } }, "✕"));
+      return r; }))) : null,
+    adder || (!linked.length ? h("p", { class: "dv-ph" }, "None.") : null));
+}
+function devActivity(t){
+  const tabs = [["all", "All"], ["comments", "Comments"], ["history", "History"], ["worklog", "Work log"]];
+  const tab = S.devTab || "comments";
+  const pane = h("div", { class: "dv-pane" });
+  if (tab === "all") pane.append(commentsSection("tasks", t.id), historySection(t));
+  else if (tab === "comments") pane.append(commentsSection("tasks", t.id));
+  else if (tab === "history") pane.append(historySection(t), linkedNotesSection("task_id", t));
+  else pane.append(workLogSection(t));
+  return h("div", { class: "dv-sec" }, h("div", { class: "dv-sect" }, h("b", {}, "Activity")),
+    h("div", { class: "dv-tabs", role: "tablist" }, tabs.map(([k, l]) => h("button", { type: "button", role: "tab", "aria-selected": String(tab === k), class: tab === k ? "on" : "", onclick: () => { S.devTab = k; drawDevTask(t.id); } }, l))), pane);
+}
+function workLogSection(t){
+  const logs = WORKLOGS[t.id] || [];
+  const hours = h("input", { class: "in", id: "wlHours", placeholder: "Time spent, e.g. 1h 30m", style: "max-width:190px", "aria-label": "Time spent" });
+  const day = h("input", { class: "in", type: "date", id: "wlDate", value: today(), max: today(), style: "max-width:160px", "aria-label": "Date" });
+  const note = h("input", { class: "in", id: "wlNote", maxlength: "500", placeholder: "What did you work on?", "aria-label": "Work description" });
+  const err = h("p", { class: "err", hidden: true });
+  const add = h("button", { type: "button", class: "btn pri sm", id: "wlAdd" }, "Log work");
+  add.addEventListener("click", async () => {
+    err.hidden = true;
+    const min = parseHours(hours.value);
+    if (!min || isNaN(min) || min < 1) { err.textContent = "Enter the time spent, like 45m, 2h or 1h 30m."; err.hidden = false; hours.focus(); return; }
+    if (min > 1440) { err.textContent = "That’s more than a day. Log each day separately."; err.hidden = false; return; }
+    if (day.value > today()) { err.textContent = "You can’t log work for a future day."; err.hidden = false; return; }
+    add.disabled = true;
+    try { ok(await sb.from("work_logs").insert({ task_id: t.id, user_id: S.me.id, minutes: min, work_date: day.value || today(), note: note.value.trim() })); await loadWorkLogs(t.id); toast(hoursText(min) + " logged."); drawDevTask(t.id); }
+    catch (e) { err.textContent = "Not logged: " + friendly(e); err.hidden = false; add.disabled = false; }
+  });
+  hours.addEventListener("keydown", e => { if (e.key === "Enter") add.click(); });
+  return h("div", {}, h("div", { class: "dv-wlform" }, hours, day, note, add), err,
+    logs.length ? h("div", { class: "dv-wlist" }, logs.map(w => h("div", { class: "dv-wl" }, avatar(w.user_id, "sm"),
+      h("div", { style: "flex:1;min-width:0" }, h("div", {}, h("b", {}, pname(w.user_id)), " logged ", h("b", {}, hoursText(w.minutes)), h("span", { class: "muted" }, " · " + fmtDate(w.work_date))), w.note ? h("div", { class: "muted" }, w.note) : null),
+      (w.user_id === S.me.id || isAdmin()) ? h("button", { type: "button", class: "linkbtn", onclick: async () => {
+        if (!confirm("Delete this work log entry (" + hoursText(w.minutes) + ")?")) return;
+        try { ok(await sb.from("work_logs").delete().eq("id", w.id)); await loadWorkLogs(t.id); drawDevTask(t.id); } catch (e) { fail(e); }
+      } }, "Delete") : null)))
+      : h("p", { class: "dv-ph" }, "No work has been logged yet."));
+}
+/* ---------------------------------------------------------------------
    Admin panel
    --------------------------------------------------------------------- */
 async function callAdmin(body){
@@ -7583,7 +8416,19 @@ async function callAdmin(body){
 function adminHeader(el, title, desc, actions){
   const tabs = [["admin-users","Users"], ["admin-roles","Roles & permissions"], ["admin-tasks","Task rules"], ["admin-google","Google"], ["admin-day","Day history"], ["admin-problems","Problems"], ["admin-storage","Storage"], ["admin-settings","Company settings"], ["admin-activity","Activity log"]];
   el.append(h("div", { class: "ph" }, h("div", {}, h("h1", {}, title), h("p", {}, desc)), actions ? h("div", { class: "acts" }, actions) : null));
-  el.append(h("div", { class: "tb" }, h("div", { class: "seg", role: "tablist" }, tabs.map(([r, l]) => h("button", { type: "button", "aria-pressed": String(S.route === r), onclick: () => go(r) }, l)))));
+  // the Admin panel's number is the sum of these, so each tab shows its own part
+  const n = adminCounts();
+  el.append(h("div", { class: "tb" }, h("div", { class: "seg", role: "tablist" }, tabs.map(([r, l]) => h("button", { type: "button", "aria-pressed": String(S.route === r), onclick: () => go(r) }, l,
+    n[r] ? h("span", { class: "badge", style: "margin-left:6px", title: n[r] + " to look at" }, String(n[r])) : null)))));
+  if (S.route === "admin-users" && n["admin-problems"]) el.append(h("div", { class: "panel", style: "display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-color:var(--warn)" },
+    h("span", {}, h("b", {}, n["admin-problems"] + " open problem" + (n["admin-problems"] === 1 ? "" : "s")), " reported in the app (errors people hit, and problems they sent)."),
+    h("button", { type: "button", class: "btn sm", onclick: () => go("admin-problems") }, "Open Problems")));
+}
+function adminCounts(){
+  const out = {};
+  if (S.loaded.has("problem_reports")) out["admin-problems"] = new Set(allRows("problem_reports").filter(r => r.status === "Open").map(r => r.kind === "auto" ? r.fingerprint : r.id)).size;
+  if (S.loaded.has("google_links") && typeof googleOn === "function" && googleOn()) out["admin-google"] = rows("google_links").filter(l => l.last_error).length;
+  return out;
 }
 
 function renderAdminUsers(el){
@@ -7879,7 +8724,7 @@ async function renderAdminActivity(el){
    --------------------------------------------------------------------- */
 const NAV = [
   ["", [["dashboard","Home"], ["overview","Company overview"], ["tasks","Tasks"], ["notes","Notes"], ["calendar","Calendar"], ["team-calendar","Team calendar"]]],
-  ["Development", [["dev","Dev dashboard"], ["projects","Projects"], ["sprints","Sprints"], ["releases","Releases"], ["tickets","Support tickets"]]],
+  ["Development", [["dev-backlog","Backlog"], ["dev-board","Board"], ["dev-reports","Reports"], ["dev","Dev dashboard"], ["projects","Projects"], ["sprints","Sprints"], ["releases","Releases"], ["tickets","Support tickets"]]],
   ["QA & Testing", [["qa","QA dashboard"], ["features","Features"], ["test_cases","Test cases"], ["bugs","Bugs"], ["qa-import","Import spreadsheet"]]],
   ["Communication", [["chat","Chat"], ["emails","Emails"], ["announcements","Announcements"]]],
   ["Sales", [["sales","Sales dashboard"], ["deals","Pipeline"], ["leads","Leads"], ["ig_leads","Instagram leads"], ["clients","Clients"], ["contacts","Contacts"], ["activities","Activities"], ["proposals","Proposals"], ["targets","Targets"], ["crm-analytics","Analytics"]]],
@@ -7890,7 +8735,7 @@ const NAV = [
 function canSee(route){
   if (["dashboard","calendar","team-calendar","people","attendance","tasks","holidays","chat"].includes(route)) return true;
   if (route === "overview") return isAdmin();
-  if (route === "dev") return isAdmin() || S.me.vertical === "Development" || lvl("projects") >= 1;
+  if (route === "dev" || route === "dev-board" || route === "dev-backlog" || route === "dev-reports") return isAdmin() || S.me.vertical === "Development" || lvl("projects") >= 1;
   if (route === "sales") return isAdmin() || S.me.vertical === "Sales" || lvl("sales") >= 1;
   if (route === "marketing") return isAdmin() || S.me.vertical === "Marketing" || lvl("marketing") >= 1;
   if (route.startsWith("admin-")) return !!S.me.is_admin;
@@ -7992,6 +8837,9 @@ async function rerender(){
     else if (route === "admin-roles") renderAdminRoles(page);
     else if (route === "overview") await renderOverview(page);
     else if (route === "dev") await renderDevHub(page);
+    else if (route === "dev-board") await renderDevBoard(page);
+    else if (route === "dev-backlog") await renderDevBacklog(page);
+    else if (route === "dev-reports") await renderDevReports(page);
     else if (route === "sales") await renderSalesHub(page);
     else if (route === "marketing") await renderMarketingHub(page);
     else if (route === "admin-settings") renderAdminSettings(page);
@@ -8131,14 +8979,9 @@ async function startSession(session){
     setTimeout(prefetch, 1200);
     if (googleOn()) { loadGoogle().catch(() => {}); autoSyncGoogle(); }
     await liveAuth(); startPresence(); load("user_status").then(() => { startActivity(); paintStatus(); }); loadChat().then(() => { renderShell(); if (S.route === "dashboard") rerender(); startChatPolling(); startChatLive(); });
+    if (typeof loadMyToday === "function") loadMyToday().then(() => renderShell());
     if (isAdmin()) load("problem_reports").then(() => renderShell());   // Google ready before anyone clicks; calendar synced if it's been a while
-    if (!channel){
-      channel = sb.channel("ws-live", { config: { private: true } }).on("postgres_changes", { event: "*", schema: "public" }, onChange).subscribe((status, err) => {
-        S.live = status;
-        // if live updates can't connect, the backup checks keep things current, and the problem is recorded for an admin
-        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") captureError("Live updates not connected: " + status + (err && err.message ? " (" + err.message + ")" : ""), "", { realtime: status });
-      });
-    }
+    startLive();
     rerender();
   } catch (e) {
     console.error(e);
@@ -8146,6 +8989,40 @@ async function startSession(session){
     $("loginErr").hidden = false; showScreen("login");
   }
 }
+// Live updates. Connections drop all the time (laptop sleep, Wi-Fi changes); the app reconnects on its own,
+// at once when the computer wakes or the network returns, and only reports a problem if it stays down.
+let wsRetry = 0, wsRetryT = null, liveDownSince = 0, liveReportedDown = false;
+function startLive(){
+  if (!S.me) return;
+  if (channel) { try { sb.removeChannel(channel); } catch (e) {} channel = null; }
+  const mine = channel = sb.channel("ws-live", { config: { private: true } }).on("postgres_changes", { event: "*", schema: "public" }, onChange).subscribe((status, err) => {
+    if (channel !== mine) return;
+    S.live = status;
+    if (status === "SUBSCRIBED") {
+      if (liveDownSince) catchUpAfterDrop();
+      wsRetry = 0; liveDownSince = 0; liveReportedDown = false; return;
+    }
+    if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+      if (!liveDownSince) liveDownSince = Date.now();
+      // the backup checks keep things current meanwhile; tell an admin only if it's been down for 3 minutes
+      if (!liveReportedDown && Date.now() - liveDownSince > 180000 && navigator.onLine !== false) {
+        liveReportedDown = true;
+        captureError("Live updates have been down for 3 minutes: " + status + (err && err.message ? " (" + err.message + ")" : ""), "", { realtime: status });
+      }
+      if (!wsRetryT) { const wait = Math.min(30000, 2000 * Math.pow(2, wsRetry++)); wsRetryT = setTimeout(() => { wsRetryT = null; startLive(); }, wait); }
+    }
+  });
+}
+// after a drop: reload what's on screen, since changes may have been missed
+function catchUpAfterDrop(){ try { for (const t of [...S.loaded]) load(t, true).catch(() => {}); setTimeout(() => rerender(), 800); } catch (e) {} }
+function liveWake(){
+  if (!S.me) return;
+  if (S.live !== "SUBSCRIBED") { clearTimeout(wsRetryT); wsRetryT = null; wsRetry = 0; startLive(); }
+  if (typeof startChatLive === "function") startChatLive();
+}
+window.addEventListener("online", liveWake);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") liveWake(); });
+
 // Quietly load every section this person can open, so switching pages is instant.
 async function prefetch(){
   const want = new Set(["attendance","leave_requests","meetings","announcements","tasks","meeting_joins","calendar_events","google_links","notes","emails","presence","user_status"]);
@@ -8158,7 +9035,8 @@ function endSession(){
   stopChatPolling(); stopChatLive();
   { const b = document.getElementById("bugBtn"); if (b) b.hidden = true; }
   shellKey = ""; resetSeenCache(); stopPresence(); Object.assign(C, { ready: false, channels: [], reads: {}, msgs: {}, more: {}, unread: {}, mentions: {}, last: {}, active: null, drafts: {}, hidden: null, reacts: {}, replyTo: {}, uploads: {} }); chatEls = null;
-  if (channel) { sb.removeChannel(channel); channel = null; }
+  clearTimeout(wsRetryT); wsRetryT = null; liveDownSince = 0;
+  if (channel) { const c = channel; channel = null; sb.removeChannel(c); }
   S.me = null; S.cache = {}; S.loaded = new Set(); S.notifications = []; S.ui = {};
   closeDlg(); showScreen("login");
 }
