@@ -891,6 +891,20 @@ dialog.dv-wide .dh .iconbtn{flex:none}
 .dv-addowner{width:auto;height:30px;min-height:0;padding:2px 8px;font-size:13px}
 .dv-dh.static{cursor:default;border-bottom:1px solid #DFE1E6}
 @media (max-width:820px){ .dv-view .dv-right{order:-1} }   /* phones: the next step and the people come first */
+
+/* mute and voice notes (2026-11ad) */
+.chat-mute.on{background:#F1F2F4;color:#44546F}
+.mutedmark{font-size:12px;opacity:.75}
+.chat-item .cnt.muted{background:#C1C7D0;color:#fff}
+.cvoice{display:flex;align-items:center;gap:8px;background:var(--white);border:1px solid var(--line);border-radius:999px;padding:4px 6px 4px 12px;max-width:360px}
+.cvoice-audio{height:34px;flex:1;min-width:160px}
+.vrec{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;background:#FFECEB;color:#AE2E24;font-size:13.5px;font-weight:600;align-self:center}
+.vrec-dot{width:10px;height:10px;border-radius:50%;background:#E5493A;animation:vrecblink 1s infinite}
+.vrec-time{font-variant-numeric:tabular-nums;min-width:36px}
+@keyframes vrecblink{50%{opacity:.25}}
+
+/* a button whose action is still running (one click, one action) */
+button.is-busy{opacity:.6;cursor:progress;pointer-events:none}
 </style>
 </head>
 <body>
@@ -997,6 +1011,32 @@ const $ = id => document.getElementById(id);
   HTMLButtonElement.prototype.removeEventListener = function(type, fn, opts){ return remove.call(this, type, (type === "click" && wrapped.get(fn)) || fn, opts); };
 })();
 
+// One click, one action, on every button. While a button's action is still running (saving, sending, uploading)
+// more clicks are ignored and it shows as busy; a second click within 0.4 s is ignored even for instant actions
+// (double-clicks, double taps). A button can opt out with data-multi="1" (e.g. steppers).
+(function guardButtonClicks(){
+  if (typeof HTMLButtonElement === "undefined" || HTMLButtonElement.prototype.__tcGuard) return;
+  const add = HTMLButtonElement.prototype.addEventListener;
+  HTMLButtonElement.prototype.__tcGuard = true;
+  HTMLButtonElement.prototype.addEventListener = function(type, fn, opts){
+    if (type !== "click" || typeof fn !== "function") return add.call(this, type, fn, opts);
+    const btn = this;
+    const guarded = function(e){
+      if (btn.dataset && btn.dataset.multi === "1") return fn.call(this, e);
+      const now = Date.now();
+      if (btn.__tcBusy || (btn.__tcLast && now - btn.__tcLast < 400 && btn.__tcLastEvent !== e) || (btn.__tcLast && btn.__tcLast > now)) { e.preventDefault(); e.stopImmediatePropagation(); return; }
+      btn.__tcLast = now; btn.__tcLastEvent = e;
+      const r = fn.call(this, e);
+      if (r && typeof r.then === "function") {
+        btn.__tcBusy = true; btn.setAttribute("aria-busy", "true"); btn.classList.add("is-busy");
+        const done = () => { btn.__tcBusy = false; btn.removeAttribute("aria-busy"); btn.classList.remove("is-busy"); };
+        r.then(done, done);
+      }
+      return r;
+    };
+    return add.call(this, type, guarded, opts);
+  };
+})();
 function h(tag, attrs, ...kids){
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs || {})){
@@ -5481,6 +5521,7 @@ async function loadChat(force){
     try {
       C.channels = ok(await sb.from("chat_channels").select("*").order("created_at")) || [];
       const reads = ok(await sb.from("chat_reads").select("*").eq("user_id", S.me.id)) || [];
+      try { C.muted = new Set((ok(await sb.from("chat_mutes").select("channel_id")) || []).map(x => x.channel_id)); } catch (e) { C.muted = C.muted || new Set(); }
       C.reads = {}; for (const r of reads) C.reads[r.channel_id] = +r.last_read_id || 0;
       await Promise.all(C.channels.map(async ch => {
         const latest = ok(await sb.from("chat_messages").select("id,author_id,body,created_at").eq("channel_id", ch.id).order("id", { ascending: false }).limit(1)) || [];
@@ -5581,20 +5622,20 @@ function chatOnChange0(payload){
     // the conversation you have open: show it straight away, even if this window is behind another one
     const mm = chatEls && chatEls.msgs, away = mm && mm.scrollHeight - mm.scrollTop - mm.clientHeight > 250;
     drawChatMessages(!away); if (away && chatEls) { chatEls.jumpNew = true; drawJump(); }
-    if (document.visibilityState === "visible") { markChatRead(m.channel_id); playMarimba(); }
+    if (document.visibilityState === "visible") { markChatRead(m.channel_id); if (chatLoud(m)) playMarimba(); }
     else {
       // you're not looking: keep it unread (and count it in the browser tab) until you come back
       C.unread[m.channel_id] = (C.unread[m.channel_id] || 0) + 1;
       if ((m.mentions || []).includes(S.me.id)) C.mentions[m.channel_id] = (C.mentions[m.channel_id] || 0) + 1;
-      playMarimba(); renderShell(); drawChatList(); updateTabTitle();
+      if (chatLoud(m)) playMarimba(); renderShell(); drawChatList(); updateTabTitle();
     }
   }
   else {
     C.unread[m.channel_id] = (C.unread[m.channel_id] || 0) + 1;
     if ((m.mentions || []).includes(S.me.id)) C.mentions[m.channel_id] = (C.mentions[m.channel_id] || 0) + 1;
     const ch = C.channels.find(c => c.id === m.channel_id);
-    if (ch) playMarimba();   // every new message has the sound, channels included (a burst plays it once)
-    if (ch && (ch.kind !== "channel" || (m.mentions || []).includes(S.me.id))) toast((ch.kind === "dm" ? "Message from " + pname(m.author_id) : ch.kind === "group" ? pname(m.author_id) + " in " + chName(ch) : pname(m.author_id) + " mentioned you in " + chName(ch)) + ": " + chatText(m).slice(0, 60));
+    if (ch && chatLoud(m)) playMarimba();   // every new message has the sound, channels included, unless muted (a tag still sounds)
+    if (ch && chatLoud(m) && (ch.kind !== "channel" || (m.mentions || []).includes(S.me.id))) toast((ch.kind === "dm" ? "Message from " + pname(m.author_id) : ch.kind === "group" ? pname(m.author_id) + " in " + chName(ch) : pname(m.author_id) + " mentioned you in " + chName(ch)) + ": " + chatText(m).slice(0, 60));
     renderShell(); if (S.route === "chat") drawChatList(); if (S.route === "dashboard") rerender();
     updateTabTitle();
   }
@@ -5617,7 +5658,8 @@ async function renderChat(el){
   const emojiBtn = h("button", { type: "button", class: "btn ghost chat-attach", title: "Emoji", "aria-label": "Add an emoji" }, "😊");
   emojiBtn.addEventListener("click", () => openEmojiPicker(emojiBtn, e => insertAtCursor(ta, e)));
   const replyBar = h("div", { class: "chat-reply", hidden: true });
-  const foot = h("div", { class: "chat-foot" }, attachBtn, emojiBtn, fileIn, ta, sendBtn);
+  const micBtn = voiceNoteButton(() => sendBtn);
+  const foot = h("div", { class: "chat-foot" }, attachBtn, emojiBtn, micBtn, fileIn, ta, sendBtn);
   const typing = h("div", { class: "chat-typing", "aria-live": "polite" });
   const live = h("span", { class: "live-dot" });
   const jump = h("button", { type: "button", class: "chat-jump", hidden: true, onclick: () => { chatEls.pinned = true; msgs.scrollTop = msgs.scrollHeight; chatEls.jumpNew = false; drawJump(); } }, "↓ Jump to latest");
@@ -5685,7 +5727,8 @@ function drawChatList(){
     list.replaceChildren(search, chatEls.items);
   }
   const item = (id, label, sub, unread, mention, extra) => h("button", { type: "button", class: "chat-item" + (C.active === id ? " on" : "") + (unread ? " unread" : ""), onclick: async () => { C.mobileView = "conv"; await openChannel(id); rerender(); } },
-    extra || null, h("span", { class: "x" }, h("b", {}, label), sub ? h("br") : null, sub || null), unread ? h("span", { class: "cnt " + (mention ? "due" : "new") }, String(unread > 99 ? "99+" : unread)) : null);
+    extra || null, h("span", { class: "x" }, h("b", {}, label, chatMuted(id) ? h("span", { class: "mutedmark", title: "Muted", "aria-label": "Muted" }, " 🔕") : null), sub ? h("br") : null, sub || null),
+    unread ? h("span", { class: "cnt " + (chatMuted(id) && !C.mentions[id] ? "muted" : mention ? "due" : "new") }, String(unread > 99 ? "99+" : unread)) : null);
   const match = t => !q || String(t || "").toLowerCase().includes(q);
   const channels = C.channels.filter(c => c.kind === "channel" && match(c.name));
   const groups = C.channels.filter(c => c.kind === "group" && match(chName(c))).sort((a, b) => String((C.last[b.id] || {}).created_at || b.created_at).localeCompare(String((C.last[a.id] || {}).created_at || a.created_at)));
@@ -5709,7 +5752,7 @@ function drawChatHead(){
   if (chatEls && chatEls.head) {
     // ‹ Back to the list of chats (phones only)
     chatEls.head.prepend(h("button", { type: "button", class: "m-back", "aria-label": "Back to chats", onclick: () => { C.mobileView = "list"; const c = chatEls.msgs.closest(".chat"); if (c) c.classList.remove("m-conv"); drawChatList(); } }, "‹"));
-    if (C.channels.some(c => c.id === C.active)) chatEls.head.append(chatMeetButton());
+    if (C.channels.some(c => c.id === C.active)) { const mb = chatMuteButton(); if (mb) chatEls.head.append(mb); chatEls.head.append(chatMeetButton()); }
     if (chatEls.live) { chatEls.head.append(chatEls.live); drawLiveStatus(); }
   }
 }
@@ -5936,7 +5979,8 @@ async function onLiveNotif(p){
   if (notifSeen.has(key)) return; notifSeen.add(key);
   try { await loadNotifications(); } catch (e) {}
   const viewing = p.tbl === "chat" && S.route === "chat" && C.active === p.entity_id && document.visibilityState === "visible";
-  if (!viewing) { toast(p.title || "New notification"); playSound("chime"); }
+  const quiet = p.tbl === "chat" && chatMuted(p.entity_id) && !/mentioned you|tagged you/i.test(p.title || "");
+  if (!viewing && !quiet) { toast(p.title || "New notification"); playSound("chime"); }
   if (p.tbl === "chat" && p.entity_id && !C.channels.find(c => c.id === p.entity_id)) { await loadChat(true); syncChatSubs(); }
   renderShell();
 }
@@ -6144,6 +6188,13 @@ function chatAttachments(m){
   const atts = m.attachments || []; if (!atts.length) return null;
   return h("div", { class: "catts" }, atts.map(a => {
     const isImg = /^image\/(png|jpe?g|gif|webp)$/.test(a.mime || "") && a.size <= 15 * 1048576;
+    // voice notes (and other sound files) play right in the chat
+    if (/^audio\//.test(a.mime || "")) {
+      const au = h("audio", { controls: true, preload: "none", class: "cvoice-audio" });
+      fileLink(a.id, true).then(u => { au.src = u; }, () => {});
+      return h("div", { class: "cvoice" }, h("span", { class: "cvoice-ic", "aria-hidden": "true" }, /^Voice note/.test(a.name || "") ? "🎤" : "🎵"), au,
+        h("button", { type: "button", class: "btn sm ghost", title: "Download", "aria-label": "Download " + a.name, onclick: () => openChatFile(a, true) }, "⬇"));
+    }
     if (isImg) {
       const img = h("img", { class: "cimg", alt: a.name, loading: "lazy" });
       fileLink(a.id).then(u => { img.src = u; }, () => { img.replaceWith(fileCard(a)); });
@@ -6537,6 +6588,82 @@ async function openMessageInfo(m){
     groups.length ? h("div", { class: "minfo-list" }, groups.flatMap(g => g.ids.map(id => h("div", { class: "minfo-row" }, avatar(id, "sm"), h("span", {}, id === S.me.id ? "You" : (pname(id) || "Someone")), h("span", { class: "minfo-emoji" }, g.e)))))
       : h("p", { class: "muted", style: "margin:4px 0 0" }, "No reactions yet.")],
     [h("span", { class: "sp" }), h("button", { type: "button", class: "btn", onclick: closeDlg }, "Close")], true);
+}
+
+
+/* ---------- muting a group or channel (2026-11ad) ----------
+   A muted chat plays no sound and shows no pop-up; an @tag of you still does. Direct messages can't be muted. */
+const chatMuted = id => !!(C.muted && C.muted.has(id));
+function chatLoud(m){ return !chatMuted(m.channel_id) || (m.mentions || []).includes(S.me.id); }
+function chatMuteButton(){
+  const ch = C.channels.find(c => c.id === C.active);
+  if (!ch || ch.kind === "dm") return null;
+  const muted = chatMuted(ch.id);
+  const b = h("button", { type: "button", class: "btn sm chat-mute" + (muted ? " on" : ""), id: "chatMute", "aria-pressed": String(muted),
+    title: muted ? "Muted: no sound or pop-ups, except when you’re tagged. Click to unmute." : "Mute this " + (ch.kind === "group" ? "group" : "channel") + ": no sound or pop-ups, except when you’re tagged.",
+    onclick: () => toggleChatMute(ch) }, muted ? "🔕 Muted" : "🔔 Mute");
+  // redrawn in the same spot after each click: a double-click mustn't mute and unmute again
+  if (Date.now() - (C.muteAt || 0) < 1500) b.__tcLast = Date.now() + 300;
+  return b;
+}
+async function toggleChatMute(ch){
+  C.muted = C.muted || new Set(); C.muteAt = Date.now();
+  const was = C.muted.has(ch.id);
+  try {
+    if (was) { ok(await sb.from("chat_mutes").delete().eq("channel_id", ch.id).eq("user_id", S.me.id)); C.muted.delete(ch.id); toast("Unmuted. You’ll hear new messages again."); }
+    else { ok(await sb.from("chat_mutes").insert({ user_id: S.me.id, channel_id: ch.id })); C.muted.add(ch.id); toast("Muted. No sound or pop-ups, except when someone tags you."); }
+  } catch (e) { fail(e, was ? "Couldn’t unmute" : "Couldn’t mute"); }
+  if (typeof drawChatHead === "function") drawChatHead(); drawChatList();
+}
+
+/* ---------- voice notes: record, then it's uploaded and sent ---------- */
+const VOICE_MAX_S = 300;
+function voiceType(){
+  const ok2 = t => window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t);
+  for (const [t, ext] of [["audio/webm;codecs=opus", "webm"], ["audio/webm", "webm"], ["audio/mp4", "m4a"], ["audio/ogg;codecs=opus", "ogg"]]) if (ok2(t)) return { type: t, ext };
+  return null;
+}
+function voiceNoteButton(getSend){
+  const btn = h("button", { type: "button", class: "btn ghost chat-attach chat-mic", id: "chatMic", title: "Record a voice note", "aria-label": "Record a voice note" }, "🎤");
+  let rec = null, stream = null, chunks = [], started = 0, timer = null, bar = null, cancelled = false;
+  const fmt = s => Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0");
+  const stopAll = () => { clearInterval(timer); timer = null; if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; if (bar) bar.remove(); bar = null; btn.hidden = false; };
+  const finish = () => { if (rec && rec.state !== "inactive") rec.stop(); };
+  btn.addEventListener("click", async () => {
+    const vt = voiceType();
+    if (!vt || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { toast("This browser can’t record voice notes. Try Chrome, Edge or Safari."); return; }
+    if (!C.active) return;
+    if (typeof chatFilesReady === "function" && !chatFilesReady()) return;   // it explains what's missing (Google Drive)
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch (e) { toast(e && e.name === "NotAllowedError" ? "Microphone blocked. Allow the microphone for this site, then try again." : "No microphone found."); return; }
+    const cid = C.active; chunks = []; cancelled = false;
+    rec = new MediaRecorder(stream, { mimeType: vt.type });
+    rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+    rec.onstop = () => {
+      const secs = (Date.now() - started) / 1000; stopAll();
+      if (cancelled || secs < 0.7 || !chunks.length) { if (!cancelled) toast("Too short. Hold on a little longer."); return; }
+      const mime = vt.type.split(";")[0];
+      const file = new File(chunks, "Voice note (" + fmt(secs) + ")." + vt.ext, { type: mime });
+      if (C.active !== cid) { toast("Voice note discarded: the conversation changed."); return; }
+      addChatFiles([file]);
+      // send it as soon as it's uploaded
+      const t0 = Date.now();
+      const wait = setInterval(() => {
+        const ups = (C.uploads && C.uploads[cid]) || [], mine = ups.find(u => u.name === file.name);
+        if (!mine || mine.state === "error" || mine.state === "cancelled" || Date.now() - t0 > 120000 || C.active !== cid) { clearInterval(wait); return; }
+        if (ups.every(u => u.state !== "uploading")) { clearInterval(wait); const s = getSend(); if (s) s.click(); }
+      }, 300);
+    };
+    rec.start(250); started = Date.now();
+    btn.hidden = true;
+    const clock = h("span", { class: "vrec-time" }, "0:00");
+    bar = h("div", { class: "vrec", role: "status" }, h("span", { class: "vrec-dot", "aria-hidden": "true" }), h("span", {}, "Recording "), clock,
+      h("button", { type: "button", class: "btn sm ghost", id: "vrecCancel", onclick: () => { cancelled = true; finish(); } }, "Cancel"),
+      h("button", { type: "button", class: "btn sm pri", id: "vrecSend", onclick: finish }, "Send"));
+    btn.after(bar);
+    timer = setInterval(() => { const s = (Date.now() - started) / 1000; clock.textContent = fmt(s); if (s >= VOICE_MAX_S) { toast("Voice notes can be up to 5 minutes."); finish(); } }, 250);
+  });
+  return btn;
 }
 /* ---------------------------------------------------------------------
    Activity and status: online / active X ago / lunch / out of office / leave / back tomorrow,
@@ -8046,6 +8173,7 @@ function devCreate(){
   const err = h("p", { class: "err", hidden: true });
   const go2 = h("button", { type: "button", class: "btn pri", id: "devNewGo" }, "Create");
   const submit = async () => {
+    if (go2.disabled) return;
     err.hidden = true;
     if (!title.value.trim()) { err.textContent = "Write a short title."; err.hidden = false; title.focus(); return; }
     const ids = owners.value();
@@ -8055,7 +8183,7 @@ function devCreate(){
     catch (e) { err.textContent = "Not created: " + friendly(e); err.hidden = false; }
     go2.disabled = false;
   };
-  go2.addEventListener("click", submit); title.addEventListener("keydown", e => { if (e.key === "Enter") submit(); });
+  go2.addEventListener("click", submit); title.addEventListener("keydown", e => { if (e.key === "Enter" && !go2.disabled) go2.click(); });
   openDialog("Create task", [h("div", { class: "form" }, h("label", { class: "fl full" }, "Title", title), h("label", { class: "fl full" }, "Notes", notes), h("div", { class: "fl full" }, h("span", {}, "Owners"), owners.el)), err],
     [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), go2], true);
   setTimeout(() => title.focus(), 30);
@@ -8140,12 +8268,15 @@ function drawDevTask(id){
   }
   S.dlg = { tbl: "tasks", id: t.id };
   const db = d.querySelector(".db"); if (db && keep) db.scrollTop = keep;
-  if (S.devBack === t.id) { S.devBack = null; const b = document.getElementById("devBackBtn"); if (b) b.click(); }
+  if (S.devBack === t.id) { S.devBack = null; const b = document.getElementById("devBackBtn"); if (b) { b.__tcLast = 0; b.click(); } }   // opened by dragging back: no pause needed
 }
 // where the task is, and the one or two buttons for the next step
 function flowBox(t){
   const owner = isOwner(t) || isAdmin(), tester = t.tester_id === S.me.id || isAdmin(), box = h("div", { class: "dv-flow" });
-  const btn = (label, cls, id, fn) => h("button", { type: "button", class: "btn " + cls, id, onclick: fn }, label);
+  // the next step's button appears where the last one was: for a moment after it appears it ignores clicks, so a
+  // double-click on Start can't also press Move to QA (or Pick up press Approve)
+  const born = Date.now();
+  const btn = (label, cls, id, fn) => { const b = h("button", { type: "button", class: "btn " + cls, id, onclick: fn }, label); b.__tcLast = born + 300; return b; };
   const steps = h("div", { class: "dv-steps" }, FLOW.map(([st, label]) => h("span", { class: "dv-step" + (st === t.status ? " on" : "") + (FLOW.findIndex(x => x[0] === st) < FLOW.findIndex(x => x[0] === t.status) ? " past" : "") }, label)));
   box.append(steps);
   const row = h("div", { class: "dv-flowbtns" });
