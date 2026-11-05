@@ -869,6 +869,28 @@ dialog.dv-wide .dh .iconbtn{flex:none}
 
 .dv-files .files-sec{border-top:0;padding-top:0;margin-top:0}
 @media (max-width:600px){.dv-brow .dv-epic,.dv-brow .dv-pts{display:none}.dv-brow{gap:6px;padding:8px}.dv-brow .dv-loz{font-size:10.5px;padding:2px 4px}.dv-counts{order:9}}
+
+/* simple Development & QA (2026-11ad) */
+.dv-chip{border:1px solid #DFE1E6;background:#fff;border-radius:999px;padding:5px 12px;font:inherit;font-size:13px;cursor:pointer;color:#44546F}
+.dv-chip.on{background:#E9F2FF;border-color:#0C66E4;color:#0C66E4}
+.dv-facestack{display:inline-flex}.dv-facestack .av{margin-left:-6px;box-shadow:0 0 0 2px #fff}.dv-facestack .av:first-child{margin-left:0}
+.dv-more{font-size:11.5px;color:#626F86;margin-left:4px;align-self:center}
+.dv-qa{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#7F5F01;background:#FFF7D6;border-radius:999px;padding:1px 2px 1px 7px}
+.dv-needqa{font-size:11px;font-weight:700;color:#AE2E24;background:#FFECEB;border-radius:4px;padding:2px 6px}
+.dv-flow{border:1px solid #DFE1E6;border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.dv-steps{display:flex;gap:4px;flex-wrap:wrap}
+.dv-step{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;padding:3px 8px;border-radius:4px;background:#F1F2F4;color:#8590A2}
+.dv-step.past{background:#DCFFF1;color:#216E4E}
+.dv-step.on{background:#0C66E4;color:#fff}
+.dv-flowbtns{display:flex;gap:8px;flex-wrap:wrap}
+.dv-backbox{display:flex;flex-direction:column;gap:8px}
+.dv-backnote{margin:0;font-size:13px;color:#AE2E24;font-weight:600}
+.dv-owners{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.dv-ownerchip{display:inline-flex;align-items:center;gap:6px;background:#F1F2F4;border-radius:999px;padding:2px 4px 2px 2px;font-size:13.5px}
+.dv-ownerchip .iconbtn{width:22px;height:22px;min-height:0;font-size:11px;padding:0;border:0;background:none}
+.dv-addowner{width:auto;height:30px;min-height:0;padding:2px 8px;font-size:13px}
+.dv-dh.static{cursor:default;border-bottom:1px solid #DFE1E6}
+@media (max-width:820px){ .dv-view .dv-right{order:-1} }   /* phones: the next step and the people come first */
 </style>
 </head>
 <body>
@@ -6842,7 +6864,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ac";
+const APP_VERSION = "2026-11ad";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -7888,506 +7910,298 @@ async function pageAll(table, project){
   return out;
 }
 /* ---------------------------------------------------------------------
-   Development › Board and Backlog, and the Jira-style task view for Development tasks.
-   Kept deliberately simple: the board first, a few filters, and a task view where every
-   change saves the moment it's made. Everything else is one click away ("More details").
-   Epics are tasks of type Epic (a task's parent_id is its epic); subtasks are tasks of
-   type Subtask under a task. Time spent is kept in work_logs.
+   Development & QA: one board, one popup. Kept deliberately simple, like Jira's basics.
+   To Do → In Progress → In QA → Done. Owners move work to QA; a tester is chosen (or a tester picks it up);
+   only the tester (or an admin) approves it to Done, or sends it back to development with a reason.
+   A task has a title, notes, owners, a tester and attachments. The database enforces the steps (task_flow).
    --------------------------------------------------------------------- */
-const DEV_TYPES = ["Feature", "Bug", "Improvement", "Testing", "Research", "Design", "DevOps", "Epic", "Subtask"];
-const DEV_COLUMNS = ["To do", "In progress", "In review", "Done"];
-const DEV_DONE_DAYS = 14;
-const TYPE_MARK = { Bug: ["●", "var(--bad)"], Epic: ["◆", "#6450F5"], Subtask: ["↳", "var(--info)"] };
-const devTasks = () => rows("tasks").filter(t => t.vertical === "Development" && !t.archived);
-const epicsList = () => devTasks().filter(t => t.type === "Epic").sort((a, b) => (a.status === "Done") - (b.status === "Done") || String(a.title).localeCompare(b.title));
-const childrenOf = id => devTasks().filter(t => t.parent_id === id);
-const typeMark = t => { const m = TYPE_MARK[t.type] || ["■", t.type === "Feature" ? "var(--ok)" : "var(--ink3)"]; return h("span", { class: "dv-type", style: "color:" + m[1], title: t.type }, m[0]); };
-const epicChip = t => { const e = t.parent_id && t.type !== "Subtask" ? byId("tasks", t.parent_id) : null; return e ? h("span", { class: "dv-epic", title: "Epic: " + e.title }, e.title.length > 22 ? e.title.slice(0, 21) + "…" : e.title) : null; };
-const pointsChip = t => t.story_points != null && t.story_points !== "" ? h("span", { class: "dv-pts", title: "Story points" }, String(t.story_points)) : null;
-const hoursText = min => { const hh = Math.floor(min / 60), mm = Math.round(min % 60); return (hh ? hh + "h" : "") + (mm || !hh ? (hh ? " " : "") + mm + "m" : ""); };
-// "1.5", "1h 30m", "90m", "2h" → minutes
-function parseHours(v){
-  const s = String(v || "").trim().toLowerCase(); if (!s) return 0;
-  const hm = s.match(/^(?:(\d+(?:\.\d+)?)\s*h)?\s*(?:(\d+)\s*m)?$/);
-  if (hm && (hm[1] || hm[2])) return Math.round((+hm[1] || 0) * 60 + (+hm[2] || 0));
-  return /^\d+(\.\d+)?$/.test(s) ? Math.round(+s * 60) : NaN;
+const FLOW = [["To do", "To Do"], ["In progress", "In Progress"], ["In review", "In QA"], ["Done", "Done"]];
+const FLOW_LABEL = Object.fromEntries(FLOW);
+const DONE_DAYS = 14;
+const devTasks = () => rows("tasks").filter(t => t.vertical === "Development" && !t.archived && t.type !== "Epic");
+const ownersOf = t => [t.assignee_id, ...(t.collaborators || [])].filter((x, i, a) => x && a.indexOf(x) === i);
+const isOwner = t => ownersOf(t).includes(S.me.id);
+// testers: people whose role can manage QA
+function isTesterId(id){
+  const p = person(id); if (!p || p.is_active === false) return false;
+  const r = rows("roles").find(x => x.id === p.role_id);
+  return !!(r && r.permissions && r.permissions.qa === "manage");
 }
+const testers = () => activePeople().filter(p => isTesterId(p.id));
+const iAmTester = () => isTesterId(S.me.id) || (typeof isTester === "function" && isTester() && !isAdmin());
+const flowLoz = st => h("span", { class: "dv-loz s-" + String(st).replace(/\s+/g, "-").toLowerCase() }, FLOW_LABEL[st] || st);
+const faces = ids => h("span", { class: "dv-facestack" }, ids.slice(0, 4).map(id => avatar(id, "sm")), ids.length > 4 ? h("span", { class: "dv-more" }, "+" + (ids.length - 4)) : null);
+const noone = () => { const s = h("span", { class: "dv-noone", title: "No one yet" }); s.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" fill="none" stroke="currentColor" stroke-width="2"/></svg>'; return s; };
 
-function devMatch(u){
-  const s = (u.q || "").toLowerCase();
-  return t => (!s || (taskKey(t) + " " + t.title + " " + (t.labels || []).join(" ")).toLowerCase().includes(s))
-    && (!u.who || t.assignee_id === u.who || (t.collaborators || []).includes(u.who))
-    && (!u.mine || t.assignee_id === S.me.id || t.tester_id === S.me.id || (t.collaborators || []).includes(S.me.id))
-    && (!u.bugs || t.type === "Bug")
-    && (!u.epic || t.parent_id === u.epic || (t.type === "Subtask" && (byId("tasks", t.parent_id) || {}).parent_id === u.epic));
-}
-
-const COL_LABEL = { "To do": "To Do", "In progress": "In Progress", "In review": "In Review", "Done": "Done" };
-const canRunSprints = () => isAdmin() || isTaskHandler("Development") || lvl("projects") >= 2;
-const activeSprint = () => rows("sprints").find(s => s.status === "Active") || null;
-// small Jira-like type icons
-const TYPE_SVG = {
-  Bug: ["#E5493A", '<circle cx="8" cy="8" r="3.2" fill="#fff"/>'],
-  Epic: ["#904EE2", '<path d="M9.2 3 5 8.8h2.6L6.8 13 11 7.2H8.4z" fill="#fff"/>'],
-  Subtask: ["#4BADE8", '<rect x="4" y="4" width="4" height="4" rx=".8" fill="#fff"/><rect x="8" y="8" width="4" height="4" rx=".8" fill="none" stroke="#fff" stroke-width="1.3"/>'],
-  Feature: ["#63BA3C", '<path d="M5.5 4h5v8l-2.5-1.8L5.5 12z" fill="#fff"/>'],
-  _: ["#4BADE8", '<path d="m5 8.2 2 2 4-4.2" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>']
-};
-function typeIcon(type){
-  const [bg, inner] = TYPE_SVG[type] || TYPE_SVG._;
-  const s = h("span", { class: "dv-ti", title: type, "aria-label": type });
-  s.innerHTML = '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect width="16" height="16" rx="3" fill="' + bg + '"/>' + inner + "</svg>";
-  return s;
-}
-const lozenge = (status) => h("span", { class: "dv-loz s-" + String(status).replace(/\s+/g, "-").toLowerCase() }, COL_LABEL[status] || status);
-const noone = () => { const s = h("span", { class: "dv-noone", title: "Unassigned" }); s.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" fill="none" stroke="currentColor" stroke-width="2"/></svg>'; return s; };
-const who = id => id ? avatar(id, "sm") : noone();
-
-/* ---------- page frame: title, tabs, toolbar ---------- */
-function devFrame(el, tab){
-  el.append(h("div", { class: "dv-top" },
-    h("div", {}, h("div", { class: "dv-crumb" }, "Spaces"), h("h1", { class: "dv-space" }, "Development")),
-    access(MOD.tasks).canCreate ? h("button", { type: "button", class: "btn pri", id: "devCreate", onclick: () => devCreate() }, "+ Create") : null));
-  el.append(h("nav", { class: "dv-tabsbar", "aria-label": "Development" }, [["dev-backlog", "Backlog"], ["dev-board", "Board"], ["dev-reports", "Reports"]].map(([r, l]) =>
-    h("a", { href: "#" + r, class: tab === r ? "on" : "", "aria-current": tab === r ? "page" : null }, l))));
-}
-function devToolbar(u, redraw, right){
-  const people = activePeople().filter(p => p.vertical === "Development" || devTasks().some(t => t.assignee_id === p.id && t.status !== "Done"));
-  const q = h("input", { class: "in dv-search", type: "search", placeholder: "Search board", value: u.q || "", id: "devSearch", "aria-label": "Search board" });
-  q.addEventListener("input", () => { u.q = q.value; redraw(); });
-  const faces = h("div", { class: "dv-faces", role: "group", "aria-label": "Show one person’s work" }, people.slice(0, 10).map(p =>
-    h("button", { type: "button", class: "dv-face" + (u.who === p.id ? " on" : ""), title: p.full_name, "aria-pressed": String(u.who === p.id), onclick: () => { u.who = u.who === p.id ? "" : p.id; redraw(true); } }, avatar(p.id, "sm"))));
-  const count = ["mine", "bugs", "epic"].filter(k => u[k]).length;
-  const fbtn = h("button", { type: "button", class: "btn dv-fbtn" + (count ? " on" : ""), id: "devFilterBtn", "aria-expanded": String(!!u.fopen), onclick: () => { u.fopen = !u.fopen; redraw(true); } }, "Filter" + (count ? " (" + count + ")" : ""));
-  const bar = h("div", { class: "dv-toolbar" }, q, faces, fbtn, h("span", { class: "grow" }), right || null);
-  if (!u.fopen) return bar;
-  const cb = (k, label) => { const c = h("input", { type: "checkbox", checked: !!u[k], onchange: e => { u[k] = e.target.checked; redraw(true); } }); return h("label", { class: "chk" }, c, label); };
-  const epics = epicsList().filter(e => e.status !== "Done");
-  const epicSel = h("select", { class: "in", style: "width:auto", "aria-label": "Epic" }, h("option", { value: "" }, "Any epic"), epics.map(e => h("option", { value: e.id }, e.title)));
-  epicSel.value = u.epic || ""; epicSel.addEventListener("change", () => { u.epic = epicSel.value; redraw(true); });
-  return h("div", {}, bar, h("div", { class: "dv-fpanel", id: "devFilterPanel" }, cb("mine", "Only my work"), cb("bugs", "Only bugs"), epics.length ? epicSel : null,
-    h("button", { type: "button", class: "linkbtn", onclick: () => { Object.assign(u, { q: "", who: "", mine: false, bugs: false, epic: "" }); redraw(true); } }, "Clear filters")));
-}
-
-/* ---------- Board ---------- */
-async function renderDevBoard(el){
-  await ensure(["tasks", "projects", "sprints", "profiles"]);
-  if (S.route !== "dev-board") return;
-  const u = S.ui.dev = S.ui.dev || {};
-  devFrame(el, "dev-board");
-  const sp = activeSprint();
-  const right = sp ? h("div", { class: "dv-sprintinfo" }, h("span", {}, h("b", {}, sp.name), sp.end_date ? " · " + daysLeft(sp.end_date) : ""),
-    canRunSprints() ? h("button", { type: "button", class: "btn pri", id: "devCompleteSprint", onclick: () => completeSprintDialog(sp) }, "Complete sprint") : null) : null;
-  const body = h("div", {});
-  const draw = full => { if (full) { rerender(); return; } body.replaceChildren(devBoard(u)); };
-  el.append(devToolbar(u, draw, right), body);
-  draw();
-}
-function daysLeft(end){ const n = Math.round((new Date(end + "T23:59:59") - new Date()) / 864e5); return n < 0 ? "ended " + (-n) + (n === -1 ? " day ago" : " days ago") : n === 0 ? "ends today" : n + (n === 1 ? " day left" : " days left"); }
-function devBoard(u){
-  const since = Date.now() - DEV_DONE_DAYS * 864e5;
-  const list = devTasks().filter(t => t.type !== "Epic" && (t.status !== "Done" || +new Date(t.completed_at || t.updated_at || 0) >= since)).filter(devMatch(u)).sort(sortByPrioDue);
-  const board = h("div", { class: "dv-board" });
-  for (const st of DEV_COLUMNS){
-    const items = list.filter(t => t.status === st);
-    const cards = h("div", { class: "dv-cards" }, items.slice(0, 150).map(devCard));
-    const col = h("section", { class: "dv-col", "aria-label": COL_LABEL[st], "data-status": st },
-      h("div", { class: "dv-colh" }, h("span", {}, COL_LABEL[st]), h("span", { class: "dv-n" }, String(items.length))), cards);
-    if (access(MOD.tasks).canCreate) col.append(inlineCreate("dv-colnew", t => ({ status: st }), "What needs to be done?"));
-    col.addEventListener("dragover", e => { if (!devDrag) return; e.preventDefault(); col.classList.add("drop"); });
-    col.addEventListener("dragleave", e => { if (!col.contains(e.relatedTarget)) col.classList.remove("drop"); });
-    col.addEventListener("drop", async e => {
-      e.preventDefault(); col.classList.remove("drop");
-      const id = devDrag; devDrag = null; const t = id && byId("tasks", id);
-      if (t && t.status !== st) await devSave(t, { status: st }, "Moved to " + COL_LABEL[st] + ".");
-    });
-    board.append(col);
-  }
-  return h("div", { class: "dv-boardwrap" }, board);
-}
-let devDrag = null;
-function devCard(t){
-  const can = access(MOD.tasks, t).canEdit;
-  const parent = t.type === "Subtask" ? byId("tasks", t.parent_id) : null;
-  const overdue = t.due_date && t.status !== "Done" && t.due_date < today();
-  const card = h("button", { type: "button", class: "dv-card", draggable: can ? "true" : "false", "data-id": t.id, onclick: () => openDevTask(t.id) },
-    t.blocked ? h("span", { class: "dv-flag" }, "⚑ Blocked") : null,
-    h("span", { class: "dv-title" }, t.title),
-    parent ? h("span", { class: "dv-parent" }, taskKey(parent) + " " + parent.title) : epicChip(t),
-    t.due_date ? h("span", { class: "dv-due" + (overdue ? " late" : "") }, fmtDate(t.due_date)) : null,
-    h("span", { class: "dv-foot" }, typeIcon(t.type), h("span", { class: "dv-key" }, taskKey(t)), h("span", { class: "grow" }), pointsChip(t), who(t.assignee_id)));
-  card.addEventListener("dragstart", e => { if (!can) { e.preventDefault(); return; } devDrag = t.id; card.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", t.id); });
-  card.addEventListener("dragend", () => { devDrag = null; card.classList.remove("dragging"); });
-  return card;
-}
-// the "+" at the bottom of a column or list: type a title, press Enter
-function inlineCreate(cls, extra, ph){
-  const btn = h("button", { type: "button", class: cls, "aria-label": "Create" }, "+ Create");
-  btn.addEventListener("click", () => {
-    const ta = h("input", { class: "in dv-newin", placeholder: ph || "What needs to be done?", maxlength: "200", "aria-label": "Title of the new work item" });
-    const done = () => ta.replaceWith(btn);
-    ta.addEventListener("keydown", async e => {
-      if (e.key === "Escape") { done(); return; }
-      if (e.key !== "Enter" || !ta.value.trim()) return;
-      ta.disabled = true;
-      try { const t = await devInsert({ type: "Feature", title: ta.value.trim(), ...extra() }); toast(taskKey(t) + " created."); rerender(); }
-      catch (err) { fail(err, "Not created"); ta.disabled = false; }
-    });
-    ta.addEventListener("blur", () => { if (!ta.value.trim()) done(); });
-    btn.replaceWith(ta); ta.focus();
-  });
-  return btn;
-}
-
-/* ---------- Backlog: sprints, then the backlog ---------- */
-async function renderDevBacklog(el){
-  await ensure(["tasks", "projects", "sprints", "profiles"]);
-  if (S.route !== "dev-backlog") return;
-  const u = S.ui.devb = S.ui.devb || {};
-  devFrame(el, "dev-backlog");
-  const body = h("div", {});
-  const draw = full => { if (full) { rerender(); return; } body.replaceChildren(...devBacklog(u)); };
-  el.append(devToolbar(u, draw, canRunSprints() ? h("button", { type: "button", class: "btn", id: "devNewSprint", onclick: newSprint }, "Create sprint") : null), body);
-  draw();
-}
-async function newSprint(){
-  try { const r = ok(await sb.rpc("create_sprint", { p_name: "" })); await load("sprints", true); toast((r && r.name ? r.name : "Sprint") + " created."); rerender(); }
-  catch (e) { fail(e, "Sprint not created"); }
-}
-function devBacklog(u){
-  const open = devTasks().filter(t => t.type !== "Epic" && t.type !== "Subtask").filter(devMatch(u)).sort(sortByPrioDue);
-  const sprints = rows("sprints").filter(s => s.status !== "Completed").sort((a, b) => (b.status === "Active") - (a.status === "Active") || String(a.created_at || "").localeCompare(String(b.created_at || "")));
-  const C = S.ui.devCollapsed = S.ui.devCollapsed || {};
-  const box = (key, title, sub, items, sp) => {
-    const counts = DEV_COLUMNS.map(st => items.filter(t => t.status === st).length);
-    const collapsed = !!C[key];
-    const head = h("div", { class: "dv-bh" },
-      h("button", { type: "button", class: "dv-caret", "aria-expanded": String(!collapsed), "aria-label": collapsed ? "Show" : "Hide", onclick: () => { C[key] = !collapsed; rerender(); } }, collapsed ? "▸" : "▾"),
-      h("b", {}, title), sub ? h("span", { class: "muted" }, sub) : null, h("span", { class: "muted" }, "(" + items.length + (items.length === 1 ? " work item)" : " work items)")),
-      h("span", { class: "grow" }),
-      h("span", { class: "dv-counts", title: "To Do · In Progress · Done" }, h("span", { class: "c-todo" }, counts[0]), h("span", { class: "c-prog" }, counts[1] + counts[2]), h("span", { class: "c-done" }, counts[3])),
-      sp && canRunSprints() ? (sp.status === "Planned" ? h("button", { type: "button", class: "btn sm", onclick: () => startSprintDialog(sp, items) }, "Start sprint")
-        : h("button", { type: "button", class: "btn sm", onclick: () => completeSprintDialog(sp) }, "Complete sprint")) : null,
-      sp && canRunSprints() ? h("button", { type: "button", class: "btn sm ghost", title: "Edit sprint", "aria-label": "Edit " + sp.name, onclick: () => openRecord("sprints", sp.id) }, "•••") : null);
-    const list = h("div", { class: "dv-blist" }, collapsed ? null : [items.length ? items.map(t => devRow(t)) : h("div", { class: "dv-bempty" }, sp ? "Plan a sprint by dragging work items here." : "Your backlog is empty."),
-      access(MOD.tasks).canCreate ? inlineCreate("dv-rownew", () => ({ sprint_id: sp ? sp.id : null }), "What needs to be done?") : null]);
-    const wrap = h("section", { class: "dv-bbox" + (sp && sp.status === "Active" ? " active" : ""), "data-sprint": sp ? sp.id : "" }, head, list);
-    wrap.addEventListener("dragover", e => { if (!devDrag) return; e.preventDefault(); wrap.classList.add("drop"); });
-    wrap.addEventListener("dragleave", e => { if (!wrap.contains(e.relatedTarget)) wrap.classList.remove("drop"); });
-    wrap.addEventListener("drop", async e => {
-      e.preventDefault(); wrap.classList.remove("drop");
-      const id = devDrag; devDrag = null; const t = id && byId("tasks", id); const to = sp ? sp.id : null;
-      if (t && (t.sprint_id || null) !== to) await devSave(t, { sprint_id: to }, sp ? "Moved to " + sp.name + "." : "Moved to the backlog.");
-    });
-    return wrap;
-  };
-  const out = [devEpicsStrip()];
-  for (const sp of sprints){
-    const items = open.filter(t => t.sprint_id === sp.id && (t.status !== "Done" || sp.status === "Active"));
-    const dates = sp.start_date ? [sp.start_date, sp.end_date].filter(Boolean).map(d => fmtDate(d)).join(" – ") : "";
-    out.push(box(sp.id, sp.name, dates, items, sp));
-  }
-  out.push(box("backlog", "Backlog", "", open.filter(t => t.status !== "Done" && (!t.sprint_id || !sprints.some(s => s.id === t.sprint_id))), null));
-  return out;
-}
-function devRow(t){
-  const can = devCanEdit(t, "status");
-  const st = can ? h("select", { class: "dv-loz sel s-" + String(t.status).replace(/\s+/g, "-").toLowerCase(), "aria-label": "Status of " + taskKey(t) }, TASK_STATUS.map(s => h("option", { value: s }, COL_LABEL[s] || s))) : lozenge(t.status);
-  if (can) { st.value = t.status; st.addEventListener("click", e => e.stopPropagation()); st.addEventListener("change", () => devSave(t, { status: st.value }, "Status: " + COL_LABEL[st.value] + ".")); }
-  const row = h("div", { class: "dv-brow", tabindex: "0", role: "button", draggable: devCanEdit(t, "sprint_id") ? "true" : "false", "data-id": t.id, onclick: () => openDevTask(t.id), onkeydown: e => { if (e.key === "Enter") openDevTask(t.id); } },
-    typeIcon(t.type), h("span", { class: "dv-key" }, taskKey(t)), h("span", { class: "dv-rt" }, t.title), epicChip(t), h("span", { class: "grow" }), st, pointsChip(t) || h("span", { class: "dv-pts empty" }, "–"), who(t.assignee_id));
-  row.addEventListener("dragstart", e => { if (row.getAttribute("draggable") !== "true") { e.preventDefault(); return; } devDrag = t.id; row.classList.add("dragging"); e.dataTransfer.setData("text/plain", t.id); });
-  row.addEventListener("dragend", () => { devDrag = null; row.classList.remove("dragging"); });
-  return row;
-}
-function devEpicsStrip(){
-  const epics = epicsList().filter(e => e.status !== "Done");
-  return h("section", { class: "dv-epics" }, h("div", { class: "dv-bh" }, h("b", {}, "Epics"), h("span", { class: "muted" }, "Big goals that group work items"), h("span", { class: "grow" }),
-      access(MOD.tasks).canCreate ? h("button", { type: "button", class: "btn sm", onclick: () => devCreate({ type: "Epic" }) }, "+ Create epic") : null),
-    epics.length ? h("div", { class: "dv-epicgrid" }, epics.map(e => { const c = childrenOf(e.id), d = c.filter(x => x.status === "Done").length;
-      return h("button", { type: "button", class: "dv-epiccard", onclick: () => openDevTask(e.id) }, h("span", { class: "dv-two" }, typeIcon("Epic"), h("b", {}, e.title)),
-        h("span", { class: "dv-bar" }, h("span", { style: "width:" + (c.length ? Math.round(d / c.length * 100) : 0) + "%" })), h("span", { class: "muted" }, c.length ? d + " of " + c.length + " done" : "No work items yet")); }))
-      : h("p", { class: "dv-bempty" }, "No epics yet."));
-}
-
-/* ---------- sprint dialogs ---------- */
-function startSprintDialog(sp, items){
-  const name = h("input", { class: "in", value: sp.name, maxlength: "80", id: "spName" });
-  const weeks = h("select", { class: "in", id: "spWeeks" }, [["1", "1 week"], ["2", "2 weeks"], ["3", "3 weeks"], ["4", "4 weeks"], ["0", "Custom"]].map(([v, l]) => h("option", { value: v }, l)));
-  weeks.value = "2";
-  const start = h("input", { class: "in", type: "date", value: today(), id: "spStart" });
-  const end = h("input", { class: "in", type: "date", value: addDays(today(), 13), id: "spEnd" });
-  const goal = h("textarea", { class: "in", rows: 3, id: "spGoal", placeholder: "What should this sprint achieve?" }); goal.value = sp.goal || "";
-  const fit = () => { if (+weeks.value) end.value = addDays(start.value || today(), 7 * +weeks.value - 1); };
-  weeks.addEventListener("change", fit); start.addEventListener("change", fit); end.addEventListener("change", () => { weeks.value = "0"; });
-  const err = h("p", { class: "err", hidden: true });
-  const goBtn = h("button", { type: "button", class: "btn pri", id: "spGo", onclick: async () => {
-    err.hidden = true;
-    if (!start.value || !end.value || end.value < start.value) { err.textContent = "Choose a start date and an end date after it."; err.hidden = false; return; }
-    goBtn.disabled = true;
-    try { ok(await sb.rpc("start_sprint", { p_sprint: sp.id, p_name: name.value.trim(), p_start: start.value, p_end: end.value, p_goal: goal.value.trim() }));
-      await load("sprints", true); closeDlg(); toast(name.value.trim() + " started."); go("dev-board"); rerender(); }
-    catch (e) { err.textContent = friendly(e); err.hidden = false; goBtn.disabled = false; }
-  } }, "Start");
-  openDialog("Start sprint", [h("p", { class: "muted", style: "margin-top:0" }, (items || []).length + " work items will be included in this sprint."),
-    h("div", { class: "form" }, h("label", { class: "fl full" }, "Sprint name", name), h("label", { class: "fl" }, "Duration", weeks), h("span", {}),
-      h("label", { class: "fl" }, "Start date", start), h("label", { class: "fl" }, "End date", end), h("label", { class: "fl full" }, "Sprint goal", goal)), err],
-    [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), goBtn], true);
-}
-function completeSprintDialog(sp){
-  const inSprint = devTasks().filter(t => t.sprint_id === sp.id && t.type !== "Epic");
-  const done = inSprint.filter(t => t.status === "Done").length, open = inSprint.length - done;
-  const next = rows("sprints").filter(s => s.status === "Planned" && s.id !== sp.id);
-  const to = h("select", { class: "in", id: "spMoveTo" }, next.map(s => h("option", { value: s.id }, s.name)), h("option", { value: "new" }, "New sprint"), h("option", { value: "" }, "Backlog"));
-  const err = h("p", { class: "err", hidden: true });
-  const goBtn = h("button", { type: "button", class: "btn pri", id: "spComplete", onclick: async () => {
-    err.hidden = true; goBtn.disabled = true;
-    try { const r = ok(await sb.rpc("complete_sprint", { p_sprint: sp.id, p_move_to: to.value && to.value !== "new" ? to.value : null, p_new: to.value === "new" }));
-      await Promise.all([load("sprints", true), load("tasks", true)]); closeDlg();
-      toast(sp.name + " completed." + (r && r.moved ? " " + r.moved + " open work item" + (r.moved === 1 ? "" : "s") + " moved." : "")); rerender(); }
-    catch (e) { err.textContent = friendly(e); err.hidden = false; goBtn.disabled = false; }
-  } }, "Complete sprint");
-  openDialog("Complete " + sp.name, [h("p", { style: "margin-top:0" }, "This sprint has ", h("b", {}, done + " completed"), " and ", h("b", {}, open + " open"), " work items."),
-    open ? h("label", { class: "fl" }, "Move open work items to", to) : h("p", { class: "muted" }, "Everything is done. Nice work."), err],
-    [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), goBtn], true);
-}
-
-/* ---------- Reports: the active sprint and velocity ---------- */
-async function renderDevReports(el){
-  await ensure(["tasks", "sprints", "profiles"]);
-  if (S.route !== "dev-reports") return;
-  devFrame(el, "dev-reports");
-  const pts = list => list.reduce((s, t) => s + (+t.story_points || 0), 0);
-  const sp = activeSprint();
-  const cards = [];
-  if (sp){
-    const items = devTasks().filter(t => t.sprint_id === sp.id && t.type !== "Epic");
-    const by = DEV_COLUMNS.map(st => [st, items.filter(t => t.status === st)]);
-    const total = items.length || 1;
-    cards.push(h("div", { class: "panel" }, h("h2", {}, sp.name + (sp.end_date ? " · " + daysLeft(sp.end_date) : "")), sp.goal ? h("p", { class: "muted" }, sp.goal) : null,
-      h("div", { class: "dv-stack" }, by.map(([st, l]) => l.length ? h("span", { class: "s-" + st.replace(/\s+/g, "-").toLowerCase(), style: "width:" + (l.length / total * 100) + "%", title: COL_LABEL[st] + ": " + l.length }) : null)),
-      h("div", { class: "dv-legend" }, by.map(([st, l]) => h("span", {}, h("i", { class: "s-" + st.replace(/\s+/g, "-").toLowerCase() }), COL_LABEL[st] + ": " + l.length + (pts(l) ? " (" + pts(l) + " pts)" : "")))),
-      h("p", { class: "muted", style: "margin-bottom:0" }, pts(by[3][1]) + " of " + pts(items) + " story points done.")));
-  } else cards.push(h("div", { class: "panel empty" }, h("b", {}, "No sprint is running"), "Start one in the Backlog."));
-  const past = rows("sprints").filter(s => s.status === "Completed").sort((a, b) => String(a.end_date || "").localeCompare(String(b.end_date || ""))).slice(-6);
-  const vel = past.map(s => [s, pts(devTasks().filter(t => t.sprint_id === s.id && t.status === "Done"))]);
-  const max = Math.max(1, ...vel.map(v => v[1]));
-  cards.push(h("div", { class: "panel" }, h("h2", {}, "Velocity"), h("p", { class: "muted" }, "Story points completed in each finished sprint."),
-    vel.length ? h("div", { class: "dv-vel" }, vel.map(([s, v]) => h("div", { class: "dv-velcol" }, h("span", { class: "dv-velv" }, String(v)), h("span", { class: "dv-velbar", style: "height:" + Math.max(4, v / max * 140) + "px" }), h("span", { class: "dv-vell" }, s.name))))
-      : h("p", { class: "dv-bempty" }, "Finish a sprint to see velocity here."),
-    vel.length ? h("p", { class: "muted", style: "margin-bottom:0" }, "Average: " + Math.round(vel.reduce((a, v) => a + v[1], 0) / vel.length) + " points per sprint.") : null));
-  el.append(h("div", { class: "grid g2" }, cards));
-}
-
-/* ---------- saving one change at a time ---------- */
-const devCanEdit = (t, k) => access(MOD.tasks, t).canEdit && (!MOD.tasks.fieldEditable || MOD.tasks.fieldEditable({ k }, t));
-async function devSave(t, patch, okMsg){
-  const M = MOD.tasks, prev = { ...t }, d = { ...patch };
-  if (M.before) M.before(d, prev);
-  Object.assign(t, d); devRefresh();
-  try { const saved = await updateRow("tasks", t.id, d); Object.assign(t, saved); if (M.after) M.after(saved, prev); toast(okMsg || "Saved."); }
-  catch (e) { Object.assign(t, prev); fail(e, "Not saved"); }
+/* ---------- running one step of the process ---------- */
+async function flowStep(t, action, extra, okMsg){
+  const M = MOD.tasks, prev = { ...t };
+  try {
+    const row = ok(await sb.rpc("task_flow", Object.assign({ p_task: t.id, p_action: action, p_reason: "", p_user: null }, extra || {})));
+    if (row) { upsertCache("tasks", row); Object.assign(t, row); if (M.after) { try { M.after(row, prev); } catch (e) {} } }
+    toast(okMsg || "Done.");
+    // the owners must hear when QA sends their work back, with the reason
+    if (action === "back") {
+      const to = ownersOf(t).filter(x => x !== S.me.id);
+      if (to.length) notify(to, "Sent back by QA: " + taskKey(t) + " " + t.title, (extra && extra.p_reason) || "", "tasks", t.id);
+      try { await load("comments", true); } catch (e) {}
+    }
+    if (action === "pick_up") { const to = ownersOf(t).filter(x => x !== S.me.id); if (to.length) notify(to, pname(S.me.id) + " is testing " + taskKey(t) + " " + t.title, "", "tasks", t.id); }
+  } catch (e) { fail(e, "Not done"); }
   devRefresh();
 }
 function devRefresh(){
   if (S.devOpen && dlg().open && S.dlg && S.dlg.id === S.devOpen) drawDevTask(S.devOpen);
-  if (["dev-board", "dev-backlog", "dev-reports", "tasks"].includes(S.route)) rerender();
+  if (["dev-board", "tasks"].includes(S.route)) rerender();
 }
 
-/* ---------- Create ---------- */
-function devCreate(preset){
-  preset = preset || {};
-  const type = h("select", { class: "in", id: "devNewType" }, DEV_TYPES.filter(x => x !== "Subtask").map(x => h("option", { value: x }, x)));
-  type.value = preset.type || "Feature";
+/* ---------- the board ---------- */
+async function renderDevBoard(el){
+  await ensure(["tasks", "profiles", "roles"]);
+  if (S.route !== "dev-board") return;
+  const u = S.ui.dev = S.ui.dev || {};
+  el.append(h("div", { class: "dv-top" },
+    h("div", {}, h("div", { class: "dv-crumb" }, "Spaces"), h("h1", { class: "dv-space" }, "Development & QA")),
+    access(MOD.tasks).canCreate ? h("button", { type: "button", class: "btn pri", id: "devCreate", onclick: () => devCreate() }, "+ Create") : null));
+  const people = activePeople().filter(p => p.vertical === "Development" || isTesterId(p.id) || devTasks().some(t => ownersOf(t).includes(p.id) && t.status !== "Done"));
+  const q = h("input", { class: "in dv-search", type: "search", placeholder: "Search board", value: u.q || "", id: "devSearch", "aria-label": "Search board" });
+  const body = h("div", {});
+  const draw = () => body.replaceChildren(devBoard(u));
+  q.addEventListener("input", () => { u.q = q.value; draw(); });
+  const chip = (k, label) => h("button", { type: "button", class: "dv-chip" + (u[k] ? " on" : ""), "aria-pressed": String(!!u[k]), onclick: () => { u[k] = !u[k]; rerender(); } }, label);
+  el.append(h("div", { class: "dv-toolbar" }, q,
+    h("div", { class: "dv-faces", role: "group", "aria-label": "Show one person’s work" }, people.slice(0, 12).map(p =>
+      h("button", { type: "button", class: "dv-face" + (u.who === p.id ? " on" : ""), title: p.full_name, "aria-pressed": String(u.who === p.id), onclick: () => { u.who = u.who === p.id ? "" : p.id; rerender(); } }, avatar(p.id, "sm")))),
+    chip("mine", "Only my work"), iAmTester() ? chip("needqa", "Needs a tester") : null), body);
+  draw();
+}
+function devBoard(u){
+  const s = (u.q || "").toLowerCase(), since = Date.now() - DONE_DAYS * 864e5;
+  const list = devTasks().filter(t => (t.status !== "Done" || +new Date(t.completed_at || t.updated_at || 0) >= since)
+    && (!s || (taskKey(t) + " " + t.title).toLowerCase().includes(s))
+    && (!u.who || ownersOf(t).includes(u.who) || t.tester_id === u.who)
+    && (!u.mine || isOwner(t) || t.tester_id === S.me.id)
+    && (!u.needqa || (t.status === "In review" && !t.tester_id)))
+    .sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")));
+  const board = h("div", { class: "dv-board" });
+  for (const [st, label] of FLOW){
+    const items = list.filter(t => t.status === st);
+    const col = h("section", { class: "dv-col", "aria-label": label, "data-status": st },
+      h("div", { class: "dv-colh" }, h("span", {}, label), h("span", { class: "dv-n" }, String(items.length)), st === "Done" ? h("span", { class: "muted", style: "font-weight:400" }, "last 2 weeks") : null),
+      h("div", { class: "dv-cards" }, items.slice(0, 200).map(devCard)));
+    if (st === "To do" && access(MOD.tasks).canCreate) col.append(inlineCreate());
+    col.addEventListener("dragover", e => { if (!devDrag) return; e.preventDefault(); col.classList.add("drop"); });
+    col.addEventListener("dragleave", e => { if (!col.contains(e.relatedTarget)) col.classList.remove("drop"); });
+    col.addEventListener("drop", e => { e.preventDefault(); col.classList.remove("drop"); const t = devDrag && byId("tasks", devDrag); devDrag = null; if (t && t.status !== st) dropTo(t, st); });
+    board.append(col);
+  }
+  return h("div", { class: "dv-boardwrap" }, board);
+}
+// dragging follows the same steps as the buttons
+function dropTo(t, st){
+  if (t.status === "To do" && st === "In progress") return flowStep(t, "start", null, "Started.");
+  if (t.status === "In progress" && st === "To do") return devSave(t, { status: "To do" }, "Moved to To Do.");
+  if (st === "In review") return flowStep(t, "to_qa", null, "Moved to QA.");
+  if (t.status === "In review" && st === "Done") return flowStep(t, "approve", null, "Approved. It’s done.");
+  if (t.status === "In review" && (st === "In progress" || st === "To do")) { S.devBack = t.id; openDevTask(t.id); return; }   // needs a reason
+  toast(st === "Done" ? "A task is finished when QA approves it. Move it to QA first." : "That step isn’t possible from here.");
+}
+let devDrag = null;
+function devCard(t){
+  const back = t.status === "In progress" && t.qa_state === "Failed";
+  const card = h("button", { type: "button", class: "dv-card", draggable: "true", "data-id": t.id, onclick: () => openDevTask(t.id) },
+    back ? h("span", { class: "dv-flag" }, "↩ Sent back by QA") : null,
+    t.blocked ? h("span", { class: "dv-flag" }, "⚑ Blocked") : null,
+    h("span", { class: "dv-title" }, t.title),
+    h("span", { class: "dv-foot" }, h("span", { class: "dv-key" }, taskKey(t)), h("span", { class: "grow" }),
+      t.status === "In review" ? (t.tester_id ? h("span", { class: "dv-qa", title: "Tester: " + pname(t.tester_id) }, "QA ", avatar(t.tester_id, "sm")) : h("span", { class: "dv-needqa" }, "Needs a tester")) : null,
+      ownersOf(t).length ? faces(ownersOf(t)) : noone()));
+  card.addEventListener("dragstart", e => { devDrag = t.id; card.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", t.id); });
+  card.addEventListener("dragend", () => { devDrag = null; card.classList.remove("dragging"); });
+  return card;
+}
+function inlineCreate(){
+  const btn = h("button", { type: "button", class: "dv-colnew", "aria-label": "Create" }, "+ Create");
+  btn.addEventListener("click", () => {
+    const inp = h("input", { class: "in dv-newin", placeholder: "What needs to be done?", maxlength: "200", "aria-label": "Title of the new task" });
+    const done = () => inp.replaceWith(btn);
+    inp.addEventListener("keydown", async e => {
+      if (e.key === "Escape") { done(); return; }
+      if (e.key !== "Enter" || !inp.value.trim()) return;
+      inp.disabled = true;
+      try { const t = await devInsert({ title: inp.value.trim() }); toast(taskKey(t) + " created."); rerender(); }
+      catch (err) { fail(err, "Not created"); inp.disabled = false; }
+    });
+    inp.addEventListener("blur", () => { if (!inp.value.trim()) done(); });
+    btn.replaceWith(inp); inp.focus();
+  });
+  return btn;
+}
+
+/* ---------- create ---------- */
+function devCreate(){
   const title = h("input", { class: "in", id: "devNewTitle", maxlength: "200", placeholder: "What needs to be done?" });
-  const epics = epicsList().filter(e => e.status !== "Done");
-  const epic = h("select", { class: "in", id: "devNewEpic" }, h("option", { value: "" }, "None"), epics.map(e => h("option", { value: e.id }, e.title)));
-  epic.value = preset.parent_id || "";
-  const epicWrap = h("label", { class: "fl" }, "Epic", epic);
-  const showEpic = () => { epicWrap.hidden = type.value === "Epic" || !epics.length; };
-  type.addEventListener("change", showEpic); showEpic();
+  const notes = h("textarea", { class: "in", id: "devNewNotes", rows: 4, placeholder: "Notes: what “done” looks like, links, steps…" });
+  const owners = ownersPicker([S.me.id]);
   const err = h("p", { class: "err", hidden: true });
   const go2 = h("button", { type: "button", class: "btn pri", id: "devNewGo" }, "Create");
   const submit = async () => {
     err.hidden = true;
-    if (!title.value.trim()) { err.textContent = "Write a short summary."; err.hidden = false; title.focus(); return; }
+    if (!title.value.trim()) { err.textContent = "Write a short title."; err.hidden = false; title.focus(); return; }
+    const ids = owners.value();
     go2.disabled = true;
-    try { const t = await devInsert({ type: type.value, title: title.value.trim(), parent_id: type.value === "Epic" ? null : (epic.value || null), sprint_id: preset.sprint_id || null });
-      closeDlg(); toast(taskKey(t) + " created."); rerender(); openDevTask(t.id); }
+    try { const t = await devInsert({ title: title.value.trim(), description: notes.value.trim(), assignee_id: ids[0] || null, collaborators: ids.slice(1) });
+      closeDlg(); toast(taskKey(t) + " created. Add a screenshot or file if you have one."); rerender(); openDevTask(t.id); }
     catch (e) { err.textContent = "Not created: " + friendly(e); err.hidden = false; }
     go2.disabled = false;
   };
   go2.addEventListener("click", submit); title.addEventListener("keydown", e => { if (e.key === "Enter") submit(); });
-  openDialog("Create", [h("div", { class: "form" }, h("label", { class: "fl" }, "Work type", type), epicWrap, h("label", { class: "fl full" }, "Summary", title)), err],
+  openDialog("Create task", [h("div", { class: "form" }, h("label", { class: "fl full" }, "Title", title), h("label", { class: "fl full" }, "Notes", notes), h("div", { class: "fl full" }, h("span", {}, "Owners"), owners.el)), err],
     [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), go2], true);
   setTimeout(() => title.focus(), 30);
+}
+// owners: chips with photos, plus "Add owner"
+function ownersPicker(start, onChange){
+  let ids = [...start];
+  const el = h("div", { class: "dv-owners" });
+  const draw = () => {
+    const free = activePeople().filter(p => !ids.includes(p.id));
+    const add = h("select", { class: "in dv-addowner", "aria-label": "Add an owner" }, h("option", { value: "" }, "+ Add owner"), free.map(p => h("option", { value: p.id }, p.full_name)));
+    add.addEventListener("change", () => { if (!add.value) return; ids.push(add.value); draw(); if (onChange) onChange(ids); });
+    el.replaceChildren(...ids.map(id => h("span", { class: "dv-ownerchip" }, avatar(id, "sm"), pname(id),
+      h("button", { type: "button", class: "iconbtn", "aria-label": "Remove " + pname(id), onclick: () => { ids = ids.filter(x => x !== id); draw(); if (onChange) onChange(ids); } }, "✕"))), add);
+  };
+  draw();
+  return { el, value: () => ids };
 }
 async function devInsert(over){
   const M = MOD.tasks, v = {};
   for (const f of M.fields) if (f.def !== undefined && !f.virtual) v[f.k] = typeof f.def === "function" ? f.def() : f.def;
-  Object.assign(v, { vertical: "Development", status: "To do", priority: v.priority || "Medium" }, over);
-  if (v.type === "Epic") { v.reviewer_id = null; v.parent_id = null; }
+  Object.assign(v, { vertical: "Development", status: "To do", type: v.type || "Feature", priority: v.priority || "Medium", assignee_id: S.me.id }, over);
   if (M.before) M.before(v, null);
   const t = await insertRow("tasks", v);
   if (M.after) M.after(t, null);
   return t;
 }
+const devCanEdit = (t, k) => access(MOD.tasks, t).canEdit && (!MOD.tasks.fieldEditable || MOD.tasks.fieldEditable({ k }, t));
+// a task's owners (and admins and task handlers) can change its title, notes and owners
+const canOwnerEdit = t => !t.archived && (isOwner(t) || isAdmin() || (typeof isTaskHandler === "function" && isTaskHandler("Development")));
+async function ownerEdit(t, patch, okMsg){
+  const M = MOD.tasks, prev = { ...t };
+  try {
+    const row = ok(await sb.rpc("task_edit", { p_task: t.id, p_title: patch.title ?? null, p_description: patch.description ?? null, p_owners: patch.owners ?? null }));
+    if (row) { upsertCache("tasks", row); Object.assign(t, row); if (M.after) { try { M.after(row, prev); } catch (e) {} } }
+    toast(okMsg || "Saved.");
+  } catch (e) { fail(e, "Not saved"); }
+  devRefresh();
+}
+async function devSave(t, patch, okMsg){
+  const M = MOD.tasks, prev = { ...t }, d = { ...patch };
+  if (M.before) M.before(d, prev);
+  try { const saved = await updateRow("tasks", t.id, d); Object.assign(t, saved); if (M.after) M.after(saved, prev); toast(okMsg || "Saved."); }
+  catch (e) { Object.assign(t, prev); fail(e, "Not saved"); }
+  devRefresh();
+}
 
-/* ---------- the work item view ---------- */
+/* ---------- the task popup ---------- */
 async function openDevTask(id){
-  await ensure(["tasks", "projects", "sprints", "releases", "profiles", "notes"]);
+  await ensure(["tasks", "profiles", "roles"]);
   if (!byId("tasks", id)) { try { const r = ok(await sb.from("tasks").select("*").eq("id", id).maybeSingle()); if (r) upsertCache("tasks", r); } catch (e) {} }
   const t = byId("tasks", id);
-  if (!t) { toast("That work item isn’t available any more."); return; }
+  if (!t) { toast("That task isn’t available any more."); return; }
   if (t.vertical !== "Development") { openRecord("tasks", id, null, { form: true }); return; }
-  if (S.devOpen !== id) { S.devTab = "comments"; S.devMoreOpen = false; }
+  if (S.devOpen !== id) S.devTab = "comments";
   S.devOpen = id;
   drawDevTask(id);
-  loadWorkLogs(id).then(() => { if (S.devOpen === id && dlg().open) drawDevTask(id); });
 }
-const WORKLOGS = {};
-async function loadWorkLogs(id){ try { WORKLOGS[id] = ok(await sb.from("work_logs").select("*").eq("task_id", id).order("work_date", { ascending: false })) || []; } catch (e) { WORKLOGS[id] = WORKLOGS[id] || []; } }
-const loggedMin = id => (WORKLOGS[id] || []).reduce((s, w) => s + (+w.minutes || 0), 0);
-
 function drawDevTask(id){
   const t = byId("tasks", id); if (!t) return;
   const M = MOD.tasks, A = access(M, t);
-  const keepScroll = dlg().open ? (dlg().querySelector(".db") || {}).scrollTop : 0;
-  const parent = t.parent_id ? byId("tasks", t.parent_id) : null;
-  const all = M.actions ? (M.actions(t, A) || []) : [];
-  const buttons = all.flatMap(n => n && n.tagName === "BUTTON" ? [n] : (n && n.querySelectorAll ? [...n.querySelectorAll("button")] : []));
-  const menuWords = /^(Archive|Restore|Copy ID|Duplicate)$/;
-  const topBtns = buttons.filter(b => !menuWords.test(b.textContent.trim()));
-  const menuBtns = buttons.filter(b => menuWords.test(b.textContent.trim()));
-  // Delete, for people allowed to (same rules and confirmation as the full form)
-  if (A.canDelete) menuBtns.push(h("button", { type: "button", id: "devDelete", style: "color:var(--bad)", onclick: async () => {
-    if (!confirm(M.deleteConfirm ? M.deleteConfirm(t) : "Delete this task? This can’t be undone.")) return;
-    if (M.beforeDelete) { try { await M.beforeDelete(t); } catch (e) { console.warn(e); } }
-    try { await deleteRow(M.table, t.id); S.devOpen = null; closeDlg(); toast("Deleted."); rerender(); } catch (e) { fail(e, "Couldn’t delete"); }
-  } }, "Delete"));
-
-  const left = h("div", { class: "dv-left" },
-    devTitle(t), devDescription(t), t.type === "Bug" ? devBugBlock(t) : null,
-    t.type === "Epic" ? devEpicWork(t) : null,
-    t.type !== "Epic" && t.type !== "Subtask" ? devSubtasks(t) : null,
-    devLinked(t),
-    (t.checklist || []).length || S.devChecklist === t.id ? checklistSection(t, A.canEdit) : null,
-    h("div", { class: "dv-sec dv-files" }, filesSection("tasks", t.id, A.canEdit || A.L >= 1 || isMine(t))),
+  const keep = dlg().open ? (dlg().querySelector(".db") || {}).scrollTop : 0;
+  const left = h("div", { class: "dv-left" }, devNotes(t),
+    h("div", { class: "dv-sec dv-files" }, filesSection("tasks", t.id, A.canEdit || A.L >= 1 || isOwner(t) || t.tester_id === S.me.id)),
     devActivity(t));
-
-  const status = h("select", { class: "dv-statusbtn s-" + String(t.status).replace(/\s+/g, "-").toLowerCase(), id: "devStatus", disabled: !devCanEdit(t, "status"), "aria-label": "Status" }, TASK_STATUS.map(s => h("option", { value: s }, COL_LABEL[s] || s)));
-  status.value = t.status; status.addEventListener("change", () => devSave(t, { status: status.value }, "Status: " + COL_LABEL[status.value] + "."));
-  const right = h("div", { class: "dv-right" },
-    h("div", { class: "dv-statusrow" }, status, topBtns.map(b => { b.className = "btn sm"; return b; })),
-    !A.canEdit ? h("p", { class: "dv-note" }, "View only. You can comment and attach files.") : null,
-    devDetails(t), devMoreFields(t),
-    h("div", { class: "dv-stamp" }, h("span", {}, "Created " + fmtAgo(t.created_at)), t.updated_at ? h("span", {}, "Updated " + fmtAgo(t.updated_at)) : null,
-      h("button", { type: "button", class: "linkbtn", id: "devMore", onclick: () => openRecord("tasks", t.id, null, { form: true }) }, "Open full form")));
-
-  openDialog("", [h("div", { class: "dv-view" }, left, right)], null);
+  const right = h("div", { class: "dv-right" }, flowBox(t), devPeople(t),
+    h("div", { class: "dv-stamp" }, h("span", {}, "Created " + fmtAgo(t.created_at) + (t.created_by ? " by " + pname(t.created_by) : "")), t.updated_at ? h("span", {}, "Updated " + fmtAgo(t.updated_at)) : null,
+      isAdmin() ? h("button", { type: "button", class: "linkbtn", id: "devMore", onclick: () => openRecord("tasks", t.id, null, { form: true }) }, "All fields (admin)") : null));
+  openDialog("", [devTitle(t), h("div", { class: "dv-view" }, left, right)], null);
   const d = dlg(); d.classList.add("dv-wide");
-  // header like Jira: epic / key on the left, a ••• menu next to close
-  const crumbs = h("div", { class: "dv-crumbs" },
-    t.type === "Subtask" && parent ? h("button", { type: "button", class: "linkbtn", onclick: () => openDevTask(parent.id) }, typeIcon(parent.type), " " + taskKey(parent)) :
-    t.type === "Epic" ? null : parent ? h("button", { type: "button", class: "linkbtn dv-epiclink", onclick: () => openDevTask(parent.id) }, typeIcon("Epic"), " " + parent.title) :
-      devCanEdit(t, "parent_id") ? h("button", { type: "button", class: "linkbtn muted", id: "devAddEpic", onclick: () => { const el = document.getElementById("dv-val-parent_id"); if (el) el.click(); } }, "✎ Add epic") : null,
-    t.type === "Epic" || !(parent || devCanEdit(t, "parent_id")) ? null : h("span", { class: "muted" }, "/"), typeIcon(t.type), h("span", { class: "dv-key" }, taskKey(t)), t.archived ? h("span", { class: "pill bad" }, "Archived") : null);
-  const dh = d.querySelector(".dh"); const h2 = dh && dh.querySelector("h2");
-  if (h2) h2.replaceWith(crumbs);
-  if (dh && menuBtns.length){
-    const menu = h("div", { class: "dv-menu", hidden: true }, menuBtns.map(b => { b.className = "dv-menuitem"; b.addEventListener("click", () => { menu.hidden = true; }); return b; }));
+  const crumbs = h("div", { class: "dv-crumbs" }, h("span", { class: "dv-key" }, taskKey(t)), flowLoz(t.status));
+  const dh = d.querySelector(".dh"), h2 = dh && dh.querySelector("h2"); if (h2) h2.replaceWith(crumbs);
+  const items = [];
+  if (A.canDelete) items.push(h("button", { type: "button", class: "dv-menuitem", id: "devDelete", style: "color:var(--bad)", onclick: async () => {
+    if (!confirm("Delete this task? This can’t be undone.")) return;
+    try { await deleteRow("tasks", t.id); S.devOpen = null; closeDlg(); toast("Deleted."); rerender(); } catch (e) { fail(e, "Couldn’t delete"); } } }, "Delete"));
+  if (devCanEdit(t, "archived")) items.unshift(h("button", { type: "button", class: "dv-menuitem", onclick: () => devSave(t, { archived: !t.archived }, t.archived ? "Restored." : "Archived.") }, t.archived ? "Restore" : "Archive"));
+  if (dh && items.length) {
+    const menu = h("div", { class: "dv-menu", hidden: true }, items);
     const mb = h("button", { type: "button", class: "iconbtn", "aria-label": "More actions", id: "devMenuBtn", onclick: e => { e.stopPropagation(); menu.hidden = !menu.hidden; } }, "•••");
     dh.insertBefore(h("div", { class: "dv-menuwrap" }, mb, menu), dh.lastChild);
   }
   S.dlg = { tbl: "tasks", id: t.id };
-  const db = d.querySelector(".db"); if (db && keepScroll) db.scrollTop = keepScroll;
+  const db = d.querySelector(".db"); if (db && keep) db.scrollTop = keep;
+  if (S.devBack === t.id) { S.devBack = null; const b = document.getElementById("devBackBtn"); if (b) b.click(); }
 }
-// a value you click to change (Jira's Details panel)
-function editRow(t, k, label, shown, editor){
-  const can = devCanEdit(t, k);
-  const val = h("div", { class: "dv-val" + (can ? " edit" : ""), id: "dv-val-" + k, tabindex: can ? "0" : null, role: can ? "button" : null, "aria-label": can ? "Change " + label : null }, shown);
-  if (can){
-    const open = () => { const ed = editor(() => drawDevTask(t.id)); val.replaceChildren(ed); val.classList.add("editing"); val.onclick = null; const f = ed.matches("input,select,textarea") ? ed : ed.querySelector("input,select,textarea"); if (f) { f.focus(); if (f.showPicker && f.tagName === "SELECT") { try { f.showPicker(); } catch (e) {} } } };
-    val.onclick = open; val.addEventListener("keydown", e => { if (e.key === "Enter" && !val.classList.contains("editing")) open(); });
+// where the task is, and the one or two buttons for the next step
+function flowBox(t){
+  const owner = isOwner(t) || isAdmin(), tester = t.tester_id === S.me.id || isAdmin(), box = h("div", { class: "dv-flow" });
+  const btn = (label, cls, id, fn) => h("button", { type: "button", class: "btn " + cls, id, onclick: fn }, label);
+  const steps = h("div", { class: "dv-steps" }, FLOW.map(([st, label]) => h("span", { class: "dv-step" + (st === t.status ? " on" : "") + (FLOW.findIndex(x => x[0] === st) < FLOW.findIndex(x => x[0] === t.status) ? " past" : "") }, label)));
+  box.append(steps);
+  const row = h("div", { class: "dv-flowbtns" });
+  let note = "";
+  if (t.status === "To do") {
+    if (owner) row.append(btn("Start", "pri", "devStart", () => flowStep(t, "start", null, "Started.")), btn("Move to QA", "", "devToQA", () => flowStep(t, "to_qa", null, "Moved to QA.")));
+    else note = "Waiting for " + (ownersOf(t).map(pname).join(", ") || "an owner") + " to start.";
+  } else if (t.status === "In progress") {
+    if (t.qa_state === "Failed") box.append(h("p", { class: "dv-backnote" }, "↩ Sent back by QA. See the reason in Comments."));
+    if (owner) row.append(btn("Move to QA", "pri", "devToQA", () => flowStep(t, "to_qa", null, "Moved to QA.")));
+    else note = "Being built by " + (ownersOf(t).map(pname).join(", ") || "its owners") + ".";
+  } else if (t.status === "In review") {
+    if (!t.tester_id) {
+      note = "Waiting for a tester.";
+      if (iAmTester()) row.append(btn("Pick up", "pri", "devPickUp", () => flowStep(t, "pick_up", null, "It’s yours to test.")));
+    } else if (tester) {
+      row.append(btn("✓ Approve", "pri", "devApprove", () => flowStep(t, "approve", null, "Approved. It’s done.")),
+        btn("Back to development", "", "devBackBtn", () => {
+          const ta = h("textarea", { class: "in", id: "devBackReason", rows: 3, placeholder: "What needs fixing? (the developers see this)" });
+          const err = h("p", { class: "err", hidden: true });
+          const send = btn("Send back", "pri", "devBackSend", () => { if (ta.value.trim().length < 3) { err.textContent = "Write a short reason, so the developer knows what to fix."; err.hidden = false; ta.focus(); return; } flowStep(t, "back", { p_reason: ta.value.trim() }, "Sent back to development."); });
+          row.replaceWith(h("div", { class: "dv-backbox" }, h("b", {}, "Why is it going back?"), ta, err, h("div", { class: "dv-flowbtns" }, send, btn("Cancel", "ghost", "", () => drawDevTask(t.id)))));
+          setTimeout(() => ta.focus(), 30);
+        }));
+    } else note = "With " + pname(t.tester_id) + " for testing.";
+  } else if (t.status === "Done") {
+    note = "Approved" + (t.tester_id ? " by " + pname(t.tester_id) : "") + (t.completed_at ? " " + fmtAgo(t.completed_at) : "") + ".";
   }
-  return h("div", { class: "dv-drow" }, h("span", { class: "dv-dl" }, label), val);
+  if (row.children.length) box.append(row);
+  if (note) box.append(h("p", { class: "dv-note" }, note));
+  return box;
 }
-const placeholder = text => h("span", { class: "dv-ph" }, text);
-function selEditor(t, k, options, none, msg){
-  return cancel => {
-    const s = h("select", { class: "in dv-in" }, none !== null ? h("option", { value: "" }, none) : null, options.map(([v, l]) => h("option", { value: v }, l)));
-    s.value = t[k] || "";
-    s.addEventListener("change", () => devSave(t, { [k]: s.value || null }, msg));
-    s.addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== s && s.isConnected) cancel(); }, 150));
-    s.addEventListener("keydown", e => { if (e.key === "Escape") cancel(); });
-    return s;
-  };
-}
-function inputEditor(t, k, type, conv, msg, ph){
-  return cancel => {
-    const i = h("input", { class: "in dv-in", type, value: t[k] == null ? "" : (Array.isArray(t[k]) ? t[k].join(", ") : String(t[k])), placeholder: ph || "", min: type === "number" ? "0" : null });
-    let saved = false;
-    const save = () => { if (saved) return; const v = conv ? conv(i.value) : (i.value || null); if (v === undefined) { toast("That value doesn’t look right."); cancel(); return; } saved = true;
-      if (JSON.stringify(v) === JSON.stringify(t[k] == null ? null : t[k])) { cancel(); return; } devSave(t, { [k]: v }, msg); };
-    i.addEventListener("keydown", e => { if (e.key === "Enter") save(); if (e.key === "Escape") { saved = true; cancel(); } });
-    i.addEventListener("blur", save);
-    if (type === "date") i.addEventListener("change", save);
-    return i;
-  };
-}
-function devDetails(t){
-  const people = activePeople().map(p => [p.id, p.full_name]);
-  const name = id => id ? h("span", { class: "dv-two" }, avatar(id, "sm"), pname(id)) : null;
-  const sp = t.sprint_id ? byId("sprints", t.sprint_id) : null;
-  const sprints = rows("sprints").filter(s => s.status !== "Completed" || s.id === t.sprint_id).map(s => [s.id, s.name + (s.status === "Active" ? " (active)" : "")]);
-  const epics = epicsList().filter(e => e.status !== "Done" || e.id === t.parent_id).map(e => [e.id, e.title]);
-  const parent = t.parent_id ? byId("tasks", t.parent_id) : null;
-  const est = +t.estimate_hours ? Math.round(+t.estimate_hours * 60) : 0, logged = loggedMin(t.id);
-  const C = S.ui.devDetails = S.ui.devDetails || { open: true };
-  const rowsEl = !C.open ? null : h("div", {},
-    editRow(t, "assignee_id", "Assignee", h("div", { class: "dv-stackcol" }, name(t.assignee_id) || h("span", { class: "dv-two" }, noone(), "Unassigned"),
-      devCanEdit(t, "assignee_id") && t.assignee_id !== S.me.id ? h("button", { type: "button", class: "linkbtn dv-assignme", id: "devAssignMe", onclick: e => { e.stopPropagation(); devSave(t, { assignee_id: S.me.id }, "Assigned to you."); } }, "Assign to me") : null),
-      selEditor(t, "assignee_id", people, "Unassigned", "Assignee saved.")),
-    t.type === "Epic" ? null : t.type === "Subtask"
-      ? h("div", { class: "dv-drow" }, h("span", { class: "dv-dl" }, "Parent"), h("div", { class: "dv-val" }, parent ? h("button", { type: "button", class: "linkbtn", onclick: () => openDevTask(parent.id) }, taskKey(parent) + " " + parent.title) : placeholder("None")))
-      : editRow(t, "parent_id", "Parent", parent ? h("span", { class: "dv-epic" }, parent.title) : placeholder("Add parent"), selEditor(t, "parent_id", epics, "None", "Parent saved.")),
-    editRow(t, "sprint_id", "Sprint", sp ? h("span", { class: "dv-link" }, sp.name) : placeholder("None"), selEditor(t, "sprint_id", sprints, "None (backlog)", "Sprint saved.")),
-    editRow(t, "priority", "Priority", t.priority ? h("span", { class: "dv-two" }, h("span", { class: "dv-prio p-" + t.priority.toLowerCase() }, t.priority === "Critical" ? "⇈" : t.priority === "High" ? "↑" : t.priority === "Low" ? "↓" : "="), t.priority) : placeholder("None"),
-      selEditor(t, "priority", PRIORITY.map(x => [x, x]), null, "Priority saved.")),
-    editRow(t, "labels", "Labels", (t.labels || []).length ? h("span", { class: "dv-labels" }, t.labels.map(x => h("span", { class: "dv-label" }, x))) : placeholder("Add labels"),
-      inputEditor(t, "labels", "text", v => [...new Set(v.split(",").map(x => x.trim()).filter(Boolean))], "Labels saved.", "Comma separated, e.g. android, api")),
-    editRow(t, "due_date", "Due date", t.due_date ? h("span", { class: t.status !== "Done" && t.due_date < today() ? "dv-late" : "" }, fmtDate(t.due_date)) : placeholder("Add date"), inputEditor(t, "due_date", "date", null, "Due date saved.")),
-    editRow(t, "start_date", "Start date", t.start_date ? fmtDate(t.start_date) : placeholder("Add date"), inputEditor(t, "start_date", "date", null, "Start date saved.")),
-    editRow(t, "story_points", "Story point estimate", t.story_points != null ? String(t.story_points) : placeholder("Add story points"),
-      inputEditor(t, "story_points", "number", v => v === "" ? null : (/^\d+$/.test(v) ? +v : undefined), "Story points saved.")),
-    h("div", { class: "dv-drow" }, h("span", { class: "dv-dl" }, "Time tracking"), h("div", { class: "dv-val edit", role: "button", tabindex: "0", id: "devTimeLink", onclick: () => { S.devTab = "worklog"; drawDevTask(t.id); setTimeout(() => { const x = document.getElementById("wlHours"); if (x) x.focus(); }, 50); } },
-      logged || est ? h("div", { class: "dv-time" }, h("span", { class: "dv-bar" + (est && logged > est ? " over" : "") }, h("span", { style: "width:" + (est ? Math.min(100, Math.round(logged / est * 100)) : 100) + "%" })),
-        h("span", { class: "muted" }, (logged ? hoursText(logged) + " logged" : "No time logged") + (est ? " · " + hoursText(Math.max(0, est - logged)) + " remaining" : ""))) : placeholder("No time logged"))),
-    h("div", { class: "dv-drow" }, h("span", { class: "dv-dl" }, "Reporter"), h("div", { class: "dv-val" }, name(t.created_by) || placeholder("None"))));
-  return h("div", { class: "dv-details" }, h("button", { type: "button", class: "dv-dh", "aria-expanded": String(C.open), onclick: () => { C.open = !C.open; drawDevTask(t.id); } }, h("span", {}, C.open ? "▾" : "▸"), " Details"), rowsEl);
-}
-function devMoreFields(t){
-  const people = activePeople().map(p => [p.id, p.full_name]);
-  const name = id => id ? h("span", { class: "dv-two" }, avatar(id, "sm"), pname(id)) : null;
-  const open = !!S.devMoreOpen;
-  const body = !open ? null : h("div", {},
-    editRow(t, "type", "Work type", h("span", { class: "dv-two" }, typeIcon(t.type), t.type), selEditor(t, "type", DEV_TYPES.filter(x => x === t.type || (t.type !== "Subtask" && x !== "Subtask")).map(x => [x, x]), null, "Work type saved.")),
-    t.type !== "Epic" ? editRow(t, "tester_id", "Tester", name(t.tester_id) || placeholder("Feature’s tester or QA lead"), selEditor(t, "tester_id", people, "Feature’s tester or QA lead", "Tester saved.")) : null,
-    t.type !== "Epic" ? editRow(t, "reviewer_id", "Reviewer", name(t.reviewer_id) || placeholder("No review needed"), selEditor(t, "reviewer_id", people, "No review needed", "Reviewer saved.")) : null,
-    editRow(t, "project_id", "Project", t.project_id ? refLabel("projects", t.project_id) : placeholder("None"), selEditor(t, "project_id", rows("projects").map(p => [p.id, p.name]), "None", "Project saved.")),
-    editRow(t, "estimate_hours", "Original estimate", +t.estimate_hours ? hoursText(Math.round(+t.estimate_hours * 60)) : placeholder("Add estimate"),
-      inputEditor(t, "estimate_hours", "text", v => { if (!v.trim()) return null; const m = parseHours(v); return isNaN(m) ? undefined : Math.round(m / 6) / 10; }, "Estimate saved.", "e.g. 4h or 1h 30m")),
-    codeSection(t) ? h("div", { class: "dv-code" }, codeSection(t)) : null);
-  return h("div", { class: "dv-details" }, h("button", { type: "button", class: "dv-dh", id: "devMoreFields", "aria-expanded": String(open), onclick: () => { S.devMoreOpen = !open; drawDevTask(t.id); } }, h("span", {}, open ? "▾" : "▸"), " More fields"), body);
+function devPeople(t){
+  const canOwners = canOwnerEdit(t);
+  const ownersEl = canOwners ? ownersPicker(ownersOf(t), ids => ownerEdit(t, { owners: ids }, "Owners saved.")).el
+    : h("div", { class: "dv-owners" }, ownersOf(t).length ? ownersOf(t).map(id => h("span", { class: "dv-ownerchip" }, avatar(id, "sm"), pname(id))) : h("span", { class: "dv-ph" }, "No owners yet"));
+  const canTester = (isOwner(t) || isAdmin()) && t.status !== "Done";
+  let testerEl;
+  if (canTester) {
+    testerEl = h("select", { class: "in dv-in", id: "devTester", "aria-label": "Tester" }, h("option", { value: "" }, t.status === "In review" ? "No one yet (any tester can pick it up)" : "Choose later"), testers().map(p => h("option", { value: p.id }, p.full_name)));
+    testerEl.value = t.tester_id || "";
+    testerEl.addEventListener("change", () => flowStep(t, "set_tester", { p_user: testerEl.value || null }, testerEl.value ? "Tester: " + pname(testerEl.value) + "." : "Tester removed."));
+  } else testerEl = t.tester_id ? h("span", { class: "dv-ownerchip" }, avatar(t.tester_id, "sm"), pname(t.tester_id)) : h("span", { class: "dv-ph" }, "No tester yet");
+  return h("div", { class: "dv-details" }, h("div", { class: "dv-dh static" }, "People"),
+    h("div", {}, h("div", { class: "dv-drow" }, h("span", { class: "dv-dl" }, "Owners"), ownersEl),
+      h("div", { class: "dv-drow" }, h("span", { class: "dv-dl" }, "Tester (QA)"), testerEl),
+      h("div", { class: "dv-drow" }, h("span", { class: "dv-dl" }, "Reporter"), t.created_by ? h("span", { class: "dv-ownerchip" }, avatar(t.created_by, "sm"), pname(t.created_by)) : h("span", { class: "dv-ph" }, "–"))));
 }
 function devTitle(t){
-  const can = devCanEdit(t, "title");
+  const can = canOwnerEdit(t);
   const el = h("h1", { class: "dv-h" + (can ? " edit" : ""), tabindex: can ? "0" : null, id: "devTitle" }, t.title);
   if (!can) return el;
   const start = () => {
-    const inp = h("input", { class: "in dv-hin", value: t.title, maxlength: "200", "aria-label": "Summary" });
-    let doneOnce = false;
-    const done = save => { if (doneOnce) return; doneOnce = true; if (save && inp.value.trim() && inp.value.trim() !== t.title) devSave(t, { title: inp.value.trim() }, "Saved."); else drawDevTask(t.id); };
+    const inp = h("input", { class: "in dv-hin", value: t.title, maxlength: "200", "aria-label": "Title" });
+    let once = false;
+    const done = save => { if (once) return; once = true; if (save && inp.value.trim() && inp.value.trim() !== t.title) ownerEdit(t, { title: inp.value.trim() }, "Saved."); else drawDevTask(t.id); };
     inp.addEventListener("keydown", e => { if (e.key === "Enter") done(true); if (e.key === "Escape") done(false); });
     inp.addEventListener("blur", () => done(true));
     el.replaceWith(inp); inp.focus(); inp.select();
@@ -8395,117 +8209,32 @@ function devTitle(t){
   el.addEventListener("click", start); el.addEventListener("keydown", e => { if (e.key === "Enter") start(); });
   return el;
 }
-function devDescription(t){
-  const can = devCanEdit(t, "description");
+function devNotes(t){
+  const can = canOwnerEdit(t);
   const shown = t.description ? h("div", { class: "dv-desc" + (can ? " edit" : ""), id: "devDesc" }, renderRich(t.description))
-    : h("div", { class: "dv-desc empty" + (can ? " edit" : ""), id: "devDesc" }, can ? "Add a description…" : "No description.");
-  const box = h("div", { class: "dv-sec" }, h("div", { class: "dv-sect" }, h("b", {}, "Description")), shown);
+    : h("div", { class: "dv-desc empty" + (can ? " edit" : ""), id: "devDesc" }, can ? "Add notes…" : "No notes.");
+  const box = h("div", { class: "dv-sec" }, h("div", { class: "dv-sect" }, h("b", {}, "Notes")), shown);
   if (can) shown.addEventListener("click", e => {
     if (e.target.closest("a")) return;
     const ta = h("textarea", { class: "in", rows: 7, id: "devDescIn" }); ta.value = t.description || "";
     attachMentions(ta, { tbl: "tasks", rec: t });
-    box.replaceChildren(h("div", { class: "dv-sect" }, h("b", {}, "Description")), ta,
-      h("div", { class: "dv-btns" }, h("button", { type: "button", class: "btn pri sm", id: "devDescSave", onclick: () => devSave(t, { description: ta.value }, "Saved.") }, "Save"),
+    box.replaceChildren(h("div", { class: "dv-sect" }, h("b", {}, "Notes")), ta,
+      h("div", { class: "dv-btns" }, h("button", { type: "button", class: "btn pri sm", id: "devDescSave", onclick: () => ownerEdit(t, { description: ta.value }, "Saved.") }, "Save"),
         h("button", { type: "button", class: "btn ghost sm", onclick: () => drawDevTask(t.id) }, "Cancel")));
     ta.focus();
   });
   return box;
 }
-function devBugBlock(t){
-  const parts = [["Steps to reproduce", t.steps], ["Expected result", t.expected_result], ["Actual result", t.actual_result], ["Found in", [t.environment, t.device, t.build_version].filter(Boolean).join(" · ")]].filter(x => x[1]);
-  if (!parts.length) return null;
-  return h("div", { class: "dv-sec" }, h("div", { class: "dv-sect" }, h("b", {}, "Bug report"), t.severity ? pill(t.severity, t.severity === "Blocker" ? "bad" : "warn") : null),
-    parts.map(([l, v]) => h("div", { class: "dv-bugrow" }, h("span", { class: "muted" }, l), h("span", { style: "white-space:pre-wrap" }, v))));
-}
-function childRow(k){
-  return h("div", { class: "dv-crow", tabindex: "0", role: "button", onclick: () => openDevTask(k.id), onkeydown: e => { if (e.key === "Enter") openDevTask(k.id); } },
-    typeIcon(k.type), h("span", { class: "dv-key" }, taskKey(k)), h("span", { class: "dv-rt" + (k.status === "Done" ? " done" : "") }, k.title), h("span", { class: "grow" }), pointsChip(k), who(k.assignee_id), lozenge(k.status));
-}
-function addLine(label, id, onEnter){
-  const btn = h("button", { type: "button", class: "dv-addline", id: id + "Btn" }, label);
-  btn.addEventListener("click", () => {
-    const inp = h("input", { class: "in", id, maxlength: "200", placeholder: "What needs to be done?" });
-    inp.addEventListener("keydown", async e => { if (e.key === "Escape") { inp.replaceWith(btn); return; } if (e.key !== "Enter" || !inp.value.trim()) return; inp.disabled = true; try { await onEnter(inp.value.trim()); } catch (err) { fail(err, "Not added"); inp.disabled = false; } });
-    inp.addEventListener("blur", () => { if (!inp.value.trim()) inp.replaceWith(btn); });
-    btn.replaceWith(inp); inp.focus();
-  });
-  return btn;
-}
-function devSubtasks(t){
-  const kids = childrenOf(t.id).filter(x => x.type === "Subtask");
-  const done = kids.filter(x => x.status === "Done").length;
-  const canAdd = access(MOD.tasks).canCreate && !t.archived;
-  return h("div", { class: "dv-sec" }, h("div", { class: "dv-sect" }, h("b", {}, "Subtasks"), kids.length ? h("span", { class: "dv-bar small" }, h("span", { style: "width:" + Math.round(done / kids.length * 100) + "%" })) : null, kids.length ? h("span", { class: "muted" }, done + " of " + kids.length + " done") : null),
-    kids.length ? h("div", { class: "dv-clist" }, kids.map(childRow)) : null,
-    canAdd ? addLine("Add subtask", "devAddSub", async title => { await devInsert({ type: "Subtask", title, parent_id: t.id, project_id: t.project_id || null, sprint_id: t.sprint_id || null, assignee_id: t.assignee_id || S.me.id, priority: t.priority || "Medium", tester_id: t.tester_id || null }); toast("Subtask added."); devRefresh(); })
-      : (!kids.length ? h("p", { class: "dv-ph" }, "No subtasks.") : null));
-}
-function devEpicWork(t){
-  const kids = childrenOf(t.id), done = kids.filter(x => x.status === "Done").length;
-  return h("div", { class: "dv-sec" }, h("div", { class: "dv-sect" }, h("b", {}, "Child work items"), kids.length ? h("span", { class: "dv-bar small" }, h("span", { style: "width:" + Math.round(done / kids.length * 100) + "%" })) : null, kids.length ? h("span", { class: "muted" }, done + " of " + kids.length + " done") : null),
-    kids.length ? h("div", { class: "dv-clist" }, kids.sort(sortByPrioDue).map(childRow)) : null,
-    access(MOD.tasks).canCreate ? addLine("Add child work item", "devAddChild", async title => { await devInsert({ type: "Feature", title, parent_id: t.id, project_id: t.project_id || null }); toast("Added to this epic."); devRefresh(); }) : null);
-}
-// Jira's "Linked work items": the tasks this one waits on
-function devLinked(t){
-  const ids = t.blocked_by || [];
-  const linked = ids.map(id => byId("tasks", id)).filter(Boolean);
-  const can = devCanEdit(t, "blocked_by");
-  const cands = devTasks().filter(x => x.id !== t.id && x.type !== "Epic" && x.status !== "Done" && !ids.includes(x.id));
-  let adder = null;
-  if (can && cands.length){
-    adder = h("button", { type: "button", class: "dv-addline", id: "devAddLinkBtn" }, "Add linked work item");
-    adder.addEventListener("click", () => {
-      const s = h("select", { class: "in", id: "devAddLink", "aria-label": "Work item this one is blocked by" }, h("option", { value: "" }, "Is blocked by…"), cands.sort(sortByPrioDue).map(x => h("option", { value: x.id }, taskKey(x) + " " + x.title)));
-      s.addEventListener("change", () => { if (s.value) devSave(t, { blocked_by: [...ids, s.value] }, "Linked."); });
-      s.addEventListener("blur", () => setTimeout(() => { if (s.isConnected && !s.value) s.replaceWith(adder); }, 150));
-      adder.replaceWith(s); s.focus();
-    });
-  }
-  return h("div", { class: "dv-sec" }, h("div", { class: "dv-sect" }, h("b", {}, "Linked work items")),
-    linked.length ? h("div", {}, h("p", { class: "dv-sub" }, "is blocked by"), h("div", { class: "dv-clist" }, linked.map(k => { const r = childRow(k);
-      if (can) r.append(h("button", { type: "button", class: "iconbtn", "aria-label": "Remove link to " + taskKey(k), onclick: e => { e.stopPropagation(); devSave(t, { blocked_by: ids.filter(x => x !== k.id) }, "Link removed."); } }, "✕"));
-      return r; }))) : null,
-    adder || (!linked.length ? h("p", { class: "dv-ph" }, "None.") : null));
-}
 function devActivity(t){
-  const tabs = [["all", "All"], ["comments", "Comments"], ["history", "History"], ["worklog", "Work log"]];
   const tab = S.devTab || "comments";
-  const pane = h("div", { class: "dv-pane" });
-  if (tab === "all") pane.append(commentsSection("tasks", t.id), historySection(t));
-  else if (tab === "comments") pane.append(commentsSection("tasks", t.id));
-  else if (tab === "history") pane.append(historySection(t), linkedNotesSection("task_id", t));
-  else pane.append(workLogSection(t));
+  const pane = h("div", { class: "dv-pane" }, tab === "history" ? historySection(t) : commentsSection("tasks", t.id));
   return h("div", { class: "dv-sec" }, h("div", { class: "dv-sect" }, h("b", {}, "Activity")),
-    h("div", { class: "dv-tabs", role: "tablist" }, tabs.map(([k, l]) => h("button", { type: "button", role: "tab", "aria-selected": String(tab === k), class: tab === k ? "on" : "", onclick: () => { S.devTab = k; drawDevTask(t.id); } }, l))), pane);
+    h("div", { class: "dv-tabs", role: "tablist" }, [["comments", "Comments"], ["history", "History"]].map(([k, l]) =>
+      h("button", { type: "button", role: "tab", "aria-selected": String(tab === k), class: tab === k ? "on" : "", onclick: () => { S.devTab = k; drawDevTask(t.id); } }, l))), pane);
 }
-function workLogSection(t){
-  const logs = WORKLOGS[t.id] || [];
-  const hours = h("input", { class: "in", id: "wlHours", placeholder: "Time spent, e.g. 1h 30m", style: "max-width:190px", "aria-label": "Time spent" });
-  const day = h("input", { class: "in", type: "date", id: "wlDate", value: today(), max: today(), style: "max-width:160px", "aria-label": "Date" });
-  const note = h("input", { class: "in", id: "wlNote", maxlength: "500", placeholder: "What did you work on?", "aria-label": "Work description" });
-  const err = h("p", { class: "err", hidden: true });
-  const add = h("button", { type: "button", class: "btn pri sm", id: "wlAdd" }, "Log work");
-  add.addEventListener("click", async () => {
-    err.hidden = true;
-    const min = parseHours(hours.value);
-    if (!min || isNaN(min) || min < 1) { err.textContent = "Enter the time spent, like 45m, 2h or 1h 30m."; err.hidden = false; hours.focus(); return; }
-    if (min > 1440) { err.textContent = "That’s more than a day. Log each day separately."; err.hidden = false; return; }
-    if (day.value > today()) { err.textContent = "You can’t log work for a future day."; err.hidden = false; return; }
-    add.disabled = true;
-    try { ok(await sb.from("work_logs").insert({ task_id: t.id, user_id: S.me.id, minutes: min, work_date: day.value || today(), note: note.value.trim() })); await loadWorkLogs(t.id); toast(hoursText(min) + " logged."); drawDevTask(t.id); }
-    catch (e) { err.textContent = "Not logged: " + friendly(e); err.hidden = false; add.disabled = false; }
-  });
-  hours.addEventListener("keydown", e => { if (e.key === "Enter") add.click(); });
-  return h("div", {}, h("div", { class: "dv-wlform" }, hours, day, note, add), err,
-    logs.length ? h("div", { class: "dv-wlist" }, logs.map(w => h("div", { class: "dv-wl" }, avatar(w.user_id, "sm"),
-      h("div", { style: "flex:1;min-width:0" }, h("div", {}, h("b", {}, pname(w.user_id)), " logged ", h("b", {}, hoursText(w.minutes)), h("span", { class: "muted" }, " · " + fmtDate(w.work_date))), w.note ? h("div", { class: "muted" }, w.note) : null),
-      (w.user_id === S.me.id || isAdmin()) ? h("button", { type: "button", class: "linkbtn", onclick: async () => {
-        if (!confirm("Delete this work log entry (" + hoursText(w.minutes) + ")?")) return;
-        try { ok(await sb.from("work_logs").delete().eq("id", w.id)); await loadWorkLogs(t.id); drawDevTask(t.id); } catch (e) { fail(e); }
-      } }, "Delete") : null)))
-      : h("p", { class: "dv-ph" }, "No work has been logged yet."));
-}
+// the old Backlog and Reports pages now lead to the board
+async function renderDevBacklog(el){ go("dev-board"); }
+async function renderDevReports(el){ go("dev-board"); }
 /* ---------------------------------------------------------------------
    Admin panel
    --------------------------------------------------------------------- */
@@ -8832,8 +8561,8 @@ async function renderAdminActivity(el){
    --------------------------------------------------------------------- */
 const NAV = [
   ["", [["dashboard","Home"], ["overview","Company overview"], ["tasks","Tasks"], ["notes","Notes"], ["calendar","Calendar"], ["team-calendar","Team calendar"]]],
-  ["Development", [["dev-backlog","Backlog"], ["dev-board","Board"], ["dev-reports","Reports"], ["dev","Dev dashboard"], ["projects","Projects"], ["sprints","Sprints"], ["releases","Releases"], ["tickets","Support tickets"]]],
-  ["QA & Testing", [["qa","QA dashboard"], ["features","Features"], ["test_cases","Test cases"], ["bugs","Bugs"], ["qa-import","Import spreadsheet"]]],
+  // Development and QA work on one simple board (2026-11ad); the older pages are hidden, their data is kept
+  ["Development & QA", [["dev-board","Board"]]],
   ["Communication", [["chat","Chat"], ["emails","Emails"], ["announcements","Announcements"]]],
   ["Sales", [["sales","Sales dashboard"], ["deals","Pipeline"], ["leads","Leads"], ["ig_leads","Instagram leads"], ["clients","Clients"], ["contacts","Contacts"], ["activities","Activities"], ["proposals","Proposals"], ["targets","Targets"], ["crm-analytics","Analytics"]]],
   ["Marketing", [["marketing","Marketing dashboard"], ["leads","Leads"], ["ig_leads","Instagram leads"], ["campaigns","Campaigns"], ["content","Content calendar"], ["seo_keywords","SEO keywords"], ["social_stats","Social media"], ["crm-analytics","Analytics"]]],
@@ -8843,7 +8572,7 @@ const NAV = [
 function canSee(route){
   if (["dashboard","calendar","team-calendar","people","attendance","tasks","holidays","chat"].includes(route)) return true;
   if (route === "overview") return isAdmin();
-  if (route === "dev" || route === "dev-board" || route === "dev-backlog" || route === "dev-reports") return isAdmin() || S.me.vertical === "Development" || lvl("projects") >= 1;
+  if (route === "dev" || route === "dev-board" || route === "dev-backlog" || route === "dev-reports") return isAdmin() || S.me.vertical === "Development" || lvl("projects") >= 1 || lvl("qa") >= 1;
   if (route === "sales") return isAdmin() || S.me.vertical === "Sales" || lvl("sales") >= 1;
   if (route === "marketing") return isAdmin() || S.me.vertical === "Marketing" || lvl("marketing") >= 1;
   if (route.startsWith("admin-")) return !!S.me.is_admin;
