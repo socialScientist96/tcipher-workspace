@@ -5903,7 +5903,9 @@ function messagesPanel(){
 let chatPollT = null, notifPollT = null, lastChatPoll = 0;
 async function chatPoll(){
   if (!S.me || !C.ready || document.visibilityState === "hidden") return;
-  const now = Date.now(), every = S.route === "chat" ? 2000 : 10000;
+  // a backup for when live updates are down: while they work, a slow safety check is enough (saves the database)
+  const live = S.live === "SUBSCRIBED" && !window.__mock;   // the preview's stand-in live connection doesn't deliver others' messages
+  const now = Date.now(), every = live ? 60000 : window.__mock ? (S.route === "chat" ? 2000 : 10000) : (S.route === "chat" ? 10000 : 30000);
   if (now - lastChatPoll < every - 200) return;
   lastChatPoll = now;
   if (!C.maxId) C.maxId = Math.max(0, ...Object.values(C.last).filter(Boolean).map(x => x.id), ...Object.values(C.msgs).flat().map(x => x.id));
@@ -5917,8 +5919,12 @@ async function chatPoll(){
 function startChatPolling(){
   stopChatPolling();
   chatPollT = setInterval(chatPoll, 1000);
+  let lastNotifPoll = 0;
   notifPollT = setInterval(async () => {
     if (!S.me || document.visibilityState === "hidden") return;
+    // live updates bring new notifications at once; this is only a backup (every 2 minutes, or 30 s while live is down)
+    if (Date.now() - lastNotifPoll < (S.live === "SUBSCRIBED" && !window.__mock ? 120000 : 20000) - 500) return;
+    lastNotifPoll = Date.now();
     const before = new Set(S.notifications.map(n => n.id + "|" + n.created_at));
     try { await loadNotifications(); } catch (e) { return; }
     const fresh = S.notifications.filter(n => !n.is_read && !before.has(n.id + "|" + n.created_at) && before.size);
@@ -7092,7 +7098,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11af";
+const APP_VERSION = "2026-11ag";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -9084,7 +9090,20 @@ function startLive(){
   });
 }
 // after a drop: reload what's on screen, since changes may have been missed
-function catchUpAfterDrop(){ try { for (const t of [...S.loaded]) load(t, true).catch(() => {}); setTimeout(() => rerender(), 800); } catch (e) {} }
+let lastCatchUp = 0;
+function catchUpAfterDrop(){
+  // reload only what's on screen (not every list ever opened), and at most every 5 minutes: drops can happen often
+  if (Date.now() - lastCatchUp < 300000) return;
+  lastCatchUp = Date.now();
+  try {
+    const M = MOD[S.route], want = new Set(["notifications"]);
+    if (M) { want.add(M.table); (M.needs || []).forEach(t => want.add(t)); }
+    if (S.route === "dev-board") want.add("tasks");
+    for (const t of want) if (S.loaded.has(t)) load(t, true).catch(() => {});
+    if (typeof loadNotifications === "function") loadNotifications().catch(() => {});
+    setTimeout(() => rerender(), 800);
+  } catch (e) {}
+}
 function liveWake(){
   if (!S.me) return;
   if (S.live !== "SUBSCRIBED") { clearTimeout(wsRetryT); wsRetryT = null; wsRetry = 0; startLive(); }
