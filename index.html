@@ -866,6 +866,9 @@ dialog.dv-wide .dh .iconbtn{flex:none}
 .dv-desc,.dv-ph,.dv-addline,.dv-view{text-align:left}
 .dv-stackcol{display:flex;flex-direction:column;align-items:flex-start;gap:4px}
 .dv-time .dv-bar{flex:none;width:100%}
+
+.dv-files .files-sec{border-top:0;padding-top:0;margin-top:0}
+@media (max-width:600px){.dv-brow .dv-epic,.dv-brow .dv-pts{display:none}.dv-brow{gap:6px;padding:8px}.dv-brow .dv-loz{font-size:10.5px;padding:2px 4px}.dv-counts{order:9}}
 </style>
 </head>
 <body>
@@ -2788,9 +2791,7 @@ function filesSection(tbl, id, canUpload){
 }
 // open a stored file in a new tab (images and PDFs show in the browser)
 async function openStored(f){
-  try { const u = await mediaLink(f, (f.size || 0) > 20 * 1048576); const a = { mime: f.mime || f.mime_type || "", name: f.name || f.file_name || "" };
-    if (typeof viewable === "function" && !viewable(a)) { saveFrom(u + (u.includes("?") ? "&" : "?") + "dl=1", a.name); toast("Downloading " + (a.name || "the file") + "…"); return; }
-    const w = window.open(u, "_blank", "noopener"); if (!w) location.href = u; } catch (e) { fail(e, "Couldn’t open the file"); }
+  try { await openFileInTab(() => mediaLink(f, true), { mime: f.mime || f.mime_type || "", name: f.name || f.file_name || "", size: f.size || 0 }); } catch (e) { fail(e, "Couldn’t open the file"); }
 }
 async function downloadFile(f){
   try {
@@ -6132,22 +6133,48 @@ function chatAttachments(m){
 function fileCard(a){
   return h("div", { class: "cfile" }, h("span", { class: "cficon", "aria-hidden": "true" }, fileIcon(a.mime || "", a.name)),
     h("span", { class: "cfx" }, h("b", {}, a.name), h("span", { class: "muted" }, chatSize(a.size))),
-    viewable(a) ? h("button", { type: "button", class: "btn sm ghost", onclick: () => openChatFile(a, false) }, "Open") : null,
+    h("button", { type: "button", class: "btn sm ghost", onclick: () => openChatFile(a, false) }, "Open"),
     h("button", { type: "button", class: "btn sm ghost", onclick: () => openChatFile(a, true) }, "Download"));
 }
-// files a browser can show (pictures, video, sound, PDF, text) open in a new tab; anything else just downloads.
-// One click does one thing: no blank tab that then downloads too.
-const viewable = a => /^(image|video|audio|text)\//.test(a.mime || "") || a.mime === "application/pdf" || /\.(pdf|png|jpe?g|gif|webp|mp4|webm|mp3|wav|txt)$/i.test(a.name || "");
+// "Open" always opens a new tab: pictures, PDFs, video and sound as they are; text files as readable text;
+// Word, Excel and PowerPoint in Google's document viewer; anything else as a page with a Download button.
+// The tab opens straight away (before the link is ready) so the browser doesn't block it.
+const viewable = a => /^(image|video|audio)\//.test(a.mime || "") || a.mime === "application/pdf" || /\.(pdf|png|jpe?g|gif|webp|mp4|webm|mp3|wav)$/i.test(a.name || "");
+const textLike = a => /^text\//.test(a.mime || "") || /json|xml|javascript|markdown|csv|yaml/.test(a.mime || "") || /\.(md|markdown|txt|csv|tsv|json|xml|ya?ml|log|ini|sql|js|ts|jsx|tsx|py|java|kt|swift|dart|go|rb|php|css|html?|sh)$/i.test(a.name || "");
+const officeLike = a => /\.(docx?|xlsx?|pptx?|odt|ods|odp|rtf)$/i.test(a.name || "") || /officedocument|msword|ms-excel|ms-powerpoint|opendocument/.test(a.mime || "");
 function saveFrom(url, name){ const link = h("a", { href: url, download: name || "" }); document.body.append(link); link.click(); link.remove(); }
-async function openChatFile(a, download){
+const tabPage = (title, body) => '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' + escHtml(title) + '</title>'
+  + '<style>body{margin:0;font-family:"Plus Jakarta Sans",Arial,sans-serif;background:#F4F4FA;color:#1D1B2E}header{display:flex;align-items:center;gap:12px;padding:12px 18px;background:#1E1A4D;color:#fff}'
+  + 'header b{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}a.btn{background:#6450F5;color:#fff;text-decoration:none;padding:8px 14px;border-radius:8px;font-weight:600;font-size:14px}'
+  + 'main{max-width:980px;margin:18px auto;padding:0 14px}pre{background:#fff;border:1px solid #E4E4F2;border-radius:10px;padding:16px;white-space:pre-wrap;word-wrap:break-word;font:13.5px/1.55 ui-monospace,Menlo,Consolas,monospace}'
+  + '.box{background:#fff;border:1px solid #E4E4F2;border-radius:12px;padding:28px;text-align:center}</style></head><body>' + body + '</body></html>';
+const escHtml = t => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+async function openFileInTab(getUrl, a){
+  const tab = window.open("", "_blank");
+  const write = html => { try { tab.document.open(); tab.document.write(html); tab.document.close(); } catch (e) {} };
+  if (tab) write(tabPage(a.name || "File", '<main><div class="box">Opening ' + escHtml(a.name || "the file") + '…</div></main>'));
   try {
-    if (!download && !viewable(a)) download = true;
-    if (a.size <= 20 * 1048576 || !download) {
-      const u = await fileLink(a.id, a.size > 20 * 1048576);
-      if (download) { saveFrom(u + "&dl=1", a.name); toast("Downloading " + a.name + "…"); return; }
-      const w = window.open(u, "_blank", "noopener"); if (!w) location.href = u;
+    const url = await getUrl();
+    const dl = url + (url.includes("?") ? "&" : "?") + "dl=1";
+    const head = '<header><b>' + escHtml(a.name || "File") + '</b><a class="btn" href="' + escHtml(dl) + '" download="' + escHtml(a.name || "") + '">Download</a></header>';
+    if (!tab) { location.href = viewable(a) ? url : dl; return; }
+    if (viewable(a)) { tab.location.href = url; return; }
+    if (officeLike(a)) { tab.location.href = "https://docs.google.com/viewer?embedded=false&url=" + encodeURIComponent(url); return; }
+    if (textLike(a) && (a.size || 0) <= 5 * 1048576) {
+      const text = await (await fetch(url)).text();
+      write(tabPage(a.name || "File", head + '<main><pre>' + escHtml(text) + '</pre></main>'));
       return;
     }
+    write(tabPage(a.name || "File", head + '<main><div class="box"><p>This kind of file can’t be shown in the browser.</p><p><a class="btn" href="' + escHtml(dl) + '" download="' + escHtml(a.name || "") + '">Download ' + escHtml(a.name || "it") + '</a></p></div></main>'));
+  } catch (e) {
+    if (tab) write(tabPage("Couldn’t open", '<main><div class="box">Couldn’t open ' + escHtml(a.name || "the file") + ': ' + escHtml(friendly(e)) + '</div></main>'));
+    else fail(e, "Couldn’t open the file");
+  }
+}
+async function openChatFile(a, download){
+  try {
+    if (!download) { await openFileInTab(() => fileLink(a.id, true), a); return; }
+    if (a.size <= 20 * 1048576) { const u = await fileLink(a.id, a.size > 20 * 1048576); saveFrom(u + "&dl=1", a.name); toast("Downloading " + a.name + "…"); return; }
     const url = await fileLink(a.id, true), piece = 8 * 1048576, parts = [];
     const t = toastProgress("Downloading " + a.name + "…");
     for (let from = 0; from < a.size; from += piece) {
@@ -6863,19 +6890,53 @@ function bugButton(){
   }
   b.hidden = !S.me;
 }
-function openReportDialog(){
+// a picture of the page as it is now, made in the browser (no permission question). The tool loads only when needed.
+const SHOT_LIB = "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js";
+let shotLib = null;
+function loadShotLib(){
+  if (window.html2canvas) return Promise.resolve();
+  if (!shotLib) shotLib = new Promise((res, rej) => {
+    const sc = document.createElement("script"); sc.src = SHOT_LIB; sc.async = true; sc.crossOrigin = "anonymous";
+    sc.onload = () => res(); sc.onerror = () => { shotLib = null; rej(new Error("The screenshot tool didn’t load.")); };
+    document.head.append(sc); setTimeout(() => { shotLib = null; rej(new Error("The screenshot tool took too long.")); }, 8000);
+  });
+  return shotLib;
+}
+async function capturePage(){
+  await loadShotLib();
+  const hide = [document.getElementById("bugBtn"), document.getElementById("toast"), dlg && dlg().open ? dlg() : null].filter(Boolean);
+  hide.forEach(el => { el.dataset.vis = el.style.visibility; el.style.visibility = "hidden"; });
+  try {
+    const canvas = await Promise.race([window.html2canvas(document.body, { backgroundColor: "#ffffff", scale: Math.min(2, window.devicePixelRatio || 1), useCORS: true, logging: false,
+      x: window.scrollX, y: window.scrollY, width: window.innerWidth, height: window.innerHeight }), new Promise((_, rej) => setTimeout(() => rej(new Error("The screenshot took too long.")), 10000))]);
+    return await new Promise(r => canvas.toBlob(b => r(b ? new File([b], "screenshot.png", { type: "image/png" }) : null), "image/png"));
+  } finally { hide.forEach(el => { el.style.visibility = el.dataset.vis || ""; }); }
+}
+async function openReportDialog(){
   crumb("opened Report a problem");
+  // take the screenshot first, so it shows the page the person was looking at
+  let auto = null;
+  // only when the screenshot tool is already loaded (it loads quietly after sign-in): never make people wait for the dialog
+  if (window.html2canvas && !(dlg && dlg().open && dlg().querySelector(".bugdlg"))) { try { auto = await capturePage(); } catch (e) { console.info("screenshot", e && e.message); } }
+  else loadShotLib().catch(() => {});
   const note = h("textarea", { class: "in", rows: 5, maxlength: "4000", placeholder: "What went wrong? What were you trying to do, and what did you expect to happen?" });
   let shot = null;
   const prev = h("div", { class: "shotprev" });
-  const showShot = f => { shot = f; prev.replaceChildren(f ? h("img", { src: URL.createObjectURL(f), alt: "Screenshot" }) : "", f ? h("button", { type: "button", class: "btn sm ghost", onclick: () => showShot(null) }, "Remove") : ""); };
+  const shotBtns = h("span", { style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap" });
+  const takeShot = async () => { try { const f = await capturePage(); if (f) showShot(f); else toast("Couldn’t take a screenshot. Choose an image instead."); } catch (e) { toast(e.message + " Choose an image instead."); } };
+  const showShot = f => { shot = f;
+    prev.replaceChildren(f ? h("img", { src: URL.createObjectURL(f), alt: "Screenshot of the page" }) : "");
+    shotBtns.replaceChildren(
+      h("button", { type: "button", class: "btn sm " + (f ? "ghost" : "soft"), id: "bugShotTake", onclick: takeShot }, f ? "📸 Retake" : "📸 Take a screenshot"),
+      f ? h("button", { type: "button", class: "btn sm ghost", id: "bugShotRemove", onclick: () => showShot(null) }, "Remove") : null,
+      h("button", { type: "button", class: "linkbtn", onclick: () => fileIn.click() }, f ? "Use another image" : "or choose an image")); };
   const fileIn = h("input", { type: "file", accept: "image/*", hidden: true, onchange: () => { const f = fileIn.files[0]; if (f && f.size > 8 * 1048576) { toast("That image is over 8 MB."); return; } showShot(f || null); } });
   const err = h("p", { class: "err", hidden: true });
   const send = h("button", { type: "button", class: "btn pri" }, "Send report");
   const box = h("div", { class: "bugdlg" },
     h("label", { class: "fl full" }, "What happened?", note),
-    h("div", { class: "fl full" }, h("span", { style: "display:flex;gap:8px;align-items:center" }, "Screenshot (optional)", h("button", { type: "button", class: "btn sm soft", onclick: () => fileIn.click() }, "Choose an image")), fileIn, prev,
-      h("span", { class: "hint" }, "Tip: take a screenshot (Cmd + Shift + 4 on a Mac, Windows + Shift + S on Windows), then paste it here with Cmd/Ctrl + V.")),
+    h("div", { class: "fl full" }, h("span", { style: "display:flex;gap:10px;align-items:center;flex-wrap:wrap" }, "Screenshot", shotBtns), prev, fileIn, fileIn, prev,
+      h("span", { class: "hint" }, "A screenshot of this page is attached for you. You can also paste one with Cmd/Ctrl + V.")),
     h("p", { class: "muted", style: "font-size:12.5px;margin:8px 0 0" }, "We also send this page (" + (S.route || "Home") + "), your browser, your last few clicks and any recent errors, so it can be fixed quickly. Only admins can see reports."),
     err);
   box.addEventListener("paste", e => { const it = [...(e.clipboardData ? e.clipboardData.items : [])].find(x => x.type.startsWith("image/")); if (it) { e.preventDefault(); showShot(it.getAsFile()); } });
@@ -6894,6 +6955,7 @@ function openReportDialog(){
       closeDlg(); toast("Thanks, your report was sent. An admin will look at it.");
     } catch (e) { err.textContent = friendly(e); err.hidden = false; send.disabled = false; send.textContent = "Send report"; }
   });
+  showShot(auto);
   openDialog("Report a problem", [box], [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), send], true);
   setTimeout(() => note.focus(), 30);
 }
@@ -6919,22 +6981,46 @@ async function renderAdminProblems(el){
     h("button", { type: "button", class: "btn pri", disabled: !openGroups.length, onclick: () => copyForClaude(openGroups) }, "📋 Copy for Claude"),
     h("button", { type: "button", class: "btn", disabled: !openGroups.length, onclick: () => downloadText("tcipher-problems-" + today() + ".txt", claudeText(openGroups), "text/plain;charset=utf-8") }, "Download as a file")));
   if (!shown.length){ el.append(h("div", { class: "panel empty" }, h("b", {}, u.view === "Open" ? "No open problems 🎉" : "Nothing here"), u.view === "Open" ? "Anything someone reports, or any error the workspace catches, shows up here." : "")); return; }
-  for (const g of shown){
+  // clear everything open in one go (each group's people are still told it was fixed)
+  if (u.view === "Open" && openGroups.length > 1) el.append(h("div", { class: "tb" }, h("span", { class: "muted" }, openGroups.length + " open."),
+    h("button", { type: "button", class: "btn sm ok", id: "probAllFixed", onclick: async () => {
+      const v = prompt("Mark all " + openGroups.length + " open problems as fixed? Add a note (optional), e.g. “Fixed in version 2026-11ac”.", "Fixed in version " + APP_VERSION);
+      if (v === null) return;
+      const ids = openGroups.flat().map(x => x.id);
+      try {
+        for (let i = 0; i < ids.length; i += 200) ok(await sb.from("problem_reports").update({ status: "Fixed", fixed_note: v.trim() }).in("id", ids.slice(i, i + 200)));
+        for (const x of openGroups.flat()) Object.assign(x, { status: "Fixed", fixed_note: v.trim() });
+        const reporters = [...new Set(openGroups.flat().filter(x => x.kind === "user" && x.user_id && x.user_id !== S.me.id).map(x => x.user_id))];
+        if (reporters.length) notify(reporters, "The problem you reported was fixed", v.trim() || "Thanks for reporting it.", "", null);
+        toast(openGroups.length + " problems marked fixed."); rerender();
+      } catch (e) { fail(e, "Couldn’t update"); }
+    } }, "Mark all open as fixed")));
+  // draw at once: screenshots for every shown report come in one request, and fill in afterwards
+  u.limit = u.limit || 30;
+  const page = shown.slice(0, u.limit);
+  const filesFor = new Map();
+  const shotsLoaded = (async () => {
+    const ids = page.map(g => g[0].id);
+    for (let i = 0; i < ids.length; i += 100) {
+      const res = await sb.from("files").select("*").eq("tbl", "problem_reports").in("entity_id", ids.slice(i, i + 100));
+      for (const f of (res.data || [])) { if (!filesFor.has(f.entity_id)) filesFor.set(f.entity_id, []); filesFor.get(f.entity_id).push(f); }
+    }
+  })().catch(() => {});
+  for (const g of page){
     const r = g[0];
     const card = h("div", { class: "panel prob" });
-    const files = (await sb.from("files").select("*").eq("tbl", "problem_reports").eq("entity_id", r.id)).data || [];
+    const shotBox = h("div", {});
+    shotsLoaded.then(async () => { for (const f of filesFor.get(r.id) || []) { try { const link = await storeLink(f, false); if (link) shotBox.append(h("a", { href: link, target: "_blank", rel: "noopener" }, h("img", { src: link, alt: "Screenshot", class: "probshot" }))); } catch (e) {} } });
     const det = r.details || {};
     card.append(h("div", { class: "ph1" },
       pill(r.kind === "user" ? "Reported" : "Automatic", r.kind === "user" ? "info" : "warn"), pill(r.status, r.status === "Open" ? "bad" : r.status === "Fixed" ? "ok" : "grey"),
-      h("b", {}, r.note ? r.note.slice(0, 90) + (r.note.length > 90 ? "…" : "") : r.message.slice(0, 110)),
+      h("b", {}, r.note ? r.note.slice(0, 90) + (r.note.length > 90 ? "…" : "") : String(r.message || "(no message)").slice(0, 110)),
       h("span", { class: "grow" }), h("span", { class: "muted", style: "font-size:12.5px;white-space:nowrap" }, fmtAgo(r.created_at))),
       h("div", { class: "muted", style: "font-size:13px;margin:4px 0 6px" }, (pname(r.user_id) || "Someone") + " · page: " + (r.page || "Home") + (g.length > 1 ? " · happened " + g.length + " times (" + [...new Set(g.map(x => pname(x.user_id).split(" ")[0]))].join(", ") + ")" : "") + (det.browser ? " · " + det.browser : "") + (det.version ? " · v" + det.version : "")));
     if (r.note && r.note.length > 90) card.append(h("p", { style: "white-space:pre-wrap;margin:0 0 6px" }, r.note));
     if (r.message && r.kind === "user") card.append(h("p", { class: "muted", style: "font-size:13px;margin:0 0 6px" }, r.message));
     if (r.kind === "auto") card.append(h("p", { class: "code", style: "display:block;white-space:pre-wrap;margin:0 0 6px" }, r.message));
-    for (const f of files){
-      try { const link = await storeLink(f, false); if (link) card.append(h("a", { href: link, target: "_blank", rel: "noopener" }, h("img", { src: link, alt: "Screenshot", class: "probshot" }))); } catch (e) {}
-    }
+    card.append(shotBox);
     const more = h("div", { hidden: true, class: "probmore" },
       (det.steps || []).length ? [h("b", {}, "What they did before"), h("ol", {}, det.steps.map(s => h("li", {}, s.s + " (" + new Date(s.t).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", second: "2-digit" }) + ")")))] : null,
       (det.recent_errors || []).length ? [h("b", {}, "Recent errors"), h("ul", {}, det.recent_errors.map(x => h("li", {}, x.m)))] : null,
@@ -6956,6 +7042,7 @@ async function renderAdminProblems(el){
       ...[r.fixed_note ? h("p", { class: "muted", style: "font-size:12.5px;margin:6px 0 0" }, "Note: " + r.fixed_note) : null, more].filter(Boolean));
     el.append(card);
   }
+  if (shown.length > page.length) el.append(h("p", {}, h("button", { type: "button", class: "btn soft", onclick: () => { u.limit += 30; rerender(); } }, "Show " + Math.min(30, shown.length - page.length) + " more (" + (shown.length - page.length) + " left)")));
 }
 function claudeText(groups){
   const lines = ["Tcipher Workspace problems: " + groups.length + " open · workspace version " + APP_VERSION + " · copied " + new Date().toLocaleString("en-IN"), "",
@@ -8164,7 +8251,7 @@ function drawDevTask(id){
     t.type !== "Epic" && t.type !== "Subtask" ? devSubtasks(t) : null,
     devLinked(t),
     (t.checklist || []).length || S.devChecklist === t.id ? checklistSection(t, A.canEdit) : null,
-    h("div", { class: "dv-sec" }, h("div", { class: "dv-sect" }, h("b", {}, "Attachments")), filesSection("tasks", t.id, A.canEdit || A.L >= 1 || isMine(t))),
+    h("div", { class: "dv-sec dv-files" }, filesSection("tasks", t.id, A.canEdit || A.L >= 1 || isMine(t))),
     devActivity(t));
 
   const status = h("select", { class: "dv-statusbtn s-" + String(t.status).replace(/\s+/g, "-").toLowerCase(), id: "devStatus", disabled: !devCanEdit(t, "status"), "aria-label": "Status" }, TASK_STATUS.map(s => h("option", { value: s }, COL_LABEL[s] || s)));
@@ -8183,7 +8270,7 @@ function drawDevTask(id){
     t.type === "Subtask" && parent ? h("button", { type: "button", class: "linkbtn", onclick: () => openDevTask(parent.id) }, typeIcon(parent.type), " " + taskKey(parent)) :
     t.type === "Epic" ? null : parent ? h("button", { type: "button", class: "linkbtn dv-epiclink", onclick: () => openDevTask(parent.id) }, typeIcon("Epic"), " " + parent.title) :
       devCanEdit(t, "parent_id") ? h("button", { type: "button", class: "linkbtn muted", id: "devAddEpic", onclick: () => { const el = document.getElementById("dv-val-parent_id"); if (el) el.click(); } }, "✎ Add epic") : null,
-    t.type === "Epic" ? null : h("span", { class: "muted" }, "/"), typeIcon(t.type), h("span", { class: "dv-key" }, taskKey(t)), t.archived ? h("span", { class: "pill bad" }, "Archived") : null);
+    t.type === "Epic" || !(parent || devCanEdit(t, "parent_id")) ? null : h("span", { class: "muted" }, "/"), typeIcon(t.type), h("span", { class: "dv-key" }, taskKey(t)), t.archived ? h("span", { class: "pill bad" }, "Archived") : null);
   const dh = d.querySelector(".dh"); const h2 = dh && dh.querySelector("h2");
   if (h2) h2.replaceWith(crumbs);
   if (dh && menuBtns.length){
@@ -8980,6 +9067,7 @@ async function startSession(session){
     if (googleOn()) { loadGoogle().catch(() => {}); autoSyncGoogle(); }
     await liveAuth(); startPresence(); load("user_status").then(() => { startActivity(); paintStatus(); }); loadChat().then(() => { renderShell(); if (S.route === "dashboard") rerender(); startChatPolling(); startChatLive(); });
     if (typeof loadMyToday === "function") loadMyToday().then(() => renderShell());
+    setTimeout(() => { if (typeof loadShotLib === "function") loadShotLib().catch(() => {}); }, 3000);   // so 🐞 can attach a screenshot instantly
     if (isAdmin()) load("problem_reports").then(() => renderShell());   // Google ready before anyone clicks; calendar synced if it's been a while
     startLive();
     rerender();
