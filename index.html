@@ -5686,7 +5686,10 @@ async function renderChat(el){
   ta.addEventListener("input", () => { C.drafts[C.active] = ta.value; if (ta.value.trim() && Date.now() - typingSentAt > 2000) { typingSentAt = Date.now(); liveSend("typing", { cid: C.active, uid: S.me.id }); } });
   ta.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing && !(ta.parentNode.querySelector(".mention-pop:not([hidden])") || document.querySelector(".mention-pop:not([hidden])"))) { e.preventDefault(); send(); } });
   sendBtn.addEventListener("click", send);
+  // one message on its way at a time: Enter pressed again while it's still sending does nothing
+  let sending = false;
   async function send(){
+    if (sending) return;
     const body = ta.value.trim(); if (!C.active) return;
     const ups = (C.uploads && C.uploads[C.active]) || [];
     if (ups.some(u => u.state === "uploading")) { toast("Wait for the upload to finish, then send."); return; }
@@ -5694,7 +5697,9 @@ async function renderChat(el){
     if (!body && !ready.length) return;
     const ch = C.channels.find(c => c.id === C.active);
     const mentions = mentionIds(body, { channel: ch });
-    sendBtn.disabled = true;
+    sending = true; sendBtn.disabled = true;
+    // the box empties straight away (so it can't be sent twice); if sending fails, the text comes back
+    const cidAtSend = C.active; ta.value = ""; C.drafts[cidAtSend] = "";
     try {
       const replying = (C.replyTo || {})[C.active];
       const m = ok(await sb.from("chat_messages").insert(Object.assign({ channel_id: C.active, body, mentions, author_id: S.me.id }, ready.length ? { attachments: ready.map(u => ({ id: u.file.id })) } : {}, replying ? { reply_to: replying.id } : {})).select().single());
@@ -5708,8 +5713,11 @@ async function renderChat(el){
       const tagged = mentions.filter(x => x !== S.me.id && (ch.kind === "channel" || (ch.members || []).includes(x)));
       // notifications for this message are created by the database (no double notifications)
       drawChatMessages(true); drawChatList();
-    } catch (e) { fail(e, "Not sent"); }
-    sendBtn.disabled = false; ta.focus();
+    } catch (e) {
+      fail(e, "Not sent");
+      if (C.active === cidAtSend && !ta.value.trim()) { ta.value = body; C.drafts[cidAtSend] = body; }
+    }
+    sending = false; sendBtn.disabled = false; ta.focus();
   }
   drawChatList(); drawChatHead(); drawChatMessages(true);
   fitChat(); requestAnimationFrame(fitChat);
@@ -5854,7 +5862,8 @@ function editMessage(m, bodyEl){
     try { const r = ok(await sb.from("chat_messages").update({ body: v, mentions: mentionIds(v, { channel: C.channels.find(c => c.id === m.channel_id) }) }).eq("id", m.id).select().single()); Object.assign(m, r); drawChatMessages(); }
     catch (e) { fail(e, "Not saved"); }
   };
-  ta.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); save(); } if (e.key === "Escape") { e.preventDefault(); drawChatMessages(); } });
+  let saving = false; const saveOnce = async () => { if (saving) return; saving = true; try { await save(); } finally { saving = false; } };
+  ta.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveOnce(); } if (e.key === "Escape") { e.preventDefault(); drawChatMessages(); } });
   bodyEl.replaceChildren(ta, h("div", { style: "display:flex;gap:6px;margin-top:4px" }, h("button", { type: "button", class: "btn sm pri", onclick: save }, "Save"), h("button", { type: "button", class: "btn sm ghost", onclick: () => drawChatMessages() }, "Cancel")));
   ta.focus();
 }
@@ -6991,7 +7000,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ad";
+const APP_VERSION = "2026-11ae";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -9014,6 +9023,7 @@ async function signIn(){
   const email = $("loginEmail").value.trim(), password = $("loginPass").value, e = $("loginErr");
   e.hidden = true;
   if (!email || !password) { e.textContent = "Enter your email and password."; e.hidden = false; return; }
+  if ($("loginBtn").disabled) return;   // already signing in (Enter pressed twice)
   $("loginBtn").disabled = true;
   const { error } = await sb.auth.signInWithPassword({ email, password });
   $("loginBtn").disabled = false;
