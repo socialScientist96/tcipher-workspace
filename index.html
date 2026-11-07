@@ -1063,7 +1063,7 @@ tbody tr.click:hover{background:#FAFAFA}
 .hello .btn:hover{background:var(--tint)}
 .hello .att .btn:last-child{background:var(--p);border-color:var(--p);color:#fff}
 .hello .att .btn:last-child:hover{background:var(--p-hover)}
-.hello .att select.in{background:var(--white)!important}
+.hello .att select.in{background-color:var(--white)!important}
 
 /* the signature: task IDs as small mono keycaps */
 .tkey{font-family:var(--mono);font-size:11.5px;font-weight:500;color:var(--ink2);background:var(--white);border:1px solid var(--line);box-shadow:inset 0 -1px 0 var(--line);border-radius:5px;padding:0 5px;line-height:18px;display:inline-flex;align-items:center;gap:4px}
@@ -1384,6 +1384,25 @@ html,body{overflow-x:clip}
   .nav a,.nav-head{min-height:44px}
   .side-kbd{display:none}
 }
+
+/* dropdowns: our own arrow, 12px in from the right edge, with room so the text never runs under it */
+select:not([multiple]):not([size]){
+  -webkit-appearance:none;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2371717A' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")!important;
+  background-repeat:no-repeat!important;background-position:right 12px center!important;background-size:16px 16px!important;
+  padding-right:40px!important;text-overflow:ellipsis
+}
+select:not([multiple]):not([size]):disabled{opacity:.6}
+select.in.sm,.perm select{background-position:right 8px center!important;background-size:14px 14px!important;padding-right:30px!important}
+select.dv-loz{background-position:right 6px center!important;background-size:12px 12px!important;padding-right:22px!important}
+
+/* sidebar section headings (Development & QA, Communication, Sales…): readable size, like the page links */
+.nav-head{font-size:14px;font-weight:600;color:#37352F;min-height:32px;padding:4px 8px}
+.nav-head:hover{color:#37352F}
+.nav-head .chev{width:18px}
+.nav-head .chev .ic{width:16px;height:16px}
+.nav-group h4{font-size:12.5px}
+@media (pointer:coarse){ .nav-head{min-height:44px} }
 </style>
 </head>
 <body>
@@ -7827,7 +7846,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ar";
+const APP_VERSION = "2026-11as";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));

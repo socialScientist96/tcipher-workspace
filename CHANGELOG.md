@@ -1,5 +1,10 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11as (8 Nov 2026): dropdown arrows and sidebar headings
+Needs: upload `index.html` and `sw.js`.
+- **Every dropdown** has its own arrow 12px in from the right edge, with room so the text never runs under it (smaller dropdowns 8px; status chips 6px).
+- **Sidebar section headings** (Development & QA, Communication, Sales, Marketing, Company) are larger (14px) and semi-bold.
+
 ## Version 2026-11ar (8 Nov 2026): Notion-style sidebar
 Needs: upload `index.html` and `sw.js`. No database or function changes.
 - **Sidebar in the style of Notion:** warm off-white, a line icon beside every page, quiet section labels with a chevron to open and close each team's section.
