@@ -1144,6 +1144,7 @@ function friendly(e){
   const m = (e && (e.message || e.error_description || e.error)) || String(e || "");
   if (/row-level security|permission denied|violates row-level/i.test(m)) return "you don’t have permission to do that.";
   if (/duplicate key/i.test(m)) return "that already exists.";
+  if (/Cannot coerce the result to a single JSON object|PGRST116/i.test(m) || (e && e.code === "PGRST116")) return "you don’t have permission to change it, or it no longer exists.";
   if (/Failed to fetch|NetworkError/i.test(m)) return "check your internet connection.";
   return m || "please try again.";
 }
@@ -1187,7 +1188,10 @@ async function load(t, force){
       for (let from = 0; from < max; from += PAGE){
         let q = sb.from(t).select("*").order(o[0], { ascending: o[1], nullsFirst: false }).order(KEYED_BY_USER.has(t) ? "user_id" : "id", { ascending: true });
         if (t === "notifications") q = q.eq("user_id", S.me.id);
-        const chunk = ok(await q.range(from, Math.min(from + PAGE, max) - 1)) || [];
+        let chunk;
+        // a busy database sometimes times out or sends a garbled reply: try once more before giving up
+        try { chunk = ok(await q.range(from, Math.min(from + PAGE, max) - 1)) || []; }
+        catch (e1) { await new Promise(r => setTimeout(r, 1500)); chunk = ok(await q.range(from, Math.min(from + PAGE, max) - 1)) || []; }
         all = all.concat(chunk);
         if (chunk.length < PAGE) break;
       }
@@ -6000,20 +6004,33 @@ function syncChatSubs(){
       ch.subscribe((st, err) => {
         if (liveSubs[id]) liveSubs[id].st = st;
         if (st === "SUBSCRIBED") { liveRetry = 0; if (id === C.active) { lastChatPoll = 0; chatPoll(); } }   // catch up on anything sent while connecting
-        drawLiveStatus(); liveTrouble(st, err);
+        if (st === "SUBSCRIBED" && subRetry[id]) subRetry[id].n = 0;
+        drawLiveStatus(); liveTrouble(st, err, id);
       });
     } catch (e) { console.warn("chat live", e); }
   }
 }
-function liveTrouble(st, err){
+// one conversation's connection failed: rebuild just that one, not all of them
+const subRetry = {};
+function retryChatSub(id){
+  if (!S.me || liveStopping) return;
+  const r = subRetry[id] = subRetry[id] || { n: 0, t: null };
+  if (r.t) return;
+  const wait = Math.min(30000, 3000 * Math.pow(2, r.n++));
+  r.t = setTimeout(() => { r.t = null; const s = liveSubs[id]; if (s) { try { sb.removeChannel(s.ch); } catch (e) {} delete liveSubs[id]; } syncChatSubs(); }, wait);
+}
+function liveTrouble(st, err, id){
   if (st !== "CHANNEL_ERROR" && st !== "TIMED_OUT") return;
-  // short drops are normal (laptop sleep, Wi-Fi); report only after repeated failures, about 3 minutes of trying
-  if (!liveReported && liveRetry >= 6 && navigator.onLine !== false) { liveReported = true; captureError("Instant chat has been down for several minutes: " + st + (err && err.message ? " (" + err.message + ")" : ""), "", { realtime: st }); }
+  // short drops are normal (laptop sleep, Wi-Fi); report only after repeated failures, about 3 minutes of trying, while someone is looking
+  const tries = id ? (subRetry[id] || {}).n || 0 : liveRetry;
+  if (!liveReported && tries >= 6 && navigator.onLine !== false && document.visibilityState === "visible") { liveReported = true; captureError("Instant chat has been down for several minutes: " + st + (err && err.message ? " (" + err.message + ")" : ""), "", { realtime: st }); }
+  if (id) { retryChatSub(id); return; }
   // try again with growing pauses; the 2-second backup check keeps messages coming meanwhile
   if (S.me && !liveStopping && !liveRetryT) { const wait = Math.min(30000, 3000 * Math.pow(2, liveRetry++)); liveRetryT = setTimeout(() => { liveRetryT = null; if (S.me) startChatLive(); }, wait); }
 }
 function stopChatLive(){
   liveStopping = true; clearTimeout(liveRetryT); liveRetryT = null;
+  for (const id of Object.keys(subRetry)) { clearTimeout(subRetry[id].t); delete subRetry[id]; }
   for (const id of Object.keys(liveSubs)) { try { sb.removeChannel(liveSubs[id].ch); } catch (e) {} }
   liveSubs = {}; if (userCh) { try { sb.removeChannel(userCh); } catch (e) {} userCh = null; }
   liveStopping = false;
@@ -6267,6 +6284,15 @@ const viewable = a => /^(image|video|audio)\//.test(a.mime || "") || a.mime === 
 const textLike = a => /^text\//.test(a.mime || "") || /json|xml|javascript|markdown|csv|yaml/.test(a.mime || "") || /\.(md|markdown|txt|csv|tsv|json|xml|ya?ml|log|ini|sql|js|ts|jsx|tsx|py|java|kt|swift|dart|go|rb|php|css|html?|sh)$/i.test(a.name || "");
 const officeLike = a => /\.(docx?|xlsx?|pptx?|odt|ods|odp|rtf)$/i.test(a.name || "") || /officedocument|msword|ms-excel|ms-powerpoint|opendocument/.test(a.mime || "");
 function saveFrom(url, name){ const link = h("a", { href: url, download: name || "" }); document.body.append(link); link.click(); link.remove(); }
+// fetch the file and save it from memory: browsers ignore "download" on links to another site, and an HTML
+// file could then open in place of the workspace. Saving from memory never leaves the page and saves once.
+async function saveFetched(url, name, mime){
+  const res = await fetch(url + (url.includes("?") ? "&" : "?") + "dl=1");
+  if (!res.ok) throw new Error("The download didn’t start (" + res.status + "). Try again.");
+  const blob = new Blob([await res.blob()], { type: mime || "application/octet-stream" });
+  const href = URL.createObjectURL(blob);
+  saveFrom(href, name || "file"); setTimeout(() => URL.revokeObjectURL(href), 60000);
+}
 const tabPage = (title, body) => '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' + escHtml(title) + '</title>'
   + '<style>body{margin:0;font-family:"Plus Jakarta Sans",Arial,sans-serif;background:#F4F4FA;color:#1D1B2E}header{display:flex;align-items:center;gap:12px;padding:12px 18px;background:#1E1A4D;color:#fff}'
   + 'header b{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}a.btn{background:#6450F5;color:#fff;text-decoration:none;padding:8px 14px;border-radius:8px;font-weight:600;font-size:14px}'
@@ -6281,7 +6307,7 @@ async function openFileInTab(getUrl, a){
     const url = await getUrl();
     const dl = url + (url.includes("?") ? "&" : "?") + "dl=1";
     const head = '<header><b>' + escHtml(a.name || "File") + '</b><a class="btn" href="' + escHtml(dl) + '" download="' + escHtml(a.name || "") + '">Download</a></header>';
-    if (!tab) { location.href = viewable(a) ? url : dl; return; }
+    if (!tab) { await saveFetched(url, a.name, a.mime); toast("Your browser blocked the new tab, so " + (a.name || "the file") + " was downloaded instead."); return; }
     if (viewable(a)) { tab.location.href = url; return; }
     if (officeLike(a)) { tab.location.href = "https://docs.google.com/viewer?embedded=false&url=" + encodeURIComponent(url); return; }
     if (textLike(a) && (a.size || 0) <= 5 * 1048576) {
@@ -6298,7 +6324,7 @@ async function openFileInTab(getUrl, a){
 async function openChatFile(a, download){
   try {
     if (!download) { await openFileInTab(() => fileLink(a.id, true), a); return; }
-    if (a.size <= 20 * 1048576) { const u = await fileLink(a.id, a.size > 20 * 1048576); saveFrom(u + "&dl=1", a.name); toast("Downloading " + a.name + "…"); return; }
+    if (a.size <= 20 * 1048576) { toast("Downloading " + a.name + "…"); await saveFetched(await fileLink(a.id, true), a.name, a.mime); return; }
     const url = await fileLink(a.id, true), piece = 8 * 1048576, parts = [];
     const t = toastProgress("Downloading " + a.name + "…");
     for (let from = 0; from < a.size; from += piece) {
@@ -8050,7 +8076,7 @@ async function renderQAImport(el){
     btn.disabled = true;
     const tabs = st.tabs.filter(t => t.include && t.kind !== "skip" && t.project);
     const prog = h("p", { class: "muted" }, "Starting…"); btn.after(prog);
-    const total = tabs.reduce((a, t) => a + t.data.length, 0); let done = 0; const out = { tc_new: 0, tc_upd: 0, bug_new: 0, bug_upd: 0, jobs: 0, feats: 0, skipped: 0, errors: [] };
+    const total = tabs.reduce((a, t) => a + t.data.length, 0); let done = 0; const out = { tc_new: 0, tc_upd: 0, bug_new: 0, bug_upd: 0, jobs: 0, feats: 0, skipped: 0, same: 0, errors: [] };
     const tick = () => { prog.textContent = "Imported " + done + " of " + total + " rows…"; };
     const featureFor = async (project, name, t) => {
       if (fixedFeature) return fixedFeature.id;
@@ -8119,6 +8145,9 @@ async function renderQAImport(el){
           if (ex){
             const upd = Object.assign({}, row); delete upd.project_id; delete upd.external_id; delete upd.created_by; delete upd.source;
             if (table === "tasks") { delete upd.qa_state; if (ex.status === "Done" && upd.status !== "Done") delete upd.status; }
+            // same as what's saved: nothing to do (importing the same sheet twice shouldn't try to edit every row)
+            const same = (a, b) => JSON.stringify(a == null || a === "" ? null : a) === JSON.stringify(b == null || b === "" ? null : b);
+            if (Object.keys(upd).every(k => same(ex[k], upd[k]))) { out.same++; if (forRow) backendFor[forRow] = ex.id; continue; }
             try { const s = await updateRow(table, ex.id, upd); if (table === "test_cases") out.tc_upd++; else out.bug_upd++; if (forRow) backendFor[forRow] = s.id; }
             catch (e) { out.errors.push(t.name + " " + ext + ": " + friendly(e)); }
           } else batch.push({ row, comment, forRow });
@@ -8133,7 +8162,7 @@ async function renderQAImport(el){
         const be = byId("tasks", beId);
         if (job && be && be.status !== "Done" && !(job.blocked_by || []).includes(beId)) { try { await updateRow("tasks", job.id, { blocked_by: [...(job.blocked_by || []), beId], blocked: false }); } catch (e) {} }
       }
-      prog.replaceChildren(...[h("b", {}, "Done. "), [out.tc_new && out.tc_new + " test cases added", out.tc_upd && out.tc_upd + " updated", out.bug_new && out.bug_new + " bugs added", out.bug_upd && out.bug_upd + " bugs updated", out.jobs && out.jobs + " development tasks added", out.feats && out.feats + " features created", out.skipped && out.skipped + " empty rows skipped"].filter(Boolean).join(" · "),
+      prog.replaceChildren(...[h("b", {}, "Done. "), [out.tc_new && out.tc_new + " test cases added", out.tc_upd && out.tc_upd + " updated", out.bug_new && out.bug_new + " bugs added", out.bug_upd && out.bug_upd + " bugs updated", out.jobs && out.jobs + " development tasks added", out.feats && out.feats + " features created", out.skipped && out.skipped + " empty rows skipped", out.same && out.same + " already up to date"].filter(Boolean).join(" · "),
         out.errors.length ? h("div", { class: "err", style: "margin-top:6px" }, h("b", {}, out.errors.length + " problem" + (out.errors.length === 1 ? "" : "s") + " (everything else was imported):"),
           h("ul", { style: "margin:4px 0 0 18px;padding:0" }, out.errors.slice(0, 12).map(x => h("li", {}, x))), out.errors.length > 12 ? h("p", {}, "…and " + (out.errors.length - 12) + " more, listed in Admin panel › Problems.") : null) : null,
         h("div", { style: "margin-top:8px;display:flex;gap:8px" }, h("button", { type: "button", class: "btn sm", onclick: () => go("test_cases") }, "Open test cases"), h("button", { type: "button", class: "btn sm", onclick: () => go("bugs") }, "Open bugs"), h("button", { type: "button", class: "btn sm ghost", onclick: () => go("qa") }, "QA dashboard"))].filter(Boolean));
@@ -9110,7 +9139,7 @@ function startLive(){
     if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
       if (!liveDownSince) liveDownSince = Date.now();
       // the backup checks keep things current meanwhile; tell an admin only if it's been down for 3 minutes
-      if (!liveReportedDown && Date.now() - liveDownSince > 180000 && navigator.onLine !== false) {
+      if (!liveReportedDown && Date.now() - liveDownSince > 180000 && navigator.onLine !== false && document.visibilityState === "visible") {
         liveReportedDown = true;
         captureError("Live updates have been down for 3 minutes: " + status + (err && err.message ? " (" + err.message + ")" : ""), "", { realtime: status });
       }
@@ -9135,6 +9164,7 @@ function catchUpAfterDrop(){
 }
 function liveWake(){
   if (!S.me) return;
+  if (liveDownSince) liveDownSince = Date.now();   // time spent hidden or asleep doesn't count as an outage
   if (S.live !== "SUBSCRIBED") { clearTimeout(wsRetryT); wsRetryT = null; wsRetry = 0; startLive(); }
   if (typeof startChatLive === "function") startChatLive();
 }
@@ -9206,7 +9236,7 @@ async function init(){
   wire();
   if (!/^https:\/\/.+/.test(SUPABASE_URL) || /^PASTE/.test(SUPABASE_KEY)) { showScreen("setup"); return; }
   if (!window.supabase) { showScreen("setup"); $("setupMsg").textContent = "The Supabase library didn’t load. Check your internet connection and reload the page."; return; }
-  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { realtime: { worker: true } });   // keep-alive runs in a worker, so background tabs aren’t disconnected
   let started = null;
   sb.auth.onAuthStateChange((evt, session) => {
     if (evt === "PASSWORD_RECOVERY") setTimeout(openRecoveryDialog, 300);
