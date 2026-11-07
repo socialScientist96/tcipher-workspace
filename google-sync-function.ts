@@ -83,6 +83,13 @@ async function syncUser(userId: string) {
   }
 }
 async function syncUserInner(userId: string) {
+  // someone who allowed only email (no calendar) has nothing to sync here: that isn't a problem
+  const link = must(await db.from("google_links").select("scopes").eq("user_id", userId).maybeSingle());
+  if (link && link.scopes && !String(link.scopes).includes("calendar")) {
+    await db.from("google_links").update({ last_sync_at: new Date().toISOString(), last_error: "" }).eq("user_id", userId);
+    try { await syncReplies(userId); } catch (e) { await db.from("google_links").update({ last_error: "Reply check failed: " + String((e as Error)?.message || e).slice(0, 200) }).eq("user_id", userId); }
+    return 0;
+  }
   const token = await accessFor(userId);
   const fromDay = addDays(today(), -7), toDay = addDays(today(), 45);
   const timeMin = new Date(fromDay + "T00:00:00+05:30").toISOString();
@@ -141,12 +148,15 @@ const meetCode = (link: string) => { const x = String(link || "").match(/meet\.g
 
 async function saveEvent(callerId: string, meetingId: string) {
   const m = must(await db.from("meetings").select("*").eq("id", meetingId).single());
-  const token = await accessFor(callerId);
   const body = await eventBody(m, !meetCode(m.link));
-  const ev = (m.google_event_id && m.google_owner === callerId)
+  // an event that already exists is updated in its owner's calendar, whoever edits it here (an admin, the creator),
+  // instead of a second copy being created in the editor's calendar
+  const owner = m.google_event_id && m.google_owner ? m.google_owner : callerId;
+  const token = await accessFor(owner);
+  const ev = (m.google_event_id && m.google_owner)
     ? await g(token, CAL + "/" + encodeURIComponent(m.google_event_id) + "?conferenceDataVersion=1&sendUpdates=all", { method: "PATCH", body: JSON.stringify(body) })
     : await g(token, CAL + "?conferenceDataVersion=1&sendUpdates=all", { method: "POST", body: JSON.stringify(body) });
-  const patch: Any = { google_event_id: ev.id, google_owner: callerId, google_html_link: ev.htmlLink || "" };
+  const patch: Any = { google_event_id: ev.id, google_owner: owner, google_html_link: ev.htmlLink || "" };
   if (ev.hangoutLink) patch.link = ev.hangoutLink;
   return must(await db.from("meetings").update(patch).eq("id", meetingId).select().single());
 }
@@ -154,7 +164,8 @@ async function deleteEvent(meetingId: string) {
   const m = must(await db.from("meetings").select("*").eq("id", meetingId).single());
   if (!m.google_event_id || !m.google_owner) return;
   const token = await accessFor(m.google_owner);
-  await g(token, CAL + "/" + encodeURIComponent(m.google_event_id) + "?sendUpdates=all", { method: "DELETE" });
+  try { await g(token, CAL + "/" + encodeURIComponent(m.google_event_id) + "?sendUpdates=all", { method: "DELETE" }); }
+  catch (e) { if (!/not found|deleted|Google error (404|410)/i.test(String((e as Error)?.message || e))) throw e; }   // already gone in Google: fine
 }
 
 /* ---------------- Google Meet joins ---------------- */

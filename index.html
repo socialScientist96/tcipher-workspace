@@ -560,7 +560,7 @@ select.in.sm{padding:4px 6px;font-size:13px;min-width:120px}
 .iw-box p{margin:0 0 16px;color:var(--ink2)}
 .iw-acts{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 /* day history */
-.dh{display:flex;flex-direction:column}
+.dhist{display:flex;flex-direction:column}
 .dh-row{display:grid;grid-template-columns:190px 1fr 230px;gap:12px;align-items:center;padding:8px 6px;border-bottom:1px solid var(--line);background:none;border-left:0;border-right:0;border-top:0;font:inherit;text-align:left;width:100%;cursor:pointer;color:var(--ink)}
 .dh-row:hover,.dh-row.on{background:var(--tint)}
 .dh-head{cursor:default;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line)} .dh-head:hover{background:none}
@@ -1098,6 +1098,8 @@ const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(3
 
 function ymd(d){ return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
 const today = () => ymd(new Date());
+// the calendar day of a timestamp in local (India) time, not UTC: 2 am IST is still "today"
+const localDay = ts => { if (!ts) return ""; const d = new Date(ts); return isNaN(d) ? "" : ymd(d); };
 const parseD = s => new Date(s + "T12:00:00");
 function dayDiff(a, b){ return Math.round((parseD(b) - parseD(a)) / 864e5); }
 function addDays(s, n){ const d = parseD(s); d.setDate(d.getDate() + n); return ymd(d); }
@@ -1117,7 +1119,7 @@ function fmtAgo(ts){
   if (s < 3600) return Math.floor(s / 60) + " min ago";
   if (s < 86400) return Math.floor(s / 3600) + " h ago";
   if (s < 86400 * 7) return Math.floor(s / 86400) + " d ago";
-  return fmtDate(String(new Date(ts).toISOString()).slice(0, 10));
+  return fmtDate(localDay(ts));
 }
 function fmtTimeOfDay(t){
   if (!t) return "";
@@ -1169,7 +1171,7 @@ const ORDER = {
   // these tables have no created_at or id column
   user_status: ["updated_at", false], presence: ["last_seen_at", false]
 };
-const LIMIT = { activity_log: 300, notifications: 60, attendance: 3000, meeting_joins: 4000 };
+const LIMIT = { activity_log: 300, notifications: 60, attendance: 20000, meeting_joins: 20000 };   // attendance: years of history for the whole team
 
 const rows = t => t === "tasks" ? (S.cache.tasks || []).filter(r => !r.archived) : (S.cache[t] || []);
 const allRows = t => S.cache[t] || [];
@@ -1196,11 +1198,15 @@ async function load(t, force){
         if (chunk.length < PAGE) break;
       }
       S.cache[t] = all;
+      S.loaded.add(t);
     } catch (e) {
+      // not marked loaded, so the next visit tries again instead of showing an empty list as if there were nothing
       console.warn("load " + t, e);
       if (!S.cache[t]) S.cache[t] = [];
+      S.loadFailed = S.loadFailed || {};
+      if (Date.now() - (S.loadFailed[t] || 0) > 60000) { S.loadFailed[t] = Date.now(); toast("Some data didn’t load (" + t.replace(/_/g, " ") + "). What you see may be incomplete; refresh to try again."); }
     }
-    S.loaded.add(t); delete S.loading[t];
+    delete S.loading[t];
     return rows(t);
   })();
   S.loading[t] = p;
@@ -1341,7 +1347,13 @@ function fieldInput(f, val, rec){
       const box = h("div", { class: "multi", "data-k": f.k, "data-multi": "1" });
       const set = new Set(val || []);
       const cands = f.cands ? f.cands(rec) : rows(f.ref);
-      const list = [...cands.filter(r => set.has(r.id)), ...cands.filter(r => !set.has(r.id))].slice(0, 80);
+      // every choice is listed (not just the first 80); a long list gets a filter box
+      const list = [...cands.filter(r => set.has(r.id)), ...cands.filter(r => !set.has(r.id))];
+      if (list.length > 15) {
+        const find = h("input", { type: "search", class: "in", placeholder: "Filter…", "aria-label": "Filter " + f.l.toLowerCase(), style: "margin-bottom:6px" });
+        find.addEventListener("input", () => { const q = find.value.trim().toLowerCase(); box.querySelectorAll("label").forEach(l => { l.hidden = !!q && !l.textContent.toLowerCase().includes(q); }); });
+        box.append(find);
+      }
       for (const r of list) box.append(h("label", {}, h("input", { type: "checkbox", value: r.id, checked: set.has(r.id) }), REF_LABEL[f.ref](r)));
       if (!list.length) box.append(h("span", { class: "muted" }, f.empty || "Nothing to choose from yet."));
       return box;
@@ -1550,7 +1562,7 @@ async function renderAdminStorage(el){
     const on = useDrive();
     const toggle = h("input", { type: "checkbox", checked: on, disabled: !st.ok && !on });
     toggle.addEventListener("change", async () => {
-      try { const data = { ...S.settings, file_store: toggle.checked ? "drive" : "supabase" }; ok(await sb.from("settings").upsert({ id: 1, data, updated_at: new Date().toISOString() })); S.settings = data; toast(toggle.checked ? "New uploads now go to Google Drive." : "New uploads now go to Supabase."); rerender(); }
+      try { const data = { ...(await latestSettings()), file_store: toggle.checked ? "drive" : "supabase" }; ok(await sb.from("settings").upsert({ id: 1, data, updated_at: new Date().toISOString() })); S.settings = data; toast(toggle.checked ? "New uploads now go to Google Drive." : "New uploads now go to Supabase."); rerender(); }
       catch (e) { fail(e, "Not saved"); toggle.checked = !toggle.checked; }
     });
     const progress = h("p", { class: "muted", style: "margin:8px 0 0" });
@@ -1592,7 +1604,7 @@ async function renderAdminStorage(el){
     h("option", { value: "all" }, "Everyone in the company"), h("option", { value: "item" }, "Only people who can open that item"));
   vis.value = (S.settings.files_visible_all === false) ? "item" : "all";
   vis.addEventListener("change", async () => {
-    const data = { ...S.settings, files_visible_all: vis.value === "all" };
+    const data = { ...(await latestSettings()), files_visible_all: vis.value === "all" };
     try { ok(await sb.from("settings").upsert({ id: 1, data, updated_at: new Date().toISOString() })); S.settings = data; toast("Saved."); } catch (e) { fail(e, "Not saved"); vis.value = vis.value === "all" ? "item" : "all"; }
   });
   const visCard = h("div", { class: "panel" }, h("h2", {}, "Who can see attachments"),
@@ -1628,6 +1640,11 @@ const LEAD_SOURCES = ["Website","Referral","LinkedIn","Instagram","Google Ads","
 const SERVICES = ["Mobile app","Web app","Website","Backend / API","UI/UX design","QA / testing","Maintenance","Staff augmentation","Consulting","Other"];
 const isAdmin = () => !!(S.me && S.me.is_admin);
 const involved = rec => !!rec && ([rec.assignee_id, rec.reviewer_id, rec.created_by].includes(S.me.id) || (rec.collaborators || []).includes(S.me.id));
+// settings as saved right now (another page or admin may have changed them since this one was drawn), so a save only changes its own part
+async function latestSettings(){
+  try { const r = ok(await sb.from("settings").select("data").eq("id", 1).maybeSingle()); if (r && r.data) return r.data; } catch (e) {}
+  return S.settings || {};
+}
 function defaultReviewer(){ const a = rows("profiles").find(p => p.is_admin && p.is_active); return a ? a.id : null; }
 const DEAL_STAGES = ["Lead","Qualified","Meeting","Proposal sent","Negotiation","Won","Lost"];
 const IG_STAGES = ["Lead","Called","Picked up","Qualified","Demo booked","Demo done","Follow up","Closed","Unqualified","Ghosted"];
@@ -1823,7 +1840,9 @@ const MOD = {
       notify(added, pname(S.me.id) + " added you to " + k + rec.title, "", "tasks", rec.id);
       const tagged = (rec.mentions || []).filter(id => !(prev && (prev.mentions || []).includes(id)) && !added.includes(id) && id !== rec.assignee_id);
       notify(tagged, pname(S.me.id) + " tagged you in " + k + rec.title, String(rec.description || "").slice(0, 140), "tasks", rec.id);
-      if (rec.status === "In review" && (!prev || prev.status !== "In review")) notify([rec.reviewer_id || rec.tester_id || defaultReviewer()], (rec.vertical === "Development" ? (rec.qa_state === "Retest" ? "Ready for retest: " : "Ready for QA: ") : "Ready for your review: ") + k + rec.title, "From " + (pname(rec.assignee_id) || "someone"), "tasks", rec.id);
+      if (rec.status === "In review" && (!prev || prev.status !== "In review")) notify(rec.reviewer_id || rec.tester_id ? [rec.reviewer_id || rec.tester_id] : rec.vertical === "Development" && testers().length ? testers().map(p => p.id) : [defaultReviewer()], (rec.vertical === "Development" ? (rec.qa_state === "Retest" ? "Ready for retest: " : "Ready for QA: ") : "Ready for your review: ") + k + rec.title, "From " + (pname(rec.assignee_id) || "someone"), "tasks", rec.id);
+      // a tester chosen (or changed) while the work is waiting in QA hears about it
+      if (prev && rec.tester_id && prev.tester_id !== rec.tester_id && rec.status === "In review" && prev.status === "In review") notify([rec.tester_id], "You’re testing " + k + rec.title, (pname(S.me.id) || "Someone") + " chose you as the tester.", "tasks", rec.id);
       if (prev && prev.status !== rec.status && rec.status === "Done") notify([rec.assignee_id, rec.created_by, ...(rec.collaborators || [])], "Task approved: " + k + rec.title, "", "tasks", rec.id);
       if (prev && prev.status !== "Done" && rec.status === "Done") {
         const unblocked = rows("tasks").filter(t => (t.blocked_by || []).includes(rec.id) && t.status !== "Done" && openDeps(t).every(x => x.id === rec.id));
@@ -1875,7 +1894,7 @@ const MOD = {
       ["Open", rs.filter(r => !["Resolved","Closed"].includes(r.status)).length],
       ["Critical / high open", rs.filter(r => !["Resolved","Closed"].includes(r.status) && PRANK[r.priority] <= 1).length, "var(--bad)"],
       ["Waiting on client", rs.filter(r => r.status === "Waiting on client").length, "var(--warn)"],
-      ["Resolved this month", rs.filter(r => r.resolved_at && r.resolved_at.slice(0, 7) === today().slice(0, 7)).length, "var(--ok)"]
+      ["Resolved this month", rs.filter(r => r.resolved_at && localDay(r.resolved_at).slice(0, 7) === today().slice(0, 7)).length, "var(--ok)"]
     ],
     before: (d, prev) => { if (["Resolved","Closed"].includes(d.status) && !(prev && prev.resolved_at)) d.resolved_at = new Date().toISOString(); if (d.status && !["Resolved","Closed"].includes(d.status)) d.resolved_at = null; },
     after: (rec, prev) => { if (rec.assignee_id && (!prev || prev.assignee_id !== rec.assignee_id)) notify([rec.assignee_id], "Ticket assigned to you: " + rec.title, rec.priority + " priority", "tickets", rec.id); }
@@ -1930,13 +1949,18 @@ const MOD = {
     detail: (rec, box) => box.append(joinsSection(rec)),
     after: async (rec, prev, extra) => {
       if (!prev) notify(rec.attendees, "Meeting: " + rec.title, (rec.repeat && rec.repeat !== "Does not repeat" ? repeatText(rec) + " from " : "") + fmtDate(rec.meeting_date) + (rec.start_time ? " at " + fmtTimeOfDay(rec.start_time) : ""), "meetings", rec.id);
-      const keepInSync = rec.google_event_id && rec.google_owner === S.me.id;
-      if (googleOn() && googleConnected() && ((extra && extra._google) || keepInSync)){
+      // an event already in Google is kept in step by whoever may edit it (the server uses the organiser's calendar)
+      const keepInSync = !!(rec.google_event_id && rec.google_owner && (rec.google_owner === S.me.id || rec.created_by === S.me.id || isAdmin()));
+      if (googleOn() && (keepInSync || (googleConnected() && extra && extra._google))){
         try { const saved = await syncMeetingToGoogle(rec); toast(keepInSync ? "Google Calendar updated. Attendees were notified." : saved && saved.link ? "Added to Google Calendar with a Meet link. Invites sent." : "Added to Google Calendar."); rerender(); }
         catch (e) { fail(e, "Saved here, but not in Google Calendar"); }
       }
     },
-    beforeDelete: async (rec) => { if (rec.google_event_id) await deleteGoogleEvent(rec); }
+    beforeDelete: async (rec) => {
+      if (!rec.google_event_id) return;
+      try { await deleteGoogleEvent(rec); }
+      catch (e) { toast("Deleted here, but the Google Calendar event is still there (" + friendly(e) + "). Delete it in Google Calendar so attendees aren’t still invited."); }
+    }
   },
 
   /* ---------------- Sales ---------------- */
@@ -1958,7 +1982,7 @@ const MOD = {
       { k: "service", l: "Service", t: "select", o: SERVICES, filter: true },
       { k: "value", l: "Deal value", t: "money" },
       { k: "stage", l: "Stage", t: "select", o: DEAL_STAGES, req: true, def: "Lead" },
-      { k: "probability", l: "Win probability (%)", t: "int", min: 0 },
+      { k: "probability", l: "Win probability (%)", t: "int", min: 0, max: 100 },
       { k: "priority", l: "Priority", t: "select", o: PRIORITY, req: true, def: "Medium", filter: true },
       { k: "source", l: "Lead source", t: "select", o: [...LEAD_SOURCES, "Existing client"], filter: true },
       { k: "owner_id", l: "Deal owner", t: "user", filter: true, def: () => S.me.id },
@@ -1979,7 +2003,7 @@ const MOD = {
     summary: rs => {
       const open = rs.filter(r => !["Won","Lost"].includes(r.stage));
       const m = today().slice(0, 7);
-      const won = rs.filter(r => r.stage === "Won" && (r.closed_at || r.updated_at || "").slice(0, 7) === m);
+      const won = rs.filter(r => r.stage === "Won" && localDay(r.closed_at || r.updated_at || "").slice(0, 7) === m);
       const closed = rs.filter(r => ["Won","Lost"].includes(r.stage));
       return [
         ["Open pipeline", money(open.reduce((s, r) => s + (+r.value || 0), 0), true)],
@@ -1991,7 +2015,7 @@ const MOD = {
     },
     actions: (rec) => crmActions("deals", rec),
     detail: (rec, box) => crmDetail("deals", rec, box),
-    before: (d, prev) => { if (["Won","Lost"].includes(d.stage) && (!prev || !["Won","Lost"].includes(prev.stage))) d.closed_at = new Date().toISOString(); if (d.stage && !["Won","Lost"].includes(d.stage)) d.closed_at = null; },
+    before: (d, prev) => { if (["Won","Lost"].includes(d.stage) && (!prev || prev.stage !== d.stage)) d.closed_at = new Date().toISOString(); if (d.stage && !["Won","Lost"].includes(d.stage)) d.closed_at = null; },
     after: (rec, prev) => {
       if (rec.owner_id && (!prev || prev.owner_id !== rec.owner_id)) notify([rec.owner_id], "Deal assigned to you: " + rec.title, money(rec.value), "deals", rec.id);
       if (prev && prev.stage !== "Won" && rec.stage === "Won") notify(peopleWith("sales", 3).map(p => p.id), "Deal won: " + rec.title, money(rec.value), "deals", rec.id);
@@ -2092,7 +2116,12 @@ const MOD = {
         ["Next steps overdue", rs.filter(r => r.next_step_date && r.next_step_date < today()).length, "var(--bad)"]
       ];
     },
-    after: async (rec) => {
+    after: async (rec, prev) => {
+      // only a new or changed next step moves the follow-up, and only from the latest activity (editing an old one mustn't reset it)
+      if (prev && prev.next_step_date === rec.next_step_date) return;
+      const newer = k => rows("activities").some(a => a[k] === rec[k] && a.id !== rec.id && String(a.activity_date || "") > String(rec.activity_date || ""));
+      if (rec.deal_id && newer("deal_id")) rec = Object.assign({}, rec, { deal_id: null });
+      if (rec.lead_id && newer("lead_id")) rec = Object.assign({}, rec, { lead_id: null });
       if (rec.deal_id && rec.next_step_date){
         const dl = byId("deals", rec.deal_id);
         if (dl && dl.next_followup !== rec.next_step_date) { try { await updateRow("deals", dl.id, { next_followup: rec.next_step_date }); } catch (e) {} }
@@ -2125,7 +2154,7 @@ const MOD = {
     sort: (a, b) => String(b.created_at).localeCompare(String(a.created_at)),
     summary: rs => [
       ["Awaiting reply", money(rs.filter(r => r.status === "Sent").reduce((s, r) => s + (+r.amount || 0), 0), true), "var(--warn)"],
-      ["Accepted this month", money(rs.filter(r => r.status === "Accepted" && (r.updated_at || "").slice(0, 7) === today().slice(0, 7)).reduce((s, r) => s + (+r.amount || 0), 0), true), "var(--ok)"],
+      ["Accepted this month", money(rs.filter(r => r.status === "Accepted" && localDay(r.updated_at || "").slice(0, 7) === today().slice(0, 7)).reduce((s, r) => s + (+r.amount || 0), 0), true), "var(--ok)"],
       ["Acceptance rate", (() => { const c = rs.filter(r => ["Accepted","Rejected","Expired"].includes(r.status)); return c.length ? Math.round(rs.filter(r => r.status === "Accepted").length / c.length * 100) + "%" : "–"; })()]
     ],
     before: d => { if (d.status === "Sent" && !d.sent_on) d.sent_on = today(); }
@@ -2267,8 +2296,19 @@ const MOD = {
       { k: "days", l: "Days", get: r => String(workingDays(r.start_date, r.end_date, r.half_day)) }, "status"],
     sort: (a, b) => String(b.start_date).localeCompare(String(a.start_date)),
     top: leaveTop,
-    validate: d => (d.end_date && d.start_date && d.end_date < d.start_date) ? "The end date is before the start date." : null,
-    before: (d, prev) => { if (!prev && d.status && d.status !== "Pending" && lvl("leave") >= 2) d.reviewed_by = S.me.id; },
+    validate: d => {
+      if (d.end_date && d.start_date && d.end_date < d.start_date) return "The end date is before the start date.";
+      if (d.start_date && d.end_date && d.type !== "Work from home" && !workingDays(d.start_date, d.end_date, d.half_day)) return "There are no working days in these dates (weekends and holidays don’t need leave).";
+      const who = d.user_id || S.me.id;
+      const clash = allRows("leave_requests").find(l => l.id !== d.id && l.user_id === who && !["Rejected", "Cancelled"].includes(l.status) && l.start_date <= d.end_date && l.end_date >= d.start_date);
+      if (clash && d.status !== "Cancelled" && d.status !== "Rejected") return "This overlaps another leave request (" + fmtDate(clash.start_date) + (clash.end_date !== clash.start_date ? " – " + fmtDate(clash.end_date) : "") + ", " + clash.status.toLowerCase() + ").";
+      return null;
+    },
+    before: (d, prev) => {
+      // your own leave always goes to someone else for approval (admins excepted)
+      if (!prev && (d.user_id || S.me.id) === S.me.id && !S.me.is_admin) d.status = "Pending";
+      if (!prev && d.status && d.status !== "Pending" && lvl("leave") >= 2) d.reviewed_by = S.me.id;
+    },
     after: (rec, prev) => {
       if (!prev && rec.user_id !== S.me.id) notify([rec.user_id], pname(S.me.id) + " marked " + rec.type.toLowerCase() + " for you", fmtDate(rec.start_date) + (rec.end_date !== rec.start_date ? " – " + fmtDate(rec.end_date) : "") + " · " + rec.status, "leave_requests", rec.id);
       else if (!prev && rec.status === "Pending") notify(peopleWith("leave", 2).map(p => p.id), pname(rec.user_id) + " applied for " + rec.type.toLowerCase() + " leave", fmtDate(rec.start_date) + (rec.end_date !== rec.start_date ? " – " + fmtDate(rec.end_date) : ""), "leave_requests", rec.id);
@@ -2352,7 +2392,7 @@ function nextNumber(prefix, table){
 }
 function wonFor(userId, month){
   const m = String(month || today()).slice(0, 7);
-  const ds = rows("deals").filter(d => d.owner_id === userId && d.stage === "Won" && (d.closed_at || d.updated_at || "").slice(0, 7) === m);
+  const ds = rows("deals").filter(d => d.owner_id === userId && d.stage === "Won" && localDay(d.closed_at || d.updated_at || "").slice(0, 7) === m);
   return { value: ds.reduce((s, d) => s + (+d.value || 0), 0), count: ds.length };
 }
 async function reviewTask(rec, approve){
@@ -2726,6 +2766,12 @@ async function openRecord(key, id, preset, opts){
       const visible = current();
       for (const f of M.fields){
         if (f.req && inputs[f.k] && (!f.show || f.show(visible)) && (data[f.k] == null || data[f.k] === "")) { err.textContent = "Fill in “" + f.l + "”."; err.hidden = false; inputs[f.k].focus && inputs[f.k].focus(); return; }
+      }
+      // numbers out of range (a negative amount, a probability over 100)
+      for (const f of M.fields){
+        const n = data[f.k]; if (n == null || n === "" || !["money", "int", "number"].includes(f.t)) continue;
+        const min = f.min != null ? f.min : f.t === "money" ? 0 : null;
+        if ((min != null && +n < min) || (f.max != null && +n > f.max)) { err.textContent = "“" + f.l + "” must be " + (f.max != null ? "between " + (min != null ? min : "") + " and " + f.max : "at least " + min) + "."; err.hidden = false; return; }
       }
       const v = M.validate && M.validate({ ...values, ...data });
       if (v) { err.textContent = v; err.hidden = false; return; }
@@ -3153,7 +3199,11 @@ function attendanceWidget(light){
     const mode = h("select", { class: "in", style: "width:auto;min-height:36px;" + (light ? "background:#fff;color:var(--ink)" : ""), "aria-label": "Working from" }, WORK_MODES.map(m => h("option", { value: m }, m)));
     wrap.append(h("span", {}, "Not checked in yet"), mode, h("button", { type: "button", class: "btn", onclick: () => checkIn(mode.value) }, "Check in"));
   } else if (!r.check_out){
-    wrap.append(h("span", {}, "Checked in at " + fmtTime(r.check_in) + " (" + r.mode + ")"), h("button", { type: "button", class: "btn", onclick: checkOut }, "Check out"));
+    // a day an admin marked can't be checked out of here (the database refuses it)
+    wrap.append(h("span", {}, r.check_in ? "Checked in at " + fmtTime(r.check_in) + (r.mode ? " (" + r.mode + ")" : "") : "Marked " + (r.status || "present") + " today" + (r.marked_by ? " by " + (pname(r.marked_by) || "an admin") : "")),
+      r.marked_by || !r.check_in ? null : h("button", { type: "button", class: "btn", onclick: checkOut }, "Check out"));
+  } else if (!r.check_in){
+    wrap.append(h("span", {}, "Checked out at " + fmtTime(r.check_out) + (r.marked_by ? " (marked by " + (pname(r.marked_by) || "an admin") + ")" : "")));
   } else {
     wrap.append(h("span", {}, "Worked " + hoursOf(r).toFixed(1) + " h today (" + fmtTime(r.check_in) + " – " + fmtTime(r.check_out) + ")"),
       r.marked_by ? null : h("button", { type: "button", class: "btn", id: "checkInAgain", onclick: () => checkIn(r.mode) }, "Check in again"));
@@ -3430,7 +3480,7 @@ async function renderDashboard(el){
   for (const a of rows("activities")) if (a.owner_id === me && a.next_step && a.next_step_date && a.next_step_date <= addDays(t0, 3))
     items.push({ d: a.next_step_date, kind: "Next step", text: a.next_step + " – " + a.subject, extra: null, open: () => openRecord("activities", a.id) });
   for (const l of rows("leads")) if (l.status !== "Converted" && l.status !== "Not a fit" && ((l.sales_owner_id === me && l.status === "Sent to sales") || (l.owner_id === me && l.status === "New")))
-    items.push({ d: (l.handed_over_at || l.created_at || "").slice(0, 10), kind: "Lead", text: l.name + (l.company ? " (" + l.company + ")" : ""), extra: pill(l.status), open: () => openRecord("leads", l.id) });
+    items.push({ d: localDay(l.handed_over_at || l.created_at || ""), kind: "Lead", text: l.name + (l.company ? " (" + l.company + ")" : ""), extra: pill(l.status), open: () => openRecord("leads", l.id) });
   for (const c of rows("content")) if (c.owner_id === me && c.status !== "Published" && c.publish_date && c.publish_date <= addDays(t0, 7))
     items.push({ d: c.publish_date, kind: "Content", text: c.channel + ": " + c.title, extra: pill(c.status), open: () => openRecord("content", c.id) });
   items.sort((a, b) => String(a.d || "9999").localeCompare(String(b.d || "9999")));
@@ -3473,7 +3523,7 @@ async function renderDashboard(el){
     "No announcements yet.", ["All", () => go("announcements")]));
 
   const week = addDays(t0, 7), up = [];
-  for (const it of agenda(t0, week).slice(0, 14)) up.push([it.day + (it.start || ""), (it.day === t0 ? "Today" : fmtDate(it.day)) + (agendaTime(it) ? " " + agendaTime(it) : ""), [it.title, it.source === "google" ? h("span", { class: "pill info", style: "margin-left:6px" }, "Google") : null], it.open, it.day === t0 ? agendaJoinButton(it, true) : null]);
+  for (const it of agenda(t0, week).filter(it => !(it.end && new Date(it.end) < Date.now())).slice(0, 14)) up.push([it.day + (it.start || ""), (it.day === t0 ? "Today" : fmtDate(it.day)) + (agendaTime(it) ? " " + agendaTime(it) : ""), [it.title, it.source === "google" ? h("span", { class: "pill info", style: "margin-left:6px" }, "Google") : null], it.open, it.day === t0 ? agendaJoinButton(it, true) : null]);
   up.sort((a, b) => a[0].localeCompare(b[0]));
   if (C.ready) right.append(messagesPanel());
   const pins = rows("notes").filter(n => n.pinned && n.owner_id === me);
@@ -3534,7 +3584,7 @@ async function renderSalesHub(el){
   if (S.route !== "sales") return;
   const t0 = today(), m = t0.slice(0, 7);
   const open = rows("deals").filter(d => !["Won","Lost"].includes(d.stage));
-  const wonM = rows("deals").filter(d => d.stage === "Won" && (d.closed_at || d.updated_at || "").slice(0, 7) === m);
+  const wonM = rows("deals").filter(d => d.stage === "Won" && localDay(d.closed_at || d.updated_at || "").slice(0, 7) === m);
   const targetsM = rows("targets").filter(t => String(t.month).slice(0, 7) === m);
   const teamTarget = targetsM.reduce((s, t) => s + (+t.target_amount || 0), 0);
   const wonVal = wonM.reduce((s, d) => s + (+d.value || 0), 0);
@@ -3568,7 +3618,7 @@ async function renderMarketingHub(el){
   await ensure(["tasks","leads","campaigns","content","seo_keywords","social_stats"]);
   if (S.route !== "marketing") return;
   const t0 = today(), m = t0.slice(0, 7);
-  const leadsM = rows("leads").filter(l => (l.created_at || "").slice(0, 7) === m);
+  const leadsM = rows("leads").filter(l => localDay(l.created_at || "").slice(0, 7) === m);
   const live = rows("campaigns").filter(c => c.status === "Live");
   const budget = live.reduce((s, c) => s + (+c.budget || 0), 0), spent = live.reduce((s, c) => s + (+c.spent || 0), 0);
   const allSpent = rows("campaigns").reduce((s, c) => s + (+c.spent || 0), 0);
@@ -3576,7 +3626,7 @@ async function renderMarketingHub(el){
   hubHeader(el, "Marketing", "Leads, campaigns, content, SEO and social media.");
   el.append(statStrip([
     ["Leads this month", leadsM.length, null, () => go("leads")],
-    ["Sent to Sales this month", rows("leads").filter(l => (l.handed_over_at || "").slice(0, 7) === m).length],
+    ["Sent to Sales this month", rows("leads").filter(l => localDay(l.handed_over_at || "").slice(0, 7) === m).length],
     ["Lead → deal rate", closed.length ? Math.round(rows("leads").filter(l => l.status === "Converted").length / closed.length * 100) + "%" : "–", "var(--ok)"],
     ["Live campaign budget used", budget ? Math.round(spent / budget * 100) + "%" : "–", spent > budget ? "var(--bad)" : null, () => go("campaigns")],
     ["Cost per lead", rows("leads").length ? money(allSpent / Math.max(1, rows("leads").filter(l => l.campaign_id).length)) : "–"],
@@ -3609,19 +3659,19 @@ async function renderOverview(el){
   if (S.route !== "overview") return;
   const t0 = today(), m = t0.slice(0, 7);
   el.append(h("div", { class: "ph" }, h("div", {}, h("h1", {}, "Company overview"), h("p", {}, "Development, Sales and Marketing side by side, and who’s working today."))));
-  const present = rows("attendance").filter(a => a.day === t0).length;
+  const present = rows("attendance").filter(a => a.day === t0 && a.status !== "Absent").length;
   const away = rows("leave_requests").filter(r => r.status === "Approved" && r.start_date <= t0 && r.end_date >= t0 && r.type !== "Work from home").length;
   el.append(statStrip([
     ["People", activePeople().length, null, () => go("people")], ["Checked in today", present, "var(--ok)", () => go("attendance")], ["On leave today", away, "var(--warn)"],
     ["Leave to approve", rows("leave_requests").filter(r => r.status === "Pending").length, "var(--warn)", () => go("leave_requests")],
     ["Tasks waiting for review", rows("tasks").filter(t => t.status === "In review").length, "var(--warn)", () => { S.ui.tasks = Object.assign(S.ui.tasks || {}, { filters: {} }); go("tasks"); }]
   ]));
-  const wonM = rows("deals").filter(d => d.stage === "Won" && (d.closed_at || d.updated_at || "").slice(0, 7) === m).reduce((s, d) => s + (+d.value || 0), 0);
+  const wonM = rows("deals").filter(d => d.stage === "Won" && localDay(d.closed_at || d.updated_at || "").slice(0, 7) === m).reduce((s, d) => s + (+d.value || 0), 0);
   const target = rows("targets").filter(t => String(t.month).slice(0, 7) === m).reduce((s, t) => s + (+t.target_amount || 0), 0);
   const blocks = {
     Development: [["Active projects", rows("projects").filter(p => p.status === "Active").length], ["Open bugs", rows("tasks").filter(t => t.vertical === "Development" && t.type === "Bug" && t.status !== "Done").length], ["Open tickets", rows("tickets").filter(t => !["Resolved","Closed"].includes(t.status)).length]],
     Sales: [["Open pipeline", money(rows("deals").filter(d => !["Won","Lost"].includes(d.stage)).reduce((s, d) => s + (+d.value || 0), 0), true)], ["Won this month", money(wonM, true) + (target ? " (" + Math.round(wonM / target * 100) + "% of target)" : "")], ["Leads waiting", rows("leads").filter(l => l.status === "Sent to sales").length]],
-    Marketing: [["Leads this month", rows("leads").filter(l => (l.created_at || "").slice(0, 7) === m).length], ["Live campaigns", rows("campaigns").filter(c => c.status === "Live").length], ["Posts due this week", rows("content").filter(c => c.status !== "Published" && c.publish_date && c.publish_date >= t0 && c.publish_date <= addDays(t0, 7)).length]]
+    Marketing: [["Leads this month", rows("leads").filter(l => localDay(l.created_at || "").slice(0, 7) === m).length], ["Live campaigns", rows("campaigns").filter(c => c.status === "Live").length], ["Posts due this week", rows("content").filter(c => c.status !== "Published" && c.publish_date && c.publish_date >= t0 && c.publish_date <= addDays(t0, 7)).length]]
   };
   el.append(h("div", { class: "grid g3" }, VERTICALS.map(v => {
     const tasks = verticalTasks(v).filter(t => t.status !== "Done");
@@ -4604,7 +4654,7 @@ function leadModule(pipeline){
     sort: (a, b) => (PRANK[a.priority] ?? 9) - (PRANK[b.priority] ?? 9) || String(b.created_at).localeCompare(String(a.created_at)),
     summary: rs => {
       const m = today().slice(0, 7);
-      const thisMonth = rs.filter(r => (r.created_at || "").slice(0, 7) === m);
+      const thisMonth = rs.filter(r => localDay(r.created_at || "").slice(0, 7) === m);
       if (ig){
         const reached = rs.filter(r => r.status !== "Lead").length;
         const demos = rs.filter(r => ["Demo booked","Demo done","Follow up","Closed"].includes(r.status)).length;
@@ -4674,7 +4724,7 @@ function crmActions(table, rec){
         h("button", { type: "button", class: "btn ok", onclick: () => setDealOutcome(rec, "Won") }, "Mark won"),
         h("button", { type: "button", class: "btn danger", onclick: () => setDealOutcome(rec, "Lost") }, "Mark lost"));
     } else {
-      out.push(h("b", { style: "flex:1" }, rec.stage === "Won" ? "Won" : "Lost" + (rec.lost_reason ? ": " + rec.lost_reason : ""), rec.closed_at ? h("span", { class: "muted", style: "font-weight:500" }, " · " + fmtDate(rec.closed_at.slice(0, 10), true)) : ""),
+      out.push(h("b", { style: "flex:1" }, rec.stage === "Won" ? "Won" : "Lost" + (rec.lost_reason ? ": " + rec.lost_reason : ""), rec.closed_at ? h("span", { class: "muted", style: "font-weight:500" }, " · " + fmtDate(localDay(rec.closed_at), true)) : ""),
         h("button", { type: "button", class: "btn", onclick: () => setDealOutcome(rec, "reopen") }, "Reopen"));
     }
   }
@@ -4777,7 +4827,7 @@ async function renderCrmAnalytics(el){
   if (!S.ui.ca) S.ui.ca = { range: "90", owner: "" };
   const u = S.ui.ca;
   const since = u.range === "all" ? "" : addDays(today(), -(+u.range));
-  const inRange = r => !since || String(r.created_at || "").slice(0, 10) >= since;
+  const inRange = r => !since || localDay(r.created_at || "") >= since;
   const own = (r, k) => !u.owner || r[k] === u.owner;
   const leads = allRows("leads").filter(r => inRange(r) && (own(r, "owner_id") || own(r, "sales_owner_id")));
   const general = leads.filter(r => (r.pipeline || "General") === "General"), ig = leads.filter(r => r.pipeline === "Instagram");
@@ -4848,7 +4898,9 @@ function csvParse(text){
   if (cell !== "" || row.length) { row.push(cell); rowsOut.push(row); }
   return rowsOut.filter(r => r.some(x => String(x).trim() !== ""));
 }
-function csvCell(v){ const s = v == null ? "" : String(v); return /[",\n\r]/.test(s) || /^\s|\s$/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+function csvCell(v){ let s = v == null ? "" : String(v);
+  // a cell that Excel would run as a formula (e.g. a name typed into a website form as =HYPERLINK(...)) is kept as text
+  if (/^[=@\t\r]/.test(s) || (/^[+-]/.test(s) && !/^[+-]?[\d.,\s()]+$/.test(s))) s = "'" + s; return /[",\n\r]/.test(s) || /^\s|\s$/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
 function csvString(matrix){ return "\uFEFF" + matrix.map(r => r.map(csvCell).join(",")).join("\r\n"); }
 function downloadText(name, text, type){
   const blob = new Blob([text], { type: type || "text/csv;charset=utf-8" });
@@ -4899,8 +4951,8 @@ function parseAmount(v){
   let s = String(v || "").toLowerCase().replace(/[₹,\s]|rs\.?|inr/g, "");
   if (!s) return null;
   let mult = 1;
-  if (/(lakh|lac|l)$/.test(s)){ mult = 100000; s = s.replace(/(lakhs?|lacs?|l)$/, ""); }
-  else if (/(crore|cr)$/.test(s)){ mult = 10000000; s = s.replace(/(crores?|cr)$/, ""); }
+  if (/(lakhs?|lacs?|l)$/.test(s)){ mult = 100000; s = s.replace(/(lakhs?|lacs?|l)$/, ""); }
+  else if (/(crores?|cr)$/.test(s)){ mult = 10000000; s = s.replace(/(crores?|cr)$/, ""); }
   else if (/k$/.test(s)){ mult = 1000; s = s.replace(/k$/, ""); }
   const n = parseFloat(s);
   return isNaN(n) ? NaN : Math.round(n * mult * 100) / 100;
@@ -5132,7 +5184,7 @@ function exportCsv(key){
   const fields = csvFields(M);
   const extraCols = [];
   if (M.keyOf) extraCols.push(["ID", r => M.keyOf(r)]);
-  if (M.table === "leads") extraCols.push(["Last contacted", r => r.last_contacted_at ? r.last_contacted_at.slice(0, 10) : ""], ["Added", r => String(r.created_at || "").slice(0, 10)],
+  if (M.table === "leads") extraCols.push(["Last contacted", r => r.last_contacted_at ? localDay(r.last_contacted_at) : ""], ["Added", r => localDay(r.created_at || "")],
     ["Form answers", r => (r.form_submissions || []).map(s => (s.form_title || s.form_name) + ": " + (s.fields || []).map(f => f.label + " = " + (Array.isArray(f.value) ? f.value.join("/") : f.value)).join("; ")).join(" | ")]);
   const out = [[...extraCols.map(c => c[0]), ...fields.map(f => f.l)]];
   for (const r of rs) out.push([...extraCols.map(c => c[1](r)), ...fields.map(f => {
@@ -5382,7 +5434,7 @@ function templatesEditor(){
   let list = clone(emailTemplates());
   const box = h("div", {});
   const save = async () => {
-    try { const data = { ...S.settings, email_templates: list }; ok(await sb.from("settings").upsert({ id: 1, data, updated_at: new Date().toISOString() })); S.settings = data; toast("Templates saved."); }
+    try { const data = { ...(await latestSettings()), email_templates: list }; ok(await sb.from("settings").upsert({ id: 1, data, updated_at: new Date().toISOString() })); S.settings = data; toast("Templates saved."); }
     catch (e) { fail(e, "Not saved"); }
   };
   function draw(){
@@ -5567,6 +5619,7 @@ async function loadChat(force){
   if (C.loading && !force) return C.loading;
   C.loading = (async () => {
     try {
+      const known = C.ready ? new Set((C.channels || []).map(c => c.id)) : null;   // a reload while running: chats that are new since
       C.channels = ok(await sb.from("chat_channels").select("*").order("created_at")) || [];
       const reads = ok(await sb.from("chat_reads").select("*").eq("user_id", S.me.id)) || [];
       try { C.muted = new Set((ok(await sb.from("chat_mutes").select("channel_id")) || []).map(x => x.channel_id)); } catch (e) { C.muted = C.muted || new Set(); }
@@ -5574,7 +5627,8 @@ async function loadChat(force){
       await Promise.all(C.channels.map(async ch => {
         const latest = ok(await sb.from("chat_messages").select("id,author_id,body,created_at").eq("channel_id", ch.id).order("id", { ascending: false }).limit(1)) || [];
         C.last[ch.id] = latest[0] || null;
-        if (C.reads[ch.id] === undefined){
+        if (C.reads[ch.id] === undefined && known && !known.has(ch.id)) C.reads[ch.id] = 0;   // a new DM or group arrived with its first message: that message is unread
+        else if (C.reads[ch.id] === undefined){
           // first time: everything already there counts as read
           C.reads[ch.id] = latest[0] ? latest[0].id : 0;
           try { await sb.from("chat_reads").upsert({ user_id: S.me.id, channel_id: ch.id, last_read_id: C.reads[ch.id] }, { onConflict: "user_id,channel_id" }); } catch (e) {}
@@ -5591,7 +5645,9 @@ async function loadChat(force){
 }
 function chatTotals(){
   let dm = 0, mention = 0, other = 0;
-  for (const ch of C.channels){ const u = C.unread[ch.id] || 0; if (!u) continue; if (ch.kind !== "channel") dm += u; else { mention += C.mentions[ch.id] || 0; other += u - (C.mentions[ch.id] || 0); } }
+  for (const ch of C.channels){ let u = C.unread[ch.id] || 0; if (!u) continue;
+    if (C.muted && C.muted.has(ch.id)) { mention += C.mentions[ch.id] || 0; continue; }   // muted: only tags count
+    if (ch.kind !== "channel") dm += u; else { mention += C.mentions[ch.id] || 0; other += u - (C.mentions[ch.id] || 0); } }
   return { due: dm + mention, fresh: other };
 }
 async function openChannel(id){
@@ -5753,14 +5809,15 @@ async function renderChat(el){
       const m = ok(await sb.from("chat_messages").insert(Object.assign({ channel_id: C.active, body, mentions, author_id: S.me.id }, ready.length ? { attachments: ready.map(u => ({ id: u.file.id })) } : {}, replying ? { reply_to: replying.id } : {})).select().single());
       if (replying) { delete C.replyTo[m.channel_id]; drawReplyBar(); }
       if (ready.length) { C.uploads[m.channel_id] = ups.filter(u => !ready.includes(u)); drawUploads(); }
-      (C.msgs[C.active] = C.msgs[C.active] || []).push(m); C.last[C.active] = m; C.reads[C.active] = m.id;
+      // filed under the conversation it was sent in, even if another chat was opened while it was sending
+      const cid = m.channel_id;
+      (C.msgs[cid] = C.msgs[cid] || []).push(m); C.last[cid] = m; C.reads[cid] = m.id;
       C.seen = C.seen || new Set(); C.seen.add(m.id); if (m.id > (C.maxId || 0)) C.maxId = m.id;
       // the database sends the live signal for this message to everyone in the conversation
-      sb.from("chat_reads").upsert({ user_id: S.me.id, channel_id: C.active, last_read_id: m.id }, { onConflict: "user_id,channel_id" }).then(() => {}, () => {});
-      ta.value = ""; C.drafts[C.active] = "";
+      sb.from("chat_reads").upsert({ user_id: S.me.id, channel_id: cid, last_read_id: m.id }, { onConflict: "user_id,channel_id" }).then(() => {}, () => {});
       const tagged = mentions.filter(x => x !== S.me.id && (ch.kind === "channel" || (ch.members || []).includes(x)));
       // notifications for this message are created by the database (no double notifications)
-      drawChatMessages(true); drawChatList();
+      if (C.active === cid) drawChatMessages(true); drawChatList();
     } catch (e) {
       fail(e, "Not sent");
       if (C.active === cidAtSend && !ta.value.trim()) { ta.value = body; C.drafts[cidAtSend] = body; }
@@ -5857,12 +5914,12 @@ function drawChatMessages(toBottom){
   const myLast = [...list].reverse().find(m => m.author_id === S.me.id);
   let lastDay = "", lastAuthor = null, lastT = 0;
   list.forEach((m, i) => {
-    const day = String(m.created_at).slice(0, 10), t = new Date(m.created_at).getTime();
+    const day = localDay(m.created_at), t = new Date(m.created_at).getTime();
     if (day !== lastDay){ msgs.append(h("div", { class: "chat-day" }, h("span", {}, day === today() ? "Today" : day === addDays(today(), -1) ? "Yesterday" : fmtDate(day, true)))); lastDay = day; lastAuthor = null; }
     if (C.unreadFrom && C.unreadFrom[C.active] === m.id) msgs.append(h("div", { class: "chat-unread", id: "unreadMark" }, h("span", {}, "New messages")));
     const next = list[i + 1];
     const first = !(lastAuthor === m.author_id && t - lastT < 5 * 60000);                         // first of a run from this person
-    const lastOfRun = !(next && next.author_id === m.author_id && new Date(next.created_at) - t < 5 * 60000 && String(next.created_at).slice(0, 10) === day);
+    const lastOfRun = !(next && next.author_id === m.author_id && new Date(next.created_at) - t < 5 * 60000 && localDay(next.created_at) === day);
     const mine = m.author_id === S.me.id;
     const time = new Date(m.created_at).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
     const bubble = m.unsent_at ? h("div", { class: "bub unsent" }, mine ? "You deleted this message" : "This message was deleted")
@@ -6826,7 +6883,10 @@ function voiceNoteButton(getSend){
       h("button", { type: "button", class: "btn sm ghost", id: "vrecCancel", onclick: () => { cancelled = true; finish(); } }, "Cancel"),
       h("button", { type: "button", class: "btn sm pri", id: "vrecSend", onclick: finish }, "Send"));
     btn.after(bar);
-    timer = setInterval(() => { const s = (Date.now() - started) / 1000; clock.textContent = fmt(s); if (s >= VOICE_MAX_S) { toast("Voice notes can be up to 5 minutes."); finish(); } }, 250);
+    timer = setInterval(() => {
+      // left Chat or switched conversation: stop recording instead of sending it later on its own
+      if (!bar || !bar.isConnected || C.active !== cid) { cancelled = true; finish(); toast("Voice note discarded: you left the conversation."); return; }
+      const s = (Date.now() - started) / 1000; clock.textContent = fmt(s); if (s >= VOICE_MAX_S) { toast("Voice notes can be up to 5 minutes."); finish(); } }, 250);
   });
   return btn;
 }
@@ -6862,7 +6922,7 @@ function statusOf(id){
   const st = ustatus(id), t = Date.now();
   const lv = onLeaveToday(id);
   if (lv) return { label: lv.half_day ? "On half-day leave today" : "On leave today", tone: "leave" };
-  const checkedOut = st && st.checked_out_at && st.checked_out_at.slice(0, 10) >= addDays(today(), -1) && new Date(st.checked_out_at).toDateString() === new Date().toDateString();
+  const checkedOut = st && st.checked_out_at && localDay(st.checked_out_at) >= addDays(today(), -1) && new Date(st.checked_out_at).toDateString() === new Date().toDateString();
   if (checkedOut || !isWorkDay(today()) || nowMin() >= hm(WH().end)) {
     if (isOnline(id) && !checkedOut) return { label: "Online", tone: "on" };
     return { label: "Back " + nextWorkStart(), tone: "off" };
@@ -6928,7 +6988,8 @@ async function activityTick(){
     lastSent = Date.now();
     const back = st && ["idle", "offline"].includes(st.state);
     await saveMyStatus(Object.assign({ last_active_at: new Date(lastInput).toISOString() }, back || !st ? { state: "active", idle_since: null } : {}));
-    if (warnState) closeIdleWarning();
+    // activity answers an idle warning, not the check-in one (closing it here made it reappear with a chime every minute)
+    if (warnState && !(warnEl && warnEl.dataset.kind === "checkin")) closeIdleWarning();
   } else if (st && st.state === "active" && idleMin >= 10) {
     await saveMyStatus({ state: "idle", idle_since: new Date(lastInput).toISOString() });   // for the day history
   }
@@ -7075,7 +7136,7 @@ async function renderAdminDay(el){
   const every = span > 14 * 60 ? 180 : span > 10 * 60 ? 120 : 60;   // keep the hour labels apart on long days
   const ticks = []; for (let m = Math.ceil(dayStart / every) * every; m <= dayEnd; m += every) ticks.push(m);
   const head = h("div", { class: "dh-row dh-head" }, h("div", { class: "dh-name" }), h("div", { class: "dh-bar" }, ticks.map(m => h("span", { class: "dh-tick", style: "left:" + pct(m) + "%" }, fmtM(m).replace(":00", "")))), h("div", { class: "dh-sum" }, "Active · lunch · work done"));
-  const list = h("div", { class: "dh" }, head);
+  const list = h("div", { class: "dhist" }, head);
   const people = data.filter(p => person(p.user_id) && (!person(p.user_id).is_admin || W.watchAdmins || p.attendance));
   for (const p of people) {
     const sp = spans(p), a = p.attendance || {};
@@ -7137,7 +7198,7 @@ function activitySettingsPanel(){
     err.hidden = true;
     if (hm(end.value) <= hm(start.value)) { err.textContent = "The day must end after it starts."; err.hidden = false; return; }
     if (+alert.value < +warn.value) { err.textContent = "Tell admins after the warning, not before."; err.hidden = false; return; }
-    const data = { ...S.settings, work_start: start.value, work_end: end.value, idle_warn_min: +warn.value, offline_grace_min: +grace.value, admin_alert_min: +alert.value, checkin_remind_min: +remind.value, lunch_min: +lunch.value, watch_admins: admins.checked };
+    const data = { ...(await latestSettings()), work_start: start.value, work_end: end.value, idle_warn_min: +warn.value, offline_grace_min: +grace.value, admin_alert_min: +alert.value, checkin_remind_min: +remind.value, lunch_min: +lunch.value, watch_admins: admins.checked };
     try { ok(await sb.from("settings").upsert({ id: 1, data, updated_at: new Date().toISOString() })); S.settings = data; toast("Working hours saved."); } catch (e) { fail(e, "Not saved"); }
   });
   return h("div", { class: "panel", style: "margin-bottom:14px" }, h("h2", {}, "Working hours and activity"),
@@ -7156,7 +7217,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ai";
+const APP_VERSION = "2026-11aj";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -7562,8 +7623,13 @@ async function recordRun(rec, status){
     const bug = rec.task_id ? byId("tasks", rec.task_id) : null;
     // the linked bug follows the retest: pass closes it, fail sends it back to the developer
     if (bug && bug.status === "In review") {
-      if (status === "Pass") { await updateRow("tasks", bug.id, { status: "Done" }); toast("Passed. " + taskKey(bug) + " is done."); }
-      else if (status === "Fail") { await updateRow("tasks", bug.id, { status: "In progress" }); await addComment("tasks", bug.id, "Retest failed: " + actual); notify([bug.assignee_id], "Retest failed: " + taskKey(bug), actual.slice(0, 140), "tasks", bug.id); toast("Sent back to " + (pname(bug.assignee_id) || "the developer") + "."); }
+      // through the QA steps (the database refuses a plain status change); the result above is saved either way
+      const step = async (action, reason) => { const row = ok(await sb.rpc("task_flow", { p_task: bug.id, p_action: action, p_reason: reason || "", p_user: null })); if (row) upsertCache("tasks", row); };
+      try {
+        if (status === "Pass") { await step("approve"); toast("Passed. " + taskKey(bug) + " is done."); }
+        else if (status === "Fail") { await step("back", "Retest failed: " + actual); notify(ownersOf(bug), "Retest failed: " + taskKey(bug), actual.slice(0, 140), "tasks", bug.id); toast("Failed. " + taskKey(bug) + " went back to the developer."); }
+        else toast("Marked " + status.toLowerCase() + ".");
+      } catch (e2) { toast("Result saved, but " + taskKey(bug) + " wasn’t updated: " + friendly(e2)); }
     } else if (status === "Fail" && !bug) {
       closeDlg();
       if (confirm("Create a bug for a developer from this failed test?")) return newBugFromCase(Object.assign({}, rec, { status, actual }));
@@ -8303,7 +8369,7 @@ function devBoard(u){
 // dragging follows the same steps as the buttons
 function dropTo(t, st){
   if (t.status === "To do" && st === "In progress") return flowStep(t, "start", null, "Started.");
-  if (t.status === "In progress" && st === "To do") return devSave(t, { status: "To do" }, "Moved to To Do.");
+  if (t.status === "In progress" && st === "To do") { if (!isOwner(t) && !isAdmin()) { toast("Only the people working on it can move it back to To Do."); return; } return devSave(t, { status: "To do" }, "Moved to To Do."); }
   if (st === "In review") return flowStep(t, "to_qa", null, "Moved to QA.");
   if (t.status === "In review" && st === "Done") return flowStep(t, "approve", null, "Approved. It’s done.");
   if (t.status === "In review" && (st === "In progress" || st === "To do")) { S.devBack = t.id; openDevTask(t.id); return; }   // needs a reason
@@ -8770,7 +8836,7 @@ function renderAdminTaskRules(el){
   save.addEventListener("click", async () => {
     err.hidden = true; save.disabled = true;
     const next = {}; for (const v of VERTICALS) next[v] = boxes[v].filter(([, cb]) => cb.checked).map(([id]) => id);
-    const data = { ...S.settings, task_handlers: next, owners_can_update_status: workers.checked };
+    const data = { ...(await latestSettings()), task_handlers: next, owners_can_update_status: workers.checked };
     try {
       ok(await sb.from("settings").upsert({ id: 1, data, updated_at: new Date().toISOString() }));
       for (const v of VERTICALS){
@@ -8825,7 +8891,7 @@ function renderAdminSettings(el){
     const leave_overrides = { ...(s.leave_overrides || {}) };
     if (thisYear.value === "") delete leave_overrides[curY]; else leave_overrides[curY] = Math.max(0, +thisYear.value);
     const splitList = v => [...new Set(v.split(",").map(x => x.trim()).filter(Boolean))];
-    const data = { ...s, company: company.value.trim() || "Company", currency: currency.value, working_days: days.filter(([c]) => c.checked).map(([c]) => +c.value), leave_types, annual_leave: +annual.value || 0, leave_overrides, counted_leave_types, holidays, lead_types: splitList(leadTypesIn.value), zones: splitList(zonesIn.value) };
+    const data = { ...(await latestSettings()), company: company.value.trim() || "Company", currency: currency.value, working_days: days.filter(([c]) => c.checked).map(([c]) => +c.value), leave_types, annual_leave: +annual.value || 0, leave_overrides, counted_leave_types, holidays, lead_types: splitList(leadTypesIn.value), zones: splitList(zonesIn.value) };
     delete data.leave_quota;
     save.disabled = true;
     try { ok(await sb.from("settings").upsert({ id: 1, data, updated_at: new Date().toISOString() })); S.settings = data; toast("Settings saved."); renderShell(); }
@@ -9053,7 +9119,7 @@ function drawNotifications(){
       p.hidden = true;
       if (!n.is_read) { try { await sb.from("notifications").update({ is_read: true }).eq("id", n.id); n.is_read = true; renderShell(); } catch (e) {} }
       if (n.tbl === "connect-google") { if (googleConnected()) toast("Google is already connected."); else connectGoogle(); return; }
-      if (n.tbl === "team-day") { S.ui.day = { day: (n.created_at || new Date().toISOString()).slice(0, 10), user: n.entity_id || "" }; go("admin-day"); return; }
+      if (n.tbl === "team-day") { S.ui.day = { day: localDay(n.created_at || new Date()), user: n.entity_id || "" }; go("admin-day"); return; }
       openTarget(n.tbl, n.entity_id);
     } }, h("b", {}, n.title), n.body ? h("span", {}, n.body) : null, h("span", {}, fmtAgo(n.created_at))));
   }
@@ -9253,7 +9319,7 @@ async function init(){
     if (evt === "PASSWORD_RECOVERY") setTimeout(openRecoveryDialog, 300);
     if (session && session.user){
       if (started !== session.user.id){ started = session.user.id; setTimeout(() => startSession(session), 0); }
-    } else if (evt === "SIGNED_OUT" || !session){ started = null; endSession(); }
+    } else if (evt === "SIGNED_OUT" || !session){ started = null; CRUMBS.length = 0; RECENT_ERRORS.length = 0; ERR_SEEN.clear(); errCount = 0; endSession(); }   // the next person's problem reports don't carry the last one's clicks
   });
   const { data } = await sb.auth.getSession();
   if (!data.session) showScreen("login");
