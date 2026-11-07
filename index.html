@@ -1090,6 +1090,14 @@ const $ = id => document.getElementById(id);
     return add.call(this, type, guarded, opts);
   };
 })();
+// Links that come from data may only be web, email, phone or in-page links. A "javascript:" link saved in a
+// meeting, task or lead would otherwise run code in the workspace (with the viewer's sign-in) when clicked.
+function safeUrl(u){
+  const raw = String(u == null ? "" : u).trim(), s = raw.replace(/[\u0000-\u0020\u007F]+/g, "");
+  if (!s) return null;
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(s)) return raw;            // relative link or #anchor
+  return /^(https?|mailto|tel|blob):/i.test(s) ? raw : null;
+}
 function h(tag, attrs, ...kids){
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs || {})){
@@ -1099,6 +1107,10 @@ function h(tag, attrs, ...kids){
     else if (k === "value") el.value = v;
     else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
     else if (v === true) el.setAttribute(k, "");
+    else if ((k === "href" || k === "src" || k === "action" || k === "formaction") && typeof v === "string") {
+      const ok2 = k === "src" && /^data:(image|audio|video)\//i.test(v.trim()) ? v : safeUrl(v);
+      if (ok2 != null) el.setAttribute(k, ok2);
+    }
     else el.setAttribute(k, v);
   }
   for (const kid of kids.flat(Infinity)){
@@ -1107,6 +1119,9 @@ function h(tag, attrs, ...kids){
   }
   return el;
 }
+// the same rule for links opened in a new tab
+{ const open0 = window.open.bind(window);
+  window.open = (u, ...rest) => { if (u && u !== "about:blank" && safeUrl(u) == null) { console.warn("Blocked a link that isn’t a web address:", String(u).slice(0, 40)); return null; } return open0(u, ...rest); }; }
 const clone = o => JSON.parse(JSON.stringify(o));
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36);
 
@@ -6392,10 +6407,12 @@ const tabPage = (title, body) => '<!doctype html><html><head><meta charset="utf-
 const escHtml = t => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 async function openFileInTab(getUrl, a){
   const tab = window.open("", "_blank");
+  if (tab) try { tab.opener = null; } catch (e) {}
   const write = html => { try { tab.document.open(); tab.document.write(html); tab.document.close(); } catch (e) {} };
   if (tab) write(tabPage(a.name || "File", '<main><div class="box">Opening ' + escHtml(a.name || "the file") + '…</div></main>'));
   try {
     const url = await getUrl();
+    if (!/^https:\/\//i.test(String(url || ""))) throw new Error("The file link isn’t a secure web address.");
     const dl = url + (url.includes("?") ? "&" : "?") + "dl=1";
     const head = '<header><b>' + escHtml(a.name || "File") + '</b><a class="btn" href="' + escHtml(dl) + '" download="' + escHtml(a.name || "") + '">Download</a></header>';
     if (!tab) { await saveFetched(url, a.name, a.mime); toast("Your browser blocked the new tab, so " + (a.name || "the file") + " was downloaded instead."); return; }
@@ -6784,13 +6801,14 @@ async function startMeetNow(){
   meetBusy = true; toast("Creating a Google Meet…");
   // open the tab now (browsers block tabs opened later), and send it to the Meet once the link is ready
   const tab = window.open("about:blank", "_blank");
+  if (tab) try { tab.opener = null; } catch (e) {}   // the new tab can't steer this one
   try {
     const now = new Date(), hhmm = String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0");
     const m = await insertRow("meetings", { title: meetTitle(ch), meeting_date: today(), start_time: hhmm, duration_min: 30, kind: "Internal",
       attendees: [...new Set([S.me.id, ...conversationPeople(ch)])], agenda: "Started from chat (" + chName(ch) + ")." });
     const saved = await syncMeetingToGoogle(m);
     const url = saved && saved.link;
-    if (!url || !/meet\.google\.com/.test(url)) throw new Error("Google didn’t return a Meet link. Try again, or use Schedule a meeting.");
+    if (!url || !/^https:\/\/meet\.google\.com\//.test(url)) throw new Error("Google didn’t return a Meet link. Try again, or use Schedule a meeting.");
     const msg = ok(await sb.from("chat_messages").insert({ channel_id: ch.id, author_id: S.me.id, body: "📹 Started a Google Meet: " + url, mentions: [] }).select().single());
     (C.msgs[ch.id] = C.msgs[ch.id] || []).push(msg); C.last[ch.id] = msg; if (msg.id > (C.maxId || 0)) C.maxId = msg.id;
     drawChatMessages(true); markChatRead(ch.id);
@@ -7248,7 +7266,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11al";
+const APP_VERSION = "2026-11am";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));

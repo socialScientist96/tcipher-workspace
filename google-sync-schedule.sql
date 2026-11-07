@@ -14,7 +14,7 @@ select cron.schedule(
   $$
   select net.http_post(
     url := 'https://pfdnziybqaumnofjknsj.supabase.co/functions/v1/google-sync',
-    headers := '{"Content-Type": "application/json", "x-cron-secret": "Q6StCwyjs7n6uHf7NOnUY3GStlvUQP_O"}'::jsonb,
+    headers := '{"Content-Type": "application/json", "x-cron-secret": "<CRON_SECRET>"}'::jsonb,
     body := '{"action": "sync_all"}'::jsonb
   );
   $$
@@ -26,7 +26,7 @@ select cron.schedule(
   $$
   select net.http_post(
     url := 'https://pfdnziybqaumnofjknsj.supabase.co/functions/v1/google-sync',
-    headers := '{"Content-Type": "application/json", "x-cron-secret": "Q6StCwyjs7n6uHf7NOnUY3GStlvUQP_O"}'::jsonb,
+    headers := '{"Content-Type": "application/json", "x-cron-secret": "<CRON_SECRET>"}'::jsonb,
     body := '{"action": "replies_all"}'::jsonb
   );
   $$

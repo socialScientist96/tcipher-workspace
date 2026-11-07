@@ -1,5 +1,12 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11am (7 Nov 2026): security fixes, notification emails restored
+Needs: deploy `google-sync-function.ts` (Edge Functions › google-sync), then upload `index.html` and `sw.js`.
+- **Notification emails restored.** The google-sync deployed on 7 Nov came from an older copy without the sending-mailbox code, so emails had stopped. Rebuilt: connect/test/disconnect the sending mailbox (admins only); every 2 minutes unread notifications over 2 minutes old are emailed to people not in the app (as chosen in My profile, to work and personal email; items from the last 3 hours); replies are posted back as a chat message or comment **only when sent from that person's own address**.
+- **Unsafe links blocked everywhere:** links that come from data may only be web, email or phone links (a `javascript:` link in a meeting or task could otherwise take over the session of whoever clicked it). Tabs opened for files and Meets can't steer the workspace tab.
+- **google-sync:** another person's Google account is used only by that person or an admin (before, naming a colleague as a meeting's Google organiser let anyone edit or cancel their real calendar events); email attachments must be files the sender can see; Cc addresses are checked.
+- **The scheduled-job secret is no longer in this repo** (`google-sync-schedule.sql` shows `<CRON_SECRET>`).
+
 ## Version 2026-11al (7 Nov 2026): works on slow connections
 Needs: upload `index.html` and the new `sw.js` (both at the site root). No database changes.
 - **Opens fast on repeat visits, even offline:** `sw.js` keeps the app's own files (the page, the Supabase library, fonts) on the device. The page is always fetched fresh first; the saved copy is used if the network takes over 4 seconds or is down. Your data is never stored by it. To turn it off, delete `sw.js` from the site.

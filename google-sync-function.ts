@@ -26,6 +26,10 @@ function secretKey(): string {
   try { const k = JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}"); if (k && k.default) return k.default; } catch (_) { /* legacy */ }
   return Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 }
+function publicKey(): string {
+  try { const k = JSON.parse(Deno.env.get("SUPABASE_PUBLISHABLE_KEYS") ?? "{}"); if (k && k.default) return k.default; } catch (_) { /* legacy */ }
+  return Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+}
 // deno-lint-ignore no-explicit-any
 type Any = any;
 const db = createClient(Deno.env.get("SUPABASE_URL")!, secretKey(), { auth: { persistSession: false, autoRefreshToken: false } });
@@ -249,23 +253,30 @@ async function gmailScopes(userId: string) {
   return { send: sc.includes("gmail.send"), read: sc.includes("gmail.readonly") };
 }
 async function hasGmail(userId: string) { return (await gmailScopes(userId)).send; }
-async function sendEmail(me: Any, body: Any) {
+async function sendEmail(me: Any, body: Any, jwt: string) {
   if (!(await hasGmail(me.id))) throw new Error("Email isn’t allowed yet. In My profile, click Reconnect Google and tick the Gmail boxes.");
   const to = String(body.to || "").split(/[,;]/).map((x: string) => x.trim()).filter(Boolean);
   const cc = String(body.cc || "").split(/[,;]/).map((x: string) => x.trim()).filter(Boolean);
   if (!to.length || to.some((x: string) => !/^[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+$/.test(x))) throw new Error("Check the email address.");
+  if (cc.some((x: string) => !/^[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+$/.test(x))) throw new Error("Check the Cc address.");
   const subject = String(body.subject || "").slice(0, 250), text = String(body.body || "").slice(0, 100000);
   if (!subject.trim()) throw new Error("Add a subject.");
   const tbl = String(body.tbl || ""), entity = body.entity_id || null;
   // attachments: files already uploaded to the record (max 20 MB together)
   const files: Any[] = [];
   let total = 0;
-  for (const fid of (Array.isArray(body.file_ids) ? body.file_ids.slice(0, 10) : [])) {
+  // attachments: only files the sender can see in the app (checked with their own sign-in, so the database's rules apply)
+  const fileIds = Array.isArray(body.file_ids) ? body.file_ids.slice(0, 10) : [];
+  const asUser = fileIds.length ? createClient(Deno.env.get("SUPABASE_URL")!, publicKey(), { global: { headers: { Authorization: "Bearer " + jwt } }, auth: { persistSession: false, autoRefreshToken: false } }) : null;
+  if (asUser && !publicKey()) throw new Error("Attachments can’t be checked on the server (no public key). Send without attachments.");
+  for (const fid of fileIds) {
+    const visible = asUser ? (await asUser.from("files").select("id").eq("id", fid).maybeSingle()).data : null;
+    if (!visible) throw new Error("One of the attachments isn’t available to you.");
     const f = must(await db.from("files").select("*").eq("id", fid).maybeSingle()); if (!f) continue;
     const dl = await db.storage.from("files").download(f.path); if (dl.error || !dl.data) throw new Error("Couldn’t attach " + f.name);
     const bytes = new Uint8Array(await dl.data.arrayBuffer()); total += bytes.length;
     if (total > 20 * 1024 * 1024) throw new Error("Attachments are over 20 MB. Remove some, or share a link instead.");
-    files.push({ name: f.name, mime: f.mime || "application/octet-stream", data: bytes });
+    files.push({ name: cleanHeader(f.name), mime: cleanHeader(f.mime || "application/octet-stream"), data: bytes });
   }
   // replying inside an existing conversation
   let threadId = "", inReplyTo = "";
@@ -405,6 +416,185 @@ async function checkReplies(userId: string): Promise<{ found: number; checked: n
   return { found, checked, problem };
 }
 
+
+/* ---------------- notification emails (the company sending mailbox) ----------------
+   An admin connects one mailbox (notifications@tcipher.com) once. Every 2 minutes (the "replies_all" job):
+   - unread notifications (chat messages create them too) that are over 2 minutes old are emailed to people
+     who haven't been active in the app for 2 minutes, as each person chose in My profile
+     ("all", "direct" = direct/group messages and @tags only, "off"); to their work email and personal email;
+   - replies to those emails are posted back as a chat message or a comment, but only when they come from
+     that person's own address. The reply address carries a one-off token: notifications+<token>@tcipher.com. */
+const APP_URL = "https://internal.tcipher.com/";
+const MAIL_BATCH = 40, MAIL_DAILY_CAP = 1500;
+const randomToken = () => { const a = new Uint8Array(24); crypto.getRandomValues(a); return b64(a).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
+const cleanHeader = (v: string) => String(v || "").replace(/[\r\n"]+/g, " ").trim();
+async function senderRow() { return must(await db.from("mail_sender").select("*").eq("id", 1).maybeSingle()); }
+async function senderToken(row: Any): Promise<string> {
+  try { return (await googleTokenRequest({ grant_type: "refresh_token", refresh_token: row.refresh_token })).access_token; }
+  catch (e) {
+    const msg = String((e as Error).message || e);
+    await db.from("mail_sender").update({ last_error: /invalid_grant|expired|revoked/i.test(msg) ? "The sending mailbox's Google access expired or was removed. An admin needs to click Reconnect." : "Google sign-in failed: " + msg.slice(0, 200) }).eq("id", 1);
+    throw e;
+  }
+}
+function mimeText(from: string, to: string[], subject: string, text: string, replyTo = "") {
+  const alt = "alt_" + crypto.randomUUID().replace(/-/g, "");
+  return b64url([
+    "From: " + from, "To: " + to.join(", "), ...(replyTo ? ["Reply-To: " + replyTo] : []),
+    "Subject: " + encHeader(cleanHeader(subject).slice(0, 200)), "MIME-Version: 1.0",
+    "Content-Type: multipart/alternative; boundary=\"" + alt + "\"", "",
+    "--" + alt, "Content-Type: text/plain; charset=UTF-8", "Content-Transfer-Encoding: base64", "", wrap76(b64(new TextEncoder().encode(text))),
+    "--" + alt, "Content-Type: text/html; charset=UTF-8", "Content-Transfer-Encoding: base64", "", wrap76(b64(new TextEncoder().encode(toHtml(text)))),
+    "--" + alt + "--", ""].join("\r\n"));
+}
+async function connectSender(me: Any, code: string) {
+  const tok = await googleTokenRequest({ grant_type: "authorization_code", code, redirect_uri: "postmessage" });
+  const granted = String(tok.scope || "");
+  if (!granted.includes("gmail.send")) throw new Error("Sending email wasn’t allowed. Click Connect again and tick every box on Google’s screen.");
+  const info = await g(tok.access_token, "https://openidconnect.googleapis.com/v1/userinfo");
+  const old = await senderRow();
+  const refresh = tok.refresh_token || (old && old.google_email === info.email ? old.refresh_token : "");
+  if (!refresh) throw new Error("Google didn’t give permanent access. Remove “Tcipher Workspace” at myaccount.google.com/permissions for that mailbox, then connect again.");
+  let history = "";
+  if (granted.includes("gmail.readonly")) { try { history = String((await g(tok.access_token, GMAIL + "profile")).historyId || ""); } catch (_) { /* replies start being read on the next run */ } }
+  must(await db.from("mail_sender").upsert({ id: 1, google_email: info.email || "", refresh_token: refresh, scopes: granted, connected_by: me.id, connected_at: new Date().toISOString(), last_error: "", history_id: history, running_until: null }));
+  return info.email || "";
+}
+async function testSender(me: Any) {
+  const row = await senderRow();
+  if (!row || !row.refresh_token) throw new Error("No sending mailbox is connected.");
+  const token = await senderToken(row);
+  const text = "This is a test from the Tcipher workspace. Notification emails will come from this address.\n\nOpen the workspace: " + APP_URL;
+  await g(token, GMAIL + "messages/send", { method: "POST", body: JSON.stringify({ raw: mimeText("Tcipher Workspace <" + row.google_email + ">", [me.email], "Test email from the Tcipher workspace", text) }) });
+  await db.from("mail_sender").update({ last_error: "" }).eq("id", 1);
+  return me.email;
+}
+async function disconnectSender() {
+  const row = await senderRow();
+  if (row && row.refresh_token) await fetch("https://oauth2.googleapis.com/revoke?token=" + encodeURIComponent(row.refresh_token), { method: "POST" }).catch(() => {});
+  must(await db.from("mail_sender").update({ refresh_token: "", google_email: "", scopes: "", history_id: "", last_error: "", running_until: null }).eq("id", 1));
+}
+// the reply address for one email: notifications+<token>@tcipher.com
+const replyAddress = (sender: string, token: string) => { const [local, domain] = sender.split("@"); return local + "+" + token + "@" + domain; };
+const isDirect = (n: Any) => n.tbl === "chat" || /tagged you|mentioned you/i.test(String(n.title || ""));
+async function sendPendingEmails(row: Any, token: string) {
+  const now = Date.now(), cutoff = new Date(now - 2 * 60000).toISOString(), oldest = new Date(now - 3 * 3600e3).toISOString();   // older unread items aren't emailed late
+  const day = today();
+  let count = row.sent_day === day ? row.sent_count || 0 : 0;
+  if (count >= MAIL_DAILY_CAP) return 0;
+  const list = must(await db.from("notifications").select("*").eq("is_read", false).is("emailed_at", null).eq("email_status", "")
+    .lt("created_at", cutoff).gt("created_at", oldest).order("created_at", { ascending: true }).limit(MAIL_BATCH * 3)) || [];
+  if (!list.length) return 0;
+  const ids = [...new Set(list.map((n: Any) => n.user_id))];
+  const people = new Map<string, Any>((must(await db.from("profiles").select("id,email,full_name,is_active,email_notifications").in("id", ids)) || []).map((p: Any) => [p.id, p]));
+  const personal = new Map<string, string>((must(await db.from("profile_private").select("user_id,personal_email").in("user_id", ids)) || []).map((p: Any) => [p.user_id, p.personal_email]));
+  const seen = new Map<string, string>((must(await db.from("presence").select("user_id,last_seen_at").in("user_id", ids)) || []).map((p: Any) => [p.user_id, p.last_seen_at]));
+  const canReply = String(row.scopes || "").includes("gmail.readonly");
+  let sent = 0;
+  for (const n of list) {
+    if (sent >= MAIL_BATCH || count >= MAIL_DAILY_CAP) break;
+    const p = people.get(n.user_id);
+    const skip = async (why: string) => { await db.from("notifications").update({ email_status: why }).eq("id", n.id); };
+    if (!p || !p.is_active) { await skip("skipped: inactive"); continue; }
+    const pref = p.email_notifications || "all";
+    if (pref === "off") { await skip("skipped: off"); continue; }
+    if (pref === "direct" && !isDirect(n)) { await skip("skipped: not direct"); continue; }
+    const last = seen.get(n.user_id);
+    if (last && last > cutoff) continue;                                   // they're in the app: they'll see it there
+    const to = [...new Set([p.email, personal.get(n.user_id)].map((x) => String(x || "").trim().toLowerCase()).filter((x) => /^[^@\s<>"]+@[^@\s<>"]+\.[^@\s<>"]+$/.test(x)))];
+    if (!to.length) { await skip("skipped: no address"); continue; }
+    // still unread right now?
+    const fresh = must(await db.from("notifications").select("is_read,emailed_at").eq("id", n.id).maybeSingle());
+    if (!fresh || fresh.is_read || fresh.emailed_at) continue;
+    let replyTo = "", tokenRow: Any = null;
+    const replyable = canReply && n.entity_id && n.tbl && (n.tbl === "chat" || !["leave_requests", "connect-google", "team-day", "emails"].includes(n.tbl));
+    if (replyable) {
+      tokenRow = { token: randomToken(), user_id: n.user_id, channel_id: n.tbl === "chat" ? n.entity_id : null, tbl: n.tbl === "chat" ? null : n.tbl, entity_id: n.tbl === "chat" ? null : n.entity_id };
+      const ins = await db.from("email_reply_tokens").insert(tokenRow);
+      if (!ins.error) replyTo = replyAddress(row.google_email, tokenRow.token); else tokenRow = null;
+    }
+    const link = APP_URL + (n.tbl && n.entity_id ? "#open/" + encodeURIComponent(n.tbl) + "/" + encodeURIComponent(n.entity_id) : "");
+    const text = [String(n.title || "Notification"), n.body ? "\n" + String(n.body) : "", "\n\nOpen it in the workspace: " + link,
+      replyTo ? "\n\nReply to this email to answer" + (n.tbl === "chat" ? " in the chat." : " with a comment.") : "",
+      "\n\n—\nYou get these emails because you weren’t in the workspace. Change what you get in My profile › Notification emails."].join("");
+    try {
+      await g(token, GMAIL + "messages/send", { method: "POST", body: JSON.stringify({ raw: mimeText("Tcipher Workspace <" + row.google_email + ">", to, String(n.title || "New notification"), text, replyTo) }) });
+      await db.from("notifications").update({ emailed_at: new Date().toISOString(), email_status: "sent" }).eq("id", n.id);
+      if (n.tbl === "chat") await db.from("chat_email_log").upsert({ user_id: n.user_id, channel_id: n.entity_id, last_emailed_at: new Date().toISOString() }, { onConflict: "user_id,channel_id" });
+      sent++; count++;
+    } catch (e) {
+      await db.from("notifications").update({ email_status: "failed: " + String((e as Error)?.message || e).slice(0, 120) }).eq("id", n.id);
+      if (tokenRow) await db.from("email_reply_tokens").delete().eq("token", tokenRow.token);
+      await db.from("mail_sender").update({ last_error: "Sending failed: " + String((e as Error)?.message || e).slice(0, 200) }).eq("id", 1);
+    }
+  }
+  if (sent) await db.from("mail_sender").update({ sent_day: day, sent_count: count, last_sent_at: new Date().toISOString(), last_error: "" }).eq("id", 1);
+  return sent;
+}
+// the reply itself, without the quoted email below it
+function replyText(raw: string) {
+  const lines = String(raw || "").replace(/\r/g, "").split("\n"), out: string[] = [];
+  for (const l of lines) {
+    if (/^\s*>/.test(l) || /^On .{4,200}wrote:\s*$/.test(l.trim()) || /^-{2,}\s*Original Message/i.test(l.trim()) || /^_{5,}/.test(l.trim()) || /^From:\s/.test(l.trim()) || /^—\s*$/.test(l.trim())) break;
+    out.push(l);
+  }
+  return out.join("\n").trim().slice(0, 4000);
+}
+async function readSenderReplies(row: Any, token: string) {
+  if (!String(row.scopes || "").includes("gmail.readonly")) return 0;
+  if (!row.history_id) { const prof = await g(token, GMAIL + "profile"); await db.from("mail_sender").update({ history_id: String(prof.historyId || "") }).eq("id", 1); return 0; }
+  const ids = new Set<string>(); let page = "", latest = String(row.history_id);
+  try {
+    for (let i = 0; i < 5; i++) {
+      const r = await g(token, GMAIL + "history?historyTypes=messageAdded&labelId=INBOX&maxResults=500&startHistoryId=" + encodeURIComponent(row.history_id) + (page ? "&pageToken=" + encodeURIComponent(page) : ""));
+      for (const hh of r.history || []) for (const ma of hh.messagesAdded || []) if (ma.message && ma.message.id) ids.add(ma.message.id);
+      latest = String(r.historyId || latest); page = r.nextPageToken; if (!page) break;
+    }
+  } catch (_) { const prof = await g(token, GMAIL + "profile"); await db.from("mail_sender").update({ history_id: String(prof.historyId || "") }).eq("id", 1); return 0; }
+  await db.from("mail_sender").update({ history_id: latest }).eq("id", 1);
+  if (!ids.size) return 0;
+  const done = new Set(((must(await db.from("email_reply_log").select("gmail_message_id").in("gmail_message_id", [...ids])) || []) as Any[]).map((x) => x.gmail_message_id));
+  let posted = 0;
+  for (const id of ids) {
+    if (done.has(id)) continue;
+    const m = await g(token, GMAIL + "messages/" + id + "?format=full");
+    const hd = (n: string) => ((m.payload && m.payload.headers) || []).filter((x: Any) => x.name.toLowerCase() === n).map((x: Any) => x.value).join(", ");
+    const from = (hd("from").match(/<([^>]+)>/) || [null, hd("from")])[1].trim().toLowerCase();
+    const text = plainBody(m.payload);
+    const tok = ((hd("to") + " " + hd("cc") + " " + hd("delivered-to")).match(/\+([A-Za-z0-9_-]{20,})@/) || [])[1] || "";
+    const log = async (status: string, uid: string | null = null) => { await db.from("email_reply_log").insert({ gmail_message_id: id, token: tok, user_id: uid, from_email: from.slice(0, 200), status }); };
+    if (!tok) { await log("no token"); continue; }
+    const t = must(await db.from("email_reply_tokens").select("user_id").eq("token", tok).maybeSingle());
+    if (!t) { await log("unknown token"); continue; }
+    // only the person the email went to can answer through it (anyone could write to the reply address)
+    const p = must(await db.from("profiles").select("email").eq("id", t.user_id).maybeSingle());
+    const pp = must(await db.from("profile_private").select("personal_email").eq("user_id", t.user_id).maybeSingle());
+    const allowed = [p && p.email, pp && pp.personal_email].map((x) => String(x || "").trim().toLowerCase()).filter(Boolean);
+    if (!allowed.includes(from)) { await log("sender not allowed", t.user_id); continue; }
+    const body = replyText(text);
+    if (!body) { await log("empty", t.user_id); continue; }
+    const r = await db.rpc("post_email_reply", { p_token: tok, p_body: body });
+    const res = r.data || {};
+    await log(r.error ? "error: " + r.error.message.slice(0, 100) : res.ok ? "posted" : "refused: " + (res.error || "?"), t.user_id);
+    if (res.ok) posted++;
+  }
+  return posted;
+}
+// one run every 2 minutes; a lock stops two runs overlapping
+async function mailRun() {
+  const until = new Date(Date.now() + 100000).toISOString(), nowIso = new Date().toISOString();
+  const lock = must(await db.from("mail_sender").update({ running_until: until }).eq("id", 1).neq("refresh_token", "")
+    .or('running_until.is.null,running_until.lt."' + nowIso + '"').select("*"));
+  const row = lock && lock[0]; if (!row) return { emailed: 0, posted: 0 };
+  try {
+    const token = await senderToken(row);
+    let posted = 0;
+    try { posted = await readSenderReplies(row, token); } catch (e) { await db.from("mail_sender").update({ last_error: "Reading replies failed: " + String((e as Error)?.message || e).slice(0, 200) }).eq("id", 1); }
+    const emailed = await sendPendingEmails(row, token);
+    return { emailed, posted };
+  } finally { await db.from("mail_sender").update({ running_until: null }).eq("id", 1); }
+}
+
 /* ---------------- handler ---------------- */
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -420,7 +610,9 @@ Deno.serve(async (req) => {
       const links = must(await db.from("google_links").select("user_id,scopes")) || [];
       let replies = 0, failed = 0;
       for (const l of links.filter((x: Any) => String(x.scopes || "").includes("gmail.readonly"))) { try { replies += await quickReplies(l.user_id); } catch (_) { failed++; } }
-      return json({ ok: true, replies, failed });
+      let mail: Any = { emailed: 0, posted: 0 };
+      try { mail = await mailRun(); } catch (e) { mail = { error: String((e as Error)?.message || e).slice(0, 200) }; }
+      return json({ ok: true, replies, failed, ...mail });
     }
     if (action === "sync_all") {
       if (!CRON || req.headers.get("x-cron-secret") !== CRON) return json({ error: "Not allowed." }, 403);
@@ -472,14 +664,23 @@ Deno.serve(async (req) => {
     if (action === "sync") return json({ ok: true, events: await syncUser(me.id) });
     if (action === "send_email") {
       const full = must(await db.from("profiles").select("id,email,full_name,is_admin").eq("id", me.id).single());
-      return json({ ok: true, email: await sendEmail(full, body) });
+      return json({ ok: true, email: await sendEmail(full, body, jwt) });
     }
     if (action === "check_replies") { let q = 0; try { q = await quickReplies(me.id); } catch (_) { /* the full check below still runs */ } const r = await checkReplies(me.id); return json({ ok: true, replies: q + r.found, checked: r.checked, problem: r.problem }); }
+
+    if (["connect_sender", "test_sender", "disconnect_sender"].includes(action)) {
+      if (!me.is_admin) return json({ error: "Only an admin can manage the sending mailbox." }, 403);
+      if (action === "connect_sender") return json({ ok: true, email: await connectSender(me, String(body.code || "")) });
+      if (action === "test_sender") return json({ ok: true, to: await testSender(me) });
+      await disconnectSender(); return json({ ok: true });
+    }
 
     const meetingId = String(body.meeting_id || "");
     if (!meetingId) return json({ error: "Missing meeting." }, 400);
     const m = must(await db.from("meetings").select("created_by,google_owner").eq("id", meetingId).single());
-    const allowed = me.is_admin || m.created_by === me.id || m.google_owner === me.id;
+    // another person's Google account is only used by that person or an admin (the creator alone isn't enough:
+    // anyone could create a meeting row naming a colleague as the Google organiser)
+    const allowed = me.is_admin || m.google_owner === me.id || (!m.google_owner && m.created_by === me.id);
     if (!allowed) return json({ error: "Only the organiser or an admin can do this." }, 403);
 
     if (action === "save_event") return json({ ok: true, meeting: await saveEvent(me.id, meetingId) });
