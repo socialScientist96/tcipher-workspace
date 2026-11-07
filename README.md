@@ -152,17 +152,18 @@ It understands Indian formats: dates as 15/11/2026, 2026-11-15 or 15 Nov 2026; a
 ## Website forms (optional): send tcipher.com form submissions straight into Leads
 
 1. **Supabase › Edge Functions › Deploy a new function › Via Editor**, name it `lead-capture`, paste `lead-capture-function.ts`, and deploy. Then turn off **Verify JWT** in its Settings.
-2. **Edge Functions › Secrets:** add `LEAD_CAPTURE_KEY` = `kZ8LihOc1t_SWiZsF2dTh1QB7k-T0HpB` (or your own random text).
+2. **Edge Functions › Secrets:** add `LEAD_CAPTURE_KEY` = any long random text (never commit it here). Optionally add `LEAD_CAPTURE_ORIGINS` = `https://tcipher.com,https://www.tcipher.com` so only your site can post.
 3. On the website form, send the submission like this:
 
 ```js
 fetch("https://pfdnziybqaumnofjknsj.supabase.co/functions/v1/lead-capture", {
   method: "POST",
-  headers: { "Content-Type": "application/json", "x-api-key": "kZ8LihOc1t_SWiZsF2dTh1QB7k-T0HpB" },
+  headers: { "Content-Type": "application/json", "x-api-key": "<your LEAD_CAPTURE_KEY>" },
   body: JSON.stringify({
     name: "Priya Sharma", email: "priya@shop.in", phone: "+91 98765 43210",
     pipeline: "Instagram",                       // or "General"
     page_url: location.href,
+    hp: form.website.value,                      // a hidden, empty "website" field: bots fill it in and are ignored
     utm: { source: "instagram", medium: "paid", campaign: "ai_guide" },
     form: { name: "ai_design_guide", title: "AI Design Skills guide",
             fields: [ { key: "ai_website", label: "Is your website AI-generated?", value: "Partly" } ] }
@@ -170,7 +171,7 @@ fetch("https://pfdnziybqaumnofjknsj.supabase.co/functions/v1/lead-capture", {
 });
 ```
 
-If the same email or phone submits again in the same pipeline, the new answers are added to the existing lead instead of creating a duplicate. Marketing (and Sales, for Instagram) are notified of every new website lead.
+If the same email or phone submits again in the same pipeline, the new answers are added to the existing lead instead of creating a duplicate. Marketing (and Sales, for Instagram) are notified of every new website lead, unless more than 15 arrive within 10 minutes (then they're saved without a notification each). One address can send at most 5 submissions in 10 minutes. Only http(s) page addresses are kept.
 
 ## Task rules (who handles tasks)
 

@@ -1229,7 +1229,9 @@ async function deleteRow(t, id){
 }
 function upsertCache(t, row){
   if (!row || !S.cache[t]) return;
-  const i = S.cache[t].findIndex(r => r.id === row.id);
+  const key = KEYED_BY_USER.has(t) ? "user_id" : "id";   // status/presence rows have no id: match on the person
+  if (row[key] == null) return;
+  const i = S.cache[t].findIndex(r => r[key] === row[key]);
   if (i >= 0) S.cache[t][i] = row; else S.cache[t].unshift(row);
 }
 
@@ -4710,7 +4712,7 @@ function formAnswersSection(rec){
     subs.map(s => h("div", { class: "formsub" },
       h("div", { class: "fh" }, h("b", {}, s.form_title || s.form_name || "Website form"), h("span", { class: "muted" }, s.submitted_at ? new Date(s.submitted_at).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" }) : "")),
       (s.fields || []).length ? h("div", { class: "fa" }, (s.fields || []).map(f => [h("span", { class: "q" }, f.label || f.key), h("span", { class: "a" }, Array.isArray(f.value) ? f.value.join(", ") : f.value === true ? "Yes" : f.value === false ? "No" : f.value == null || f.value === "" ? "–" : String(f.value))])) : null,
-      s.page_url ? h("div", { class: "muted", style: "font-size:12.5px;margin-top:4px" }, "From ", h("a", { href: s.page_url, target: "_blank", rel: "noopener" }, s.page_url.replace(/^https?:\/\//, "").slice(0, 60))) : null,
+      /^https?:\/\//i.test(s.page_url || "") ? h("div", { class: "muted", style: "font-size:12.5px;margin-top:4px" }, "From ", h("a", { href: s.page_url, target: "_blank", rel: "noopener" }, s.page_url.replace(/^https?:\/\//, "").slice(0, 60))) : null,
       s.utm && Object.values(s.utm).some(Boolean) ? h("div", { class: "muted", style: "font-size:12.5px" }, "UTM: " + Object.entries(s.utm).filter(([, v]) => v).map(([k, v]) => k + "=" + v).join(" · ")) : null)));
 }
 function linkedTasksSection(table, rec){
@@ -5004,7 +5006,7 @@ async function openCsvImport(key){
     const dupFinder = csvDupFinder(key, M);
     const out = [];
     st.rows.forEach((r, idx) => {
-      const d = {}, warns = [], errs = [], extra = [];
+      const d = {}, warns = [], errs = [], extra = [], defs = [];
       st.headers.forEach((hd, i) => {
         const k = st.map[i], raw = r[i];
         if (!k){ if (st.keepExtra && raw != null && String(raw).trim() !== "") extra.push({ key: norm(hd).replace(/ /g, "_").slice(0, 64) || "col_" + i, label: hd || "Column " + (i + 1), value: String(raw).trim() }); return; }
@@ -5015,12 +5017,12 @@ async function openCsvImport(key){
       });
       for (const f of fields){
         if (d[f.k] !== undefined) continue;
-        if (f.def !== undefined){ const dv = typeof f.def === "function" ? f.def() : f.def; if (dv !== undefined && dv !== null && dv !== "") d[f.k] = dv; }
+        if (f.def !== undefined){ const dv = typeof f.def === "function" ? f.def() : f.def; if (dv !== undefined && dv !== null && dv !== "") { d[f.k] = dv; defs.push(f.k); } }
       }
       for (const f of fields) if (f.req && (d[f.k] === undefined || d[f.k] === "" || d[f.k] === null) && (!f.show || f.show(d))) errs.push("“" + f.l + "” is missing");
       if (extra.length) d.form_submissions = [{ form_name: "csv_import", form_title: "Imported from " + st.file, page_url: "", utm: {}, fields: extra, submitted_at: new Date().toISOString() }];
       const dup = !errs.length && dupFinder ? dupFinder(d) : null;
-      out.push({ line: idx + 2, d, warns, errs, dup });
+      out.push({ line: idx + 2, d, warns, errs, dup, defs });
     });
     // duplicates inside the file itself
     if (dupFinder){
@@ -5078,7 +5080,8 @@ async function openCsvImport(key){
       done += chunk.length; tick();
     }
     for (const x of toUpd){
-      const d = {}; for (const [k, v] of Object.entries(x.d)) if (v !== undefined && v !== "" && !(Array.isArray(v) && !v.length)) d[k] = v;
+      // only what the file actually has: defaults for new rows (status "New", owner = me…) must not overwrite the existing record
+      const d = {}; for (const [k, v] of Object.entries(x.d)) if (!(x.defs || []).includes(k) && v !== undefined && v !== "" && !(Array.isArray(v) && !v.length)) d[k] = v;
       if (d.form_submissions) d.form_submissions = [...(x.dup.form_submissions || []), ...d.form_submissions].slice(-20);
       try { await updateRow(M.table, x.dup.id, d); updated++; } catch (e) { failed.push({ line: x.line, why: friendly(e) }); }
       done++; tick();
@@ -7153,7 +7156,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ah";
+const APP_VERSION = "2026-11ai";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -8144,7 +8147,15 @@ async function renderQAImport(el){
           const ex = ext ? existing.get(ext) : null;
           if (ex){
             const upd = Object.assign({}, row); delete upd.project_id; delete upd.external_id; delete upd.created_by; delete upd.source;
-            if (table === "tasks") { delete upd.qa_state; if (ex.status === "Done" && upd.status !== "Done") delete upd.status; }
+            // work done in the app wins over the sheet: a result only when the sheet records one, status only forwards,
+            // people only where nobody is set yet, and the feature it was moved to stays
+            if (table === "tasks") {
+              delete upd.qa_state; delete upd.blocked; delete upd.blocked_reason;
+              const FL = ["To do", "In progress", "In review", "Done"];
+              if (FL.indexOf(upd.status) <= FL.indexOf(ex.status)) delete upd.status;
+            } else if (upd.status === "Not run" || upd.status === ex.status) delete upd.status;
+            for (const k of ["assignee_id", "tester_id", "feature_id"]) if (!upd[k] || ex[k]) delete upd[k];
+            for (const k of ["retest_count", "reopen_count"]) if ((upd[k] || 0) <= (ex[k] || 0)) delete upd[k];
             // same as what's saved: nothing to do (importing the same sheet twice shouldn't try to edit every row)
             const same = (a, b) => JSON.stringify(a == null || a === "" ? null : a) === JSON.stringify(b == null || b === "" ? null : b);
             if (Object.keys(upd).every(k => same(ex[k], upd[k]))) { out.same++; if (forRow) backendFor[forRow] = ex.id; continue; }
@@ -8196,7 +8207,7 @@ const tabKey = name => String(name || "").replace(/\//g, "-").trim().slice(0, 60
 async function pageAll(table, project){
   const out = [];
   for (let from = 0; from < 50000; from += 1000){
-    const r = ok(await sb.from(table).select("id,external_id,status").eq("project_id", project).range(from, from + 999)) || [];
+    const r = ok(await sb.from(table).select("*").eq("project_id", project).range(from, from + 999)) || [];
     out.push(...r); if (r.length < 1000) break;
   }
   return out;
