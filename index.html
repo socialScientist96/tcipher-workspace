@@ -998,7 +998,7 @@ a{color:var(--p-ink)}
 .side .foot .who span{color:var(--ink3)}
 .side .foot button:not(.who){background:var(--white);border:1px solid var(--line);color:var(--ink2);border-radius:8px;padding:4px 10px;font-size:12px}
 .side .foot button:not(.who):hover{background:var(--tint);color:var(--ink)}
-.side .av.on::after{border-color:#FBFBFB}
+.side .av.on::after{border-color:#FFFFFF}
 .mystatus-slot{padding:8px 4px 4px}
 .mystatus{background:var(--white);border:1px solid var(--line);color:var(--ink2);border-radius:8px}
 .mystatus:hover{background:var(--tint)}
@@ -1328,7 +1328,7 @@ html,body{overflow-x:clip}
    Notion-style sidebar (2026-11ar): warm off-white, an icon on every page,
    search, Home / Chat / Calendar shortcuts, recents, quiet section labels
    ===================================================================== */
-.side{background:#FBFBFB;border-right:1px solid var(--line);padding:8px 8px 8px;color:#5F5E5B}
+.side{background:#FFFFFF;border-right:1px solid var(--line);padding:8px 8px 8px;color:#5F5E5B}
 .side-top{display:flex;align-items:center;gap:2px;padding:4px 4px 8px 8px;flex:none}
 .side-top .grow{flex:1}
 .side .brand{padding:4px 0;flex-direction:row;align-items:center}
@@ -1366,7 +1366,7 @@ html,body{overflow-x:clip}
 .nav a.on .nic{color:#37352F}
 .side.searching .side-quick,.side.searching .recents,.side.searching .nav-group.bugnav,.side.searching .nav-head .chev,.side.searching .nav-head .cnt{display:none}
 .side .foot{border-top:1px solid var(--line);padding:8px 4px 0}
-.side .av.on::after{border-color:#FBFBFB}
+.side .av.on::after{border-color:#FFFFFF}
 .mystatus{background:#fff;border-color:#E9E9E7}
 /* hide the sidebar on a computer (the menu button at the top brings it back) */
 @media (min-width:961px){
@@ -7846,7 +7846,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11at";
+const APP_VERSION = "2026-11au";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));

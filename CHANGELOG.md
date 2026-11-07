@@ -1,5 +1,9 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11au (8 Nov 2026): white sidebar
+Needs: upload `index.html` and `sw.js`.
+- The sidebar's background is white (#FFFFFF), with the hairline edge separating it from the page. Layout unchanged.
+
 ## Version 2026-11at (8 Nov 2026): sidebar background
 Needs: upload `index.html` and `sw.js`.
 - The sidebar's background is back to the light grey from before the Notion-style change (#FBFBFB, with the same hairline edge as the rest of the app). Its layout is unchanged.
