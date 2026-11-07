@@ -917,6 +917,11 @@ button.is-busy{opacity:.6;cursor:progress;pointer-events:none}
 .vp-time{font-size:12px;color:var(--ink2);font-variant-numeric:tabular-nums;min-width:74px;text-align:right}
 .vp-speed{border:1px solid var(--line);background:#fff;border-radius:999px;font:inherit;font-size:11.5px;font-weight:700;padding:2px 8px;cursor:pointer;color:var(--ink2)}
 .vp-speed{white-space:nowrap;min-width:42px;text-align:center;flex:none}
+.pwwrap{position:relative;display:block;width:100%}
+.pwwrap .in{padding-right:40px}
+.pweye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:32px;height:32px;display:grid;place-items:center;border:0;background:transparent;color:var(--ink3);border-radius:6px;cursor:pointer;padding:0}
+.pweye:hover{color:var(--ink);background:rgba(9,30,66,.06)}
+.pweye:focus-visible{outline:2px solid var(--p);outline-offset:1px}
 </style>
 </head>
 <body>
@@ -974,6 +979,28 @@ button.is-busy{opacity:.6;cursor:progress;pointer-events:none}
 <dialog id="dlg"></dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+<script>
+/* show / hide password: adds an eye button to every password box, including ones added later */
+(function(){
+  const EYE = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const EYE_OFF = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.9 17.9A10.4 10.4 0 0 1 12 19c-6.5 0-10-7-10-7a18.5 18.5 0 0 1 5.1-5.9M9.9 5.2A9.8 9.8 0 0 1 12 5c6.5 0 10 7 10 7a18.6 18.6 0 0 1-2.2 3.2M14.1 14.1a3 3 0 1 1-4.2-4.2"/><path d="M2 2l20 20"/></svg>';
+  function enhance(inp){
+    if (inp.dataset.pw) return; inp.dataset.pw = "1";
+    const wrap = document.createElement("span"); wrap.className = "pwwrap";
+    const btn = document.createElement("button"); btn.type = "button"; btn.className = "pweye";
+    const set = shown => { inp.type = shown ? "text" : "password"; btn.innerHTML = shown ? EYE_OFF : EYE;
+      btn.setAttribute("aria-label", shown ? "Hide password" : "Show password"); btn.title = btn.getAttribute("aria-label"); btn.setAttribute("aria-pressed", String(shown)); };
+    btn.addEventListener("mousedown", e => e.preventDefault());   // keep the cursor in the box
+    btn.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); set(inp.type === "password"); inp.focus(); });
+    set(false);
+    const place = () => { if (!inp.parentNode || wrap.contains(inp)) return; inp.parentNode.insertBefore(wrap, inp); wrap.append(inp, btn); };
+    if (inp.parentNode) place(); else { const mo = new MutationObserver(() => { if (inp.parentNode) { mo.disconnect(); place(); } }); mo.observe(document, { childList: true, subtree: true }); }
+  }
+  const scan = root => { if (root.matches && root.matches('input[type="password"]')) enhance(root); if (root.querySelectorAll) root.querySelectorAll('input[type="password"]').forEach(enhance); };
+  const start = () => { scan(document); new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => n.nodeType === 1 && scan(n)))).observe(document.body, { childList: true, subtree: true }); };
+  if (document.body) start(); else document.addEventListener("DOMContentLoaded", start);
+})();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
 <script>
 /* =====================================================================
@@ -1692,7 +1719,7 @@ const MOD = {
     allRowsWhen: u => u.quick === "archived",
     quick: [
       ["all", "All"],
-      ["mine", "My tasks", t => t.assignee_id === S.me.id || (t.status === "In review" && !!t.qa_state && (t.tester_id === S.me.id || t.reviewer_id === S.me.id))],
+      ["mine", "My tasks", t => t.assignee_id === S.me.id || (t.collaborators || []).includes(S.me.id) || (t.status === "In review" && !!t.qa_state && (t.tester_id === S.me.id || t.reviewer_id === S.me.id))],
       ["tagged", "Tagged me", t => (t.mentions || []).includes(S.me.id)],
       ["review", "I’m reviewing", t => t.reviewer_id === S.me.id && t.status !== "Done"],
       ["helping", "Helping", t => (t.collaborators || []).includes(S.me.id)],
@@ -4421,7 +4448,7 @@ function badgeInfo(route){
       add(rows("tasks").filter(t => t.status === "In review" && t.qa_state && (t.tester_id === me || t.reviewer_id === me)).length + (L("test_cases") ? rows("test_cases").filter(c => c.status === "Retest" && c.tester_id === me).length : 0), "waiting for you to test", "due");
     } break;
     case "bugs": if (L("tasks")) {
-      add(rows("tasks").filter(t => t.type === "Bug" && t.assignee_id === me && t.status !== "Done" && t.status !== "In review").length, "bugs assigned to you", "due");
+      add(rows("tasks").filter(t => t.type === "Bug" && myTask(t) && t.status !== "Done" && t.status !== "In review").length, "bugs assigned to you", "due");
       add(rows("tasks").filter(t => t.type === "Bug" && t.created_by !== me && t.status !== "Done" && isNewer(t.created_at, route)).length, "new bugs", "new");
     } break;
     case "test_cases": if (L("test_cases")) {
@@ -7586,7 +7613,7 @@ async function addComment(tbl, id, body){ try { await sb.from("comments").insert
     rowFilter: t => t.type === "Bug",
     quick: [
       ["all", "All open", t => t.status !== "Done"],
-      ["mine", "Assigned to me", t => t.assignee_id === S.me.id && t.status !== "Done"],
+      ["mine", "Assigned to me", t => (t.assignee_id === S.me.id || (t.collaborators || []).includes(S.me.id)) && t.status !== "Done"],
       ["retest", "Waiting for retest", t => t.status === "In review"],
       ["failed", "Sent back", t => t.qa_state === "Failed"],
       ["reported", "I reported", t => t.tester_id === S.me.id || t.created_by === S.me.id],
@@ -7715,7 +7742,7 @@ async function renderQA(el){
     left.append(h("div", { class: "panel" }, h("h2", {}, "Waiting for you to test", h("span", { class: "muted", style: "font-weight:400;font-size:13px" }, " " + (forMe.length + retestMine.length))),
       forMe.length || retestMine.length ? [...forMe.slice(0, 15).map(taskRow), ...retestMine.slice(0, 15).map(caseRow)] : h("p", { class: "nothing" }, "Nothing waiting. Finished development work comes here automatically.")));
   // for developers: what's been sent to them
-  const myBugs = rows("tasks").filter(t => inP(t) && t.assignee_id === S.me.id && t.vertical === "Development" && t.status !== "Done" && (t.type === "Bug" || t.qa_state === "Failed"));
+  const myBugs = rows("tasks").filter(t => inP(t) && (t.assignee_id === S.me.id || (t.collaborators || []).includes(S.me.id)) && t.vertical === "Development" && t.status !== "Done" && (t.type === "Bug" || t.qa_state === "Failed"));
   const myCases = cases.filter(c => c.assignee_id === S.me.id && ["Fail", "Blocked"].includes(c.status));
   left.append(h("div", { class: "panel" }, h("h2", {}, "Sent to you to fix", h("span", { class: "muted", style: "font-weight:400;font-size:13px" }, " " + (myBugs.length + myCases.length))),
     myBugs.length || myCases.length ? [...myBugs.slice(0, 15).map(taskRow), ...myCases.slice(0, 15).map(caseRow)] : h("p", { class: "nothing" }, "Nothing assigned to you.")));
