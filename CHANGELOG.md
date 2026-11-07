@@ -1,5 +1,11 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11an (7 Nov 2026): browser security policy and tamper checks
+Needs: upload `index.html` and `sw.js`.
+- **Security policy (CSP)** in the page: code and data may only come from / go to this site, Supabase, Google (sign-in, Drive, Docs viewer) and the three library CDNs. A stolen session can no longer be sent to another site. **Using a new outside site in the code means adding it to the policy at the top of index.html.**
+- **Tamper checks (SRI)** on the Supabase library (both sources), the screenshot library and the Excel library: a changed copy is refused.
+- Links to other sites no longer carry the full page address (referrer policy).
+
 ## Version 2026-11am (7 Nov 2026): security fixes, notification emails restored
 Needs: deploy `google-sync-function.ts` (Edge Functions › google-sync), then upload `index.html` and `sw.js`.
 - **Notification emails restored.** The google-sync deployed on 7 Nov came from an older copy without the sending-mailbox code, so emails had stopped. Rebuilt: connect/test/disconnect the sending mailbox (admins only); every 2 minutes unread notifications over 2 minutes old are emailed to people not in the app (as chosen in My profile, to work and personal email; items from the last 3 hours); replies are posted back as a chat message or comment **only when sent from that person's own address**.
