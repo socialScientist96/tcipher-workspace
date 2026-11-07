@@ -12,7 +12,7 @@
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" crossorigin="anonymous">
 <style>
 :root{
   color-scheme: light;
@@ -937,6 +937,233 @@ button.is-busy{opacity:.6;cursor:progress;pointer-events:none}
 .pweye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:32px;height:32px;display:grid;place-items:center;border:0;background:transparent;color:var(--ink3);border-radius:6px;cursor:pointer;padding:0}
 .pweye:hover{color:var(--ink);background:rgba(9,30,66,.06)}
 .pweye:focus-visible{outline:2px solid var(--p);outline-offset:1px}
+
+/* =====================================================================
+   Design pass 2026-11ap: quiet neutral chrome, one accent (Tcipher violet),
+   a light sidebar, weights 400–600, sentence-case labels, line icons,
+   and task IDs set as small mono keycaps (the workspace's signature detail).
+   Method after "unslop" by Damir Sokolovsky (@heydamir), CC BY 4.0.
+   ===================================================================== */
+:root{
+  --p:#6450F5; --p-hover:#5340E6; --p-ink:#4B3BCB; --p-soft:#F1EFFE; --p-soft2:#E6E2FD;
+  --p-deep:#18181B; --p-deep2:#27272A;
+  --bg:#F7F7F8; --white:#FFFFFF; --ink:#18181B; --ink2:#52525B; --ink3:#71717A; --line:#E7E7EA;
+  --tint:#F4F4F5; --tint2:#EDEDF0; --tint3:#D4D4D8;
+  --ok:#15803D; --ok-t:#EAF6EE; --warn:#A15C07; --warn-t:#FBF2E2; --bad:#C2303F; --bad-t:#FCECEE; --info:#3A5BA0; --info-t:#EEF2F9;
+  --shadow:0 1px 2px rgba(0,0,0,.04), 0 6px 16px rgba(0,0,0,.05);
+  --r:12px;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.22,1,.36,1);
+}
+body{font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+b,strong{font-weight:600}
+h1,h2,h3,h4{font-weight:600}
+a{color:var(--p-ink)}
+:focus-visible{outline:2px solid var(--p);outline-offset:2px}
+.ic{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;vertical-align:-3px}
+
+/* sign-in */
+.auth-side{background:#131316;color:#EDEDEF}
+.auth-side::after{display:none}
+.auth-side h1{font-weight:500;letter-spacing:-.02em;max-width:16ch;text-wrap:balance}
+.auth-side p{color:#A1A1AA}
+.auth-note{color:#85858B;font-size:13px}
+.auth-card h2{font-weight:600;letter-spacing:-.01em}
+.auth-card code{background:var(--tint)}
+
+/* sidebar: light, hairline edge, accent only on the page you're on */
+.side{background:#FBFBFB;color:var(--ink2);border-right:1px solid var(--line);padding:16px 12px 12px}
+.side .nav{scrollbar-color:rgba(0,0,0,.15) transparent}
+.side .nav::-webkit-scrollbar-thumb{background:rgba(0,0,0,.14)}
+.side .brand{padding:4px 8px 20px;gap:4px}
+.side .brand-logo{height:28px}
+.side .brand-tag{color:var(--ink3);font-weight:500;font-size:12px;letter-spacing:0;padding-left:2px}
+.nav-group{margin:0 0 8px}
+.nav-group h4{margin:16px 8px 4px;font-size:12px;font-weight:500;color:var(--ink3)}
+.nav a{min-height:32px;padding:6px 8px;gap:8px;margin:2px 0;border-radius:8px;color:var(--ink2);font-weight:500;font-size:14px}
+.nav a:hover{background:var(--tint);color:var(--ink)}
+.nav a.on{background:var(--p-soft);color:var(--p-ink);font-weight:500}
+.nav a .cnt,.nav-head .cnt,.chat-item .cnt,.panel .cnt{border-radius:6px;padding:0 6px;font-family:var(--mono);font-size:11px;font-weight:500;line-height:18px;min-width:18px;text-align:center}
+.cnt.due,.nav a .cnt.due,.nav-head .cnt.due{background:var(--bad);color:#fff}
+.cnt.new,.nav a .cnt.new,.nav-head .cnt.new,.nav a.on .cnt.new{background:var(--tint2);color:var(--ink2)}
+.nav-group.coll{margin-top:8px}
+.nav-head{color:var(--ink2);font-size:13px;font-weight:500;text-transform:none;letter-spacing:0;padding:6px 8px;min-height:32px}
+.nav-head:hover{color:var(--ink);background:var(--tint)}
+.nav-head .chev{color:var(--ink3)}
+.side .foot{border-top:1px solid var(--line);padding:12px 4px 0;gap:8px}
+.side .foot .who b{color:var(--ink);font-size:13px;font-weight:600}
+.side .foot .who span{color:var(--ink3)}
+.side .foot button:not(.who){background:var(--white);border:1px solid var(--line);color:var(--ink2);border-radius:8px;padding:4px 10px;font-size:12px}
+.side .foot button:not(.who):hover{background:var(--tint);color:var(--ink)}
+.side .av.on::after{border-color:#FBFBFB}
+.mystatus-slot{padding:8px 4px 4px}
+.mystatus{background:var(--white);border:1px solid var(--line);color:var(--ink2);border-radius:8px}
+.mystatus:hover{background:var(--tint)}
+.mystatus .dot{background:var(--tint3)}
+@media (max-width:960px){.side.open{box-shadow:0 0 0 100vmax rgba(9,9,11,.4)}}
+
+/* top bar and page header */
+.topbar{background:rgba(247,247,248,.9);padding:10px clamp(16px,3vw,32px);min-height:56px}
+.topbar .crumb{font-weight:500;color:var(--ink2)}
+.iconbtn{border-color:var(--line);border-radius:8px;width:36px;height:36px;color:var(--ink2)}
+.iconbtn:hover{border-color:var(--tint3);color:var(--ink)}
+.iconbtn .dot{border-radius:6px;font-family:var(--mono);font-weight:500}
+.content{padding:24px clamp(16px,3vw,32px) 64px}
+.ph{margin-bottom:20px}
+.ph h1{font-weight:500;letter-spacing:-.02em}
+.ph p{color:var(--ink2)}
+
+/* buttons and fields */
+.btn{font-weight:500;border-radius:8px;min-height:36px;padding:8px 14px;gap:8px;color:var(--ink);border-color:var(--line);box-shadow:0 1px 1px rgba(0,0,0,.03)}
+.btn:hover{border-color:var(--tint3);background:var(--tint)}
+.btn.pri{background:var(--p);border-color:var(--p);color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.14)}
+.btn.pri:hover{background:var(--p-hover);border-color:var(--p-hover)}
+.btn.soft{background:var(--tint);border-color:var(--tint);color:var(--ink)}
+.btn.soft:hover{background:var(--tint2);border-color:var(--tint2)}
+.btn.ghost{box-shadow:none}
+.btn.ghost:hover{background:var(--tint)}
+.btn.danger{box-shadow:none}
+.btn.sm{min-height:32px;padding:4px 10px;font-size:13px}
+.btn:active{transform:scale(.98)}
+.in{border-color:var(--line);border-radius:8px;min-height:36px}
+.in:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(100,80,245,.14)}
+.fl{font-weight:500;gap:6px}
+.chk{font-weight:500}
+.err{font-weight:500}
+.seg{border-radius:8px;border-color:var(--line)}
+.seg button{font-weight:500;min-height:34px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
+
+/* surfaces */
+.panel{border-radius:var(--r);padding:20px}
+.panel h2{font-size:15px;font-weight:600;margin-bottom:12px}
+.panel h2 a,.panel h2 button.link{font-weight:500;color:var(--p-ink)}
+.grid{gap:16px}
+.stats{gap:12px;margin-bottom:20px}
+.stat{border-top:1px solid var(--line);border-radius:var(--r);padding:16px}
+.stat .v{font-size:24px;font-weight:500;letter-spacing:-.01em;line-height:1.2}
+.stat .l{color:var(--ink3);font-size:13px;font-weight:400;margin-top:2px}
+.pill{border-radius:6px;padding:1px 8px;font-size:12px;font-weight:500;background:var(--tint);color:var(--ink2);line-height:20px}
+.pill.grey{background:var(--tint);color:var(--ink2)}
+th{background:#FAFAFA;font-weight:500;font-size:12px}
+tbody tr.click:hover{background:#FAFAFA}
+.empty b{font-weight:500}
+
+/* Home: the day as the title, check-in in a quiet card */
+.hello{background:none;color:var(--ink);padding:0;border-radius:0;margin-bottom:20px;align-items:center;overflow:visible}
+.hello::after{display:none}
+.hello h1{font-weight:500;font-size:clamp(22px,2.6vw,28px);letter-spacing:-.02em;color:var(--ink)}
+.hello p{color:var(--ink3);margin-top:4px}
+.hello .att{background:var(--white);border:1px solid var(--line);border-radius:12px;padding:8px 8px 8px 16px;gap:8px}
+.hello .att span{color:var(--ink2);font-size:13px}
+.hello .btn{background:var(--white);color:var(--ink);border-color:var(--line);font-weight:500!important}
+.hello .btn:hover{background:var(--tint)}
+.hello .att .btn:last-child{background:var(--p);border-color:var(--p);color:#fff}
+.hello .att .btn:last-child:hover{background:var(--p-hover)}
+.hello .att select.in{background:var(--white)!important}
+
+/* the signature: task IDs as small mono keycaps */
+.tkey{font-family:var(--mono);font-size:11.5px;font-weight:500;color:var(--ink2);background:var(--white);border:1px solid var(--line);box-shadow:inset 0 -1px 0 var(--line);border-radius:5px;padding:0 5px;line-height:18px;display:inline-flex;align-items:center;gap:4px}
+a.tkey:hover{background:var(--tint);color:var(--ink)}
+.dv-key{font-family:var(--mono);font-size:11.5px;font-weight:500;color:var(--ink3);letter-spacing:0}
+.mention{background:var(--p-soft);color:var(--p-ink);font-weight:500}
+.code{font-family:var(--mono)}
+.fhead{color:var(--ink2);font-weight:600;text-transform:none;letter-spacing:0;font-size:13px}
+
+/* boards */
+.col{background:var(--tint);border-radius:12px}
+.card{border-radius:10px;border-left-width:3px}
+.card .t{font-weight:500}
+.card:hover,.pcard:hover,button.stat:hover,.note-card:hover{transform:none;box-shadow:var(--shadow)}
+.dv-col{background:var(--tint)}
+.dv-col.drop,.dv-bbox.active{background:var(--p-soft)}
+.dv-colh{color:var(--ink2);font-weight:500}
+.dv-card{color:var(--ink);box-shadow:0 1px 1px rgba(0,0,0,.06),0 0 0 1px rgba(0,0,0,.04)}
+.dv-card:hover{background:#FCFCFC;box-shadow:0 1px 2px rgba(0,0,0,.06),0 4px 12px rgba(0,0,0,.05)}
+.dv-tabsbar a.on{color:var(--ink);border-bottom-color:var(--p)}
+.dv-chip{border-radius:8px;border-color:var(--line);color:var(--ink2)}
+.dv-chip.on,.dv-tabs button.on{background:var(--p-soft);border-color:var(--p-soft2);color:var(--p-ink)}
+.dv-face.on,.dv-fbtn.on{border-color:var(--p)}
+.dv-loz,.dv-step{text-transform:none;letter-spacing:0;font-weight:500;font-size:12px}
+.dv-step.on{background:var(--p);color:#fff}
+.dv-statusbtn{font-weight:500}
+.dv-statusbtn.s-in-progress{background:var(--p);color:#fff}
+.dv-loz.s-in-progress{background:var(--p-soft);color:var(--p-ink)}
+.dv-counts span{border-radius:6px;font-weight:500;font-family:var(--mono);font-size:11px}
+.dv-counts .c-prog{background:var(--p-soft);color:var(--p-ink)}
+.dv-qa,.dv-needqa{font-weight:500;border-radius:6px}
+.dv-pts{border-radius:6px;font-family:var(--mono);font-size:11px}
+.dv-h{font-weight:500;color:var(--ink)}
+.dv-link{color:var(--p-ink)}
+.dv-flag{display:inline-flex;align-items:center;gap:4px;font-weight:500}
+.dv-epiccard:hover{border-color:var(--tint3)}
+.dv-velbar,.dv-stack span.s-in-progress,.dv-legend i.s-in-progress{background:var(--p)}
+
+/* lists, rows and small bits */
+.row:hover,.load-row:hover,.chat-item:hover,.nitem:hover,.mention-item:hover,.mention-item.on,.status-menu button:hover{background:var(--tint)}
+.load-row[aria-pressed="true"],.chat-item.on{background:var(--tint2)}
+.bar{background:var(--tint);border-radius:4px}
+.b1{background:#C9C3FB}.b2{background:var(--p)}.b3{background:#D08A3C}
+.hday{background:var(--tint);color:var(--ink);border-radius:10px}
+.hday b{font-weight:500}
+.hday small{text-transform:none;font-weight:500;color:var(--ink3)}
+.note-card .nt{font-weight:600;display:flex;align-items:center;gap:6px}
+.note-card.pinned{background:var(--white);border-color:var(--tint3)}
+.cal-head div{background:#FAFAFA;font-weight:500}
+.cal-day .dn{font-weight:500;font-family:var(--mono);font-size:12px}
+.cal-day.today .dn{border-radius:6px}
+.cal-day.out{background:#FBFBFB}
+.ev{border-radius:4px}
+.ev,.ev.k-task{background:var(--tint);color:var(--ink2)}
+.tev.workspace{background:var(--tint);color:var(--ink)}
+.nitem.unread{background:#FAFAFF}
+.av.on::after{background:#22A06B}
+.lastact.is-on{color:var(--ok);font-weight:500}
+.live-dot{font-weight:500}
+.blocked-ic{display:inline-flex;color:var(--bad);margin-right:4px;vertical-align:-2px}
+
+/* chat */
+.chat{border-radius:var(--r)}
+.chat-list{background:#FBFBFB}
+.chat-list h4{text-transform:none;letter-spacing:0;font-size:12px;font-weight:500;margin:16px 8px 4px}
+.chat-item.unread b{font-weight:600}
+.gicon{background:var(--tint);color:var(--ink2)}
+.chat-msgs .bname{font-weight:500}
+.chat-msgs .bub{background:#F1F1F3;border-radius:16px}
+.chat-msgs .bub.tagged{box-shadow:0 0 0 1px #E9B949 inset;background:#FFFBF0}
+.chat-unread{text-transform:none;letter-spacing:0;font-weight:500;color:var(--bad)}
+.chat-unread::before,.chat-unread::after{background:#F2C4C8}
+.chat-jump{font-weight:500;box-shadow:0 4px 12px rgba(0,0,0,.12)}
+.chat-attach{display:inline-flex;align-items:center;justify-content:center;color:var(--ink3)}
+.chat-attach:hover{color:var(--ink)}
+.mact{color:var(--ink3)}
+.mact:hover{color:var(--ink)}
+.chat-reply{background:var(--tint);border-left-color:var(--p)}
+.react span{font-weight:500}
+.react.mine{border-color:var(--p-soft2);background:var(--p-soft)}
+.meetcard .mic{display:inline-flex;color:var(--ink2)}
+.cvoice-ic,.cficon,.upic{display:inline-flex;color:var(--ink3)}
+.mutedmark{display:inline-flex;vertical-align:-1px;margin-left:4px;color:var(--ink3)}
+.mention.all{background:#FBF2E2;color:#8A5A00}
+.chat-head .chat-acts .btn .ic{margin:0}
+
+/* floating bits */
+.toast{background:#18181B;font-weight:500;border-radius:10px}
+.verbar,.netbar{background:#18181B}
+.bugbtn{background:var(--white);color:var(--ink2);border:1px solid var(--line);border-right:0;box-shadow:var(--shadow)}
+.bugbtn .bi{display:inline-flex}
+.bugbtn .bi .ic{transform:rotate(-90deg)}
+dialog{border-radius:16px;box-shadow:0 24px 64px rgba(0,0,0,.18),0 0 0 1px rgba(0,0,0,.04)}
+dialog::backdrop{background:rgba(9,9,11,.4)}
+.dh h2{font-weight:600}
+.dh .iconbtn{border-color:transparent}
+.iw-box .iw-icon{display:inline-grid;place-items:center;width:44px;height:44px;border-radius:12px;background:var(--tint);color:var(--ink2);font-size:0}
+.idle-warn{background:rgba(9,9,11,.4)}
+[role="menuitem"]{display:flex;align-items:center;gap:8px}
+
+/* one easing curve; hover is a colour change, never a lift */
+.btn,.row,.card,.nav a,.load-row,.pcard,.stat,.iconbtn,tbody tr,.ev,.seg button,.nitem,.dv-card{transition:background-color .15s var(--ease),border-color .15s var(--ease),color .15s var(--ease),box-shadow .15s var(--ease),transform .15s var(--ease)}
+.content > .enter{animation:pageIn .3s var(--ease)}
 </style>
 </head>
 <body>
@@ -957,8 +1184,8 @@ button.is-busy{opacity:.6;cursor:progress;pointer-events:none}
 <section class="auth" id="login" hidden>
   <div class="auth-side">
     <img class="logo" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAM4AAABICAYAAAC+9soBAAAYeElEQVR42u2deZQdVZ3HP79bVe91dxJ2EQYGPTo4TJBFowMKTAQREPelw5oNEFBHSII4Mjin81BxQxKI44JnJEQHMe24g4qCRHSEA8qoGB3FhZFNQCAhSb/3qur+5o+6N337pV/363R30iH1O6dS6VfL3X7f+1vvLZiC1Nenpm+2xuFvV9X02Dvu0m+v+ZG+AUBVI0oqaTtRPNUAA1CriQXsu87QXboS3tpo2rOf3sgR06YTNRp8uhy2kkrgBOQAw8UL9EAV5qHMSyocYNVgc2sHBowth6ykEjiBpKnV0CVzOTyO+ZdceX01pjvNoNG0ebOJAIhgyiEraSrQ1GDE2zAgiuGsaT2cYtVWB5o2y3IsSCQiJWBKKiVOq03Dbe4HZaDeJBewIAmi5QiVVAInBMzatUitJjlA32z1EsUIRAoq5diUVAIHQKW3FzNzJuqdALf8WJ/TBTNuPoq15VCUVAInhAsqS2cT1dZI1t9PDrBkrr6oezoLehIW2IwVNeR95VCUVAInkDKCKGvI3nWSViv78BrBnmWtPdEYEycxNGFTOQwllcAZQqIXnKrPrnZzuloWRhGHGGMYqEOjaetZZqqqpYu5pB2PJoVpe3uLdJglC/RVXdP4VRxzpYk4pJlaW09tDlaBWITSB1BSKXE8zXy0AIQqByQxew4M2IZC4uMxyuC/JZW0k0scFVWNNsdmipc38xxFiMsgZkmlxAmor08Nt2FqayQTYUhcxipSqmMTNC3plqEtkTJCvMMBx9sxLohpz32t9px2EWeYKnvNfjkfnoJMN9kSz04mI081kKiqgSGTot2ZgDxm4Kzu1WhOP7a/v4j6L1qoz4s1n5tmdm5Pl3m+TbiRKZYr4wY038GlzZ5ABFh3Xi8im7Zjn+7UmepjBs4cB5jFc3V2nDBfLW+uVKJdcwsbN5J37cqGqTQriohV1aOBuUA6CZJH3TuvEpHf+DInCjAO9BXgdmAfoAF0A5cCn1DVWESy7dCnbwBOBupAF/AFEbl9Itv/DACOCoj29Wllw5/yU0DeZgzHxBE0LQzUbWYtFkxliqX+GzdDvwg4d5LL+hrwmxb1ZcImeGAvYDfXHgP0bOc+PbalT9c6cPvrz2jqiMn7+gpm2HQ/L6xWo1VJYo7JrNV6M89VrYpIDFM6kLnJzdQb3bnd0QSylqMxyjEQPDuZVHcScyCo2/akja4OG9x5oFTVhoBm0L1sFWmm5NZaFSQG2VHW/XcDVXdMljpbmeQ27AEk7vBt2t6TbhwcpgSOy2RevRrr9Fmp1TZfjNhxope+nr8B/svNjFEbVSgD9gOOds+JO98MrBuh3d7GebilzIlyauAkzdlOPcvduN3p5zNK2r7Aac1kFoHv3a4HXHMND7vB26FIpHBkiMj3ge93YPjOplhWZwOAnSMiD2yttylwhcswgOvIhevacUMn5YVOhcC5MMS4d3WRranLWBwbroxWSWQBHW9ZwfuHa4tOhoMijKXFXh07eC0i/ZKzhqy3V6M9U044aR4X9FTZ56GHmAWQR0i8A3rqO4jjRG4mnz7MtV1V9eEOjN4hjOcZ1DF9PkLdok4G2t0nnTCHr8cw9RnRjdxpXUbDeeDp03Z9pqqRn9i2Zizds9rhfWMCRdh37vfIje/mtsR9fX3GLyy76EzdW2NOE7Fn5U1zaCwQRdxbq+3YiWWjxXFUFRHJVXW4Qc7dtY4ZKmQKVZ0BvBB4HrC3u+Vx4I/AvSLyVCeMtDVM1qY++wOHAAe4iWIdcD9wj4g8Pk6mNkDmpF0CHAocCOzumPyvwK9F5F7Xp2Ys0idwdfu2HAQcBPyNU2PXAw8CP3daQsdlDHc96IfM/R07G7MZ12o1e9GZjReaSuVstZxWSXi2VUMjs1l9wAha6tBjZR7HFC8A3gW83jHpcPSQqt4IXC0i9/pZL5ztHBNWKNzdezmVuQosF5Ev+MEN4iuzgE+5wU6ANSLyblU9ArgYOAGYMUxdHlPV7wAfE5FfbgV4Ylf+7qp6IXAK8PfDqKiZqv6cIu71+bCdnYBfVbuBhe44tI1TZoOq/ghYISI3tSsj6LNXAJc5z2gF+AZwpStvT+BU4CQ3+c0A1sdL5uc3KZyQxETNFOpNm4vXTQVDmWs2Jp3bDcQi4P2B6qeOkTVwRsRupnwbME9VPygi71dV4ySgtniwjgJ2CX772+Bd4Xl34KXBfY+o6tuBFYHdlgYqlK/LsyiCxG9R1feKyAqnunVq+zypqjMdwA8M2t0M2uDLmgWsUtXjgXOcZGibVhSA5mXApx1gPDVbVDbj+v0k4CRVvR44V0Q2DgMe32f7AscEvz/gxnEO8LHhJr64kphXN1MYaNgMiASJpFgUUEqaMbpn3eAuBy70s2swmEmrChgwVwW4TFWfLyILHMO2zvYbHEP4WbFd3ChzoPCB0n8CXhswWWWYunhVVp3Kc7Wq7i4il7WpS6tbGuAVwEecZ7LhQBq3SARfhi9vHjAgIue3KycAzUnOM9oTTEJJG4njJyoDnA7sp6qvAza2AWjqyvb984Cqvhn4Ugs4vZ1p42Zqc8AUcZmSxmNDqOrFDjQpg7ENz1gPO/1bgOc4tSt0J6fAfFW9T0Q+4Gf7FgYNj3aaQOjFEyelNADok8A9rj5dTjocymAenGfqmqreLyLXjaK2+fadEwDXx8v+4o4u1+ZqUEdxbT5PVb8tIl9vLSdQe2cBXw7c8WG/3gn82rXL25NHOlBZV8Zs4LMicmobgHoHQOLORzlV0AOwFZzRjhTEnOqgOQS4nME4i4/v3AEsBe4MHAF7OSnwQaeuWfdMDrxPVa8XkT90MNt3VMXAvX6Vs2EebPGkzQY+7FQ8G3gQl6nqzU7dGy0HTYN2/NBJn58450MF2J8iFvWeAPTGPdenqt8MJwpv76lqF7ASmOb6wk8MtwEXi8jdw4zJMU6lmxmA+RRV/ZKIfHWEicDX6+XBpJZQpBN9AfgFRRbKs8rFZRNH/8ZgXMyD5qvAbBH5rgeNM/4fF5GVwBHAr9y9WTBbX9oykOMFTgTURGSRiDzo7KgosGFuBY5zjG4CptkduMipNqPxigfnl4HjROQmEXlSRKyI1EXkPhG5BDijpY+gyCWc5RwhUaD6WifJXtii9t4MnCgid6sWCyjDQ0RuB04EHmAwkK3Apd7l3kGfecl2BfBiEfmQiNwoIj8QkdUlcCbGg3Yg8MYW4/9+YKGINFU1CeMEbrArzmV6mlMnEgeaAWC6u3+80sYP/t0istQxlnHMnLtDVTURkQ3O5tgQzOoKnK6qu4hINtxiugA0xqll57k+SVw7/WFcm29wEsRLNd/Gk1smC+tc2ucxmMlhnMv5HNevsYho0BYfOvB9W2NoEHYW8FJn+EcdTAKfEpGLgaaqxgE44xI443QIuPNrHePnwSAvE5F1jinT0CB1g+0H/pfAJ4FvOb36YBE5ZYIXhV09WPSW6paIpK4u9wH93gB2bQk9TmYERhPgcyLyhHtX6trpDxvEVa4OQO3pJQFgItf+Q4GDAykgFBkUDzgVTh1DDznc74mT+H91IPAS69WjSHMPmr8AlwSB7CwAZ1YCZ/xqEBT5bZs9lU6C3Dia1PCzuFOhXiciK0XkjxNYt8hJsB+2OCLaCFAVp2oRSAQNdH4ZZQL5nnuHtmlv7gB0L/C7QI0COCCwo0JbQ1pAdp0DYt0z8TBH6o6/OvUzbPtLRukL//tXRWRdoDIOdUeXvL/Vapo4tSBiMG7h6bfAH92s2VHE2s1shpbUjgkA9f85XZ9R6qJObftF4Pr2THxQy6zfWo5xLuj73DvsKM6UTFV/E7wXijhSlzO+fRmHtIBTgeNU9eDg75G0gYxiDRMMxrCe41OCnHRq5yD40QiqaQmcCaBpDKbS+IH8cxjN7+Ql7r6JjJ35ujzs6jJadN5fewx4lKF5e/t4idGG2XDes/VjqN/9LX8noX3jzvu2MLNQBJbHo1bvxmB6zkj3+UlAS+BMDiUOPOEAb5hAr9h4gfN0UBcdSfI5cDVUtXUvg+kdlJfR2ZIK3ydPtKlv+P/pbRweYwVMmEHdzWAAWEaoX30kKR2D5m1aZ1GGJEdGBiX3BnBLNqnzsWuQ26ay+fm8tXx/v8iQWdYCeXFt6PtVivro1FsLNFwG8FSyHbcmTictTJON4ZlOqbkV79StbA8t0sx2oLqO2J64kphoy9kHNCPq6QGFXTdPKTnx9IQot1vyRSZE06ZBLoOzhEClWiGy1rg0HodIA0lS3P/U+sGVjAI91QpRZk1kZLAuolBNiKbNgE2btkgX2d7UcLP6LsFA7N7BwEw2+R7ftZO6BAmlPQwmgfp3rPf3TEL9Rrr2dEvd1wNvoMgSkK3oX5+tsH684xM3M84e7kKa5ax/OjJ7Kn/dPHUl/L6eco7qlgVmWa5ProviGbvx+0CerdkwwLl5RiZmsKPyHIhzfeqJKCbhrkDcrNo4wM/TLM/ERDJYF2g2cp5aF5lMuLsDD9G2pE0U6Sv7BQP+fFXtFpGBTjJ/W5wDE7WoTAJvVSd18Yy4n7dpAvrzNpakxmkqD7X8PgN40LnNpz6t7tVoda9GU+X+SfCQRe78ai0oc2fr1nxsXgjW8lzszqvcvak756r6Yh/4G22mH+2aqnap6sOuTg13fndLHXwbjnXXc1eXTFUPHa0uLgYiqjo36IPU/f/i4B5f3ofctaY7P6Squ3TQJv/8JS3PP6qq09y1xJ3f4a6lwZic54KQFRdUHemIhmljPMy497aMu6rq4e3GvWPngN9LrVOazPs7ncG3Md1CkZLvYw4xcJaI/LMbqBFXQarqKoqcte9R5Lb9yi8qG6fE8XV5vYj8YqS6BA6CM1vsIyX8Suu2cXj4Oq5xbQgTXk8Xkc/4eFGbBWh+iUeuqp+kSAL91gTGyIiXzM/eG0XR/llm7VTd51kVjSNDbskWLeAy4Cn1H63avuQBfxPwlLMnfOzmLFW9xjFshcGsAs/UsfNgnexAB/BKd77ZpdFvjR7fqvIo8A5V/YyIPOZm86wFYLHLZDgROL4FXPcC9wRxq23hibWO+ddSZD+/LADUP6nq6SJyvUvrsWy5HkddXd8LvN39frmq3gUso8jSGBevx2i0No74UBIbWj3WOkXmdRFIEti4iXcuv5Z1uz1XjdS2/26RPinRMeTngCUMRrm7gS+r6utE5H+HA51Ll/+PwNOTUQQBv+beHY/TlvPR/32Blao6R0Q2DuOpaqrqi4HrWjxqQrHS1AcLt+Vebj4P8OMU63DCnYc+q6obReTr7aSVql4EfMg5A4QiZHAscIXr23HZa+bKVfKNgUa+SBXqDVuvN21Wb9qs0bS51eITUNZu3wNg/Yb84o+vlE8uFaRWm1JbrPrZ8SMUgcMwQ/pA4Ceq+gFVfYWqPs8dr1DVjzoVaB8G4wxdbpa9doKSPEND+2SKaPhbVHUfVe1W1Wmq+nfOhrkVeHbAfJFTcf5zAusylknJB5C/AnydwWUXUAQwv6aqN6jqG1X1IFV9jqoepqoLVfVWiqxmv9jNg26ViNzkk3PHJXF6ezVavkquWjJfT+iqmpPrDZsbMZFVm6WpvWVwS1uzzeWPgk0i4nrd/vfyz8dX9PZqVOufWnsg+NlLRB5V1bOAbzKYJCnONX2pO3zsotIy43tGbQJni0h9mIVs4yGf5Hg4RS7aeooNQyInjSpt6rLQqZPReBltHI4boVhefhDFHgZpMDmd4g6/oUaFofEa735OKNbSXDBeSbMZODNnoorKxXB2mtmfxZHZJ8ttliQmSpt868pVsnxq2Dkq22Dw/Iq/cIlvJ/ue+YzeG1X1dGCVGyy/jNkH7irBoObBIMcUkepTReSOwGkgLfaUX7Mzlv2Zfcq/Tz6FIuYU7l+QtTiMGsA8EblzBNDYoD5bI5FGfd71q3Gq8GsoljLPCuocti0KfvcSxu9KcwfwVpetPlwaVOu4M9q4m1pN7JxezBXXySNpZhaKICKQZVaThGWL5+rJAOfO0gRUdFseWpz7+tRsI09axXV2Nej0uEPJkzsmu4FiEdXPGNweNgkMdZ8UmQTX7waOHW75cGDA7+Hu7QnOo00CnkEvdMwTbqEbZjyEW9neC7xKRFaPImmmufu73XmPMRrcPZ08H4Dn985G+YRj8jgYr7C94bhtBD4OHO8X8LXJHay2jHs82rhvrmhfn8a1mmRL5uvlXVUuGRiwaRybWNU+kYn5x+XXyh/6+tRMMftioqSZ3yboIIqFU+HnQD7q1LBOA5leWiQU2wr1Ai+myP71Eqfp7KG7KNaXfMUZ4MMyqjPML3VSwq8S/ZqI3BbU3Zd7rLNXbGA7vcgB4jxgDsU6lxmBm3e9U2W+SJG2PzBCXXx5JwOvcm2J3Ts+4tRMGWHHGv/8cRRbZzXc808DlzvvXtutnNz/D6HYhONYp8LNCCamjRRbHn/X2TS/bX1+mLocBiwIxl0otod6sF1bAoQX+0X3And02x9UKuaYRtM2qxVTaab27nQXc/Qee5AuraFC+Qm9ToAY/D3d2RK7uZ+eAB4JPVzj/a7MKMCZLSI/DO7dyzklpuEyH8K40VT9xk24BVfw297OqdHjQPiIiDwS9guT8LW4QByJzpypOqcmdtHCgQVpVrk7itit0bBpd7d5ia6zn66tiBYyW2PWbPdPTEzmwLRmMORj7XS/UX0QU9hAsXBrC4B5R8IYt8CFsa3b8fZSAqQOJI8P0/aO1wMFKUKDM6+MKZA95uf9+ib/rFu09qiT3sNJadtJnbZm3LfQKXt7Nervl3zJXO2tVFndTG0GaLVikvpAfuGyL8RX983WuLZm4r4C5jd7938fvDc6px/LM0SyBRuE08IoE7nJ+UgS52gR+XGL00GCuIjuqN/vHK4tAci2LfXNLqLDi+fmn/zXt6kumpenFy3Is/ecpc1FZ+pxHmATUlaflsu3Jwg47tyaq6aqelR4T0njpzZekMLe2R8qpoefxDGHNVKbJbGJ1fKwZeCIK1f2/Hm8zoLiQ7ySn3/m03vvUp3+mjQFY7CqTE8Nq1dcK49NkdSaHQI4nUqcsrfGT21me9GZM9Fl/TJg0+bc3NpNcWQky2wWx+yLrXyxr0/jg9cirQvOxiLV5hQq4Qumxz23JTGfS2I+t8t0Vlq1L2c66/v61JSgKWkHAg7UamJX92q07PrqLzNrFicxkQg0mjbr6oqOWvdHrprTL3nf7LGvyPM20oWn6+EmsrfGsfmHjQN2wBhY97S9fvmq6IwVK6Sxo39epKSdEDhQpPv3zdZ4+XVyzUCD67sqJgaoN2zWXeUdi+fq22prJPM20VhAc8F8fWWli1uNMfs1mrbRUzXdacb3Z/zJzC/sHhVKabO1ZFuOkrYlcACW3kbe16cmz3l7I+W+JDGxKpJm5HHMisXz9cjaGsk6cRZ40Cyep2+qGr4B7N7MbLNaMdVmau/c1GTO0jU+9aIEzTjGNExDMexkH7bdjs6BoeRd1Ivn65GRsberGrHWksQmstbe36xvOuLqG6Y/eu65xE8+ueUM9+ijyDv3Ruf0S754np6XxHw6t2CtTasVk6SZva8p5uUrrpXHentXR/39c0oDduudA0cCn29xDpwqIj8tnQPbGDgheBadmb2npzv6yEDT5gBdFRPVG/aWZaui40d7x5J5+u4k4WNpjrXW2kpsYqv2z001r7x6pfzOl1EOy7gA5KVNSOmOGqfZ4YEDg+7jxfPzm7oq5tX1ps1RJEmMyVL7fRXzB8Em4WYeIghKpmL2rcS8Ns2sqmLjyEQI65v15uyrrq/+j393OSQl7Qg0pmWwv5pZ7KeWN1jYFHtPHJl9ssxqmlpbSczxxrQ3m1Sh0SyWpUXGCLApbfKmEjSTInWG/YJySdtJ4oQq24Vz9cRqwndya3PVIsdppM0Cpdis0IhBY2NMmvHmZavkqxOdvlNSSdvKAzMm6ncu6qs+L99NU3t5tWIihRwkEiRudwBGDDaJjGmk+dklaEraqSSOUwakt7cA3f499rZqYo5upDaXET+LqFlX1cSbGlyy/Dr5cAmaknYqiePwpjNnov39klvM3CznyUiMtP+8g6RdFRMP1O2HS9CUtBNLnKH2zuASBDKwUbGhk5MzaNZTNfGmul25bFW0sHAEPHOWDJRUAmeraDAbIP9Ud5c5f6BuMxHx25xm3V0mrjfs6hnPNaetXYus7seWiZsl7fTA8fbOzB6Sp7F3JLE5rJnZHNCuiokbTXv7hqp55WeuIVsKUkPK3KmSdlYbZ6i9A1C7Tuqamrm5tXURo9XExM2Un+aY119zjaRL+0rQlFTSsCobwOJ5uvB956teNF9/+54zdH8oV3mWVNKozgKAJfP13y+Yr7OgSNMpe6akZxr9P7OMyf/Hd6W+AAAAAElFTkSuQmCC" alt="Tcipher" height="36">
-    <div><h1>Development, Sales and Marketing, in one place.</h1><p>Tasks, projects, releases, pipeline, leads, campaigns, content, leave and attendance for the whole Tcipher team.</p></div>
-    <div style="color:#8F92D6;font-size:13px">Accounts are created by your admin.</div>
+    <div><h1>Development, Sales and Marketing in one place</h1><p>Tasks, projects, releases, pipeline, leads, campaigns, content, leave and attendance for the whole Tcipher team.</p></div>
+    <div class="auth-note">Accounts are created by your admin</div>
   </div>
   <div class="auth-main"><div class="auth-card">
     <h2>Sign in</h2>
@@ -997,7 +1224,7 @@ button.is-busy{opacity:.6;cursor:progress;pointer-events:none}
   <aside class="side" id="side"></aside>
   <div class="main">
     <div class="topbar">
-      <button class="iconbtn menu" id="menuBtn" type="button" aria-label="Menu">☰</button>
+      <button class="iconbtn menu" id="menuBtn" type="button" aria-label="Menu"><svg class="ic" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg></button>
       <div class="crumb" id="crumb"></div>
       <button class="iconbtn" id="bell" type="button" aria-label="Notifications">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
@@ -1053,6 +1280,54 @@ const MAX_FILE_MB = 50;
 (function(){
 "use strict";
 const LOGO_WHITE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAM4AAABICAYAAAC+9soBAAATSElEQVR42u1de7ScVXX/7Zm5N7k3D94vYYUWjFIxiAZqfGCIoMhL1FYescUmgNS2IKsSlaVdRapSaiwENbS6QEgBASkPkVgwagWqQbLEQBZgiFIkkCCPkkseN/fOzK9/fHtn9j33m5lv7szcmUvOXutbc+985/vOPufsffbz7AG6EEjmSBaC7+aR/CHJU/T/PCJEiLCDYXLu/+kkF5L8H5JFJhAZJ0LHodBNyIhIWZliJoAz9Zqht8t6RYgQGcckDQACOBzAZwF8EECf3i4BEP07F5csQjdAtxBiTkQIYCGA0wBMAlBUCZOPDBMhSpzRksbDNpUwZQA9cXkiRMYZzTAiIqWAgXIqYRiXJkJknIQ5RBmDzglwIIBpAB6LSxEh2jgBw5AsiAhFpCQiZZJvJbkEwCMATjdGihAhShxlGjX6iyQnAThRHQDHub63xmWIEBnHgYiQ5D4A5gNYAGCWuz2IxHsWPWYRIuOopMmLSInk+wB8F8Aeequshn9O+5a4BBEi4zhho58zlGm2I3EvR+kSITJOaM8oY3hX8pD+X4hMEyEyzkiGySGJ/BeRBC99XEaiOtbSjWmUDRlnZoIxjmUnaxCzTLIfwMcA7Angn7uQ6Not8crtJORuYxILYo/X+Cc84yjDlF3U/yAAf6nXwQDu7rYJVHxKE1za7IEkq8Ly9wZEZGsH53Snjr0VxjBhxjBzAXwcwEcA7KK3SwA2d9OuqAHXdytjD7dB8piXcImIPGF9tophlOl7AdwPYF8kjpY+AJ8H8A0NLhc7MKenADgBSVhhMoDrReT+Vo5/wjOOLSDJXiTZy+cAOMo1sUzm3i5zAuQUr7cC+ESb+7oDwBNtsulEVeBddTw5AP0dntN5wZw+psxt9yPj6MIRwJsBLHM7rS1iQZmnW2Gr7tTFOmNOs4XqqXg2B0NtHsOgSswhVI5ddBK2KA4mcbZFVW20EegJq4SKi3miHF/uU2Kb1MbNpbfNY9gdSSysx42p09K84K7cTs84zgtVVn3Wqx8TKe3f8HwCwH/qDpmvImmKAPYH8G59zqTsvQA21Ri32Tgbgj5b5dSASpqzVD0r6bo96CRehE4yjjJIPojJzFCiGJ5ogzNHhoisALAig3SdC+C/UfFcAcDZIrK+gT7LVTYhSWG4TC5cHcdNWfoLbFIJ3+/cyDIWXBpxbFRRfctIjpawRe9PGwvb4aDwAqTgJ1MXqKgu5/cDOF89ObPdzjzhIEMcJ68bxdSUe7uQ3JDB6B1BeMGclmrgls+y0NpOshCH4ZGCT003clZc6vG58/Sx2pxZPuNY11KfZcZ2DTGFnzsTJqZ97WAc7z4kuTeAM5Ck/h+mbdZggp/IrBfHIQlNSk1b5JLey0xQnihITlOnykEA9tYmLwJ4CsAaEXklCyGNhciq4HMAkiz1GbpRbALwNICHReTFJok6B6Co0q5HaWgmgN2Uhl4C8LiIrNE5zTUifRyt2lgOAXAIgNepGjsA4FkAq1VLyNxH2n03D0X9v6A25lBBbZg3qw59BoB99Lmi7nBRh26QeJQo3gDgPCQVe2ZUaf4cybsBXCkia2zX87udCwPcgcQlPaxOjitE5HqXiW7xldkArtL16wHwMxG5kOTbASxSTWJaCi4vkPwvAF8VkUfHwDxGS7uR/BSSsMUbU7SUIsnVSOJe/+HHmYX5SfYhOaKyQBkzzSmzmeQDAL4uIsur9eHm7GgAl6jHshfA9wH8q/a3B4DTAXxAN79pAAZAcrkr9kf9u6QXST5iC0ryCP2uzNEwrJ+3OMTOdO+s1v4Lrv3i4J6HUrsKEtq7SB4f4FvWXS2tsMgoUW9tSF5A8lWHe5nkEMnteg0FczhI8h+sHzff9jmZ5KZgPi5yu6Afw7FBu7tIfjJYgyHtc1DxKbl7W0ieZ+8MVRjX36Xafpt+fozkm0iuDcZtYx5OoYPrSPb4MddZn3eQXB28Y7sby6COzcMNJKekqWPuvWcEz9yo359K8ukUWmQBwPFOwuSdURwlTYPuWd2hrgDwKTen5roNq/aUnL3SC+ASkgeLyF/pgoa7/WZVrWxXrBY3smC0xZfeA+AkvWfP9qQ4Ksxm6AdwJcndROSSKriEbmkAOBrAZeqZ3K50VAgkgvVh/Z0JYJuI/HW1fpyk+YB6Rvt1jNRx9FbxdBYVt/kA9id5MoAtqpaH0m1Y+7b5WU/yIwBudvNGHZMAKBf0gRy6rKrnBFPPbHEXKdMMoxLbMMLaoPq3ADhQ1S6/QQ0D+DjJdSLyJcsJDAjUX9V2aO/FEwDTHbH2Avg/AA8rPpPVBjkMlTw4I+ovknxaRK6ro7bZ+M52jGvxsuf1mqxjnuRwFB3zuSR/KCJ3hv04tXc2gFudO97P64MAHtdxmT05R5mqrH3MBfBtETm9CoOaA6BHP9+lqqAxYMic+YkUxOx2ppkF4CuoxFksvrMSwMUAHnSOgD1VCnxZDduyPlMC8AWSN4rI7zLs9plQdO71JWrDPBuoK3ORZLQf6SRVGcDlJO8FsDFDDhrdOO5T6fMLdT70AjhA7ejPYGRlVgL4R5J3+Y3Cq6kArgUwBZWqrjkNGywSkVUpa3IUgH8D8CbHzKeRvFlEbq+xERhe73SbWg+SdKLrkRSX2QpgL7A6RBsng43jnr0lsBFJ8jY17Kv1ewDJNYHdQZJXB/bEZJIbnE5PkhdWsXHmBWtkuFzsd3K1X/JubaeS/Ll7xtZgcdBPaOMMB3P2vVprQ/J0xa2kn4bnkcE47PPvXD/Wxz02r2pb5v3l5vYZZ1+WSa7SNrmgj4+mrLv9/VUtNJMqZiM050GbCeBDzm0v6uJdICJDagBL4EjoVZfpGapO9Kgqsw3AVG3frLQxtWaViFxsRCMiZS3VVTLXsYhsVptjs9vVCWA+yekiUqxhwJuUeh7AuTonPTpOu3I65ptUgphUszGeEOz6ZXVpn4tKJkdOXc5n67z6smM7Lje3X8TIIOxsAEeqJ63WxmsS+ioRWQRgiGTBMWchMk6TDgH9PEkJv+QW+XIR2aREOewNUl1sW/hHASwF8APVqw8VkdNafKbpykrXo9UtERlWXNYB+J4LQxDAfqhkwudqEJoAuEZEXtZ3Des47Sq7uMqVjqkNjnAMk9fxHwbgUKcKCpIMivWqwlEJesSl3/cAuF1jR3nnqDk+YNBqTPM8gItcILvomLMYGad5+wFI8tt2xDNUgtxdT2rYLi4iF4jIySJyrYg81ULc8irB7svgKaXie6tjEmOed9YhNqOjH+k7WGW8JWWgNQCeRCUfEABmODvK2xoSMNl1yoiDRsQp17BeL6md5cd+RJ25sO9vF5FN6i0d1TZ60saupomqBXn1THlYC+Ap3TUzRaytdgOC1I4WMPXvAawPvkttr2rbI871bUR8SLDrh/3k1AW9Tt9RruNMKZJ8wr0XAPZS79tW18esgDkJ4L0kD8XowjBpzFxEcoYJzgl2oKUEhb/6F2wOD9SKLUXGaR6moJJKYwv5jI/mZ3mJtmtl7Mxw2aC41IvO270XAPwBI/P29jWJUYXYoN6zgQbwezr4v8fbN/q5X0DMAuCfmlSrd0UlPadWO9sEGBmnPdCjzOMXeHMd1WY81chXHS6sJfmUubaTDGsZTM3QXxHZchptTl6ugq//e2oVh0ejDOMzqPtQCQBLDfwGa0npQg1EfDDMD6hURWSXMDq3zdqXqkxA2L7s2ksVfLot4TQtA7ibbMexuO0lIJpiA89khaExvJMYe9zRS7NyBtW15nhqBUDt+10abO93iV6MTONJa+9PMvZnaN9tPzi1XXf16W4hdsuwMO0GCdavXhKlJZT2o5IEau8YsDZtwK/WvVcD3AcAnIIkS0DGML+WrTDQ7PoUkERza4m5l9z/v0WSWlHtJGRB2xj8DElBh2KV3aMA4CH33TIAq6u0N3xWZfAQjSdsRZK+sr/D+WCSfSKyLUvmb+AcaNWhMnHeqiy4GCHubzaNg2fGWZLmVOt4Lvh+GoBn1W3eUSiIyDUZFjWvyXEvArg6S3vVm9cBWNdA+18C+GVGY7qjKpvuzuadeRyVw35Ekl7yJyQfrrczGjG3wTlg/b4OwEySj9bBJaeG8BzVFLx6/WiHbLbVgWqfB3AMyacwMjZTY5lG5L4V9MtiKzg7C5GUGjmb0c72LVYXWgU/dgaoxRwWKnPXSj/JKwMuI7mC5GdJztVctlYwjhHbB+vh4jajvwjUYyLJCxtP1bPsNJZSgPd8qx4LPa0aXoanegGXkjyP5B9bnKclEofk53SHLKN7j0Z7I/USAK9kVYHaDMbsywG8ovaEOTAWkvyWiDyieVX+qK+otN9O8gQkxRIB4Bj9vFfT6KVJYjXV729I/ruIvKAR9WLAYAXNZDgOwLGB5FsD4GEXtxoPT6wViHkMSfbzOxxDvYfkfBG5UdN6ysEc2YnPktL2J/X7r5B8CMDlSLI0mqL1giJ3KSYG/C2ATd1SLVKlRV4J8hoAf+8kTh+AW0meLCK/SWM6TZe/2nl6ikiCgHeYKtik+mbR//0AXEvyVBHZkrIpDZF8G4DrAo+aIDlpasHC8azlZnmAX0NyDsdXHvo2yS0icmc1aUXy00rXw/rcFCRFFBfr3OaaRe77AC7Q/wd1corovlrLi0RkKarkW3UQbHe8DEngsOAIbyaAX5D8EsmjSR6k19Ek/0VVoH2dmjdZN7LvtCjJ0xvaJyCJhv8ZyX1J9pGcQvL1eo7oJ6gcm7d8rccB3NBCXBrZlCyAfBuAOzEydNIP4A6SN5H8EMlDSB5I8i0kF5D8CYDFqBx2M6ZbJiLLLTm3WVUtLyJLSL5fJ7fkDK8fOzuoE2qRne/4uYgsTjnc1XGw3UtE/kByIYC7UIlPCRLX9Of1sthFb7DjG6EOAThLRAZbPFZbz8OR5KINICkYkldp1FsFlwWqTuabJbQx6+gJ056DJD3njagcEgSSuganKc3agTMfrzH3cw+SszTnNytpvKpmyX1nAfiV7oB2jPoHInJFVxg5qmOPgy1VxMgjvlnqnllG790k5yNxq5stYTp43hGoBXrFrcMgkl/gXukOx0lgT5k20Eh9Zl+m2GrjTdcLznb0NLEdwJki8mANpik7fMYikeo+r/OaU1X4RCRHmWc7nP3Y8u57kzBWlWYlgD/XbPU0NT9c97qCwl6SE5GNSNLavY57uRqvSDlfMZ5XbpwcAb062ZPcpBcySp6SEtlNSH5V+1eolIftcYa6JUX2uPurAMxLOz7sDPjdtW2/+8ziUCkjOc69EiNL6PqMB1/Kdg2A94nILXUkzRRt36efuzdocPdned4xz2/VRvkGKjXAewPVGMG6bQHwNQDHisizNWzjScG6F+qte8EtekFE7iF5KYCLnFG1jOSf6lHeThnlHKf3rwVwBUb+HMgLWXFwzPNTknOQlBX6KIC3Icn+NYkzpPbQQ0jOl9ymBvgIQg1K4F6mUsLO9D8QuG6rjcuOMi9FcijsVCTnXKahUmdgQFWZ7yJJ299WR9IASWlg6lgK+o7tDbqal+gzBSRZAkM1JHpORF4FcB7JbyEpwjFPVbhpbmPagqTk8T1q06zVjb+apDHPoV93AbCx1rpLoEsasfwUyeElq/qxCsmZk2G0oHzpax3CRSI5VW2JXfWrlwFs9B6uZjclp97NU0O/7JwOc0XkPtd2T1XJp0AzH6wYYStwabO9I8Hc7q1OjX5lwo2qPe2YF7T71+LcWeyDSL7szmuT5Hf0XuE1TPCScqJQmnhXvpYx6s7+SxbGCPDKhff1c56rG2Dn+d9lx7Wr9eXwlay0EuCTb5TWxvq8PVunTSGrI6Al655SwGDYMc/57WCeFMTzXZoh0Mz4csElLe6jJuMEbcQxbW4iz3XaWDo2HlfJZGlQYWSI5Hv9IrRKykUYP8aJ0Bp3dBrYkeBPIzn3/RZUahFfT/LtIvJMC/XyvQGc6IzHqQBuUTekRJsqwoQycPVzltYTLroaWg80q1I5qfYGko+l1PudFKVRlDgTfTE+4VQ2Y55vjtXecUxzOMn1+r6txjSBFyVCZJwJuSBG5DekMM85jTKPe98x6rmjq2D5I/OGRKZpinFKzi4tRcbprNdiOsknXanQohL8nKyL4pjmw6r++ZKuK/W3VSSqaE0xzjEp5YOPiozT2UWZ43Yyq637vyT3UYLvCev4uviDvePc4HdaqAy5V1zclq3RkyR/o79V86QeX4hz2+GF+UwgdUhyRcZ3XJhS1Pv3Wns5LmyLnDoa6PRXVHtbDNIo86j7eDmSGrz+ZxdWAPgdKucffB9FJCknJ2Fk6voAknSQX3cydT1ChPHYzURVs+fczzWUmA1K7trS6mBqhBF2qXQ0ih6hqsp2nFPZyi7OU+0qOkYjyQ97h0GECDsD85h37Ms1fggqBP9jPQsj00TYWVUB85jdX+NX19J+ge1zkWki7NT2jn7+kQYya9k65na+NDJNhMg86UcQylUkjZ3nyUeDNUJknoq9c1WKvWN/39zIoa0IEXYme2cyyV87e8eY5j5X6COm0kSIkKKyzSK5zTHNKpK7epsoQoQI6SrbAmWatSQPiEwTIUJ2yfPNmFgY4bUM/w8yas4A7yfRKQAAAABJRU5ErkJggg==";
+// the same logo with dark lettering, for the light sidebar
+const LOGO_DARK = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAM4AAABICAYAAAC+9soBAAAYq0lEQVR42u2de5QdRZ3HP1Xdfe/MJOEthdKLHj34CIKP6PoCI4KI+FpdJzwkCQHE1wpJEFePrpPrE1clgbiA8YghshEzrm9QEZGIriAoq2BgNYqsrVCAQkKSmXtvd9X+0dVJ5XLvzJ3MTGZC+ndOpzO3X/X6Per3+/6qYBrSwICVA3Nt6P92cc0ee/Ot9nvrf2rfCGCtDSippCmicLoxDECtJgxg3vNWu09PxFvqDXPWo1t50YyZBPU6l5fdVlLJOB45huGCM+zhVrAAy4KowmHGSkxmzNCQNGWXlVQyjqdpajXs0vk8Nwz518zyhmpIbzOFesNkjQYCQAhk2WUlTQeaHgPxRiQIi+TMGX2cbKypDjVMmmYYEIEQomSYkkqN0zqn4Ub3g2VouEEmwICIELbsoZJKxvEZZsMGRK0mMoCBubbQKFJAYMGKsm9KKhkHwIr+fuTs2djCCfCjn9kn98Cs617GhrIrSioZx2cXrFg2l6C2XqSDg2QAS+fb5/XO5Iy+iDNMysoa4kNlV5RUMo6nZQTCsp70PSfaauUQXiswZxpjXi2lDKMQGrCt7IaSSsbZiYQ99xSrqr2cZg2LgoAjpZQMDUO9YYbTVFatLV3MJVG6owH6+3M4zNIz7Kt6ZvDbMOQiGXBko2nMcNNkYCwQCkHpAyip1DgFzX4gZwhrOSwKOXBoyNQtREU8xrLj35JK2ss1jhXW2mB7bCZ/eSPLsAjCMohZUqlxaAli3oisrRepEOwUlzEWUZpjE0NKxY9pR62TUm3vaYxTzGNcENOc8zrbd+r5vFVWOWjuS7lwGg66ydZ4ZjIH8nRjEqViCTsJRbM3MfKYGWddvw3mDWIGB/Oo/+JF9qmhzeY3UzO/r0c+zURcwzTDyrgOzfZwbXMgEADGnTdrnWybwjY1pcYZA81zDLNkvp0bRiy0hjdXKsG+mYGtW8l69mXLdJKKWidGqfhoYD7QnATNY907L9Y6ubv45kQxjGP6CnATcAhQB3qBDwKfUyoOtU7SKWjTNwInAcNAD3CV1slNE1n/xwHjWAHCDgzYypY/ZSeDeJuUHBMG0DAwNGxSYzAgK9MM+i+dhH4ecM4kf+ubwN0t5stEkQAOAvZz9ZFA3xS36bEtbbrBMXdxnb3eqzYwkA+Gbffy7Go1WBNF8pjUGDvcyDJrjRVChNMmRaE9bXOSeqs7dzoaQNpy1Ec5hrxnJ5OGncYc8so2lbTVlWGLOw+Vplo76L/zkjWaZMYYKxAhiD0l778XqLpjsszZyiTX4QAgckdRp6kWuqF3yJJxHJJ53TqMEMJYa0Wttv1isAdFL4ty3g38l5OMQQdTKAUOBY52zwl3vg7YNEK9iznOfS3fnEhPWhM4y5lnmeu3Wwp5RklTyzitSGYh4Ic32cNWreI+13l7FGmdZO58PXB9FxPfueRpdcZjsLO1TpJd9TZ5rnDRhuG6cuG6elzdrXercCp4zoV2bmSxK2UZoyewXRjAAHa83/Le364udjIcFH4sLSzMsSM2IMSgyFhP2t9vgwObnHDiAs7tq3LIX//KHIAsQIR2j3XnjmRKBE6Sz2xzbV+l4vu6mPTuNPCKAeoGfTZC2YJuOtrdJ7oZHEU52pRnRDdyt2UZzZHhefpspzZTKg4KwbYrfemetV3eN+YAc9F27vfA9e/2uoQDAwOySCw7/3R7sA05VQhzZtaQR4UCgoA7a7U9G1g2WhxHqRitk0ypuF0nZ+5a1wPKHxRKxbOAZwNPBQ52tzwE3APcqXXySDcDaVcGWYfyxMCRwGFOUGwC7gVu1zp5aJyDWgKp03YRcBRwOLC/G+R/A+7SOrnTtakci/bxXN1FXZ4JPBN4kjNjNwN/AX7trISuv9HuutcOqfs7dHPMRlir1cz5p9efLSuVs6zh1EqEMlZST006PCQFtrShdyHOkSkVPx14D/AGN0jb0V+Viq8BLtE6ubOQer60c4OwQu7uPsiZzFVghdbJVUXnevGVOcBlrrMjYL3WyXuVil8EXACcAMxqU5YHlYq/D3xa6+SOXWCe0H1/f6Xi84CTgWe0MVFTpeJfk8e9vtwSrxqV+ZWKe4FF7jiqg1Nmi1LxT4GVWifXdvqG12avAD7iPKMV4NvARe57BwKnACc64TcL2BwuXZhda+GEKCRoNGG4YTJR2KYCSYk1G5PN7TpiMfBRz/SzbiBbzxkROkn5NmCBUvHHtU4+qlQsnQa0LR6slwH7eL/9g/cu/7w/8ELvvvuVit8JrPTmbU3PhCrK8gTyIPE/KxW/X+tkpTPdup37PKxUPNsx+OFevRteHYpvzQHWKBUfD5ztNENHWJHHNC8BLncMU1CjxWSTrt1PBE5UKl4LnKN1srUN8xRt9kTgGO/3xPXjPODT7QSfrETyNSCDobpJs9zNXC7HtIvuWdfYK4DlrvNSj2EiJ80q7v+FyZG63z6iVLzamSLt2n+Le2bYnTvFjVJ3vTi/HLjUMU3xTOS55ytuABVl6QMuUSr+sNM4o42F4vornAfycPK4VureW9Q59B0RjnkXOK3Qqc4+05zoHDxHuXc3vTBA1Tsi942mq9NpwDXOZBbtwLLevUPunCgVvxn4qmOahlenDGiGjabJ8tVlRFiO/fHNIZSKLwDOcx1RxDaKAXGfs78F8GRndvnu5CawUKl4o9bJxwpp3zJA/aOTJeB78YTTUtYdFeBh4HZXnh430I/ycHDFfLCmVHyv1smVo5htRf3O9hi3iJdpd/S4Ole9MgpX57crFX9P6+Rbrd/xzN45wNc8d7zfrrcAd7l6FfPJF3vCqQnMBb6gdXKKa9esTZsF7pnAafdFnqXQag4Ge1IQc7ozzZHAJ7w4SxHfuRlYBtziOQIOAl4HfNyZa8Y9kwEfUipeq3Xyxw6dzC7Esgr3+sVuDvOXFk/aXOBCZ+IZz4O4XKn4OmfujYZBs149fgJ8Cvi5cz5UgJg8FvU+j+mle25Aqfg7vqAoNINScQ+wGpjh2qIQDDcCF2id3NamT45xJt1sj5lPVir+qtbJN0YQBEW5XuoJtYgcTnQV8BtyFMoTSi0zcfRv3uAvmOYbwClaJ40WD85DwGql4uuB7wNHePOOKjmA86wJwr1ZxzQ1rZNlbVICjNbJDUrFr3Sm1ktcOYybL53vnAvBaO54952vuTpnLXChjcAHnGNgrddGkGMJ52id3OoN6kLbnO20SOoxzXXA67VOGu1CDQ5s+mrHuId6GveDSsXf7iJI7QubzwAf0jqpT9tF1/dgD9rhwD+1TP7vBRa5zo0KN60nTSOtk0Sp+FTglx6UZgiY6e4Zr7bJXOffpnWyrFOcRqk40jrZolS8wJlxMzxtcJpS8Ue0TjZ3mB/gaSkNvN21SdSCpxPO83a1UvEJzhQqhExIjrS+1Wdo9463e0gO6VzOZ7t2LeJFWUt9Kq5ta8AXPMaaA7xQ6+Rm1xajCYHLtE4uUCoWzhW9vX9LxpkYpPDr3MBPvUGyXOtkkxuUzTYxg6Lj71AqvhR4GjksaL3WyT2dsj53kS4pytXORNE6abqybFQqHvQGtfQ8TteM4CgoTLQrtE7+7t7VijSxSsVFXOUS5xiQ3qB/gccwhfl7lNPGeMxztZu89wBNN6Bp863IafwLyXOZmq6PXuPMZ9FB8xRMo52GLALHaalxmHAs3NEtbdp0npwRtYbWSepcpIsnqWyB02A/6QLXZl15v+YYpxAKwtn814xgOhYM9UP3DjtSEFep+E7g9+TBy+Lew7y4SujNNQocYfGNK53gGe6iDf6mVPxzJ9hMK4N2qE+hPb/hBF/bfKeSccaXZJY5lX94y+XfAfe4Du4qYu0km2yFdkwAU/8fkHQBQLUu2Pob5/qe6Q2uZ7ZI/XYg1zqw0b3DjOJMSZWK7/bei4sj9bjJd/GNI1uY0wKvVCo+wvt7JGsgJc9hwothPblghg7aqvj2T0fS+CXjjJ9msANKU3Tkn/1oPt2DQ80kaMP7XFlGi84X1x4EHmjB7R1SaIwOgw3nPds8hvLd2/J35M9v2BGYbA3yfnScuWf7sQOeM9J9hRCw03d/nD2bIsc8fgdvafl7Ks3IR7spi4emrvPYZYlndvG9tMuUiqIcf+9QXv//Mzs4PMZy2Jbv9nqOGDFC+YZH0tIh2KxD7QyWncCRgcSSFYXZeScO4Xzs1sO2WbH9+az1+8X9QuwkZQ2Q5dd2fr8VeXns9MsFaocAnk4CKdjFVG1/0KRjeKZbauzCO+0u1ocWbWa6MF1HrE9YieRjCiIE2JSgrw8s7LtdpGSEMyOCzDx2XKSCYMYMyMQOKSGgUq0QGCMD4SlbIyGK8vsf2bwjk1FAX7VCkBoZSLGjLMJCNSKYMQu2bdsuLaYL1Z1U38friP0nOqltHANl327K4gFK+9gBAi3esXmCvXyjDUzRoi2tV443kqMExC60b4FW2Dze/gkbKWe1u9BMMzY/GsgDLX/bLroi/jDc5GxrH/vBNM3sw5uCcNZ+/MHTZ+u3DHFOlpIKuaOhsgwIM/vI34OQiFs9dbNm6xC/bqZZKmQgdpQFGvWMRzYFMhXcNs0yH7c5+MqhXoc/Tam4V+tkqBvkb4tzYKKSyoTnreqmLMVAPLSY03j0592sSQs39V9bfp8F/EXrZONUd3p40WpxRaeLK6/esZYaWOatEg8BX+x0/yVX+ffDvC+KjS5i3Jb+fVXL/WvEL4BfdLr/wxf5WnFq125z0rnwztxFHlwrpFgMPEup+PbRJGMxmCfBOVB890nA4UrFd4xSFukmwi8mh8j4JvwdUzRn+3WbYO5xSsX3uP+PZkKKFuxb2C4mM2nLQxVrqTHGtdcm435rrZhqpmlDPyKH5AsPq3am1sm/uM4yo+Dc1rgB/kPy4Nxvi6SycTJOUZY3aJ38ZqSyeMLg9Jb5kcXfpXX3ME9RxvUewxS/naZ18vkiXtQhAa1I8chccPku4LtFYHlCNM7Shen7gyCI09SY6brOs7XYMJBkhnTxGXwEeMQWm1ZNLRUMfy3wiJtPFLGbM5WKV7kBW2nj4Qm1TupKxSc5pgM4zp2vczB6Mc55UmH6vUup+PNaJw+OAIVpOHzX8S3MdSdwuxe32h0hDOMG/wZy9PNLPIZ6uVLxaVona5WKIxczas3Hsa6s7wfe6X7/hFLxreQpH98drwAIscGGMOCTUSix9jEDdlqQEBBFsHUb717xJTbt9xQrhUv3ngbmWuAG5BXAUg+q0gt8Tan49Von/9uO6Rxc/ouepyclDwJ+szAFx2m+FdH/J5KDSudpnWxt46lqKBU/H7iyxaMmyDNNi2BhupvzmzKl4s+SQ5H8lYe+oFS8VevkW520lVLx+cAnnTNAkIcMjgU+49pWjm+Os0Z8e/GCdHFvNVgxXDfDiNx8EyDC0HncppiBggA2b8kuWLEmvHTmaitriOmUzl1Ix08Bp5MHQwspeDjwc2cuXE8excclR53kpOFMb1D0OCn7pQkCefoT7ZPIo+EfA35GHrAssGhvIkdk79uCDL4L+M8JLMuYVihyAeSvKxV/y3nTijynPuCbSsVfJceu3U0OLdoPeL7T4Md6CYQF86zROrnWA+fuckpN2N9vgxVrxMVLF9oTeqrypOG6yaSQgbEmbTbNj3YsaSvtFARITBQQDg+b/17x5fAz/f02qA1OrzUQCumldfKAUvGZwHdcJxVwlf3doPygF7uodICwN4CztE6Gu4DxjzWWkwLPdVi0zeQLhgSOcSodyrLImZPBeBYLYfwp6W8jh+c8w2MeyNc1OLklk1a0YNEKcOdvgHPHq2m2M87s2ViLFRfAWc3U/CoM5CFpZtIokkGzwXcvWiNWTI95jhVCiGw3BDNTbz4yKtasgMu4wXWNUvFpwBoPLW28wF3FD/R6nRySR6pPKSDvBUymZT6VeoDHbpnKeKtuFojlfdh5/YK0xWFUBxZondwyAtMYrzy7opFGfd61q3Sm8GvJU5nntKSIF3ULWhAMxfoGkXO4vMWBNtvBoFr7fVQ7S9ZqwszrR37mSnF/M5WLhEAIAWlqbBSxfMl8exLAOXNsBFbY3XnY/DwwYOVu8qQVufFVr9HDMZgWgdbJ1cCrgV95y8NG3kS9AEVG3vXbgGPbpQ97E/gDPDMl7GLRdesN0PPc4PGX0PURD/5StncCr9I6WTeKppnh7u915wPGOOHu6+Z5j3n+4Myvz7lBHrZZy4CWftsKfBY4XuvkLyNgB6st/R6O1u8hwOCgyAYGbFiriR8sXWg/2VOVHxgaMk0rEUFg1ixeZP9xxZfEHwcGdvOkvGjGyV/XzXqo5hUt24E8SJdRZo95fqxU/GK3rFC/s7uf4GmcBjmQ8lZno3/dTcB3GqgtS+B+ymmJIqf/p92kCnipzJeSJ4XNI19jYJbn5t3sTJmvONj+0CiaBpeFWaxiE7p31Mfoar7YPROSowQaI2h0qXXyKPAepeJVbhGOY50JN8sTTFvdnOcHbk7zu5Y12dr1+50t/S6A+0fqd9G6XnQ/cHOv+XGlIo+pN0yjWpGVRtPc1txHHn3AATSX1bACUW6h193CecXfM91cYj8P4Hi/7+Ea774ynnl3LHCDZ+MLYK7WyU+8ew8iRwfMwCEf/LjRdN3jxl+Cy/vtYEA5DVZ37Xp/y5oKE75bnKeOhJ0929p5NWEWLxo6o5lWbgsC9qvXTbO3V77AbjKX11YGi5hrQ9ZP+RYTk9kxQZuVPO1YdyvzcuGt1skW8sStTtsBmjEugcsY83aK+VIENB2TPNRhmeCu3utBhPx8nmyMq36O6fkiv6l4Vusk1Tp5wGnv1veHri7ZZPS7aLe35+CgyJbOt/2VKusaTZMCtlqR0fBQdt7yq8JLBubasLZepBNnJ+WLvRd/H3Ewdt4ghseJZvMWCH9M4tgkrLbTTuMcrXXysxang/DiInZP3b+zXV12x56pbSdzBWMsmZ9d2tsj37mtbtJAIgIpTaPBiSuuEjcUDMYE7Fpdq4lymd3dyDhla03S/ji19WT9/TZgmPPrkpdWI/mcetOkUhKFIVctPWPbiy5aLf483kG/rt8G82oie8fpjx68T3Xma5tNkBJjLTObknUrvyQenCbQmpJKoouEK2Fnz8YuHxRDptmYnxmzLQykSFOThiFPxFS+MjBgwyM2IFoTzrrWNHNtOC83CZ8+M+y7MQq5Igq5Yp+ZrDbWvJSZbB4YsLJkmpL2qD1AazVh1vXbYPna6h2pkUuikEAIqDdM2tMTvGzTPVw8b1BkA3PHnpFXmILnnWafKwNzQxjKZ20dMkNSwqZHzdoVa4K3rlwp6nv69iIl7aWb5+aMYcMVV4pVQ3XW9lRkCDBcN2lvlXctmW/fVlsv0oG5Nhwr05y70B5X6eEGKeWh9Yap91VlbzPl+ll/kgvzfUetoNQ2jAOW7x8l7e5dp5fdSDYwYGWW8c56k41RJENrEc2ULAxZuWShfXFtvUj7XTJaN0yzZIF9U1XybWD/Rmoa1YqsNprmlm0N5i1bX0AvSqYZR5/6MBRZLsoyBbtOCyFsf7+Vg4Ni85KFdr4w5iYppcgyQxTKaiDM1eee8uiLLrmaB845x0YPP/xYCffAA4h3H4ydNyjSJQvs26OQyzMDJjPNnoqsNFOzsSHk6y9bKx5+qH9dMFibV3p+GNc26hvZ2au2rWwWJt8d3Y4K9/Pi09P39fUGnxpqmAygpyKD4br50fI1wfGjvWPpAvveKOLTzQxjjDGVUIbGmj83rDzuktXi9xPl4mYvRy20EYjNPTVOs8czDjj38aDIlizMru2pyNcMN0yGRUSRlGnTXG+F/KPARP5iHkIgsKRWyCdWQl7XTI21FhMGMkCwuTHcmHvx2ur/FO8uu6Skx4Wp5tNvZ+frqWV1FjWEuT0M5CFpamyzaUwlksdL2XnaZC3UG8YABFIKYFuzwZtKppm0aDojbQxb0m7UOL7Jdt58++pqxPczYzJrc4zTSIsFinyxQikkNpRSNlPevHyN+MZEw3dKKmlaeNVaadC5qC/+svhBs2k+Ua3IwEIGIhCIsNMBSCExUSBlvZmdVTJNSXuVxvFTEADiPnNjNZJH15smEyNui2jTnqoMt9X5wIorxYUl05S0V2kcH5IzOCgyg5yfZjwcCCmstR2CbaLZU5Hh0LC5sGSakvZijdMpBYEUTJAv6LQ9ZSDtq8pw27BZvXxNsCh3BDx+UgZKKhmHXQVr5miA7LLeHvmOoWGTCpFvkWitTXt7ZDhcN+tmPUWeumEDYt0gpgRulrTXM04x35ndR/Qo5uYolM9ppCYDbE9FhvWGuWlLVR73+VWky0BMszXRSippd85xdp7vANSuFMO2KednxgwLIW01kmGjyS8z5BtWrRLNZQMl05RUUluTDWDJArvoQ++w9vyF9nfve6uNiyzPsoVKKmkEZwHA0oX2P85daOfAji08Sirp8UT/D6YtxBMUavwrAAAAAElFTkSuQmCC";
+// line icons (Lucide, ISC licence): one set, one size, one stroke, coloured by the text around them
+const ICONS = {
+  paperclip: '<path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>',
+  smile: '<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01"/><path d="M15 9h.01"/>',
+  mic: '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/>',
+  video: '<path d="m16 13 5.22 3.48a.5.5 0 0 0 .78-.42V7.87a.5.5 0 0 0-.75-.43L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/>',
+  bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+  bellOff: '<path d="M8.7 3A6 6 0 0 1 18 8a21.3 21.3 0 0 0 .6 5"/><path d="M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="m2 2 20 20"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  bug: '<path d="m8 2 1.88 1.88"/><path d="M14.12 3.88 16 2"/><path d="M9 7.13v-1a3 3 0 1 1 6 0v1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"/><path d="M12 20v-9"/><path d="M6.53 9C4.6 8.8 3 7.1 3 5"/><path d="M6 13H2"/><path d="M3 21c0-2.1 1.7-3.9 3.8-4"/><path d="M20.97 5c0 2.1-1.6 3.8-3.5 4"/><path d="M22 13h-4"/><path d="M17.2 17c2.1.1 3.8 1.9 3.8 4"/>',
+  message: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
+  mail: '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
+  phone: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
+  pencil: '<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  menu: '<path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/>',
+  calendar: '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>',
+  camera: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
+  copy: '<rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+  pin: '<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>',
+  file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/>',
+  fileText: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
+  sheet: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h8"/><path d="M8 17h8"/><path d="M12 11v8"/>',
+  image: '<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21"/>',
+  film: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 3v18"/><path d="M3 7.5h4"/><path d="M3 12h18"/><path d="M3 16.5h4"/><path d="M17 3v18"/><path d="M17 7.5h4"/><path d="M17 16.5h4"/>',
+  music: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+  archive: '<rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
+  coffee: '<path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/><path d="M6 2v2"/>',
+  logOut: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
+  flag: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/>',
+  ban: '<circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  pause: '<rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/>',
+  checkSquare: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/>'
+};
+function ic(name, size){
+  const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  const px = String(size || 16);
+  s.setAttribute("viewBox", "0 0 24 24"); s.setAttribute("width", px); s.setAttribute("height", px);
+  s.setAttribute("class", "ic"); s.setAttribute("aria-hidden", "true"); s.setAttribute("focusable", "false");
+  s.innerHTML = ICONS[name] || "";
+  return s;
+}
 
 /* ---------------------------------------------------------------------
    Small helpers
@@ -1638,8 +1913,8 @@ async function renderAdminStorage(el){
     card.append(...[setupNote(),
       h("p", { style: "margin:6px 0 0" }, pill(st.ok ? "Connected" : "Problem", st.ok ? "ok" : "bad"), " ", st.ok ? "Using " + (st.account || "your Google account") + "." : st.message),
       h("div", { class: "drive-folders" },
-        h("div", {}, "📁 ", f1.link ? h("a", { href: f1.link, target: "_blank", rel: "noopener" }, f1.name || "Tcipher Workspace files") : (f1.name || "Tcipher Workspace files"), f1.shared_drive ? h("span", { class: "pill ok", style: "margin-left:6px" }, "In a Shared drive") : null),
-        h("div", {}, "📁 ", f2.link ? h("a", { href: f2.link, target: "_blank", rel: "noopener" }, f2.name || "Tcipher Workspace backups") : (f2.name || "Tcipher Workspace backups"), f2.shared_drive ? h("span", { class: "pill ok", style: "margin-left:6px" }, "In a Shared drive") : null)),
+        h("div", {}, ic("folder"), " ", f1.link ? h("a", { href: f1.link, target: "_blank", rel: "noopener" }, f1.name || "Tcipher Workspace files") : (f1.name || "Tcipher Workspace files"), f1.shared_drive ? h("span", { class: "pill ok", style: "margin-left:6px" }, "In a Shared drive") : null),
+        h("div", {}, ic("folder"), " ", f2.link ? h("a", { href: f2.link, target: "_blank", rel: "noopener" }, f2.name || "Tcipher Workspace backups") : (f2.name || "Tcipher Workspace backups"), f2.shared_drive ? h("span", { class: "pill ok", style: "margin-left:6px" }, "In a Shared drive") : null)),
       !(f1.shared_drive && f2.shared_drive) ? h("p", { class: "tipline" }, "Recommended: in Google Drive, create a Shared drive called “Tcipher Workspace”, add only admins, and drag both folders into it. The company then owns the files, not one person’s account. The workspace keeps working; nothing needs changing here.") : null,
       h("p", { class: "muted", style: "font-size:12.5px;margin:8px 0 0" }, "Keep these folders private. Anyone who can open them can open every proposal and offer letter in them."),
       h("label", { class: "chk", style: "margin-top:10px" }, toggle, "Store new uploads in Google Drive"),
@@ -2705,7 +2980,7 @@ function taskCard(r){
       proj ? h("span", {}, proj) : null,
       dueTag(r.due_date, r.status === "Done"),
       r.status === "In review" && r.reviewer_id ? h("span", {}, "Review: " + pname(r.reviewer_id).split(" ")[0]) : null,
-      checklistProgress(r) ? h("span", { title: "Checklist" }, "☑ " + checklistProgress(r)) : null,
+      checklistProgress(r) ? h("span", { title: "Checklist" }, ic("checkSquare", 14), " " + checklistProgress(r)) : null,
       (r.mentions || []).includes(S.me.id) && r.assignee_id !== S.me.id ? h("span", { class: "pill info", style: "font-size:11.5px" }, "@you") : null,
       h("span", { class: "grow" }),
       h("span", { class: "stack" }, avatar(r.assignee_id, "sm"), (r.collaborators || []).slice(0, 3).map(id => avatar(id, "sm")))));
@@ -2720,7 +2995,7 @@ function openDialog(title, bodyNodes, footNodes, narrow){
   const d = dlg();
   d.className = narrow ? "narrow" : "";
   d.replaceChildren(...[
-    h("div", { class: "dh" }, h("h2", {}, title), h("button", { type: "button", class: "iconbtn", "aria-label": "Close", onclick: closeDlg }, "✕")),
+    h("div", { class: "dh" }, h("h2", {}, title), h("button", { type: "button", class: "iconbtn", "aria-label": "Close", onclick: closeDlg }, ic("x", 18))),
     h("div", { class: "db" }, bodyNodes),
     footNodes ? h("div", { class: "df" }, footNodes) : null].filter(Boolean));   // (a missing footer used to show the word "null")
   if (!d.open) d.showModal();
@@ -2892,7 +3167,7 @@ function commentsSection(tbl, id){
       if (!cs.length) list.append(h("p", { class: "nothing" }, "No comments yet."));
       for (const c of cs) list.append(h("div", { class: "cmt" }, avatar(c.author_id, "sm"),
         h("div", { class: "bd" }, h("div", { class: "hd" }, h("b", {}, pname(c.author_id) || "Someone"), c.kind && c.kind !== "Info" ? h("span", { class: "pill " + (c.kind === "Escalation" ? "bad" : "ok"), style: "font-size:11px" }, c.kind === "Action" ? "Action needed" : c.kind) : null, fmtAgo(c.created_at),
-          c.via_email ? h("span", { class: "viaemail", title: "Posted by replying to an email" }, " · ✉️ via email") : null,
+          c.via_email ? h("span", { class: "viaemail", title: "Posted by replying to an email" }, " · via email") : null,
           ((c.author_id === S.me.id && tbl !== "tasks") || S.me.is_admin) ? h("button", { type: "button", class: "del", onclick: async () => { try { ok(await sb.from("comments").delete().eq("id", c.id)); refresh(); } catch (e) { fail(e); } } }, " · Delete") : null),
           h("p", {}, renderRich(c.body)))));
     } catch (e) { list.replaceChildren(h("p", { class: "nothing" }, "Comments couldn’t be loaded.")); }
@@ -2924,7 +3199,7 @@ function commentsSection(tbl, id){
 /* files */
 function filesSection(tbl, id, canUpload){
   const input = h("input", { type: "file", multiple: true, hidden: true });
-  const btn = h("button", { type: "button", class: "btn sm soft", onclick: () => input.click() }, "📎 Add files");
+  const btn = h("button", { type: "button", class: "btn sm soft", onclick: () => input.click() }, ic("paperclip"), "Add files");
   const limit = () => driveReady() ? 100 : MAX_FILE_MB;
   const hint = h("span", { class: "muted fhint" }, "");
   const sec = h("div", { class: "section files-sec" }, h("h3", {}, "Files & media", canUpload ? btn : null), input);
@@ -2940,7 +3215,7 @@ function filesSection(tbl, id, canUpload){
         u.state === "uploading" ? h("span", { class: "upbar" }, h("span", { style: "width:" + Math.round(u.progress * 100) + "%" })) : null,
         u.state === "error" ? h("span", { class: "err", style: "display:block;font-size:12px" }, u.error) : null),
       u.state === "uploading" ? h("span", { class: "uppc muted" }, Math.round(u.progress * 100) + "%") : null,
-      h("button", { type: "button", class: "upclose", title: "Cancel", onclick: () => { u.state = "cancelled"; try { u.xhr && u.xhr.abort(); } catch (e) {} uploading.splice(uploading.indexOf(u), 1); drawUps(); } }, "✕"))));
+      h("button", { type: "button", class: "upclose", title: "Cancel", onclick: () => { u.state = "cancelled"; try { u.xhr && u.xhr.abort(); } catch (e) {} uploading.splice(uploading.indexOf(u), 1); drawUps(); } }, ic("x", 14)))));
   };
   const canDelete = f => f.uploaded_by === S.me.id || S.me.is_admin;
   const delBtn = f => canDelete(f) ? h("button", { type: "button", class: "btn sm ghost danger", title: "Delete", onclick: async () => {
@@ -3355,7 +3630,7 @@ function openPerson(id){
   const lv = rows("leave_requests").find(x => x.user_id === p.id && x.status === "Approved" && x.start_date <= today() && x.end_date >= today());
   openDialog(p.full_name, [
     h("div", { style: "display:flex;gap:14px;align-items:center;margin-bottom:14px" }, avatar(p.id, "lg"), h("div", { style: "flex:1" }, h("b", { style: "font-size:16px" }, p.full_name), h("div", { class: "muted" }, p.title || ""), statusLine(p.id)),
-      h("button", { type: "button", class: "btn sm pri", onclick: () => { closeDlg(); openDM(p.id); } }, "💬 Message")),
+      h("button", { type: "button", class: "btn sm pri", onclick: () => { closeDlg(); openDM(p.id); } }, ic("message"), "Message")),
     h("div", { class: "related" },
       h("div", { class: "ri" }, h("span", {}, "Vertical"), h("b", {}, p.vertical || "–")),
       h("div", { class: "ri" }, h("span", {}, "Role"), h("b", {}, role ? role.name : "–")),
@@ -3363,8 +3638,8 @@ function openPerson(id){
       h("div", { class: "ri" }, h("span", {}, "Phone"), p.phone ? h("a", { href: "tel:" + p.phone }, p.phone) : h("span", { class: "muted" }, "–")),
       h("div", { class: "ri" }, h("span", {}, "Joined"), h("span", {}, p.joined_on ? fmtDate(p.joined_on, true) : "–")),
       lv ? h("div", { class: "ri" }, h("span", {}, "Today"), pill(lv.type === "Work from home" ? "Working from home" : "On leave", "warn")) : null)
-  ], [S.me.is_admin ? h("button", { type: "button", class: "btn sm", onclick: () => { closeDlg(); emailPerson(p, "offer"); } }, "✉️ Offer letter") : null,
-      S.me.is_admin ? h("button", { type: "button", class: "btn sm", onclick: () => { closeDlg(); emailPerson(p, "onboarding"); } }, "✉️ Onboarding email") : null,
+  ], [S.me.is_admin ? h("button", { type: "button", class: "btn sm", onclick: () => { closeDlg(); emailPerson(p, "offer"); } }, ic("mail"), "Offer letter") : null,
+      S.me.is_admin ? h("button", { type: "button", class: "btn sm", onclick: () => { closeDlg(); emailPerson(p, "onboarding"); } }, ic("mail"), "Onboarding email") : null,
       h("span", { class: "sp" }), S.me.is_admin ? h("button", { type: "button", class: "btn soft", onclick: () => { closeDlg(); openUserEditor(p.id); } }, "Edit in admin") : null, h("button", { type: "button", class: "btn", onclick: closeDlg }, "Close")], true);
 }
 
@@ -3428,7 +3703,7 @@ function openMyProfile(){
       h("div", { class: "full section", style: "margin-top:4px" }, h("h3", {}, "Google Calendar and Meet"), googleCard()),
       h("div", { class: "full section", style: "margin-top:4px" }, h("h3", {}, "Sounds"),
         h("div", { style: "display:flex;align-items:center;gap:12px;flex-wrap:wrap" },
-          h("label", { class: "chk" }, h("input", { type: "checkbox", checked: soundOn(), onchange: e => { setSound(e.target.checked); toast(e.target.checked ? "Sounds on." : "Sounds off."); if (e.target.checked) playSound("chime", true); } }), "🔔 Play a sound for new notifications and messages"),
+          h("label", { class: "chk" }, h("input", { type: "checkbox", checked: soundOn(), onchange: e => { setSound(e.target.checked); toast(e.target.checked ? "Sounds on." : "Sounds off."); if (e.target.checked) playSound("chime", true); } }), "Play a sound for new notifications and messages"),
           h("button", { type: "button", class: "btn sm soft", onclick: () => playSound("chime", true) }, "Test sound")),
         h("p", { class: "muted", style: "font-size:12.5px;margin:4px 0 0" }, "Saved for this browser. Check that your computer or phone isn’t muted."))),
     err
@@ -3516,10 +3791,10 @@ async function renderDashboard(el){
   if (S.route !== "dashboard") return;
   const t0 = today(), me = S.me.id;
 
-  const hr = new Date().getHours();
-  const greet = hr < 12 ? "Good morning" : hr < 17 ? "Good afternoon" : "Good evening";
-  el.append(h("div", { class: "hello" }, h("div", {}, h("h1", {}, greet + ", " + (S.me.full_name.split(" ")[0] || "there")),
-    h("p", {}, new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) + (S.me.vertical ? " · " + S.me.vertical : isAdmin() ? " · All verticals" : ""))), attendanceWidget(true)));
+  // the page is titled by the day; check-in sits in a quiet card beside it
+  const scope = S.me.vertical || (isAdmin() ? "All verticals" : "");
+  el.append(h("div", { class: "hello" }, h("div", {}, h("h1", {}, new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })),
+    h("p", {}, [S.me.full_name, scope].filter(Boolean).join(" · "))), attendanceWidget(true)));
 
   // everything on my plate, from every module
   const items = [];
@@ -3558,7 +3833,7 @@ async function renderDashboard(el){
   const mw = h("div", { class: "panel" }, h("h2", {}, "My work", h("button", { type: "button", class: "link", onclick: () => openRecord("tasks", null) }, "+ Add task")));
   if (!items.length) mw.append(h("p", { class: "nothing" }, "Nothing on your plate. Add a task or check your vertical’s board."));
   for (const i of items.slice(0, 12)) mw.append(h("button", { type: "button", class: "row", onclick: i.open },
-    h("span", { class: "pill grey", style: "min-width:76px;justify-content:center" }, i.kind), h("span", { class: "x" }, i.blocked ? "⛔ " : "", i.text), i.extra, h("span", { class: "y", style: "min-width:70px;text-align:right" }, i.d ? dueTag(i.d) : "")));
+    h("span", { class: "pill grey", style: "min-width:76px;justify-content:center" }, i.kind), h("span", { class: "x" }, i.blocked ? h("span", { class: "blocked-ic", title: "Blocked" }, ic("ban", 14)) : "", i.text), i.extra, h("span", { class: "y", style: "min-width:70px;text-align:right" }, i.d ? dueTag(i.d) : "")));
   if (items.length > 12) mw.append(h("p", { class: "nothing" }, "and " + (items.length - 12) + " more"));
   left.append(mw);
 
@@ -4139,7 +4414,7 @@ function attachMentions(ta, opts){
   };
   const close = () => { box.hidden = true; start = -1; };
   const draw = () => box.replaceChildren(...items.map((p, i) => h("button", { type: "button", class: "mention-item" + (i === idx ? " on" : "") + (p.all ? " all" : ""), role: "option",
-    onmousedown: e => { e.preventDefault(); pick(p); } }, p.all ? h("span", { class: "av sm allav", "aria-hidden": "true" }, "👥") : avatar(p.id, "sm"), h("span", {}, p.full_name), h("small", {}, p.all ? p.title : (p.vertical || p.title || "")))));
+    onmousedown: e => { e.preventDefault(); pick(p); } }, p.all ? h("span", { class: "av sm allav", "aria-hidden": "true" }, ic("users", 13)) : avatar(p.id, "sm"), h("span", {}, p.full_name), h("small", {}, p.all ? p.title : (p.vertical || p.title || "")))));
   const pick = p => {
     const pos = ta.selectionStart;
     ta.value = ta.value.slice(0, start) + "@" + p.full_name + " " + ta.value.slice(pos);
@@ -4234,7 +4509,7 @@ function checklistSection(rec, canEdit){
     items.forEach((it, i) => list.append(h("div", { class: "ck" + (it.done ? " done" : "") },
       h("input", { type: "checkbox", checked: !!it.done, disabled: !canEdit, "aria-label": it.text, onchange: e => { items[i].done = e.target.checked; save(); } }),
       h("span", { class: "x" }, renderRich(it.text)),
-      canEdit ? h("button", { type: "button", class: "del", "aria-label": "Remove", onclick: () => { items.splice(i, 1); save(); } }, "✕") : null)));
+      canEdit ? h("button", { type: "button", class: "del", "aria-label": "Remove", onclick: () => { items.splice(i, 1); save(); } }, ic("x", 14)) : null)));
     if (!items.length) list.append(h("p", { class: "nothing" }, canEdit ? "Break the work into steps, e.g. “API endpoint”, “UI”, “Tests”." : "No checklist."));
     if (canEdit){
       const inp = h("input", { class: "in", placeholder: "Add a step and press Enter", maxlength: "300" });
@@ -4391,7 +4666,7 @@ function notesBoard(el, A){
     for (const n of list){
       const t = byId("tasks", n.task_id), pr = byId("projects", n.project_id), mt = byId("meetings", n.meeting_id);
       grid.append(h("button", { type: "button", class: "note-card" + (n.pinned && n.owner_id === S.me.id ? " pinned" : ""), onclick: () => openRecord("notes", n.id) },
-        h("div", { class: "nt" }, n.pinned && n.owner_id === S.me.id ? "📌 " : "", n.title || "Untitled"),
+        h("div", { class: "nt" }, n.pinned && n.owner_id === S.me.id ? ic("pin", 14) : "", n.title || "Untitled"),
         h("div", { class: "nb" }, renderRich(String(n.body || "").slice(0, 260) + (String(n.body || "").length > 260 ? "…" : ""))),
         h("div", { class: "nm" }, pill(VIS_LABEL[n.visibility] || n.visibility, n.visibility === "Private" ? "grey" : "info"),
           t ? h("span", { class: "tkey" }, taskKey(t)) : null, pr ? h("span", {}, pr.name) : null, mt ? h("span", {}, mt.title) : null,
@@ -4752,8 +5027,8 @@ function contactBar(table, rec){
   const btn = (label, href, kind, enabled) => h("button", { type: "button", class: "btn sm", disabled: !enabled, title: enabled ? "" : "No " + (kind === "Email" ? "email" : "phone") + " saved",
     onclick: () => { if (href) window.open(href, "_blank", "noopener"); log(kind); } }, label);
   return h("div", { class: "cbar" },
-    btn("📞 Call", phone ? "tel:" + String(phone).replace(/\s/g, "") : null, "Call", !!phone),
-    btn("💬 WhatsApp", phone ? "https://wa.me/" + waNumber(phone) + "?text=" + encodeURIComponent("Hi " + first + ", ") : null, "WhatsApp", !!phone),
+    btn("Call", phone ? "tel:" + String(phone).replace(/\s/g, "") : null, "Call", !!phone),
+    btn("WhatsApp", phone ? "https://wa.me/" + waNumber(phone) + "?text=" + encodeURIComponent("Hi " + first + ", ") : null, "WhatsApp", !!phone),
     h("button", { type: "button", class: "btn sm", disabled: !email, title: email ? "" : "No email saved", onclick: () => { closeDlg(); openComposer({ ...emailCtx(table, rec), tbl: table, entity_id: rec.id }); } }, "✉️ Email"),
     btn("SMS", phone ? "sms:" + String(phone).replace(/\s/g, "") : null, "SMS", !!phone),
     h("button", { type: "button", class: "btn sm soft", onclick: () => log("Note") }, "+ Log activity"));
@@ -5378,7 +5653,7 @@ function emailsSection(tbl, rec){
   const threads = new Map(); for (const e of list){ const k = e.gmail_thread_id || e.id; if (!threads.has(k)) threads.set(k, []); threads.get(k).push(e); }
   const unread = list.filter(e => e.direction === "in" && !e.read_at && e.user_id === S.me.id);
   const sec = h("div", { class: "section" }, h("h3", {}, "Emails", unread.length ? h("span", { class: "pill bad", style: "margin-left:6px" }, unread.length + " new " + (unread.length === 1 ? "reply" : "replies")) : null,
-    h("button", { type: "button", class: "btn sm soft", style: "margin-left:auto", onclick: () => { closeDlg(); openComposer({ ...emailCtx(tbl, rec), tbl, entity_id: rec.id }); } }, "✉️ New email")));
+    h("button", { type: "button", class: "btn sm soft", style: "margin-left:auto", onclick: () => { closeDlg(); openComposer({ ...emailCtx(tbl, rec), tbl, entity_id: rec.id }); } }, ic("mail"), "New email")));
   if (!threads.size) sec.append(h("p", { class: "nothing" }, canEmail() ? "No emails yet. Emails you send from here, and the replies, show up in this list." : "Connect Google with email to send from your own address and see replies here."));
   for (const [, msgs] of [...threads.entries()].reverse()) sec.append(threadView(msgs, tbl, rec));
   if (unread.length) setTimeout(() => markRead(unread), 1500);
@@ -5396,7 +5671,7 @@ function threadView(msgs, tbl, rec){
     box.append(h("div", { class: "emsg " + e.direction + (e.direction === "in" && !e.read_at ? " unread" : "") },
       h("div", { class: "em" }, e.direction === "in" ? h("b", {}, e.from_email.replace(/<.*>/, "").trim() || e.from_email) : h("span", {}, h("b", {}, pname(e.user_id) || "You"), h("span", { class: "muted" }, " to " + e.to_email)),
         h("span", { class: "muted" }, new Date(e.sent_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }))),
-      bodyEl, (e.attachments || []).length ? h("div", { class: "muted", style: "font-size:12.5px;margin-top:4px" }, "📎 " + e.attachments.map(a => a.name).join(", ")) : null));
+      bodyEl, (e.attachments || []).length ? h("div", { class: "muted", style: "font-size:12.5px;margin-top:4px" }, ic("paperclip", 13), " " + e.attachments.map(a => a.name).join(", ")) : null));
   }
   if (last.user_id === S.me.id || msgs.some(m => m.user_id === S.me.id)){
     const anchor = [...msgs].reverse().find(m => m.user_id === S.me.id) || last;
@@ -5440,7 +5715,7 @@ async function renderEmails(el){
   if (!S.ui.emails) S.ui.emails = { view: "replies", q: "" };
   const u = S.ui.emails;
   el.append(h("div", { class: "ph" }, h("div", {}, h("h1", {}, "Emails"), h("p", {}, "Emails you’ve sent from the workspace, and the replies to them. Only these conversations are read; the rest of your inbox stays private.")),
-    h("div", { class: "acts" }, h("button", { type: "button", class: "btn pri", onclick: () => newEmailToAnyone() }, "✉️ New email"))));
+    h("div", { class: "acts" }, h("button", { type: "button", class: "btn pri", onclick: () => newEmailToAnyone() }, ic("mail"), "New email"))));
   if (!canEmail()) el.append(h("div", { class: "panel", style: "background:var(--tint);border-color:transparent;display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px" },
     h("span", { style: "flex:1;min-width:200px" }, h("b", {}, "Send from your own email. "), "Connect Google once and tick the Gmail boxes. Emails go from your address, and replies show up here."),
     h("button", { type: "button", class: "btn pri", onclick: () => connectGoogle() }, googleConnected() ? "Reconnect Google" : "Connect Google")));
@@ -5811,11 +6086,11 @@ async function renderChat(el){
   attachMentions(ta, { allLabel: () => { const c = C.channels.find(x => x.id === C.active); return !c ? "Everyone here" : c.kind === "channel" ? (c.vertical ? "Everyone in the " + c.vertical + " team" : "Everyone in the company") : "Everyone in this conversation"; } });
   const sendBtn = h("button", { type: "button", class: "btn pri" }, "Send");
   const fileIn = h("input", { type: "file", multiple: true, hidden: true });
-  const attachBtn = h("button", { type: "button", class: "btn ghost chat-attach", title: "Attach files (up to 100 MB each)", "aria-label": "Attach files" }, "📎");
+  const attachBtn = h("button", { type: "button", class: "btn ghost chat-attach", title: "Attach files (up to 100 MB each)", "aria-label": "Attach files" }, ic("paperclip", 18));
   attachBtn.addEventListener("click", () => { if (chatFilesReady()) fileIn.click(); });
   fileIn.addEventListener("change", () => { addChatFiles([...fileIn.files]); fileIn.value = ""; });
   const upl = h("div", { class: "chat-uploads", hidden: true });
-  const emojiBtn = h("button", { type: "button", class: "btn ghost chat-attach", title: "Emoji", "aria-label": "Add an emoji" }, "😊");
+  const emojiBtn = h("button", { type: "button", class: "btn ghost chat-attach", title: "Emoji", "aria-label": "Add an emoji" }, ic("smile", 18));
   emojiBtn.addEventListener("click", () => openEmojiPicker(emojiBtn, e => insertAtCursor(ta, e)));
   const replyBar = h("div", { class: "chat-reply", hidden: true });
   const micBtn = voiceNoteButton(() => sendBtn);
@@ -5829,7 +6104,7 @@ async function renderChat(el){
   chatEls = { list, head, msgs, ta, typing, live, jump, upl, replyBar, pending: true };   // being drawn off-screen, about to be shown
   el._chatEls = chatEls;           // so the chat can always find the copy that's actually on screen
   el.append(h("div", { class: "chat" + (C.mobileView === "conv" ? " m-conv" : "") }, list, h("div", { class: "chat-main" }, head, h("div", { class: "chat-msgwrap" }, msgs, jump), typing, replyBar, upl, foot,
-    h("p", { class: "muted", style: "font-size:12px;margin:4px 14px 10px" }, "Text, links and files up to 100 MB each (📎, drag a file here, or paste a screenshot). Files are kept in the company’s Google Drive; only this conversation’s members can open them. Messages are kept permanently."))));
+    h("p", { class: "muted", style: "font-size:12px;margin:4px 14px 10px" }, "Text, links and files up to 100 MB each: attach them, drag them here or paste a screenshot. Files are kept in the company’s Google Drive; only this conversation’s members can open them. Messages are kept permanently."))));
   ta.value = C.drafts[C.active] || "";
   // drop files anywhere on the conversation, or paste a screenshot into the box
   const main = el.querySelector(".chat-main");
@@ -5896,7 +6171,7 @@ function drawChatList(){
     list.replaceChildren(search, chatEls.items);
   }
   const item = (id, label, sub, unread, mention, extra) => h("button", { type: "button", class: "chat-item" + (C.active === id ? " on" : "") + (unread ? " unread" : ""), onclick: async () => { C.mobileView = "conv"; await openChannel(id); rerender(); } },
-    extra || null, h("span", { class: "x" }, h("b", {}, label, chatMuted(id) ? h("span", { class: "mutedmark", title: "Muted", "aria-label": "Muted" }, " 🔕") : null), sub ? h("br") : null, sub || null),
+    extra || null, h("span", { class: "x" }, h("b", {}, label, chatMuted(id) ? h("span", { class: "mutedmark", title: "Muted", "aria-label": "Muted" }, ic("bellOff", 13)) : null), sub ? h("br") : null, sub || null),
     unread ? h("span", { class: "cnt " + (chatMuted(id) && !C.mentions[id] ? "muted" : mention ? "due" : "new") }, String(unread > 99 ? "99+" : unread)) : null);
   const match = t => !q || String(t || "").toLowerCase().includes(q);
   const channels = C.channels.filter(c => c.kind === "channel" && match(c.name));
@@ -5910,7 +6185,7 @@ function drawChatList(){
   chatEls.items.replaceChildren(...[
     channels.length ? h("h4", {}, "Channels") : null, ...channels.map(c => item(c.id, "# " + c.name, c.vertical ? c.vertical + " team" : "Everyone", C.unread[c.id], C.mentions[c.id])),
     h("h4", { style: "display:flex;align-items:center" }, "Groups", h("button", { type: "button", class: "linkbtn", style: "margin-left:auto;text-transform:none;letter-spacing:0", onclick: () => groupDialog(null) }, "+ New group")),
-    ...(groups.length ? groups.map(c => item(c.id, chName(c), (c.members || []).length + " people", C.unread[c.id], true, h("span", { class: "gicon", "aria-hidden": "true" }, "👥")))
+    ...(groups.length ? groups.map(c => item(c.id, chName(c), (c.members || []).length + " people", C.unread[c.id], true, h("span", { class: "gicon", "aria-hidden": "true" }, ic("users", 15))))
       : [h("p", { class: "muted", style: "font-size:12.5px;margin:2px 8px 6px" }, q ? "No groups match." : "Private chats with a few people.")]),
     h("h4", {}, "Direct messages"), ...(people.length ? [] : [h("p", { class: "muted", style: "font-size:12.5px;margin:2px 8px 6px" }, "No one matches “" + C.q.trim() + "”.")]),
     ...people.map(({ p, ch }) => h("button", { type: "button", class: "chat-item" + (ch && C.active === ch.id ? " on" : "") + (ch && C.unread[ch.id] ? " unread" : ""), onclick: open(() => openDM(p.id)) },
@@ -5932,7 +6207,7 @@ function drawChatHead0(){
   if (ch.kind === "group"){
     const members = (ch.members || []).map(person).filter(Boolean);
     const on = members.filter(p => isOnline(p.id)).length;
-    chatEls.head.replaceChildren(h("span", { class: "gicon", "aria-hidden": "true" }, "👥"), h("span", { class: "x" }, h("b", {}, chName(ch)), h("br"), h("span", { class: "muted", style: "font-size:12.5px" }, members.length + " people · " + on + " online · private")),
+    chatEls.head.replaceChildren(h("span", { class: "gicon", "aria-hidden": "true" }, ic("users", 15)), h("span", { class: "x" }, h("b", {}, chName(ch)), h("br"), h("span", { class: "muted", style: "font-size:12.5px" }, members.length + " people · " + on + " online · private")),
       h("span", { class: "stack" }, members.slice(0, 6).map(p => avatar(p.id, "sm"))),
       ch.created_by === S.me.id || isAdmin() ? h("button", { type: "button", class: "btn sm", onclick: () => groupDialog(ch) }, "Manage") : h("button", { type: "button", class: "btn sm ghost", onclick: () => leaveGroup(ch) }, "Leave"));
     return;
@@ -5942,9 +6217,9 @@ function drawChatHead0(){
     chatEls.head.replaceChildren(avatar(other && other.id), h("span", { class: "x" }, h("b", {}, other ? other.full_name : "Someone"), h("br"), other ? statusLine(other.id) : null),
       h("span", { class: "chat-acts" },
         other && other.phone
-          ? h("button", { type: "button", class: "btn sm", title: "Opens WhatsApp with " + other.full_name.split(" ")[0], onclick: () => window.open("https://wa.me/" + waNumber(other.phone) + "?text=" + encodeURIComponent("Hi " + other.full_name.split(" ")[0] + ", "), "_blank", "noopener") }, h("span", { "aria-hidden": "true" }, "💬"), h("span", { class: "bl" }, " WhatsApp"))
-          : other ? h("button", { type: "button", class: "btn sm", disabled: true, title: other.full_name.split(" ")[0] + " hasn’t added a phone number in My profile yet" }, h("span", { "aria-hidden": "true" }, "💬"), h("span", { class: "bl" }, " WhatsApp")) : null,
-        other && other.email ? h("button", { type: "button", class: "btn sm", onclick: () => openComposer({ to: other.email, name: other.full_name, templateFor: "any", tbl: "", entity_id: null }) }, h("span", { "aria-hidden": "true" }, "✉️"), h("span", { class: "bl" }, " Email")) : null));
+          ? h("button", { type: "button", class: "btn sm", title: "Opens WhatsApp with " + other.full_name.split(" ")[0], onclick: () => window.open("https://wa.me/" + waNumber(other.phone) + "?text=" + encodeURIComponent("Hi " + other.full_name.split(" ")[0] + ", "), "_blank", "noopener") }, ic("message"), h("span", { class: "bl" }, "WhatsApp"))
+          : other ? h("button", { type: "button", class: "btn sm", disabled: true, title: other.full_name.split(" ")[0] + " hasn’t added a phone number in My profile yet" }, ic("message"), h("span", { class: "bl" }, "WhatsApp")) : null,
+        other && other.email ? h("button", { type: "button", class: "btn sm", onclick: () => openComposer({ to: other.email, name: other.full_name, templateFor: "any", tbl: "", entity_id: null }) }, ic("mail"), h("span", { class: "bl" }, "Email")) : null));
   } else {
     const members = activePeople().filter(p => !ch.vertical || p.vertical === ch.vertical || p.is_admin);
     const on = members.filter(p => isOnline(p.id)).length;
@@ -5962,7 +6237,7 @@ function drawChatMessages(toBottom){
   const showNames = ch.kind !== "dm";
   msgs.replaceChildren();
   if (C.more[C.active]) msgs.append(h("div", { style: "text-align:center;margin:6px 0" }, h("button", { type: "button", class: "btn sm ghost", onclick: async () => { const h0 = msgs.scrollHeight; await loadEarlier(C.active); drawChatMessages(); msgs.scrollTop = msgs.scrollHeight - h0; } }, "Load earlier messages")));
-  if (!list.length) msgs.append(h("div", { class: "empty", style: "margin:auto" }, h("b", {}, "No messages yet"), "Say hello 👋"));
+  if (!list.length) msgs.append(h("div", { class: "empty", style: "margin:auto" }, h("b", {}, "No messages yet"), "Say hello"));
   // "Seen": in a direct chat, the other person has read up to here
   const other = ch.kind === "dm" ? dmOther(ch) : null;
   const theirLatest = other ? Math.max(0, ...list.filter(m => m.author_id === other).map(m => m.id)) : 0;
@@ -5981,7 +6256,7 @@ function drawChatMessages(toBottom){
     const bubble = m.unsent_at ? h("div", { class: "bub unsent" }, mine ? "You deleted this message" : "This message was deleted")
       : h("div", { class: "bub" + ((m.mentions || []).includes(S.me.id) && !mine ? " tagged" : "") + (m.body ? "" : " files-only") }, replyQuote(m), m.body ? renderRich(m.body) : null, meetCard(m), chatAttachments(m));
     // a reply someone sent by answering a notification email
-    const via = m.via_email && !m.unsent_at ? h("span", { class: "viaemail", title: "Sent by replying to an email" }, "✉️ via email") : null;
+    const via = m.via_email && !m.unsent_at ? h("span", { class: "viaemail", title: "Sent by replying to an email" }, "via email") : null;
     const meta = lastOfRun ? h("div", { class: "bmeta" }, time, m.edited_at ? " · edited" : "", via ? " · " : "", via,
       mine && myLast && m.id === myLast.id && other ? h("span", { class: "seen" + (seenUpTo >= m.id ? " on" : "") }, seenUpTo >= m.id ? " · Seen" : " · Sent") : null,
       mine && myLast && m.id === myLast.id && !other && !m.unsent_at ? groupSeenLabel(m) : null)
@@ -6036,11 +6311,11 @@ function messagesPanel(){
   const online = activePeople().filter(p => p.id !== S.me.id && isOnline(p.id));
   return h("div", { class: "panel" }, h("h2", {}, "Messages", h("button", { type: "button", class: "link", onclick: () => go("chat") }, "Open chat")),
     items.length ? items.slice(0, 5).map(c => h("button", { type: "button", class: "row", onclick: async () => { await openChannel(c.id); go("chat"); } },
-      c.kind === "dm" ? avatar(dmOther(c), "sm") : h("span", { class: "tkey" }, c.kind === "group" ? "👥" : "#"),
+      c.kind === "dm" ? avatar(dmOther(c), "sm") : h("span", { class: "tkey" }, c.kind === "group" ? ic("users", 12) : "#"),
       h("span", { class: "x" }, h("b", {}, chName(c)), h("br"), h("span", { class: "muted", style: "font-size:13px" }, C.last[c.id] ? (pname(C.last[c.id].author_id).split(" ")[0] + ": " + chatText(C.last[c.id]).slice(0, 60)) : "")),
       h("span", { class: "cnt " + (c.kind !== "channel" || C.mentions[c.id] ? "due" : "new") }, String(C.unread[c.id]))))
       : replies.length ? null : h("p", { class: "nothing" }, "You’re all caught up."),
-    replies.slice(0, 4).map(e => h("button", { type: "button", class: "row", onclick: () => openEmail(e) }, h("span", { class: "tkey" }, "✉️"),
+    replies.slice(0, 4).map(e => h("button", { type: "button", class: "row", onclick: () => openEmail(e) }, h("span", { class: "tkey" }, ic("mail", 12)),
       h("span", { class: "x" }, h("b", {}, (e.from_email.replace(/<.*>/, "").trim() || e.from_email)), h("br"), h("span", { class: "muted", style: "font-size:13px" }, (e.subject + " · " + e.snippet).slice(0, 70))),
       h("span", { class: "cnt due" }, "Reply"))),
     replies.length > 4 ? h("button", { type: "button", class: "linkbtn", onclick: () => go("emails") }, "All " + replies.length + " email replies") : null,
@@ -6300,7 +6575,7 @@ window.addEventListener("resize", () => { if (S.route === "chat") fitChat(); });
    --------------------------------------------------------------------- */
 const CHAT_MAX = 100 * 1024 * 1024;
 const chatSize = n => n >= 1048576 ? (n / 1048576).toFixed(n >= 10485760 ? 0 : 1) + " MB" : n >= 1024 ? Math.round(n / 1024) + " KB" : (n || 0) + " B";
-const chatText = m => m ? (m.unsent_at ? "Message deleted" : m.body || ((m.attachments || []).length ? "📎 " + m.attachments[0].name + (m.attachments.length > 1 ? " and " + (m.attachments.length - 1) + " more" : "") : "")) : "";
+const chatText = m => m ? (m.unsent_at ? "Message deleted" : m.body || ((m.attachments || []).length ? "Attachment: " + m.attachments[0].name + (m.attachments.length > 1 ? " and " + (m.attachments.length - 1) + " more" : "") : "")) : "";
 function chatFilesReady(){
   if (!(S.settings && S.settings.drive_folder)) { toast(isAdmin() ? "Connect Google Drive first: Admin panel › Storage." : "Sending files needs Google Drive. Ask an admin to connect it (Admin panel › Storage)."); return false; }
   return true;
@@ -6364,7 +6639,7 @@ function drawUploads(progressOnly){
       u.state === "uploading" ? h("span", { class: "upbar" }, h("span", { style: "width:" + Math.round(u.progress * 100) + "%" })) : null,
       u.state === "error" ? h("span", { class: "err", style: "display:block;font-size:12px" }, u.error) : null),
     u.state === "uploading" ? h("span", { class: "uppc muted" }, Math.round(u.progress * 100) + "%") : u.state === "ready" ? h("span", { class: "pill ok" }, "Ready") : null,
-    h("button", { type: "button", class: "upclose", title: u.state === "uploading" ? "Cancel" : "Remove", "aria-label": "Remove " + u.name, onclick: () => cancelUpload(u) }, "✕"))));
+    h("button", { type: "button", class: "upclose", title: u.state === "uploading" ? "Cancel" : "Remove", "aria-label": "Remove " + u.name, onclick: () => cancelUpload(u) }, ic("x", 14)))));
   if (chatEls.ta) chatEls.ta.placeholder = list.some(u => u.state === "ready") ? "Add a message (optional), then press Enter to send" : "Write a message… type @ to tag someone. Enter to send, Shift + Enter for a new line.";
 }
 function cancelUpload(u){
@@ -6375,8 +6650,8 @@ function cancelUpload(u){
   if (wasReady && u.file) filesFn("delete", "&id=" + encodeURIComponent(u.file.id)).catch(() => {});
   drawUploads();
 }
-const fileIcon = (mime, name) => /^image\//.test(mime) ? "🖼" : /^video\//.test(mime) ? "🎬" : /^audio\//.test(mime) ? "🎵" : /pdf/.test(mime) || /\.pdf$/i.test(name) ? "📄"
-  : /sheet|excel|csv/.test(mime) || /\.(xlsx?|csv)$/i.test(name) ? "📊" : /zip|compressed|rar|7z/.test(mime) || /\.(zip|rar|7z)$/i.test(name) ? "🗜" : "📎";
+const fileIcon = (mime, name) => ic(/^image\//.test(mime) ? "image" : /^video\//.test(mime) ? "film" : /^audio\//.test(mime) ? "music" : /pdf/.test(mime) || /\.pdf$/i.test(name) ? "fileText"
+  : /sheet|excel|csv/.test(mime) || /\.(xlsx?|csv)$/i.test(name) ? "sheet" : /zip|compressed|rar|7z/.test(mime) || /\.(zip|rar|7z)$/i.test(name) ? "archive" : "file", 18);
 
 /* ---------- showing files in a conversation ---------- */
 const LINKS = new Map();   // file id → { url, until }
@@ -6510,7 +6785,7 @@ function voicePlayer(a){
   const speeds = [1, 1.5, 2]; let sp = 0;
   const speedBtn = h("button", { type: "button", class: "vp-speed", "aria-label": "Playback speed", "data-multi": "1" }, "1×");
   const box = h("div", { class: "cvoice vp", "data-file": a.id },
-    h("span", { class: "cvoice-ic", "aria-hidden": "true" }, /^Voice note/.test(a.name || "") ? "🎤" : "🎵"), playBtn, bar, time, speedBtn,
+    h("span", { class: "cvoice-ic", "aria-hidden": "true" }, /^Voice note/.test(a.name || "") ? ic("mic") : ic("music")), playBtn, bar, time, speedBtn,
     h("button", { type: "button", class: "btn sm ghost vp-dl", title: "Download", "aria-label": "Download " + a.name, onclick: () => openChatFile(a, true) }, "⬇"));
   let loaded = null, total = voiceSecs(a.name);
   const draw = () => {
@@ -6651,7 +6926,7 @@ function drawReplyBar(){
   chatEls.replyBar.hidden = !m;
   if (!m) { chatEls.replyBar.replaceChildren(); return; }
   chatEls.replyBar.replaceChildren(h("span", { class: "rbx" }, h("b", {}, "Replying to " + (m.author_id === S.me.id ? "yourself" : pname(m.author_id) || "a message")), h("span", { class: "muted" }, chatText(m).slice(0, 120))),
-    h("button", { type: "button", class: "upclose", title: "Cancel reply", "aria-label": "Cancel reply", onclick: () => { delete C.replyTo[C.active]; drawReplyBar(); } }, "✕"));
+    h("button", { type: "button", class: "upclose", title: "Cancel reply", "aria-label": "Cancel reply", onclick: () => { delete C.replyTo[C.active]; drawReplyBar(); } }, ic("x", 14)));
 }
 // the quote shown above a reply; click it to jump to the original
 function replyQuote(m){
@@ -6705,16 +6980,16 @@ function reactionsRow(m){
 }
 // the small toolbar on a message: reply, react, edit, delete
 function messageActions(m, bubble){
-  const del = h("button", { type: "button", class: "mact", title: "Delete", "aria-label": "Delete message", onclick: () => openDeleteChoice(m) }, "🗑");
+  const del = h("button", { type: "button", class: "mact", title: "Delete", "aria-label": "Delete message", onclick: () => openDeleteChoice(m) }, ic("trash", 15));
   if (m.unsent_at) return h("div", { class: "macts" }, del);   // a deleted message: you can still hide it for yourself
   const mine = m.author_id === S.me.id;
-  const reactBtn = h("button", { type: "button", class: "mact", title: "React", "aria-label": "React to this message" }, "😊");
+  const reactBtn = h("button", { type: "button", class: "mact", title: "React", "aria-label": "React to this message" }, ic("smile", 15));
   reactBtn.addEventListener("click", () => openQuickReact(reactBtn, m));
   return h("div", { class: "macts" },
     h("button", { type: "button", class: "mact", title: "Reply", "aria-label": "Reply to this message", onclick: () => setReplyTo(m) }, "↩"),
     reactBtn,
     mine ? h("button", { type: "button", class: "mact", title: "Info", "aria-label": "Who has seen it, and who reacted", onclick: () => openMessageInfo(m) }, "ⓘ") : null,
-    mine ? h("button", { type: "button", class: "mact", title: "Edit", "aria-label": "Edit message", onclick: () => editMessage(m, bubble) }, "✎") : null,
+    mine ? h("button", { type: "button", class: "mact", title: "Edit", "aria-label": "Edit message", onclick: () => editMessage(m, bubble) }, ic("pencil", 15)) : null,
     del);
 }
 // the delete popup: Delete for me, Delete for everyone (your own messages), Cancel
@@ -6797,12 +7072,12 @@ function conversationPeople(ch){
   return (ch.members || []).filter(id => person(id));
 }
 function chatMeetButton(){
-  const b = h("button", { type: "button", class: "btn sm chat-meet", title: "Start or schedule a Google Meet with this conversation" }, "📹 Meet");
+  const b = h("button", { type: "button", class: "btn sm chat-meet", title: "Start or schedule a Google Meet with this conversation" }, ic("video"), "Meet");
   b.addEventListener("click", e => {
     e.stopPropagation();
     const menu = h("div", { class: "status-menu", role: "menu" },
-      h("button", { type: "button", role: "menuitem", onclick: () => { menu.remove(); startMeetNow(); } }, "📹 Start a meeting now"),
-      h("button", { type: "button", role: "menuitem", onclick: () => { menu.remove(); scheduleMeet(); } }, "🗓 Schedule a meeting…"));
+      h("button", { type: "button", role: "menuitem", onclick: () => { menu.remove(); startMeetNow(); } }, ic("video"), "Start a meeting now"),
+      h("button", { type: "button", role: "menuitem", onclick: () => { menu.remove(); scheduleMeet(); } }, ic("calendar"), "Schedule a meeting…"));
     document.body.append(menu);
     const r = b.getBoundingClientRect(); menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 240)) + "px"; menu.style.top = (r.bottom + 6) + "px";
     setTimeout(() => document.addEventListener("click", () => menu.remove(), { once: true }), 0);
@@ -6832,7 +7107,7 @@ async function startMeetNow(){
     const saved = await syncMeetingToGoogle(m);
     const url = saved && saved.link;
     if (!url || !/^https:\/\/meet\.google\.com\//.test(url)) throw new Error("Google didn’t return a Meet link. Try again, or use Schedule a meeting.");
-    const msg = ok(await sb.from("chat_messages").insert({ channel_id: ch.id, author_id: S.me.id, body: "📹 Started a Google Meet: " + url, mentions: [] }).select().single());
+    const msg = ok(await sb.from("chat_messages").insert({ channel_id: ch.id, author_id: S.me.id, body: "Started a Google Meet: " + url, mentions: [] }).select().single());
     (C.msgs[ch.id] = C.msgs[ch.id] || []).push(msg); C.last[ch.id] = msg; if (msg.id > (C.maxId || 0)) C.maxId = msg.id;
     drawChatMessages(true); markChatRead(ch.id);
     if (tab) tab.location.href = url; else window.open(url, "_blank", "noopener");
@@ -6850,7 +7125,7 @@ function scheduleMeet(){
 function meetCard(m){
   const x = String(m.body || "").match(/https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}/i);
   if (!x) return null;
-  return h("a", { class: "meetcard", href: x[0], target: "_blank", rel: "noopener" }, h("span", { class: "mic", "aria-hidden": "true" }, "📹"),
+  return h("a", { class: "meetcard", href: x[0], target: "_blank", rel: "noopener" }, h("span", { class: "mic", "aria-hidden": "true" }, ic("video", 20)),
     h("span", { class: "mx" }, h("b", {}, "Google Meet"), h("span", {}, x[0].replace("https://", ""))), h("span", { class: "btn sm pri" }, "Join"));
 }
 
@@ -6874,8 +7149,8 @@ async function openMessageInfo(m){
     : h("p", { class: "muted", style: "margin:4px 0 0" }, empty);
   const groups = []; for (const r of rx) { let g = groups.find(x => x.e === r.emoji); if (!g) groups.push(g = { e: r.emoji, ids: [] }); g.ids.push(r.user_id); }
   openDialog("Message info", [
-    h("div", { class: "minfo-msg" }, chatText(m).slice(0, 200) || "📎 Files", h("span", { class: "muted" }, " · sent " + new Date(m.created_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }))),
-    h("h3", { class: "minfo-h" }, "✓ Seen by", h("span", {}, String(s.seen.length))), who(s.seen, "Nobody yet."),
+    h("div", { class: "minfo-msg" }, chatText(m).slice(0, 200) || "Files", h("span", { class: "muted" }, " · sent " + new Date(m.created_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }))),
+    h("h3", { class: "minfo-h" }, "Seen by", h("span", {}, String(s.seen.length))), who(s.seen, "Nobody yet."),
     h("h3", { class: "minfo-h" }, "Not seen yet", h("span", {}, String(s.notSeen.length))), who(s.notSeen, "Everyone has seen it."),
     h("h3", { class: "minfo-h" }, "Reactions", h("span", {}, String(rx.length))),
     groups.length ? h("div", { class: "minfo-list" }, groups.flatMap(g => g.ids.map(id => h("div", { class: "minfo-row" }, avatar(id, "sm"), h("span", {}, id === S.me.id ? "You" : (pname(id) || "Someone")), h("span", { class: "minfo-emoji" }, g.e)))))
@@ -6894,7 +7169,7 @@ function chatMuteButton(){
   const muted = chatMuted(ch.id);
   const b = h("button", { type: "button", class: "btn sm chat-mute" + (muted ? " on" : ""), id: "chatMute", "aria-pressed": String(muted),
     title: muted ? "Muted: no sound or pop-ups, except when you’re tagged. Click to unmute." : "Mute this " + (ch.kind === "group" ? "group" : "channel") + ": no sound or pop-ups, except when you’re tagged.",
-    onclick: () => toggleChatMute(ch) }, muted ? "🔕 Muted" : "🔔 Mute");
+    onclick: () => toggleChatMute(ch) }, muted ? [ic("bellOff"), "Muted"] : [ic("bell"), "Mute"]);
   // redrawn in the same spot after each click: a double-click mustn't mute and unmute again
   if (Date.now() - (C.muteAt || 0) < 1500) b.__tcLast = Date.now() + 300;
   return b;
@@ -6918,7 +7193,7 @@ function voiceType(){
   return null;
 }
 function voiceNoteButton(getSend){
-  const btn = h("button", { type: "button", class: "btn ghost chat-attach chat-mic", id: "chatMic", title: "Record a voice note", "aria-label": "Record a voice note" }, "🎤");
+  const btn = h("button", { type: "button", class: "btn ghost chat-attach chat-mic", id: "chatMic", title: "Record a voice note", "aria-label": "Record a voice note" }, ic("mic", 18));
   let rec = null, stream = null, chunks = [], started = 0, timer = null, bar = null, cancelled = false;
   const fmt = s => Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0");
   const stopAll = () => { clearInterval(timer); timer = null; if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; if (bar) bar.remove(); bar = null; btn.hidden = false; };
@@ -7106,7 +7381,7 @@ function showIdleWarning(kind){
     if (offline && warnState !== "offline") { warnState = "offline"; saveMyStatus({ state: "offline", idle_since: new Date(lastInput).toISOString() }); }
     const mm = Math.floor(left / 60), ss = String(left % 60).padStart(2, "0");
     body.replaceChildren(
-      h("div", { class: "iw-icon", "aria-hidden": "true" }, offline ? "⏸" : "⏰"),
+      h("div", { class: "iw-icon", "aria-hidden": "true" }, ic(offline ? "pause" : "clock", 22)),
       h("h2", {}, kind === "checkin" ? "You haven’t checked in yet" : offline ? "You’re now shown as offline" : "You’ve been inactive for " + WH().warn + " minutes"),
       h("p", {}, kind === "checkin" ? "It’s " + timeOf(new Date().toISOString()) + ". Check in to start your day, or set yourself out of office."
         : offline ? "Click I’m back when you’re at your desk. If you were working outside the workspace, that’s fine: just let us know."
@@ -7159,9 +7434,9 @@ function drawMyStatus(){
   btn.addEventListener("click", e => {
     e.stopPropagation();
     const menu = h("div", { class: "status-menu", role: "menu" },
-      away ? h("button", { type: "button", role: "menuitem", onclick: () => { menu.remove(); backNow(); } }, "✓ I’m back") : h("button", { type: "button", role: "menuitem", onclick: () => { menu.remove(); imHere(); } }, "● Available"),
-      h("button", { type: "button", role: "menuitem", onclick: () => { menu.remove(); startLunch(); } }, "🍽 Lunch break (" + WH().lunch + " min)"),
-      h("button", { type: "button", role: "menuitem", onclick: () => { menu.remove(); openOutOfOffice(); } }, "🚪 Out of office until…"));
+      away ? h("button", { type: "button", role: "menuitem", onclick: () => { menu.remove(); backNow(); } }, "I’m back") : h("button", { type: "button", role: "menuitem", onclick: () => { menu.remove(); imHere(); } }, "● Available"),
+      h("button", { type: "button", role: "menuitem", onclick: () => { menu.remove(); startLunch(); } }, ic("coffee"), "Lunch break (" + WH().lunch + " min)"),
+      h("button", { type: "button", role: "menuitem", onclick: () => { menu.remove(); openOutOfOffice(); } }, ic("logOut"), "Out of office until…"));
     document.body.append(menu);
     const r = btn.getBoundingClientRect(); menu.style.left = r.left + "px"; menu.style.bottom = (window.innerHeight - r.top + 6) + "px";
     setTimeout(() => document.addEventListener("click", () => menu.remove(), { once: true }), 0);
@@ -7289,7 +7564,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ao";
+const APP_VERSION = "2026-11ap";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -7332,7 +7607,7 @@ window.addEventListener("unhandledrejection", e => { const r = e.reason || {}; c
 function bugButton(){
   let b = document.getElementById("bugBtn");
   if (!b){
-    b = h("button", { type: "button", id: "bugBtn", class: "bugbtn", "aria-label": "Report a problem", title: "Report a problem", onclick: () => openReportDialog() }, h("span", { class: "bi", "aria-hidden": "true" }, "🐞"), h("span", { class: "bt" }, "Report a problem"));
+    b = h("button", { type: "button", id: "bugBtn", class: "bugbtn", "aria-label": "Report a problem", title: "Report a problem", onclick: () => openReportDialog() }, h("span", { class: "bi", "aria-hidden": "true" }, ic("bug", 14)), h("span", { class: "bt" }, "Report a problem"));
     document.body.append(b);
   }
   b.hidden = !S.me;
@@ -7395,7 +7670,7 @@ async function openReportDialog(){
   const showShot = f => { shot = f;
     prev.replaceChildren(f ? h("img", { src: URL.createObjectURL(f), alt: "Screenshot of the page" }) : "");
     shotBtns.replaceChildren(
-      h("button", { type: "button", class: "btn sm " + (f ? "ghost" : "soft"), id: "bugShotTake", onclick: takeShot }, f ? "📸 Retake" : "📸 Take a screenshot"),
+      h("button", { type: "button", class: "btn sm " + (f ? "ghost" : "soft"), id: "bugShotTake", onclick: takeShot }, ic("camera"), f ? "Retake" : "Take a screenshot"),
       f ? h("button", { type: "button", class: "btn sm ghost", id: "bugShotRemove", onclick: () => showShot(null) }, "Remove") : null,
       h("button", { type: "button", class: "linkbtn", onclick: () => fileIn.click() }, f ? "Use another image" : "or choose an image")); };
   const fileIn = h("input", { type: "file", accept: "image/*", hidden: true, onchange: () => { const f = fileIn.files[0]; if (f && f.size > 8 * 1048576) { toast("That image is over 8 MB."); return; } showShot(f || null); } });
@@ -7430,7 +7705,7 @@ async function openReportDialog(){
 
 /* ---------- Admin panel › Problems ---------- */
 async function renderAdminProblems(el){
-  adminHeader(el, "Problems", "Errors the workspace caught automatically, and problems people reported with the 🐞 button.");
+  adminHeader(el, "Problems", "Errors the workspace caught automatically, and problems people reported with the Report a problem button.");
   await load("problem_reports", true);
   if (S.route !== "admin-problems") return;
   if (!S.ui.problems) S.ui.problems = { view: "Open" };
@@ -7446,9 +7721,9 @@ async function renderAdminProblems(el){
   const openGroups = groupsOf(all.filter(r => r.status === "Open"));
   el.append(statStrip([["Open", openGroups.length, openGroups.length ? "var(--bad)" : null], ["Reported by people", all.filter(r => r.kind === "user" && r.status === "Open").length], ["Caught automatically", openGroups.filter(g => g[0].kind === "auto").length], ["Fixed", groupsOf(all.filter(r => r.status === "Fixed")).length, "var(--ok)"]]));
   el.append(h("div", { class: "tb" }, segmented([["Open","Open"], ["Fixed","Fixed"], ["Ignored","Ignored"], ["All","All"]], u.view, v => { u.view = v; rerender(); }),
-    h("button", { type: "button", class: "btn pri", disabled: !openGroups.length, onclick: () => copyForClaude(openGroups) }, "📋 Copy for Claude"),
+    h("button", { type: "button", class: "btn pri", disabled: !openGroups.length, onclick: () => copyForClaude(openGroups) }, ic("copy"), "Copy for Claude"),
     h("button", { type: "button", class: "btn", disabled: !openGroups.length, onclick: () => downloadText("tcipher-problems-" + today() + ".txt", claudeText(openGroups), "text/plain;charset=utf-8") }, "Download as a file")));
-  if (!shown.length){ el.append(h("div", { class: "panel empty" }, h("b", {}, u.view === "Open" ? "No open problems 🎉" : "Nothing here"), u.view === "Open" ? "Anything someone reports, or any error the workspace catches, shows up here." : "")); return; }
+  if (!shown.length){ el.append(h("div", { class: "panel empty" }, h("b", {}, u.view === "Open" ? "No open problems" : "Nothing here"), u.view === "Open" ? "Anything someone reports, or any error the workspace catches, shows up here." : "")); return; }
   // clear everything open in one go (each group's people are still told it was fixed)
   if (u.view === "Open" && openGroups.length > 1) el.append(h("div", { class: "tb" }, h("span", { class: "muted" }, openGroups.length + " open."),
     h("button", { type: "button", class: "btn sm ok", id: "probAllFixed", onclick: async () => {
@@ -8452,7 +8727,7 @@ function devCard(t){
   const back = t.status === "In progress" && t.qa_state === "Failed";
   const card = h("button", { type: "button", class: "dv-card", draggable: "true", "data-id": t.id, onclick: () => openDevTask(t.id) },
     back ? h("span", { class: "dv-flag" }, "↩ Sent back by QA") : null,
-    t.blocked ? h("span", { class: "dv-flag" }, "⚑ Blocked") : null,
+    t.blocked ? h("span", { class: "dv-flag" }, ic("flag", 12), "Blocked") : null,
     h("span", { class: "dv-title" }, t.title),
     h("span", { class: "dv-foot" }, h("span", { class: "dv-key" }, taskKey(t)), h("span", { class: "grow" }),
       t.status === "In review" ? (t.tester_id ? h("span", { class: "dv-qa", title: "Tester: " + pname(t.tester_id) }, "QA ", avatar(t.tester_id, "sm")) : h("span", { class: "dv-needqa" }, "Needs a tester")) : null,
@@ -8530,7 +8805,7 @@ function ownersPicker(start, onChange){
     const add = h("select", { class: "in dv-addowner", "aria-label": "Add an owner" }, h("option", { value: "" }, "+ Add owner"), free.map(p => h("option", { value: p.id }, p.full_name)));
     add.addEventListener("change", () => { if (!add.value) return; ids.push(add.value); draw(); if (onChange) onChange(ids); });
     el.replaceChildren(...ids.map(id => h("span", { class: "dv-ownerchip" }, avatar(id, "sm"), pname(id),
-      h("button", { type: "button", class: "iconbtn", "aria-label": "Remove " + pname(id), onclick: () => { ids = ids.filter(x => x !== id); draw(); if (onChange) onChange(ids); } }, "✕"))), add);
+      h("button", { type: "button", class: "iconbtn", "aria-label": "Remove " + pname(id), onclick: () => { ids = ids.filter(x => x !== id); draw(); if (onChange) onChange(ids); } }, ic("x", 14)))), add);
   };
   draw();
   return { el, value: () => ids };
@@ -9081,7 +9356,7 @@ function renderShell(){
   const oldNav = side.querySelector(".nav");
   const keepScroll = oldNav ? oldNav.scrollTop : 0;
   side.replaceChildren(
-    h("a", { class: "brand", href: "#dashboard", "aria-label": (S.settings.company || "Tcipher") + " workspace home" }, h("img", { src: LOGO_WHITE, alt: "Tcipher", class: "brand-logo" }), h("span", { class: "brand-tag" }, "Workspace")));
+    h("a", { class: "brand", href: "#dashboard", "aria-label": (S.settings.company || "Tcipher") + " workspace home" }, h("img", { src: LOGO_DARK, alt: "Tcipher", class: "brand-logo" }), h("span", { class: "brand-tag" }, "Workspace")));
   const nav = h("nav", { class: "nav", "aria-label": "Main" });
   for (const [group, items] of NAV){
     // items shared by Sales and Marketing show under your own team only (admins see them under both)
@@ -9105,7 +9380,7 @@ function renderShell(){
       h("span", { class: "chev", "aria-hidden": "true" }, "›"), h("span", { class: "gl" }, group), sum);
     nav.append(h("div", { class: "nav-group coll" + (open ? " open" : "") }, head, body));
   }
-  nav.append(h("div", { class: "nav-group bugnav" }, h("a", { href: "#" + S.route, onclick: e => { e.preventDefault(); side.classList.remove("open"); openReportDialog(); } }, "🐞 Report a problem")));
+  nav.append(h("div", { class: "nav-group bugnav" }, h("a", { href: "#" + S.route, onclick: e => { e.preventDefault(); side.classList.remove("open"); openReportDialog(); } }, ic("bug"), "Report a problem")));
   side.append(nav, h("div", { class: "foot" }, avatar(S.me.id),
     h("button", { type: "button", class: "who", style: "background:none;border:0;text-align:left;padding:0;cursor:pointer", onclick: openMyProfile, title: "My profile" },
       h("b", {}, S.me.full_name), h("span", {}, S.me.is_admin ? "Admin, all verticals" : [S.me.vertical, refLabel("roles", S.me.role_id)].filter(Boolean).join(" · ") || "Employee")),

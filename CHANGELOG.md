@@ -1,5 +1,15 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11ap (8 Nov 2026): design pass
+Needs: upload `index.html` and `sw.js`. No database or function changes.
+- **Quieter look, same app.** Neutral greys for the frame; Tcipher violet only for main buttons, the page you're on and key highlights. Weights 400–600, sentence-case labels (no more all-caps headings), one radius scale, no hover lift.
+- **Light sidebar** with a dark-lettered version of the logo.
+- **Home** is titled by the day; check-in sits in a plain card (no purple banner or greeting).
+- **Line icons instead of emoji** in buttons, chat tools, file types and menus (emoji in messages and reactions are unchanged).
+- **Task IDs as small mono keycaps** (JetBrains Mono), also used for counts.
+- Sign-in page: near-black side panel without the decorative circle.
+- Method after "unslop" by Damir Sokolovsky (@heydamir), CC BY 4.0; icons from Lucide (ISC).
+
 ## Version 2026-11ao (7 Nov 2026): two-step sign-in and sign-in CAPTCHA
 Needs: upload `index.html` and `sw.js`; deploy `admin-users-function.ts` and `google-sync-function.ts`; run `upgrade-2026-11ao.sql`.
 - **Two-step sign-in** (authenticator app codes): set up in My profile › Two-step sign-in. When it's on, sign-in asks for the 6-digit code. Admins see a reminder in the Admin panel until they turn it on.
