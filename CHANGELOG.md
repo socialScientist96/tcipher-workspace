@@ -1,5 +1,17 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11aq (8 Nov 2026): phones, tablets and slow connections
+Needs: upload `index.html` and `sw.js`. No database or function changes.
+- **Bottom bar on phones and small tablets:** the menu and notifications sit at the bottom, within thumb reach. Notifications open just above the bar instead of over the page.
+- **Pop-up windows on phones slide up from the bottom**, leave the top of the page visible, and keep their buttons at the bottom (the main button full width, last).
+- **Everything you tap on a touch screen is at least 44px**; form fields use 16px text so iPhones don't zoom in; number, phone, email and web fields bring up the matching keyboard (no autocorrect or auto-capitals in them).
+- **Phone numbers are tappable** everywhere they show (People cards, person details, leads, contacts, clients); Call and SMS open the phone app directly (SMS links were blocked before).
+- **Calendar on touch screens:** each day is one big button with coloured dots; tapping it lists the day's items.
+- **Chat on phones:** icon-only header buttons, the message box gets the full width with tools and Send below it, and the chat stops above the bottom bar. Tap a message to show reply / react / delete (they no longer squeeze every bubble).
+- **No sideways page scrolling**; wide tables and boards scroll inside their own box. The Report a problem tab moves into the menu on touch screens.
+- **No jumps while loading:** chat pictures get a fixed box before they arrive; fonts that arrive late no longer reflow the page; pictures load lazily.
+- **Slow connections:** the database and library connections open early; an unused copy of the logo was removed.
+
 ## Version 2026-11ap (8 Nov 2026): design pass
 Needs: upload `index.html` and `sw.js`. No database or function changes.
 - **Quieter look, same app.** Neutral greys for the frame; Tcipher violet only for main buttons, the page you're on and key highlights. Weights 400–600, sentence-case labels (no more all-caps headings), one radius scale, no hover lift.

@@ -12,7 +12,10 @@
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" crossorigin="anonymous">
+<!-- open the connections to the database and the library early: saves a round trip or two on slow networks -->
+<link rel="preconnect" href="https://pfdnziybqaumnofjknsj.supabase.co" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=optional" rel="stylesheet" crossorigin="anonymous">
 <style>
 :root{
   color-scheme: light;
@@ -1164,6 +1167,162 @@ dialog::backdrop{background:rgba(9,9,11,.4)}
 /* one easing curve; hover is a colour change, never a lift */
 .btn,.row,.card,.nav a,.load-row,.pcard,.stat,.iconbtn,tbody tr,.ev,.seg button,.nitem,.dv-card{transition:background-color .15s var(--ease),border-color .15s var(--ease),color .15s var(--ease),box-shadow .15s var(--ease),transform .15s var(--ease)}
 .content > .enter{animation:pageIn .3s var(--ease)}
+
+/* =====================================================================
+   Phones and tablets (2026-11aq)
+   ===================================================================== */
+/* the page itself never scrolls sideways; wide things (tables, the board) scroll inside their own box */
+html,body{overflow-x:clip}
+.content,dialog,.npanel{overflow-wrap:break-word}
+.content img,.content video,dialog img,dialog video{max-width:100%}
+.tablewrap,.boardwrap,.dv-boardwrap{-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+
+/* touch screens: every control is at least 44px to tap, and fields never zoom the page */
+@media (pointer:coarse){
+  .btn,.btn.sm{min-height:44px}
+  .btn.sm{padding:6px 12px}
+  .iconbtn{width:44px;height:44px}
+  .in,select.in,select.in.sm,textarea.in,.dv-in{min-height:44px;font-size:16px}
+  input,select,textarea{font-size:16px}
+  .nav a,.nav-head{min-height:44px}
+  .row,.load-row,.mention-item,.status-menu button,.dv-menuitem,[role="menuitem"]{min-height:44px}
+  .chat-item{min-height:48px}
+  .seg button,.dv-tabs button,.dv-chip{min-height:44px}
+  .chk{min-height:44px}
+  .chk input,.multi input,.day input,.checklist .ck input{width:20px;height:20px}
+  .multi label{min-height:44px}
+  .linkbtn,.panel h2 a,.panel h2 button.link,.dv-addline,.dv-rownew,.dv-colnew{min-height:44px;display:inline-flex;align-items:center}
+  .mact{width:40px;height:40px}
+  .upclose,.checklist .del,.cmt .del,.cedit{min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center}
+  .side .foot button:not(.who){min-height:44px}
+  .mystatus{min-height:44px}
+  .tkey{line-height:24px}
+  a.tel,.ri a,.c a.tel{display:inline-flex;align-items:center;min-height:44px}
+  .dv-face{min-width:36px;min-height:36px}
+  .vp-play{width:44px;height:44px}
+  .vp-speed{min-height:36px}
+  .react{min-height:32px}
+  .epbtn{width:44px;height:44px}
+  .pweye{width:44px;height:44px}
+  .dv-val.edit{min-height:44px}
+  .tb .in,.tb select{min-height:44px}
+}
+
+/* phones and small tablets: the bar with the menu and notifications sits at the bottom, under your thumb */
+@media (max-width:960px){
+  .topbar{position:fixed;top:auto;bottom:0;left:0;right:0;z-index:50;border-bottom:0;border-top:1px solid var(--line);background:rgba(255,255,255,.96);
+    padding:6px 12px calc(6px + env(safe-area-inset-bottom,0px));min-height:0}
+  .topbar .crumb{text-align:center}
+  .content{padding:16px 16px calc(96px + env(safe-area-inset-bottom,0px));min-height:0}
+  .ph{gap:12px}
+  .ph .acts{width:100%}
+  .ph .acts .btn{flex:1 1 auto;justify-content:center}
+  /* notifications open just above the bar, not over the whole screen */
+  .npanel{position:fixed;top:auto;left:8px;right:8px;width:auto;bottom:calc(64px + env(safe-area-inset-bottom,0px));max-height:min(70dvh,560px);z-index:49}
+  .toast{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+  .netbar{bottom:calc(72px + env(safe-area-inset-bottom,0px))}
+  .chat{height:calc(100dvh - 32px - 64px - env(safe-area-inset-bottom,0px))}
+  .side{padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+}
+
+/* phones: pop-up windows slide up from the bottom, leave the top of the page in view,
+   and keep their buttons at the bottom where a thumb can reach them */
+@media (max-width:640px){
+  dialog,dialog.narrow,dialog.dv-wide{width:100%;max-width:100%;margin:auto 0 0;border-radius:16px 16px 0 0;max-height:calc(100dvh - 48px)}
+  dialog[open]{display:flex;flex-direction:column}
+  dialog[open] > *{flex:none}
+  dialog[open] > .db{flex:1 1 auto;min-height:0;max-height:none;overscroll-behavior:contain}
+  dialog[open]{animation:sheetIn .3s var(--ease)}
+  .dh{padding:12px 16px 0}
+  .db{padding:12px 16px}
+  .df{padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));gap:8px}
+  .df .sp{display:none}
+  .df > .btn{flex:1 1 auto;justify-content:center}
+  .df > .btn.pri{flex-basis:100%;order:9}
+  .form{gap:12px}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .stat .v{font-size:20px;overflow-wrap:anywhere}
+  .tb{gap:8px}
+  .tb > *{flex:1 1 calc(50% - 4px);min-width:0}
+  .tb .search{flex-basis:100%}
+  .hello{align-items:stretch}
+  .hello .att{width:100%;padding:8px 8px 8px 12px}
+  .hello .att .in{flex:1 1 auto}
+  .emoji-pop{width:min(320px,calc(100vw - 16px))}
+  .emoji-pop.quick{max-width:calc(100vw - 16px)}
+  .mention-pop,.status-menu,.dv-menu{max-width:calc(100vw - 16px)}
+  .idle-warn .iw-box{padding:20px}
+  .verbar{left:8px;right:8px;transform:none;border-radius:12px;justify-content:space-between}
+  .people,.notes-grid,.hgrid{grid-template-columns:1fr}
+}
+@keyframes sheetIn{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
+
+/* phones on their side: little height, so pop-ups use almost all of it and the bar stays slim */
+@media (max-width:960px) and (max-height:500px) and (orientation:landscape){
+  dialog,dialog.narrow,dialog.dv-wide{max-height:calc(100dvh - 12px)}
+  .topbar{padding-top:4px;padding-bottom:calc(4px + env(safe-area-inset-bottom,0px))}
+  .chat{height:calc(100dvh - 24px - 56px);min-height:260px}
+  .npanel{max-height:calc(100dvh - 72px)}
+}
+
+/* month calendar on phones: seven tappable days per row, a dot per item, the day's list opens from the bottom */
+.cal-scroll{overflow-x:auto}
+.cal-min{min-width:640px}
+.cal-phone{display:none}
+@media (max-width:640px), (pointer:coarse) and (max-width:1100px){
+  .cal-scroll{overflow-x:visible}
+  .cal-min{min-width:0}
+  .cal-day{min-height:56px;padding:0;position:relative;align-items:center}
+  .cal-day .dn{margin-top:6px;pointer-events:none;position:relative;z-index:1}
+  .cal-day .ev{display:none}
+  .cal-phone{display:flex;position:absolute;inset:0;width:100%;border:0;background:none;padding:0 0 8px;cursor:pointer;align-items:flex-end;justify-content:center;font:inherit;color:inherit}
+  .cal-phone:active{background:var(--tint)}
+  .cal-dots{display:flex;gap:3px}
+  .cal-dots i{width:6px;height:6px;border-radius:50%;background:var(--ink3)}
+  .cal-dots i.k-meeting,.cal-dots i.k-google{background:var(--info)} .cal-dots i.k-leave{background:var(--warn)} .cal-dots i.k-holiday{background:var(--bad)}
+  .cal-dots i.k-release{background:var(--ok)} .cal-dots i.k-task{background:var(--p)}
+  .cal-head div{padding:8px 0;text-align:center}
+}
+
+/* chat pictures sit in a fixed box (the whole picture shows; tap to open it full size), so messages don't jump as pictures arrive */
+.cimg{width:min(280px,70vw);height:200px;max-height:none;object-fit:contain;background:var(--tint)}
+
+/* small fixes from measuring every page at phone sizes */
+@media (pointer:coarse){
+  .side .foot .who{min-height:44px}
+  .linkbtn{padding:0 8px;min-width:44px;justify-content:center}
+  .panel h2 a,.panel h2 button.link{padding:0 8px;margin-right:-8px;min-width:44px;justify-content:center}
+  .dv-faces{flex-wrap:wrap;gap:4px}
+  .dv-face{margin-left:0;min-width:44px;min-height:44px;display:inline-grid;place-items:center}
+}
+@media (max-width:640px){
+  .tb > span{flex-basis:100%;flex-wrap:wrap}
+  .tb > .seg{flex-basis:100%;display:flex}
+  .tb > .seg button{flex:1 1 0}
+  .ph .acts{flex-wrap:wrap}
+}
+
+/* chat on phones: icon-only header buttons, the message box gets the whole width, tools and Send underneath */
+@media (max-width:760px){
+  .chat-head .chat-acts{gap:4px}
+  .chat-head .btn{padding:0;width:44px;min-height:44px;justify-content:center;font-size:14px}
+  .chat-head .btn .bl{display:none}
+  .chat-head .live-dot{display:none}
+  .cmsg .macts,.chat-msgs .cmsg .macts{display:none;opacity:1}
+  .cmsg.sel .macts,.chat-msgs .cmsg.sel .macts{display:flex}
+  .chat-head .stack{display:none}
+  .chat-head .x{flex:1 1 auto;min-width:0}
+  .chat-head .x .muted{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chat-foot{flex-wrap:wrap;gap:4px 8px;padding:8px 10px}
+  .chat-foot textarea{order:-1;flex:1 1 100%;min-width:0}
+  .chat-foot #chatSend,.chat-foot .btn.pri{margin-left:auto}
+  .chat-main > p.muted{display:none}
+  .chat-msgs{padding:8px 10px}
+  .chat-msgs .bcol{max-width:82%}
+}
+
+/* touch screens of any size (phones on their side, tablets): the Report a problem tab moves into the menu so it never covers content */
+@media (pointer:coarse){ .bugbtn{display:none} .side .bugnav{display:flex} }
 </style>
 </head>
 <body>
@@ -1190,7 +1349,7 @@ dialog::backdrop{background:rgba(9,9,11,.4)}
   <div class="auth-main"><div class="auth-card">
     <h2>Sign in</h2>
     <p class="sub">Use the email and password your admin gave you.</p>
-    <label class="fl" style="margin-bottom:12px">Email<input class="in" id="loginEmail" type="email" autocomplete="username"></label>
+    <label class="fl" style="margin-bottom:12px">Email<input class="in" id="loginEmail" type="email" autocomplete="username" inputmode="email" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="next"></label>
     <label class="fl">Password<input class="in" id="loginPass" type="password" autocomplete="current-password"></label>
     <div id="captchaBox" style="margin-top:12px" hidden></div>
     <p class="err" id="loginErr" hidden></p>
@@ -1279,7 +1438,6 @@ const MAX_FILE_MB = 50;
 
 (function(){
 "use strict";
-const LOGO_WHITE = "data:image/png;base64,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";
 // the same logo with dark lettering, for the light sidebar
 const LOGO_DARK = "data:image/png;base64,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";
 // line icons (Lucide, ISC licence): one set, one size, one stroke, coloured by the text around them
@@ -1393,8 +1551,10 @@ function safeUrl(u){
   const raw = String(u == null ? "" : u).trim(), s = raw.replace(/[\u0000-\u0020\u007F]+/g, "");
   if (!s) return null;
   if (!/^[a-z][a-z0-9+.-]*:/i.test(s)) return raw;            // relative link or #anchor
-  return /^(https?|mailto|tel|blob):/i.test(s) ? raw : null;
+  return /^(https?|mailto|tel|sms|blob):/i.test(s) ? raw : null;
 }
+// a dialable link for a phone number as people type it ("+91 98765 43210", "098765-43210")
+function telHref(v){ return "tel:" + String(v || "").replace(/[^\d+]/g, ""); }
 function h(tag, attrs, ...kids){
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs || {})){
@@ -1414,6 +1574,10 @@ function h(tag, attrs, ...kids){
     if (kid == null || kid === false) continue;
     el.append(kid.nodeType ? kid : String(kid));
   }
+  // a phone, SMS or email link inside a clickable row or card opens the phone or mail app, not the row as well
+  if (tag === "a" && /^(tel|sms|mailto):/i.test(el.getAttribute("href") || "")) el.addEventListener("click", e => e.stopPropagation());
+  // pictures load when they come into view and never hold up the page
+  if (tag === "img") { if (!el.hasAttribute("loading")) el.setAttribute("loading", "lazy"); el.decoding = "async"; }
   return el;
 }
 // the same rule for links opened in a new tab
@@ -1687,7 +1851,7 @@ function fieldInput(f, val, rec){
       return box;
     }
     case "number": case "money": case "int":
-      return h("input", { ...common, type: "number", step: f.t === "int" ? "1" : "any", min: f.min != null ? String(f.min) : null, value: val == null ? "" : String(val), placeholder: f.ph || "" });
+      return h("input", { ...common, type: "number", inputmode: f.t === "int" ? "numeric" : "decimal", step: f.t === "int" ? "1" : "any", min: f.min != null ? String(f.min) : null, value: val == null ? "" : String(val), placeholder: f.ph || "" });
     case "date": return h("input", { ...common, type: "date", value: val ? String(val).slice(0, 10) : "" });
     case "month": return h("input", { ...common, type: "month", value: val ? String(val).slice(0, 7) : "" });
     case "time": return h("input", { ...common, type: "time", value: val ? String(val).slice(0, 5) : "" });
@@ -1725,7 +1889,11 @@ function fieldInput(f, val, rec){
       return sel;
     }
     default:
-      return h("input", { ...common, type: f.t === "email" ? "email" : f.t === "url" ? "url" : f.t === "phone" ? "tel" : "text", value: val || "", placeholder: f.ph || "", maxlength: "500" });
+      return h("input", { ...common, type: f.t === "email" ? "email" : f.t === "url" ? "url" : f.t === "phone" ? "tel" : "text", value: val || "", placeholder: f.ph || "", maxlength: "500",
+        // the right phone keyboard, and no auto-capitals or autocorrect in addresses and numbers
+        inputmode: f.t === "email" ? "email" : f.t === "url" ? "url" : f.t === "phone" ? "tel" : null,
+        autocapitalize: ["email", "url", "phone"].includes(f.t) ? "off" : null, autocorrect: ["email", "url", "phone"].includes(f.t) ? "off" : null,
+        spellcheck: ["email", "url", "phone"].includes(f.t) ? "false" : null });
   }
 }
 function readInput(f, el){
@@ -1760,7 +1928,7 @@ function display(f, val, rec){
     case "select": { const o = opts(f, rec).find(x => x.v === val); const lbl = o ? o.l : val; return f.pill === false ? h("span", {}, lbl || "–") : (val ? h("span", { class: "pill " + tone(val) }, lbl) : pill(val)); }
     case "url": return val ? h("a", { href: /^https?:\/\//i.test(val) ? val : "https://" + val, target: "_blank", rel: "noopener" }, val.replace(/^https?:\/\//i, "").slice(0, 40)) : h("span", { class: "muted" }, "–");
     case "email": return val ? h("a", { href: "mailto:" + val }, val) : h("span", { class: "muted" }, "–");
-    case "phone": return val ? h("a", { href: "tel:" + val }, val) : h("span", { class: "muted" }, "–");
+    case "phone": return val ? h("a", { href: telHref(val), class: "tel" }, val) : h("span", { class: "muted" }, "–");
     case "number": case "int": return val == null || val === "" ? h("span", { class: "muted" }, "–") : h("span", {}, String(+val));
     default: return val ? h("span", {}, String(val)) : h("span", { class: "muted" }, "–");
   }
@@ -3611,10 +3779,10 @@ function renderDirectory(el){
     const list = activePeople().filter(p => (!u.vert || (u.vert === "__none" ? !p.vertical : p.vertical === u.vert)) && (!s || (p.full_name + " " + p.title + " " + p.email).toLowerCase().includes(s)));
     for (const p of list){
       const role = byId("roles", p.role_id);
-      grid.append(h("button", { type: "button", class: "pcard", onclick: () => openPerson(p.id) },
+      grid.append(h("div", { class: "pcard", role: "button", tabindex: "0", onclick: () => openPerson(p.id), onkeydown: e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openPerson(p.id); } } },
         h("div", { class: "top" }, avatar(p.id, "lg"), h("div", { style: "min-width:0" }, h("b", {}, p.full_name), h("small", {}, p.title || (role ? role.name : "")), h("br"), statusLine(p.id))),
         h("div", { class: "c" }, p.vertical || (p.is_admin ? "All verticals" : "No vertical"), p.is_admin ? " · Admin" : ""),
-        h("div", { class: "c" }, p.email, p.phone ? h("br") : null, p.phone || null)));
+        h("div", { class: "c" }, p.email, p.phone ? h("br") : null, p.phone ? h("a", { href: telHref(p.phone), class: "tel" }, p.phone) : null)));
     }
     if (!list.length) grid.append(h("p", { class: "nothing" }, "No one matches."));
   }
@@ -3635,7 +3803,7 @@ function openPerson(id){
       h("div", { class: "ri" }, h("span", {}, "Vertical"), h("b", {}, p.vertical || "–")),
       h("div", { class: "ri" }, h("span", {}, "Role"), h("b", {}, role ? role.name : "–")),
       h("div", { class: "ri" }, h("span", {}, "Email"), h("a", { href: "mailto:" + p.email }, p.email)),
-      h("div", { class: "ri" }, h("span", {}, "Phone"), p.phone ? h("a", { href: "tel:" + p.phone }, p.phone) : h("span", { class: "muted" }, "–")),
+      h("div", { class: "ri" }, h("span", {}, "Phone"), p.phone ? h("a", { href: telHref(p.phone), class: "tel" }, p.phone) : h("span", { class: "muted" }, "–")),
       h("div", { class: "ri" }, h("span", {}, "Joined"), h("span", {}, p.joined_on ? fmtDate(p.joined_on, true) : "–")),
       lv ? h("div", { class: "ri" }, h("span", {}, "Today"), pill(lv.type === "Work from home" ? "Working from home" : "On leave", "warn")) : null)
   ], [S.me.is_admin ? h("button", { type: "button", class: "btn sm", onclick: () => { closeDlg(); emailPerson(p, "offer"); } }, ic("mail"), "Offer letter") : null,
@@ -3765,18 +3933,20 @@ async function renderCalendar(el){
   for (let i = 0; i < 42; i++){
     const inMonth = d.slice(0, 7) === u.month;
     const list = (ev[d] || []).slice().sort((a, b) => (RANK[a.kind] ?? 9) - (RANK[b.kind] ?? 9) || (/^\d/.test(a.text) && /^\d/.test(b.text) ? timeKey(a.text) - timeKey(b.text) : 0) || a.n - b.n);
+    const day = d;
+    const showDay = () => openDialog(fmtDate(day, true), list.length ? list.map(e => h("button", { type: "button", class: "row", onclick: () => { if (e.open) { closeDlg(); e.open(); } } }, h("span", { class: "pill" }, e.kind), h("span", { class: "x" }, e.text))) : h("p", { class: "nothing" }, "Nothing on this day."), null, true);
     const cell = h("div", { class: "cal-day" + (inMonth ? "" : " out") + (d === today() ? " today" : "") }, h("span", { class: "dn" }, String(+d.slice(8))));
+    // phones: the whole day is one big button that lists the day's items; a dot shows there's something on it
+    cell.append(h("button", { type: "button", class: "cal-phone", "aria-label": fmtDate(day, true) + (list.length ? ", " + list.length + " item" + (list.length === 1 ? "" : "s") : ", nothing on"), onclick: showDay },
+      list.length ? h("span", { class: "cal-dots" }, list.slice(0, 3).map(e => h("i", { class: "k-" + e.kind }))) : null));
     list.slice(0, 4).forEach(e => cell.append(h("button", { type: "button", class: "ev k-" + e.kind, title: e.text, onclick: e.open || null }, e.text)));
-    if (list.length > 4){
-      const day = d;
-      cell.append(h("button", { type: "button", class: "ev more", onclick: () => openDialog(fmtDate(day, true), list.map(e => h("button", { type: "button", class: "row", onclick: () => { if (e.open) { closeDlg(); e.open(); } } }, h("span", { class: "pill" }, e.kind), h("span", { class: "x" }, e.text))), null, true) }, "+" + (list.length - 4) + " more"));
-    }
+    if (list.length > 4) cell.append(h("button", { type: "button", class: "ev more", onclick: showDay }, "+" + (list.length - 4) + " more"));
     grid.append(cell);
     d = addDays(d, 1);
     if (i === 34 && d.slice(0, 7) !== u.month) break;
   }
   cal.append(grid);
-  el.append(h("div", { style: "overflow-x:auto" }, h("div", { style: "min-width:640px" }, cal)));
+  el.append(h("div", { class: "cal-scroll" }, h("div", { class: "cal-min" }, cal)));
   el.append(h("div", { class: "legend", style: "margin-top:12px" }, [["task","Task due"],["meeting","Meeting"],["google","Google Calendar"],["leave","Leave"],["release","Release / deadline"],["content","Content"],["invoice","Sales follow-up"],["renewal","Proposal expiry"],["holiday","Holiday"]].map(([k, l]) => h("span", {}, h("span", { class: "ev k-" + k, style: "display:inline-block;width:auto;margin-right:4px" }, l)))));
 }
 
@@ -5025,12 +5195,12 @@ function contactBar(table, rec){
   const phone = rec.phone, email = rec.email, first = String(rec.contact_name || rec.name || "").split(" ")[0];
   const log = kind => logActivity(table, rec, kind);
   const btn = (label, href, kind, enabled) => h("button", { type: "button", class: "btn sm", disabled: !enabled, title: enabled ? "" : "No " + (kind === "Email" ? "email" : "phone") + " saved",
-    onclick: () => { if (href) window.open(href, "_blank", "noopener"); log(kind); } }, label);
+    onclick: () => { if (href) { if (/^(tel|sms):/i.test(href)) location.href = href; else window.open(href, "_blank", "noopener"); } log(kind); } }, label);
   return h("div", { class: "cbar" },
-    btn("Call", phone ? "tel:" + String(phone).replace(/\s/g, "") : null, "Call", !!phone),
+    btn("Call", phone ? telHref(phone) : null, "Call", !!phone),
     btn("WhatsApp", phone ? "https://wa.me/" + waNumber(phone) + "?text=" + encodeURIComponent("Hi " + first + ", ") : null, "WhatsApp", !!phone),
     h("button", { type: "button", class: "btn sm", disabled: !email, title: email ? "" : "No email saved", onclick: () => { closeDlg(); openComposer({ ...emailCtx(table, rec), tbl: table, entity_id: rec.id }); } }, "✉️ Email"),
-    btn("SMS", phone ? "sms:" + String(phone).replace(/\s/g, "") : null, "SMS", !!phone),
+    btn("SMS", phone ? "sms:" + telHref(phone).slice(4) : null, "SMS", !!phone),
     h("button", { type: "button", class: "btn sm soft", onclick: () => log("Note") }, "+ Log activity"));
 }
 function logActivity(table, rec, kind){
@@ -6266,6 +6436,13 @@ function drawChatMessages(toBottom){
       !mine ? (lastOfRun ? avatar(m.author_id, "sm") : h("span", { class: "avspace" })) : null,
       col, messageActions(m, bubble));
     if (mine) row.prepend(row.lastChild);            // the toolbar sits to the left of your bubble
+    // phones: tap a message to show its reply / react / delete buttons (they'd squeeze every bubble otherwise)
+    row.addEventListener("click", e => {
+      if (e.target.closest("a,button,audio,video,textarea,input")) return;
+      const was = row.classList.contains("sel");
+      row.parentElement && row.parentElement.querySelectorAll(".cmsg.sel").forEach(x => x.classList.remove("sel"));
+      if (!was) row.classList.add("sel");
+    });
     msgs.append(row); lastAuthor = m.author_id; lastT = t;
   });
   const mark = msgs.querySelector("#unreadMark");
@@ -6564,7 +6741,10 @@ document.addEventListener("visibilitychange", () => {
 function fitChat(){
   const el = document.querySelector("#content .chat"); if (!el) return;
   const top = el.getBoundingClientRect().top;
-  if (top > 0) el.style.height = Math.max(420, Math.floor(window.innerHeight - top - 16)) + "px";
+  // on phones the menu bar sits at the bottom of the screen: stop above it
+  const bar = document.querySelector(".topbar"), barH = bar && getComputedStyle(bar).position === "fixed" ? bar.getBoundingClientRect().height : 0;
+  const small = window.innerHeight < 560;
+  if (top > 0) el.style.height = Math.max(small ? 240 : 420, Math.floor(window.innerHeight - top - 16 - barH)) + "px";
 }
 window.addEventListener("resize", () => { if (S.route === "chat") fitChat(); });
 /* ---------------------------------------------------------------------
@@ -6668,7 +6848,7 @@ function chatAttachments(m){
     // voice notes (and other sound files) play right in the chat, with an easy player
     if (/^audio\//.test(a.mime || "")) return voicePlayer(a);
     if (isImg) {
-      const img = h("img", { class: "cimg", alt: a.name, loading: "lazy" });
+      const img = h("img", { class: "cimg", alt: a.name, loading: "lazy", width: "280", height: "200" });   // a fixed box, so the chat doesn't jump when the picture arrives
       fileLink(a.id).then(u => { img.src = u; }, () => { img.replaceWith(fileCard(a)); });
       return h("button", { type: "button", class: "cimgbtn", title: "Open " + a.name, onclick: () => openChatFile(a, false) }, img);
     }
@@ -7072,7 +7252,7 @@ function conversationPeople(ch){
   return (ch.members || []).filter(id => person(id));
 }
 function chatMeetButton(){
-  const b = h("button", { type: "button", class: "btn sm chat-meet", title: "Start or schedule a Google Meet with this conversation" }, ic("video"), "Meet");
+  const b = h("button", { type: "button", class: "btn sm chat-meet", title: "Start or schedule a Google Meet with this conversation" }, ic("video"), h("span", { class: "bl" }, "Meet"));
   b.addEventListener("click", e => {
     e.stopPropagation();
     const menu = h("div", { class: "status-menu", role: "menu" },
@@ -7169,7 +7349,7 @@ function chatMuteButton(){
   const muted = chatMuted(ch.id);
   const b = h("button", { type: "button", class: "btn sm chat-mute" + (muted ? " on" : ""), id: "chatMute", "aria-pressed": String(muted),
     title: muted ? "Muted: no sound or pop-ups, except when you’re tagged. Click to unmute." : "Mute this " + (ch.kind === "group" ? "group" : "channel") + ": no sound or pop-ups, except when you’re tagged.",
-    onclick: () => toggleChatMute(ch) }, muted ? [ic("bellOff"), "Muted"] : [ic("bell"), "Mute"]);
+    onclick: () => toggleChatMute(ch) }, muted ? [ic("bellOff"), h("span", { class: "bl" }, "Muted")] : [ic("bell"), h("span", { class: "bl" }, "Mute")]);
   // redrawn in the same spot after each click: a double-click mustn't mute and unmute again
   if (Date.now() - (C.muteAt || 0) < 1500) b.__tcLast = Date.now() + 300;
   return b;
@@ -7564,7 +7744,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ap";
+const APP_VERSION = "2026-11aq";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
