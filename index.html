@@ -1323,6 +1323,67 @@ html,body{overflow-x:clip}
 
 /* touch screens of any size (phones on their side, tablets): the Report a problem tab moves into the menu so it never covers content */
 @media (pointer:coarse){ .bugbtn{display:none} .side .bugnav{display:flex} }
+
+/* =====================================================================
+   Notion-style sidebar (2026-11ar): warm off-white, an icon on every page,
+   search, Home / Chat / Calendar shortcuts, recents, quiet section labels
+   ===================================================================== */
+.side{background:#F8F8F7;border-right:1px solid #EDEDEB;padding:8px 8px 8px;color:#5F5E5B}
+.side-top{display:flex;align-items:center;gap:2px;padding:4px 4px 8px 8px;flex:none}
+.side-top .grow{flex:1}
+.side .brand{padding:4px 0;flex-direction:row;align-items:center}
+.side .brand-logo{height:24px}
+.side-ic{width:30px;height:30px;display:grid;place-items:center;border:0;background:none;border-radius:6px;color:#91918E;cursor:pointer;padding:0}
+.side-ic:hover{background:#EFEFED;color:#37352F}
+.side-search{flex:none;display:flex;align-items:center;gap:8px;margin:0 4px 8px;padding:0 8px;height:34px;background:#fff;border:1px solid #E9E9E7;border-radius:8px;color:#91918E;cursor:text}
+.side-search:focus-within{border-color:#C9C3FB;box-shadow:0 0 0 3px rgba(100,80,245,.12)}
+.side-search-in{flex:1;min-width:0;border:0;outline:0;background:none;font:inherit;font-size:14px;color:#37352F;padding:0}
+.side-search-in::placeholder{color:#91918E}
+.side-search-in::-webkit-search-cancel-button{display:none}
+.side-kbd{font-family:var(--mono);font-size:11px;color:#A5A4A0;border:1px solid #E9E9E7;border-radius:4px;padding:0 4px;line-height:16px;white-space:nowrap}
+.side-quick{flex:none;display:flex;gap:4px;padding:0 4px 8px}
+.side-chip{display:inline-flex;align-items:center;gap:6px;height:32px;min-width:32px;padding:0 8px;justify-content:center;border-radius:8px;color:#91918E;text-decoration:none;font-weight:500;font-size:14px;position:relative}
+.side-chip:hover{background:#EFEFED;color:#37352F}
+.side-chip.on{background:#EFEFED;color:#37352F}
+.side-chip .cnt{position:absolute;top:-4px;right:-4px;min-width:16px;line-height:16px;font-size:10px;padding:0 4px}
+.side .nav{padding:0 4px;margin:0 -4px}
+.nav-group{margin:0 0 4px}
+.nav-group h4,.nav-head{font-size:12px;font-weight:500;color:#91918E;text-transform:none;letter-spacing:0}
+.nav-group h4{margin:12px 8px 2px}
+.nav-group.coll{margin-top:8px}
+.nav-head{min-height:28px;padding:4px 8px;gap:4px;border-radius:6px}
+.nav-head:hover{background:#EFEFED;color:#5F5E5B}
+.nav-head .gl{flex:0 1 auto}
+.nav-head .chev{display:inline-grid;place-items:center;width:16px;color:#A5A4A0;opacity:0;transition:transform .15s var(--ease),opacity .15s var(--ease)}
+.nav-head:hover .chev,.nav-head:focus-visible .chev,.nav-group.coll:not(.open) .nav-head .chev{opacity:1}
+.nav-group.open .nav-head .chev{transform:rotate(90deg)}
+.nav-head .cnt{margin-left:auto}
+.nav a{min-height:30px;padding:4px 8px;gap:8px;margin:1px 0;border-radius:6px;color:#5F5E5B;font-weight:500;font-size:14px}
+.nav a .nic{display:inline-grid;place-items:center;width:20px;flex:none;color:#91918E}
+.nav a .nl{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav a:hover{background:#EFEFED;color:#37352F}
+.nav a.on{background:#EFEFED;color:#37352F;font-weight:600}
+.nav a.on .nic{color:#37352F}
+.side.searching .side-quick,.side.searching .recents,.side.searching .nav-group.bugnav,.side.searching .nav-head .chev,.side.searching .nav-head .cnt{display:none}
+.side .foot{border-top:1px solid #EDEDEB;padding:8px 4px 0}
+.side .av.on::after{border-color:#F8F8F7}
+.mystatus{background:#fff;border-color:#E9E9E7}
+/* hide the sidebar on a computer (the menu button at the top brings it back) */
+@media (min-width:961px){
+  body.side-off .shell{grid-template-columns:minmax(0,1fr)}
+  body.side-off .side{display:none}
+  body.side-off .topbar .menu{display:grid}
+}
+@media (max-width:960px){ .side-hide{display:none} }
+@media (pointer:coarse){
+  .side-ic{width:44px;height:44px}
+  .side-search{height:44px}
+  .side .brand{min-height:44px}
+  .side-search-in{font-size:16px}
+  .side-chip{height:44px;min-width:44px}
+  .nav a,.nav-head{min-height:44px}
+  .side-kbd{display:none}
+}
 </style>
 </head>
 <body>
@@ -1476,6 +1537,28 @@ const ICONS = {
   check: '<path d="M20 6 9 17l-5-5"/>',
   clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   pause: '<rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/>',
+  home: '<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .71-1.53l7-6a2 2 0 0 1 2.58 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  layoutGrid: '<rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/>',
+  kanban: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 7v7"/><path d="M12 7v4"/><path d="M16 7v9"/>',
+  megaphone: '<path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>',
+  trendingUp: '<path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><path d="M16 7h6v6"/>',
+  userPlus: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6"/><path d="M22 11h-6"/>',
+  atSign: '<circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/>',
+  briefcase: '<path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><rect width="20" height="14" x="2" y="6" rx="2"/>',
+  contact: '<path d="M16 2v2"/><path d="M8 2v2"/><path d="M7 22v-2a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/><circle cx="12" cy="11" r="3"/><rect x="3" y="4" width="18" height="18" rx="2"/>',
+  activity: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+  target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  barChart: '<path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>',
+  send: '<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98"/><path d="m15.41 6.51-6.82 3.98"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+  gift: '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C9.5 3 11 5 12 8c1-3 2.5-5 4.5-5a2.5 2.5 0 0 1 0 5"/>',
+  shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+  panelLeft: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/>',
+  squarePen: '<path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.38 2.62a1 1 0 0 1 3 3l-9.01 9.02a2 2 0 0 1-.86.5l-2.87.84a.5.5 0 0 1-.62-.62l.84-2.87a2 2 0 0 1 .5-.86z"/>',
+  chevronRight: '<path d="m9 18 6-6-6-6"/>',
+  calendarDays: '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/>',
   checkSquare: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/>'
 };
 function ic(name, size){
@@ -7744,7 +7827,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11aq";
+const APP_VERSION = "2026-11ar";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -9519,6 +9602,35 @@ function navOpen(group){
   return group in st ? !!st[group] : false;
 }
 function setNavOpen(group, open){ const st = navState(); st[group] = open; try { localStorage.setItem("tc_nav_" + S.me.id, JSON.stringify(st)); } catch (e) {} }
+// Notion-style sidebar helpers: an icon per page, recents, the menu search, and hiding the sidebar
+const ROUTE_ICON = { dashboard: "home", overview: "layoutGrid", tasks: "checkSquare", notes: "fileText", calendar: "calendar", "team-calendar": "calendarDays",
+  "dev-board": "kanban", chat: "message", emails: "mail", announcements: "megaphone", sales: "trendingUp", deals: "kanban", leads: "userPlus", ig_leads: "atSign",
+  clients: "briefcase", contacts: "contact", activities: "activity", proposals: "fileText", targets: "target", "crm-analytics": "barChart", marketing: "megaphone",
+  campaigns: "send", content: "calendarDays", seo_keywords: "search", social_stats: "share", people: "users", leave_requests: "sun", holidays: "gift",
+  attendance: "clock", meetings: "video", documents: "folder", "admin-users": "shield" };
+let sideQuery = "";
+function recentRoutes(){ try { return JSON.parse(localStorage.getItem("tc_recent_" + S.me.id) || "[]"); } catch (e) { return []; } }
+function rememberRecent(route){
+  const r = route.startsWith("admin-") ? "admin-users" : route;
+  if (!NAV.some(([, items]) => items.some(([x]) => x === r))) return;
+  const list = [r, ...recentRoutes().filter(x => x !== r)].slice(0, 8);
+  try { localStorage.setItem("tc_recent_" + S.me.id, JSON.stringify(list)); } catch (e) {}
+}
+function filterSide(){
+  const side = $("side"), q = (sideQuery || "").trim().toLowerCase();
+  side.classList.toggle("searching", !!q);
+  for (const g of side.querySelectorAll(".nav .nav-group:not(.recents):not(.bugnav)")){
+    let any = false;
+    for (const a of g.querySelectorAll("a[data-label]")){ const hit = !q || a.dataset.label.includes(q); a.hidden = !hit; any = any || hit; }
+    const body = g.querySelector(".nav-items");
+    if (body) body.hidden = q ? !any : !g.classList.contains("open");
+    g.hidden = !!q && !any;
+  }
+}
+function setSideHidden(hidden){
+  document.body.classList.toggle("side-off", hidden);
+  try { localStorage.setItem("tc_side_off", hidden ? "1" : ""); } catch (e) {}
+}
 function renderShell(){
   bugButton();
   const side = $("side");
@@ -9535,20 +9647,45 @@ function renderShell(){
   shellKey = key;
   const oldNav = side.querySelector(".nav");
   const keepScroll = oldNav ? oldNav.scrollTop : 0;
+  const label = r => (NAV.flatMap(([, i]) => i).find(([x]) => x === r) || [r, r === "admin-users" ? "Admin panel" : r])[1];
+  const isOn = r => S.route === r || (r === "admin-users" && S.route.startsWith("admin-"));
+  const closeSide = () => side.classList.remove("open");
+  let canNewTask = false; try { canNewTask = !!access(MOD.tasks).canCreate; } catch (e) {}
+  // top row: the logo, New task, and Hide sidebar (computers)
   side.replaceChildren(
-    h("a", { class: "brand", href: "#dashboard", "aria-label": (S.settings.company || "Tcipher") + " workspace home" }, h("img", { src: LOGO_DARK, alt: "Tcipher", class: "brand-logo" }), h("span", { class: "brand-tag" }, "Workspace")));
+    h("div", { class: "side-top" },
+      h("a", { class: "brand", href: "#dashboard", "aria-label": (S.settings.company || "Tcipher") + " workspace home" }, h("img", { src: LOGO_DARK, alt: "Tcipher", class: "brand-logo" })),
+      h("span", { class: "grow" }),
+      canNewTask ? h("button", { type: "button", class: "side-ic", title: "New task", "aria-label": "New task", onclick: () => { closeSide(); openRecord("tasks", null); } }, ic("squarePen", 18)) : null,
+      h("button", { type: "button", class: "side-ic side-hide", title: "Hide sidebar (Ctrl+\\)", "aria-label": "Hide sidebar", onclick: () => setSideHidden(true) }, ic("panelLeft", 18))));
+  // search: narrows the menu as you type (Ctrl+K or ⌘K jumps here)
+  const search = h("input", { class: "side-search-in", id: "sideSearch", type: "search", placeholder: "Search", "aria-label": "Search the menu", autocomplete: "off", enterkeyhint: "go",
+    oninput: () => { sideQuery = search.value; filterSide(); },
+    onkeydown: e => {
+      if (e.key === "Escape") { search.value = ""; sideQuery = ""; filterSide(); search.blur(); }
+      if (e.key === "Enter") { const first = [...side.querySelectorAll(".nav-items a, .nav-group:not(.coll) a")].find(a => !a.closest("[hidden]") && a.offsetParent); if (first) { search.value = ""; sideQuery = ""; filterSide(); search.blur(); first.click(); } }
+    } });
+  search.value = sideQuery || "";
+  side.append(h("label", { class: "side-search" }, ic("search", 16), search, h("kbd", { class: "side-kbd" }, /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘K" : "Ctrl K")));
+  // Home, Chat and Calendar always one tap away
+  const quick = (r, icon) => canSee(r) ? h("a", { href: "#" + r, class: "side-chip" + (isOn(r) ? " on" : ""), title: label(r), "aria-label": label(r), onclick: closeSide }, ic(icon, 18), isOn(r) ? h("span", {}, label(r)) : null, navBadge(r)) : null;
+  side.append(h("div", { class: "side-quick" }, quick("dashboard", "home"), quick("chat", "message"), quick("calendar", "calendar")));
   const nav = h("nav", { class: "nav", "aria-label": "Main" });
+  // recently opened pages (this browser), like a notebook's recents
+  const rec = recentRoutes().filter(r => canSee(r) && !["dashboard", "chat", "calendar"].includes(r)).slice(0, 5);
+  if (rec.length) nav.append(h("div", { class: "nav-group recents" }, h("h4", {}, "Recents"),
+    rec.map(r => h("a", { href: "#" + r, class: isOn(r) ? "on" : null, onclick: closeSide }, h("span", { class: "nic" }, ic(ROUTE_ICON[r] || "file", 18)), h("span", { class: "nl" }, label(r))))));
   for (const [group, items] of NAV){
     // items shared by Sales and Marketing show under your own team only (admins see them under both)
     const shared = ["leads","ig_leads","crm-analytics"];
-    const visible = items.filter(([r]) => canSee(r) && !(shared.includes(r) && ((group === "Sales" && !(isAdmin() || lvl("sales") >= 1)) || (group === "Marketing" && !(isAdmin() || lvl("marketing") >= 1)))));
+    const visible = items.filter(([r]) => r !== "dashboard" && canSee(r) && !(shared.includes(r) && ((group === "Sales" && !(isAdmin() || lvl("sales") >= 1)) || (group === "Marketing" && !(isAdmin() || lvl("marketing") >= 1)))));
     if (!visible.length) continue;
     const links = visible.map(([r, l]) => {
       const badge = navBadge(r);
       const on = S.route === r || (r === "admin-users" && S.route.startsWith("admin-"));
-      return h("a", { href: "#" + r, class: on ? "on" : null, onclick: () => side.classList.remove("open") }, l, badge);
+      return h("a", { href: "#" + r, class: on ? "on" : null, "data-label": l.toLowerCase(), onclick: () => side.classList.remove("open") }, h("span", { class: "nic" }, ic(ROUTE_ICON[r] || "file", 18)), h("span", { class: "nl" }, l), badge);
     });
-    if (!group || group === "Admin") { nav.append(h("div", { class: "nav-group" }, group ? h("h4", {}, group) : null, links)); continue; }
+    if (!group || group === "Admin") { nav.append(h("div", { class: "nav-group" }, h("h4", {}, group || "Workspace"), links)); continue; }
     // collapsible section: remembers open/closed, and shows the section's totals when closed
     const hasCurrent = visible.some(([r]) => r === S.route);
     const open = navOpen(group, hasCurrent);
@@ -9557,15 +9694,16 @@ function renderShell(){
     const sum = !open && (due || fresh || bang) ? h("span", { class: "cnt " + (due || bang ? "due" : "new") }, due ? String(due > 99 ? "99+" : due) : bang ? "!" : (fresh > 99 ? "99+" : fresh) + " new") : null;
     const body = h("div", { class: "nav-items", hidden: !open }, links);
     const head = h("button", { type: "button", class: "nav-head", "aria-expanded": String(open), onclick: () => { const now = body.hidden; body.hidden = !now; head.setAttribute("aria-expanded", String(now)); setNavOpen(group, now); shellKey = ""; renderShell(); } },
-      h("span", { class: "chev", "aria-hidden": "true" }, "›"), h("span", { class: "gl" }, group), sum);
+      h("span", { class: "gl" }, group), h("span", { class: "chev", "aria-hidden": "true" }, ic("chevronRight", 14)), sum);
     nav.append(h("div", { class: "nav-group coll" + (open ? " open" : "") }, head, body));
   }
-  nav.append(h("div", { class: "nav-group bugnav" }, h("a", { href: "#" + S.route, onclick: e => { e.preventDefault(); side.classList.remove("open"); openReportDialog(); } }, ic("bug"), "Report a problem")));
+  nav.append(h("div", { class: "nav-group bugnav" }, h("a", { href: "#" + S.route, onclick: e => { e.preventDefault(); side.classList.remove("open"); openReportDialog(); } }, h("span", { class: "nic" }, ic("bug", 18)), h("span", { class: "nl" }, "Report a problem"))));
   side.append(nav, h("div", { class: "foot" }, avatar(S.me.id),
     h("button", { type: "button", class: "who", style: "background:none;border:0;text-align:left;padding:0;cursor:pointer", onclick: openMyProfile, title: "My profile" },
       h("b", {}, S.me.full_name), h("span", {}, S.me.is_admin ? "Admin, all verticals" : [S.me.vertical, refLabel("roles", S.me.role_id)].filter(Boolean).join(" · ") || "Employee")),
     h("button", { type: "button", onclick: () => sb.auth.signOut() }, "Sign out")), h("div", { id: "myStatus", class: "mystatus-slot" }));
   nav.scrollTop = keepScroll;
+  filterSide();
   if (typeof drawMyStatus === "function") drawMyStatus();
 
 }
@@ -9579,7 +9717,7 @@ async function rerender(){
   if (S.route && S.route !== route && S.me) markSeen(S.route);
   if (route !== "chat") { chatEls = null; if (typeof C !== "undefined") { C.unreadFrom = {}; C.scrollToUnread = null; } }   // leaving Chat: the "New messages" line is redrawn fresh next time   // leaving a tab: everything you saw there is no longer "new"
   S.route = route;
-  if (S.me) markSeen(route);
+  if (S.me) { markSeen(route); rememberRecent(route); }
   renderShell();
   const el = $("content");
   const focused = document.activeElement && document.activeElement.id && el.contains(document.activeElement) ? document.activeElement.id : null;
@@ -9984,7 +10122,13 @@ function wire(){
   $("loginPass").addEventListener("keydown", e => { if (e.key === "Enter") signIn(); });
   $("forgotBtn").addEventListener("click", forgot);
   $("inactiveOut").addEventListener("click", () => sb.auth.signOut());
-  $("menuBtn").addEventListener("click", () => $("side").classList.toggle("open"));
+  $("menuBtn").addEventListener("click", () => { if (window.innerWidth > 960) setSideHidden(!document.body.classList.contains("side-off")); else $("side").classList.toggle("open"); });
+  try { if (localStorage.getItem("tc_side_off") === "1") document.body.classList.add("side-off"); } catch (e) {}
+  document.addEventListener("keydown", e => {
+    if (!S.me || !(e.metaKey || e.ctrlKey) || e.altKey) return;
+    if (e.key.toLowerCase() === "k") { e.preventDefault(); if (window.innerWidth > 960) setSideHidden(false); else $("side").classList.add("open"); const i = $("sideSearch"); if (i) { i.focus(); i.select(); } }
+    if (e.key === "\\" && window.innerWidth > 960) { e.preventDefault(); setSideHidden(!document.body.classList.contains("side-off")); }
+  });
   document.addEventListener("click", e => { const sd = $("side"); if (sd.classList.contains("open") && !sd.contains(e.target) && !$("menuBtn").contains(e.target)) sd.classList.remove("open"); });
   $("bell").addEventListener("click", e => { e.stopPropagation(); const p = $("npanel"); p.hidden = !p.hidden; if (!p.hidden) drawNotifications(); });
   document.addEventListener("click", e => { const p = $("npanel"); if (!p.hidden && !p.contains(e.target)) p.hidden = true; });

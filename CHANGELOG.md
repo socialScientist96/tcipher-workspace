@@ -1,5 +1,13 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11ar (8 Nov 2026): Notion-style sidebar
+Needs: upload `index.html` and `sw.js`. No database or function changes.
+- **Sidebar in the style of Notion:** warm off-white, a line icon beside every page, quiet section labels with a chevron to open and close each team's section.
+- **Search box** at the top narrows the menu as you type; Enter opens the first match, Esc clears it. **Ctrl+K / ⌘K** jumps to it from anywhere.
+- **Home, Chat and Calendar shortcuts** under the search, with the chat's unread count.
+- **Recents:** the last pages you opened (kept in this browser only).
+- **New task** button at the top of the sidebar; **hide the sidebar** on a computer with the panel button or **Ctrl+\\ / ⌘\\** (the menu button brings it back; remembered per browser).
+
 ## Version 2026-11aq (8 Nov 2026): phones, tablets and slow connections
 Needs: upload `index.html` and `sw.js`. No database or function changes.
 - **Bottom bar on phones and small tablets:** the menu and notifications sit at the bottom, within thumb reach. Notifications open just above the bar instead of over the page.
