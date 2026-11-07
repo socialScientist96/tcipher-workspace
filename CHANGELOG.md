@@ -1,5 +1,15 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11al (7 Nov 2026): works on slow connections
+Needs: upload `index.html` and the new `sw.js` (both at the site root). No database changes.
+- **Opens fast on repeat visits, even offline:** `sw.js` keeps the app's own files (the page, the Supabase library, fonts) on the device. The page is always fetched fresh first; the saved copy is used if the network takes over 4 seconds or is down. Your data is never stored by it. To turn it off, delete `sw.js` from the site.
+- **Time limits on every database request:** reading waits up to 20 s for the server (and is retried by the library), saving up to 60 s and is never repeated automatically. Before, a stalled request left "Loading…" on screen forever.
+- **"Slow connection…" and "You're offline" notices** at the bottom left.
+- **Starting up on a bad connection** shows "Loading the workspace…", then "Can't reach the server… Trying again shortly" with a **Try again** button, instead of a blank page or the "Contact your admin" (account turned off) screen.
+- **Lighter update check:** asks only whether the page changed, instead of downloading the whole app (~230 KB) every 5 minutes.
+- **On 2G/3G or data-saver connections,** pages load only what they show (no loading ahead in the background).
+- **Backup source for the Supabase library** (unpkg) if the main one (jsDelivr) doesn't load.
+
 ## Ready to go live: version 2026-11m (this folder)
 Needs: run `upgrade-2026-11k.sql`, then `upgrade-2026-11m.sql`, in Supabase (both are safe to run again), then upload `index.html`.
 - **Instant chat that really is instant:** the workspace now signs in to Supabase’s live connection and uses **private channels**, one per conversation plus one per person. The database itself sends the “new message” and “new notification” signals. This works whether or not the project allows public live channels. The backup check runs every 2 seconds on Chat.
