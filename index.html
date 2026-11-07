@@ -1164,7 +1164,9 @@ const ORDER = {
   profiles: ["full_name", true], roles: ["name", true], targets: ["month", false], social_stats: ["month", false], activities: ["activity_date", false],
   meetings: ["meeting_date", false], attendance: ["day", false], meeting_joins: ["joined_at", false], notes: ["updated_at", false], tasks: ["created_at", false], features: ["name", true], test_cases: ["number", true], google_links: ["connected_at", false], emails: ["sent_at", false], problem_reports: ["created_at", false], presence: ["last_seen_at", false], user_status: ["updated_at", false], calendar_events: ["start_date", true], settings: ["id", true], time_entries: ["work_date", false],
   activity_log: ["at", false], notifications: ["created_at", false], invoices: ["issue_date", false],
-  leave_requests: ["start_date", false], expenses: ["spent_on", false]
+  leave_requests: ["start_date", false], expenses: ["spent_on", false],
+  // these tables have no created_at or id column
+  user_status: ["updated_at", false], presence: ["last_seen_at", false]
 };
 const LIMIT = { activity_log: 300, notifications: 60, attendance: 3000, meeting_joins: 4000 };
 
@@ -7125,7 +7127,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ag";
+const APP_VERSION = "2026-11ah";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -9215,6 +9217,32 @@ async function init(){
   const { data } = await sb.auth.getSession();
   if (!data.session) showScreen("login");
 }
+/* ---------------------------------------------------------------------
+   Don't redraw under a press. New chat messages, live updates and status
+   changes rebuild lists and buttons; if that lands between pressing and
+   releasing, the button pressed is gone and the click is lost (people had
+   to click twice). While a press is held, redraws wait and run right
+   after the click.
+   --------------------------------------------------------------------- */
+let pressing = false, pressT = null; const heldDraws = new Map();
+function flushHeldDraws(){ pressing = false; clearTimeout(pressT); const fns = [...heldDraws.values()]; heldDraws.clear(); fns.forEach(f => { try { f(); } catch (e) { console.warn("redraw", e); } }); }
+document.addEventListener("pointerdown", e => { if (e.button > 0) return; pressing = true; clearTimeout(pressT); pressT = setTimeout(flushHeldDraws, 4000); }, true);
+["pointerup", "pointercancel", "dragend"].forEach(ev => document.addEventListener(ev, () => { if (pressing) setTimeout(flushHeldDraws, 0); }, true));
+function holdWhilePressing(name, fn, merge){
+  return function(...args){
+    if (!pressing) return fn.apply(this, args);
+    const prev = heldDraws.get(name);
+    const use = merge && prev ? merge(prev.args, args) : args;
+    const run = () => fn.apply(this, use); run.args = use;
+    heldDraws.set(name, run);
+  };
+}
+rerender = holdWhilePressing("rerender", rerender);
+renderShell = holdWhilePressing("renderShell", renderShell);
+drawChatList = holdWhilePressing("drawChatList", drawChatList);
+drawChatMessages = holdWhilePressing("drawChatMessages", drawChatMessages, (a, b) => [!!(a[0] || b[0])]);
+drawMyStatus = holdWhilePressing("drawMyStatus", drawMyStatus);
+
 init();
 })();
 </script>
