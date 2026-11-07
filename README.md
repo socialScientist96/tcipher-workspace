@@ -6,6 +6,8 @@ The internal workspace for Tcipher's three verticals, **Development**, **Sales**
 |---|---|---|
 | `index.html` | The whole app (the page everyone opens), incl. your Supabase and Google settings | This GitHub repo, served by GitHub Pages |
 | `supabase-setup.sql` | Database, security rules, roles and settings | Run once in Supabase › SQL Editor |
+| `schema-live-2026-11-07.sql` | The full live database structure (7 Nov 2026), including upgrades that were never saved as files | Reference, or run after `supabase-setup.sql` on a new database |
+| `export-schema.sql` | Prints the live structure, to refresh the file above | Supabase › SQL Editor, then Export › Download CSV |
 | `admin-users-function.ts` | Lets the admin panel create logins and reset passwords | Supabase › Edge Functions, named `admin-users` |
 | `google-sync-function.ts` | Automatic Google Calendar sync, Meet links and Meet join import | Supabase › Edge Functions, named `google-sync` |
 | `google-sync-schedule.sql` | Runs the Google sync every 10 minutes | Supabase › SQL Editor (after enabling pg_cron and pg_net) |
