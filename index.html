@@ -2684,6 +2684,8 @@ async function openRecord(key, id, preset, opts){
   }
   // Development tasks open in the simpler, Jira-style view (the full form is one click away from there)
   if (key === "tasks" && rec && rec.vertical === "Development" && !(opts && opts.form) && typeof openDevTask === "function") { openDevTask(rec.id); return; }
+  // a new task starts with the simple form (the full one is behind "More options")
+  if (key === "tasks" && !rec && !(opts && opts.form) && typeof taskCreate === "function") { taskCreate(preset); return; }
   const A = access(M, rec);
   const editable = rec ? A.canEdit : A.canCreate;
   const values = rec ? clone(rec) : {};
@@ -7217,7 +7219,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11aj";
+const APP_VERSION = "2026-11ak";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -8408,26 +8410,45 @@ function inlineCreate(){
 }
 
 /* ---------- create ---------- */
-function devCreate(){
-  const title = h("input", { class: "in", id: "devNewTitle", maxlength: "200", placeholder: "What needs to be done?" });
-  const notes = h("textarea", { class: "in", id: "devNewNotes", rows: 4, placeholder: "Notes: what “done” looks like, links, steps…" });
-  const owners = ownersPicker([S.me.id]);
+// One simple form for every new task (Development and the rest): title, notes, owners and an optional due date.
+// "More options" opens the full form with what was typed, for bugs, projects, reviewers and the rest.
+function devCreate(){ return taskCreate({ vertical: "Development" }); }
+function taskCreate(preset){
+  preset = preset || {};
+  const verts = isAdmin() ? VERTICALS : [S.me.vertical || "Development"];
+  const startV = verts.includes(preset.vertical) ? preset.vertical : verts.includes(S.me.vertical) ? S.me.vertical : verts[0];
+  const vertical = verts.length > 1 ? h("select", { class: "in", id: "taskNewVertical" }, verts.map(v => h("option", { value: v, selected: v === startV }, v))) : null;
+  const title = h("input", { class: "in", id: "devNewTitle", maxlength: "200", placeholder: "What needs to be done?", value: preset.title || "" });
+  const notes = h("textarea", { class: "in", id: "devNewNotes", rows: 4, placeholder: "Notes: what “done” looks like, links, steps…" }, preset.description || "");
+  const owners = ownersPicker([preset.assignee_id || S.me.id, ...(preset.collaborators || [])].filter((x, i, a) => x && a.indexOf(x) === i));
+  const due = h("input", { class: "in", id: "taskNewDue", type: "date", value: preset.due_date || "", min: today() });
   const err = h("p", { class: "err", hidden: true });
   const go2 = h("button", { type: "button", class: "btn pri", id: "devNewGo" }, "Create");
+  const values = () => { const ids = owners.value(), vv = vertical ? vertical.value : startV;
+    return Object.assign({}, preset, { vertical: vv, type: preset.type || ({ Sales: "Follow-up", Marketing: "Content" })[vv] || "Feature", title: title.value.trim(), description: notes.value.trim(),
+    assignee_id: ids[0] || null, collaborators: ids.slice(1), due_date: due.value || null }); };
   const submit = async () => {
     if (go2.disabled) return;
     err.hidden = true;
     if (!title.value.trim()) { err.textContent = "Write a short title."; err.hidden = false; title.focus(); return; }
-    const ids = owners.value();
     go2.disabled = true;
-    try { const t = await devInsert({ title: title.value.trim(), description: notes.value.trim(), assignee_id: ids[0] || null, collaborators: ids.slice(1) });
-      closeDlg(); toast(taskKey(t) + " created. Add a screenshot or file if you have one."); rerender(); openDevTask(t.id); }
+    try {
+      const t = await devInsert(values());
+      closeDlg(); rerender();
+      if (t.vertical === "Development") { toast(taskKey(t) + " created. Add a screenshot or file if you have one."); openDevTask(t.id); }
+      else toast((taskKey(t) ? taskKey(t) + " " : "Task ") + "created.");
+    }
     catch (e) { err.textContent = "Not created: " + friendly(e); err.hidden = false; }
     go2.disabled = false;
   };
   go2.addEventListener("click", submit); title.addEventListener("keydown", e => { if (e.key === "Enter" && !go2.disabled) go2.click(); });
-  openDialog("Create task", [h("div", { class: "form" }, h("label", { class: "fl full" }, "Title", title), h("label", { class: "fl full" }, "Notes", notes), h("div", { class: "fl full" }, h("span", {}, "Owners"), owners.el)), err],
-    [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), go2], true);
+  const more = h("button", { type: "button", class: "linkbtn", id: "taskNewMore", onclick: () => { const v = values(); closeDlg(); openRecord("tasks", null, v, { form: true }); } }, "More options");
+  openDialog("Create task", [h("div", { class: "form" },
+      vertical ? h("label", { class: "fl" }, "Vertical", vertical) : null,
+      h("label", { class: "fl full" }, "Title", title), h("label", { class: "fl full" }, "Notes", notes),
+      h("div", { class: "fl full" }, h("span", {}, "Owners"), owners.el),
+      h("label", { class: "fl" }, h("span", {}, "Due date ", h("span", { class: "muted", style: "font-weight:400" }, "(optional)")), due)), err],
+    [more, h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), go2], true);
   setTimeout(() => title.focus(), 30);
 }
 // owners: chips with photos, plus "Add owner"
@@ -8447,7 +8468,10 @@ function ownersPicker(start, onChange){
 async function devInsert(over){
   const M = MOD.tasks, v = {};
   for (const f of M.fields) if (f.def !== undefined && !f.virtual) v[f.k] = typeof f.def === "function" ? f.def() : f.def;
-  Object.assign(v, { vertical: "Development", status: "To do", type: v.type || "Feature", priority: v.priority || "Medium", assignee_id: S.me.id }, over);
+  const vert = (over && over.vertical) || "Development";
+  // the type fits the vertical (a Sales task is a follow-up, not a feature), unless one was chosen
+  Object.assign(v, { vertical: vert, status: "To do", type: ({ Sales: "Follow-up", Marketing: "Content" })[vert] || "Feature", priority: v.priority || "Medium", assignee_id: S.me.id }, over);
+  if (vert === "Development") v.reviewer_id = over.reviewer_id || null;   // Development work is reviewed by QA, not a default reviewer
   if (M.before) M.before(v, null);
   const t = await insertRow("tasks", v);
   if (M.after) M.after(t, null);
