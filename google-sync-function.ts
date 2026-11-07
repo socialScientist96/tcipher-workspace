@@ -638,6 +638,13 @@ Deno.serve(async (req) => {
     if (!who || !who.user) return json({ error: "Sign in again." }, 401);
     const me = must(await db.from("profiles").select("id,email,is_admin,is_active").eq("id", who.user.id).single());
     if (!me.is_active) return json({ error: "Your account is turned off." }, 403);
+    // an admin who has two-step sign-in counts as an admin only in a session where the code was entered
+    if (me.is_admin) {
+      let aal = "aal1";
+      try { const p = jwt.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"); aal = String(JSON.parse(atob(p + "===".slice((p.length + 3) % 4))).aal || "aal1"); } catch (_) { /* aal1 */ }
+      const { data: fac } = await db.auth.admin.mfa.listFactors({ userId: me.id });
+      if (aal !== "aal2" && (fac?.factors ?? []).some((f: Any) => f.status === "verified")) me.is_admin = false;
+    }
 
     if (action === "connect") {
       const tok = await googleTokenRequest({ grant_type: "authorization_code", code: String(body.code || ""), redirect_uri: "postmessage" });

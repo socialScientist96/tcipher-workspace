@@ -1,5 +1,12 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11ao (7 Nov 2026): two-step sign-in and sign-in CAPTCHA
+Needs: upload `index.html` and `sw.js`; deploy `admin-users-function.ts` and `google-sync-function.ts`; run `upgrade-2026-11ao.sql`.
+- **Two-step sign-in** (authenticator app codes): set up in My profile › Two-step sign-in. When it's on, sign-in asks for the 6-digit code. Admins see a reminder in the Admin panel until they turn it on.
+- **Admins who use it get admin rights only after entering the code** (database, admin-users and google-sync all check), so a stolen admin password alone can't reach the admin panel. Admins who haven't set it up yet work as before.
+- **Admin › Users › edit a person › Reset two-step sign-in**, for someone who lost their phone.
+- **Sign-in CAPTCHA (Cloudflare Turnstile)**, off until a site key is set in `TURNSTILE_SITE_KEY` (index.html) and the secret key in Supabase › Authentication › Attack Protection. Set the site key and publish first, then turn it on in Supabase.
+
 ## Version 2026-11an (7 Nov 2026): browser security policy and tamper checks
 Needs: upload `index.html` and `sw.js`.
 - **Security policy (CSP)** in the page: code and data may only come from / go to this site, Supabase, Google (sign-in, Drive, Docs viewer) and the three library CDNs. A stolen session can no longer be sent to another site. **Using a new outside site in the code means adding it to the policy at the top of index.html.**
