@@ -1,5 +1,13 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11bq (8 Nov 2026): moving blocks in notes, fixed
+Needs: upload `index.html` and `sw.js`. No database change.
+- **Drag the six dots to move a block**, rebuilt: a purple line shows exactly where it will land, and it lands there (dragging down used to put it one place lower than the line showed). The page scrolls when you drag near the top or bottom. A toggle moves with everything inside it. Esc cancels. A click on the dots still opens the block menu.
+- **Works on phones and tablets** too (hold the six dots and drag with a finger); before, moving blocks only worked with a mouse.
+- Fixed: dropping a file on a block also moved the first block of the note.
+- Fixed: dragging selected text inside a note didn't work (and could move a block if the text was a number).
+- Fixed: dragging a picture inside a note could upload it again; the dashed drop outline no longer gets stuck.
+
 ## Version 2026-11bp (8 Nov 2026): Insert below in the note block menu
 Needs: upload `index.html` and `sw.js`. No database change.
 - The six-dot block menu now has **Insert below**, with a side menu like Turn into and Color: **Image…** and **Video…** first (opens the file picker; the new picture goes under the block without replacing it), then every other block type (text, headings, page, lists, to-do, toggles, quote, callout, code, divider).

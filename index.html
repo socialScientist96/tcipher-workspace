@@ -1848,6 +1848,10 @@ dialog{border-radius:var(--r-xl)}
 .nb-block:not(:focus-within) .nb-caption:empty::before{content:""}
 .nb-caption:empty::before{content:attr(data-placeholder);color:var(--ink3)}
 .t-image,.t-video{--lh:120px}
+.nb-blocks{position:relative}
+.nb-dropline{position:absolute;left:0;right:0;height:3px;border-radius:2px;background:var(--p);pointer-events:none;z-index:5}
+.nb-handle{touch-action:none}
+body.nb-moving,body.nb-moving *{cursor:grabbing!important;user-select:none!important;-webkit-user-select:none!important}
 .nb-blocks.nb-dropping{outline:2px dashed var(--p);outline-offset:8px;border-radius:var(--r-md)}
 </style>
 </head>
@@ -5842,15 +5846,11 @@ async function renderNotePage(el, id){
   function blockEl(b, i, num){
     const row = h("div", { class: "nb-block t-" + b.type + (b.color ? " c-" + b.color : ""), "data-i": i, style: "--lvl:" + (b.level || 0) });
     if (editable){
-      const handle = h("button", { type: "button", class: "nb-handle", title: "Drag to move · click for options", "aria-label": "Block options", draggable: "true",
-        onclick: e => { e.stopPropagation(); blockMenu(handle, i); } }, ic("grip", 18));
-      handle.addEventListener("dragstart", e => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(i)); row.classList.add("dragging"); });
-      handle.addEventListener("dragend", () => row.classList.remove("dragging"));
+      const handle = h("button", { type: "button", class: "nb-handle", title: "Drag to move · click for options", "aria-label": "Block options",
+        onclick: e => { e.stopPropagation(); if (handle.__dragged) return; blockMenu(handle, i); } }, ic("grip", 18));
+      handle.addEventListener("pointerdown", e => dragBlock(e, i, row, handle));
       const add = h("button", { type: "button", class: "nb-add", title: "Add a block below", "aria-label": "Add a block below", onclick: () => { insertAfter(i, { type: "text" }); } }, ic("plus", 18));
       row.append(h("div", { class: "nb-gutter" }, add, handle));
-      row.addEventListener("dragover", e => { e.preventDefault(); row.classList.add("drop"); });
-      row.addEventListener("dragleave", () => row.classList.remove("drop"));
-      row.addEventListener("drop", e => { e.preventDefault(); row.classList.remove("drop"); const from = +e.dataTransfer.getData("text/plain"); if (Number.isInteger(from) && from !== i) moveBlock(from, i); });
     }
     if (b.type === "divider") { row.append(h("hr", { class: "nb-hr" })); return row; }
     if (nbMedia(b.type)){
@@ -5860,7 +5860,7 @@ async function renderNotePage(el, id){
       else {
         media.append(h("div", { class: "nb-media-wait" }, h("span", { class: "spinner" }), "Loading…"));
         nbMediaLink(b.file, b.type === "video").then(url => {
-          const el = b.type === "video" ? h("video", { class: "nb-video", src: url, controls: true, preload: "metadata", playsinline: true }) : h("img", { class: "nb-img", src: url, alt: nbText(b.html) || b.name || "Picture" });
+          const el = b.type === "video" ? h("video", { class: "nb-video", src: url, controls: true, preload: "metadata", playsinline: true, draggable: "false" }) : h("img", { class: "nb-img", src: url, alt: nbText(b.html) || b.name || "Picture", draggable: "false" });
           if (b.type === "image") {
             el.addEventListener("click", () => { if (!box.classList.contains("nb-resizing")) window.open(url, "_blank", "noopener"); });
             // a tall phone photo starts at a comfortable height instead of filling the whole column
@@ -5968,13 +5968,65 @@ async function renderNotePage(el, id){
   }
   // drop pictures or videos anywhere on the page
   wrap.addEventListener("dragover", e => { if (editable && e.dataTransfer && [...e.dataTransfer.types].includes("Files")) { e.preventDefault(); wrap.classList.add("nb-dropping"); } });
-  wrap.addEventListener("dragleave", e => { if (e.target === wrap) wrap.classList.remove("nb-dropping"); });
+  wrap.addEventListener("dragleave", e => { if (!wrap.contains(e.relatedTarget)) wrap.classList.remove("nb-dropping"); });
   wrap.addEventListener("drop", e => {
     if (!editable || !e.dataTransfer || !e.dataTransfer.files || !e.dataTransfer.files.length) return;
     e.preventDefault(); e.stopPropagation(); wrap.classList.remove("nb-dropping");
     const row = e.target.closest && e.target.closest(".nb-block"); let at = row ? +row.dataset.i : blocks.length - 1;
     for (const f of [...e.dataTransfer.files]) { uploadMedia(f, at); at++; }
   });
+  /* Moving a block: hold the six dots and drag (mouse, pen or finger). A purple line shows exactly where it will land;
+     near the top or bottom of the screen the page scrolls. A toggle moves with everything inside it. Esc cancels. */
+  function dragBlock(e, i, row, handle){
+    if (e.button || !editable) return;
+    const x0 = e.clientX, y0 = e.clientY; let on = false, before = null, lastY = y0, raf = 0, line = null;
+    try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+    const scroller = (() => { for (let el = wrap.parentElement; el && el !== document.body; el = el.parentElement) { const o = getComputedStyle(el).overflowY; if ((o === "auto" || o === "scroll") && el.scrollHeight > el.clientHeight) return el; } return null; })();
+    const place = () => {
+      const rows = [...wrap.children].filter(r => r.classList.contains("nb-block")), w = wrap.getBoundingClientRect();
+      let y = null; before = blocks.length;
+      for (const r of rows) { const rc = r.getBoundingClientRect(); if (lastY < rc.top + rc.height / 2) { before = +r.dataset.i; y = rc.top; break; } }
+      if (y == null) { const last = rows[rows.length - 1]; y = last ? last.getBoundingClientRect().bottom : w.top; }
+      line.style.top = Math.round(y - w.top - 1) + "px";
+      // landing where it already is changes nothing: hide the line
+      const end = (() => { let k = i + 1; if (nbToggle(blocks[i].type)) while (k < blocks.length && (blocks[k].level || 0) > (blocks[i].level || 0)) k++; return k; })();
+      line.hidden = before >= i && before <= end;
+    };
+    const tick = () => {
+      const top = scroller ? scroller.getBoundingClientRect().top : 0, bottom = scroller ? scroller.getBoundingClientRect().bottom : innerHeight;
+      const d = lastY < top + 60 ? -Math.ceil((top + 60 - lastY) / 4) : lastY > bottom - 60 ? Math.ceil((lastY - bottom + 60) / 4) : 0;
+      if (d) { scroller ? scroller.scrollBy(0, d) : window.scrollBy(0, d); place(); }
+      raf = requestAnimationFrame(tick);
+    };
+    const move = ev => {
+      lastY = ev.clientY;
+      if (!on) {
+        if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 5) return;
+        on = true; closeNbMenu(); row.classList.add("dragging"); document.body.classList.add("nb-moving");
+        line = h("div", { class: "nb-dropline" }); wrap.append(line); raf = requestAnimationFrame(tick);
+      }
+      ev.preventDefault(); place();
+    };
+    const done = ok => {
+      handle.removeEventListener("pointermove", move); handle.removeEventListener("pointerup", up); handle.removeEventListener("pointercancel", cancel); document.removeEventListener("keydown", esc, true);
+      cancelAnimationFrame(raf); if (!on) return;
+      row.classList.remove("dragging"); document.body.classList.remove("nb-moving"); if (line) line.remove();
+      handle.__dragged = true; setTimeout(() => { handle.__dragged = false; }, 0);   // the click that ends a drag doesn't open the menu
+      if (ok && line && !line.hidden && before != null) moveBlockTo(i, before);
+    };
+    const up = () => done(true), cancel = () => done(false);
+    const esc = ev => { if (ev.key === "Escape" && on) { ev.preventDefault(); ev.stopPropagation(); done(false); } };
+    handle.addEventListener("pointermove", move); handle.addEventListener("pointerup", up); handle.addEventListener("pointercancel", cancel); document.addEventListener("keydown", esc, true);
+  }
+  // put the block at "from" (and, for a toggle, what's inside it) just before the block now at "before"
+  function moveBlockTo(from, before){
+    const lvl = blocks[from].level || 0; let end = from + 1;
+    if (nbToggle(blocks[from].type)) while (end < blocks.length && (blocks[end].level || 0) > lvl) end++;
+    if (before >= from && before <= end) return;
+    const chunk = blocks.splice(from, end - from);
+    blocks.splice(before > from ? before - chunk.length : before, 0, ...chunk);
+    queueSave(); draw(before > from ? before - chunk.length : before);
+  }
   function moveBlock(from, to){
     // a toggle moves with everything folded under it
     const lvl = blocks[from].level || 0; let end = from + 1;
@@ -9110,7 +9162,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11bp";
+const APP_VERSION = "2026-11bq";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
