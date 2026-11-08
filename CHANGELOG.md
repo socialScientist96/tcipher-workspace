@@ -1,5 +1,11 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11az (8 Nov 2026): sidebar sections and font sizes
+Needs: upload `index.html` and `sw.js`.
+- **Sidebar sections** (Development & QA, Communication, Sales, Marketing, Company) each have an icon and an arrow that always shows: pointing right when closed, down when open. Their pages sit indented on a thin guide line underneath, so it's clear they belong to the section and that it can be closed.
+- **Every sidebar icon is in the theme purple** (pages, sections, Home / Chat / Calendar, New task, Hide sidebar, search).
+- **Font sizes:** Roboto (body text) renders about 6% larger; Poppins (headings, menu, buttons, labels) about 10% smaller.
+
 ## Version 2026-11ay (8 Nov 2026): easier to read
 Needs: upload `index.html` and `sw.js`.
 - **Body text is 15px** (was 14) with roomier line spacing; tables, chat messages, comments and descriptions follow.

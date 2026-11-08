@@ -1407,15 +1407,18 @@ select.dv-loz{background-position:right 6px center!important;background-size:12p
 /* fonts (2026-11ax): Poppins is the main face — titles, headings, menu, buttons, labels, key figures;
    Roboto is the second — body text, tables, messages, notes and what you type. Task IDs stay in the mono face. */
 :root{--font-main:Poppins,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;--font-text:Roboto,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
-body{font-family:var(--font-text)}
+/* sizes per font: Poppins renders 10% smaller than its set size, Roboto about 6% larger (font-size-adjust scales by x-height:
+   Poppins 0.551 × 0.9 ≈ 0.496, Roboto 0.528 × 1.06 ≈ 0.56); browsers without it keep the set sizes */
+:root{--adj-main:0.496;--adj-text:0.56}
+body{font-family:var(--font-text);font-size-adjust:var(--adj-text)}
 h1,h2,h3,h4,.ph h1,.hello h1,.panel h2,.dh h2,.section h3,.auth-side h1,.auth-card h2,
 .nav a,.nav-head,.nav-group h4,.side-chip,.side .brand-tag,.side .foot .who b,.topbar .crumb,
 .btn,.seg button,.dv-tabsbar a,.dv-tabs button,.dv-chip,.linkbtn,.panel h2 a,.panel h2 button.link,
 .fl,.chk,th,.stat .v,.stat .l,.pill,.dv-loz,.dv-step,.dv-statusbtn,.colh b,.dv-colh,.card .t,.dv-title,.dv-h,.dv-sect b,.dv-dh,.dv-dl,
-.note-card .nt,.pcard b,.post h3,.chat-head .x b,.chat-list h4,.chat-item b,.hday b,.empty b,.toast,.iw-box h2,.npanel .nh b,.nitem b{font-family:var(--font-main)}
-.in,input,select,textarea,.side-search-in{font-family:var(--font-text)}
-.side .foot button:not(.who),.mystatus,.status-menu button,[role="menuitem"]{font-family:var(--font-main)}
-.tkey,.dv-key,.code,.cnt,.side-kbd,.cal-day .dn,.dv-counts span,.dv-pts,.iconbtn .dot{font-family:var(--mono)}
+.note-card .nt,.pcard b,.post h3,.chat-head .x b,.chat-list h4,.chat-item b,.hday b,.empty b,.toast,.iw-box h2,.npanel .nh b,.nitem b{font-family:var(--font-main);font-size-adjust:var(--adj-main)}
+.in,input,select,textarea,.side-search-in{font-family:var(--font-text);font-size-adjust:var(--adj-text)}
+.side .foot button:not(.who),.mystatus,.status-menu button,[role="menuitem"]{font-family:var(--font-main);font-size-adjust:var(--adj-main)}
+.tkey,.dv-key,.code,.cnt,.side-kbd,.cal-day .dn,.dv-counts span,.dv-pts,.iconbtn .dot{font-family:var(--mono);font-size-adjust:none}
 
 /* =====================================================================
    Readability (2026-11ay): body text 15px with roomier lines, nothing below 13px,
@@ -1494,6 +1497,23 @@ th{font-size:13px}
   body.kb-open #content .chat{position:fixed;left:8px;right:8px;z-index:55;min-height:0;margin:0}
   body.kb-open .chat-foot{padding-bottom:8px}
 }
+
+/* sidebar sections (2026-11az): an icon per section, an arrow that always shows (right = closed, down = open),
+   and the section's pages tucked under it on a thin guide line, so it reads as one group you can close */
+.nav-head{gap:8px;padding:4px 8px}
+.nav-head .gic{display:inline-grid;place-items:center;width:20px;flex:none;color:var(--p)}
+.nav-head .gl{flex:1 1 auto;min-width:0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-head .cnt{margin-left:0}
+.nav-head .chev{opacity:1!important;display:inline-grid;place-items:center;width:24px;height:24px;flex:none;border-radius:6px;color:#91918E;transition:transform .2s var(--ease),background-color .15s var(--ease),color .15s var(--ease)}
+.nav-head:hover .chev{background:#E9E9E7;color:#37352F}
+.nav-group.open > .nav-head .chev{transform:rotate(90deg)}
+.nav-group.coll .nav-items{margin:2px 0 8px 18px;padding-left:8px;border-left:1px solid #E3E3E0}
+.nav-group.coll .nav-items a{padding-left:8px}
+.side.searching .nav-group.coll .nav-items{margin-left:0;padding-left:0;border-left:0}
+/* the theme purple on every sidebar icon */
+.nav a .nic,.nav a.on .nic,.side-chip,.side-ic{color:var(--p)}
+.side-chip:hover,.side-chip.on,.side-ic:hover{color:var(--p-ink)}
+.side-search > .ic{color:var(--p)}
 </style>
 </head>
 <body>
@@ -1647,6 +1667,8 @@ const ICONS = {
   check: '<path d="M20 6 9 17l-5-5"/>',
   clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   pause: '<rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/>',
+  building: '<rect width="16" height="20" x="4" y="2" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/>',
+  code: '<path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/>',
   home: '<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .71-1.53l7-6a2 2 0 0 1 2.58 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
   layoutGrid: '<rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/>',
   kanban: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8 7v7"/><path d="M12 7v4"/><path d="M16 7v9"/>',
@@ -7956,7 +7978,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ay";
+const APP_VERSION = "2026-11az";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -9737,6 +9759,7 @@ const ROUTE_ICON = { dashboard: "home", overview: "layoutGrid", tasks: "checkSqu
   clients: "briefcase", contacts: "contact", activities: "activity", proposals: "fileText", targets: "target", "crm-analytics": "barChart", marketing: "megaphone",
   campaigns: "send", content: "calendarDays", seo_keywords: "search", social_stats: "share", people: "users", leave_requests: "sun", holidays: "gift",
   attendance: "clock", meetings: "video", documents: "folder", "admin-users": "shield" };
+const GROUP_ICON = { "Development & QA": "code", Communication: "message", Sales: "trendingUp", Marketing: "megaphone", Company: "building", Admin: "shield" };
 let sideQuery = "";
 function recentRoutes(){ try { return JSON.parse(localStorage.getItem("tc_recent_" + S.me.id) || "[]"); } catch (e) { return []; } }
 function rememberRecent(route){
@@ -9823,7 +9846,8 @@ function renderShell(){
     const sum = !open && (due || fresh || bang) ? h("span", { class: "cnt " + (due || bang ? "due" : "new") }, due ? String(due > 99 ? "99+" : due) : bang ? "!" : (fresh > 99 ? "99+" : fresh) + " new") : null;
     const body = h("div", { class: "nav-items", hidden: !open }, links);
     const head = h("button", { type: "button", class: "nav-head", "aria-expanded": String(open), onclick: () => { const now = body.hidden; body.hidden = !now; head.setAttribute("aria-expanded", String(now)); setNavOpen(group, now); shellKey = ""; renderShell(); } },
-      h("span", { class: "gl" }, group), h("span", { class: "chev", "aria-hidden": "true" }, ic("chevronRight", 14)), sum);
+      h("span", { class: "gic", "aria-hidden": "true" }, ic(GROUP_ICON[group] || "folder", 18)), h("span", { class: "gl" }, group), sum,
+      h("span", { class: "chev", title: open ? "Close section" : "Open section", "aria-hidden": "true" }, ic("chevronRight", 16)));
     nav.append(h("div", { class: "nav-group coll" + (open ? " open" : "") }, head, body));
   }
   nav.append(h("div", { class: "nav-group bugnav" }, h("a", { href: "#" + S.route, onclick: e => { e.preventDefault(); side.classList.remove("open"); openReportDialog(); } }, h("span", { class: "nic" }, ic("bug", 18)), h("span", { class: "nl" }, "Report a problem"))));
