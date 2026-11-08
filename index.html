@@ -1765,7 +1765,7 @@ dialog{border-radius:var(--r-xl)}
 
 /* Notion-style menus: items with a side menu show an arrow at the right edge */
 .nb-menu button .ic{color:var(--ink2);flex:none}
-.nb-menu .nb-subarrow{margin-left:auto;display:inline-grid;place-items:center;color:var(--ink3)}
+.nb-menu .nb-subarrow,.nb-menu button > .nb-subarrow{flex:none;margin-left:auto;margin-right:-2px;display:inline-grid;place-items:center;color:var(--ink3)}
 .nb-menu button.has-sub.open{background:var(--tint)}
 .nb-menu button.danger,.nb-menu button.danger .ic{color:var(--bad)}
 .nb-sub{z-index:3001}
@@ -8976,7 +8976,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11bk";
+const APP_VERSION = "2026-11bl";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
