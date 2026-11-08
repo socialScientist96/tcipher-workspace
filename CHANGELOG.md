@@ -1,5 +1,9 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11bp (8 Nov 2026): Insert below in the note block menu
+Needs: upload `index.html` and `sw.js`. No database change.
+- The six-dot block menu now has **Insert below**, with a side menu like Turn into and Color: **Image…** and **Video…** first (opens the file picker; the new picture goes under the block without replacing it), then every other block type (text, headings, page, lists, to-do, toggles, quote, callout, code, divider).
+
 ## Version 2026-11bo (8 Nov 2026): resize pictures and videos in notes
 Needs: upload `index.html` and `sw.js`. No database change.
 - **Drag to resize:** hover over a picture or video in a note page and drag the white bar on either side to make it smaller or bigger; it stays centred and shows the size while you drag. The size is saved with the note, and everyone sees it the same way. Double-click a bar to go back to full width. On phones the bars are always visible.

@@ -5941,12 +5941,12 @@ async function renderNotePage(el, id){
     blocks.splice(i + 1, 0, nb); queueSave(); if (!keepFocus) draw(i + 1, 0); return nb;
   }
   // pictures and videos: from the file picker, a paste or a drop
-  async function uploadMedia(file, at, replace){
+  async function uploadMedia(file, at, replace, below){
     const type = /^video\//.test(file.type) ? "video" : /^image\//.test(file.type) ? "image" : "";
     if (!type) { toast("Only pictures and videos can go in a note here. Other files go under Share & details › Files."); return; }
     if (file.size > NB_MEDIA_MAX[type]) { toast((type === "video" ? "Videos" : "Pictures") + " can be up to " + Math.round(NB_MEDIA_MAX[type] / 1048576) + " MB."); return; }
     const here = blocks[at];
-    if (!replace && here && here.type === "text" && !nbText(here.html).trim()) replace = true;   // an empty line becomes the picture
+    if (!replace && !below && here && here.type === "text" && !nbText(here.html).trim()) replace = true;   // an empty line becomes the picture
     let b;
     if (replace) { b = blocks[at]; Object.assign(b, { type, file: null, name: file.name, _uploading: true }); }
     else { b = { id: nbId(), type, html: "", level: (blocks[at] || {}).level || 0, name: file.name, _uploading: true }; blocks.splice(at + 1, 0, b); }
@@ -5961,9 +5961,9 @@ async function renderNotePage(el, id){
       draw(); fail(e, "Couldn’t upload it");
     }
   }
-  function pickMedia(i, type){
+  function pickMedia(i, type, below){
     const input = h("input", { type: "file", accept: type === "video" ? "video/*" : "image/*", hidden: true });
-    input.addEventListener("change", () => { const f = input.files && input.files[0]; input.remove(); if (f) uploadMedia(f, i, !nbText(blocks[i].html).trim() && !nbMedia(blocks[i].type)); });
+    input.addEventListener("change", () => { const f = input.files && input.files[0]; input.remove(); if (f) uploadMedia(f, i, !below && !nbText(blocks[i].html).trim() && !nbMedia(blocks[i].type), below); });
     document.body.append(input); input.click();
   }
   // drop pictures or videos anywhere on the page
@@ -6068,6 +6068,9 @@ async function renderNotePage(el, id){
     nbMenu(anchor, [
       [h("span", {}, ic("refresh", 16), "Turn into"), null, { sub: () => NB_TYPES.map(([t, l, g]) => [h("span", {}, h("span", { class: "nb-glyph" }, g), l, b.type === t ? h("span", { class: "nb-tick" }, "✓") : null), () => turnInto(i, t)]), subHeading: "Turn into" }],
       [h("span", {}, ic("palette", 16), "Color"), null, { sub: () => NB_COLORS.map(([c, l]) => [h("span", {}, h("span", { class: "nb-swatch c-" + (c || "none") }, "A"), l, (b.color || "") === c ? h("span", { class: "nb-tick" }, "✓") : null), () => { b.color = c; queueSave(); draw(); }]), subHeading: "Color" }],
+      // add a new block under this one: a picture, a video or any other kind
+      [h("span", {}, ic("plus", 16), "Insert below"), null, { sub: () => ["image", "video"].concat(NB_TYPES.map(t => t[0]).filter(t => !nbMedia(t))).map(t => { const [, l, g] = NB_TYPES.find(x => x[0] === t);
+        return [h("span", {}, h("span", { class: "nb-glyph" }, g), nbMedia(t) ? l + "…" : l), () => { if (nbMedia(t)) { pickMedia(i, t, true); return; } insertAfter(i, { type: "text", level: b.level || 0 }, true); turnInto(i + 1, t); }]; }), subHeading: "Insert below" }],
       [h("span", {}, ic("copy", 16), "Duplicate"), () => { blocks.splice(i + 1, 0, Object.assign({}, b, { id: nbId() })); queueSave(); draw(i + 1, "end"); }],
       [h("span", {}, ic("arrowUp", 16), "Move up"), () => { if (i > 0) moveBlock(i, i - 1); }],
       [h("span", {}, ic("arrowDown", 16), "Move down"), () => { if (i < blocks.length - 1) moveBlock(i, i + 1); }],
@@ -9107,7 +9110,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11bo";
+const APP_VERSION = "2026-11bp";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
