@@ -1,5 +1,13 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11ay (8 Nov 2026): easier to read
+Needs: upload `index.html` and `sw.js`.
+- **Body text is 15px** (was 14) with roomier line spacing; tables, chat messages, comments and descriptions follow.
+- **Nothing below 13px:** hints, dates, meta lines, labels and small notes are lifted to 13–14px.
+- **Bigger headings:** page titles 26–32px, panel titles 17px, pop-up titles 21px, task titles 26px, key figures 26px.
+- Sidebar links and section names 15px.
+- **Chat on phones with the keyboard open:** the chat pins itself to the visible part of the screen, so the header stays at the top and the message box sits just above the keyboard; the bottom bar steps aside while you type. Android also resizes the page for the keyboard now (`interactive-widget=resizes-content`).
+
 ## Version 2026-11ax (8 Nov 2026): Poppins and Roboto
 Needs: upload `index.html` and `sw.js`.
 - **Poppins** is the main font (titles, headings, menu, buttons, labels, key figures) and **Roboto** the second (body text, tables, chat, notes, fields), replacing Montserrat and Lora. Task IDs and counts keep the fixed-width font.
