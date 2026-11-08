@@ -1,5 +1,12 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11bd (8 Nov 2026): the whole site on one design system (Unslop)
+Needs: upload `index.html` and `sw.js`.
+- **One type scale everywhere:** 12.5 (IDs, counts), 13 (captions, labels), 14 (buttons, menu, secondary text), 15 (reading text), 16 (panel titles, notes), 20 (dialog titles), 26 (key figures), 28 (page titles), 36 (note titles). Poppins for headings, menu and buttons; Roboto for text. Sizes are now exactly what's set (no per-font scaling), and small text set inside pages can't fall below the scale.
+- **One spacing grid (4px), three corner sizes (8 / 12 / 16), one accent** (Tcipher purple), quiet neutral surfaces, no hover lift.
+- **Layout:** stat numbers fill one row instead of leaving an orphan card; side-by-side panels no longer stretch to each other's height; "+ New …" buttons use the line-icon plus.
+- All design values now live in one block at the end of the stylesheet ("DESIGN SYSTEM").
+
 ## Version 2026-11bc (8 Nov 2026): notes as pages, like Notion
 Needs: run `upgrade-2026-11bc.sql` (until then notes still save their text, and the page says formatting is kept for that visit only); upload `index.html` and `sw.js`.
 - **Every note opens as a full page you write in directly**: a big title, then blocks. Saves by itself as you type ("Saving… / Saved", or "Saved on this device" on a bad connection).

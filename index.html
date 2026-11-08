@@ -1638,6 +1638,113 @@ th{font-size:13px}
   .t-h1 .nb-text,.t-th1 .nb-text{font-size:26px}.t-h2 .nb-text,.t-th2 .nb-text{font-size:22px}
 }
 @media (pointer:coarse){ .nb-handle{width:36px;height:36px} .nb-tog{width:36px;height:36px} .nb-menu button{min-height:44px} }
+
+/* =====================================================================
+   DESIGN SYSTEM (2026-11bd) — the whole site redone with Unslop, in one place.
+   Everything below wins over the earlier layers. Change the look here, not above.
+   Direction: an internal workspace for Tcipher's development, sales and marketing team.
+   Character: calm, exact, a little warm. World: a well-kept notebook and a clear task board.
+   Moments: the Board and the notes pages carry the colour; the chrome stays quiet.
+   Signature: task IDs as small mono keycaps. Accent: Tcipher purple, used sparingly.
+   Method after "unslop" by Damir Sokolovsky (@heydamir), CC BY 4.0.
+   ===================================================================== */
+:root{
+  /* one type scale — every size on the site is one of these */
+  --fs-meta:12.5px;   /* mono IDs, counts, timestamps */
+  --fs-sm:13px;       /* captions, hints, pills, table heads */
+  --fs-ui:14px;       /* buttons, menu, labels, secondary text */
+  --fs-body:15px;     /* reading text (Roboto) */
+  --fs-lg:16px;       /* panel titles, notes text */
+  --fs-xl:20px;       /* dialog titles, note heading 3 */
+  --fs-2xl:26px;      /* key figures, note heading 2 */
+  --fs-page:28px;     /* page titles */
+  --fs-hero:36px;     /* note title */
+  /* 4px spacing grid */
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:20px; --s6:24px; --s8:32px; --s10:40px;
+  /* three corner sizes */
+  --r-sm:6px; --r-md:8px; --r-lg:12px; --r-xl:16px;
+  --adj-main:none; --adj-text:none;   /* sizes are exact: no per-font scaling */
+}
+*{font-size-adjust:none}
+body{font-size:var(--fs-body);line-height:1.55}
+
+/* ---- type roles ---- */
+.ph h1,.hello h1{font-size:var(--fs-page);font-weight:600;letter-spacing:-.015em;line-height:1.2;margin:0}
+.ph p,.hello p{font-size:var(--fs-body);color:var(--ink2);margin-top:var(--s1)}
+.panel h2,.ws-head h2{font-size:var(--fs-lg);font-weight:600;letter-spacing:0}
+.dh h2{font-size:var(--fs-xl);font-weight:600}
+.section h3,.dv-sect b,.ws-body .ws-h{font-size:var(--fs-body);font-weight:600}
+.stat .v{font-family:var(--font-main);font-size:var(--fs-2xl);font-weight:500;letter-spacing:-.01em;line-height:1.15}
+.stat .l{font-family:var(--font-text);font-size:var(--fs-sm);color:var(--ink3);font-weight:400;margin-top:var(--s1)}
+.btn{font-size:var(--fs-ui);font-weight:500}
+.btn.sm,.seg button,.dv-chip,.dv-tabs button{font-size:var(--fs-sm)}
+.fl{font-size:var(--fs-sm);font-weight:500;color:var(--ink2)}
+.fl .hint,.hint,.muted{font-size:inherit}
+.fl .hint{font-size:var(--fs-sm);font-weight:400}
+.in,input,select,textarea{font-size:var(--fs-body)}
+table{font-size:var(--fs-ui)} th{font-size:var(--fs-sm);font-weight:500} td{font-size:var(--fs-ui)}
+.pill,.dv-loz,.dv-step,.dv-qa,.dv-needqa{font-size:12.5px;font-weight:500}
+.tkey,.dv-key,.code,.cnt,.side-kbd,.cal-day .dn,.dv-counts span,.dv-pts,.ws-time,.iconbtn .dot{font-family:var(--mono);font-size:var(--fs-meta)}
+.row,.load-row,.chat-item .x,.nitem b,.related .ri,.file,.frow,.hbar{font-size:var(--fs-ui)}
+.row .y,.hist .y,.nitem span,.lastact,.viaemail,.card .m,.dv-parent,.dv-due,.dv-sub,.dv-note,.dv-stamp,.post .meta,.legend,.dv-legend,.cmt .bd .hd,.chat-msgs .bmeta,.chat-msgs .bname,.ev,.tev,.cal-head div,.nothing,.empty{font-size:var(--fs-sm)}
+.card .t,.dv-title{font-size:var(--fs-ui);font-weight:500;line-height:1.4}
+.cmt .bd p,.post .body,.dv-desc,.ro,.chat-msgs .bub,.note-card .nb{font-size:var(--fs-body)}
+.note-card .nt,.pcard b,.post h3{font-size:var(--fs-lg);font-weight:600}
+.empty b{font-size:var(--fs-body);font-weight:500}
+.toast{font-size:var(--fs-ui)}
+/* sidebar */
+.nav a,.nav-tree-item,.side-chip{font-size:var(--fs-ui)}
+.nav-head{font-size:var(--fs-ui);font-weight:600}
+.nav-group h4{font-size:12px;font-weight:500}
+.side-search-in{font-size:var(--fs-ui)}
+.side .foot .who b{font-size:var(--fs-ui)}
+.side .foot .who span,.mystatus{font-size:12px}
+.topbar .crumb{font-size:var(--fs-ui)}
+/* notes pages */
+.nb-title{font-size:var(--fs-hero);font-weight:600}
+.nb-text{font-size:var(--fs-lg)}
+.t-h1 .nb-text,.t-th1 .nb-text{font-size:28px}
+.t-h2 .nb-text,.t-th2 .nb-text{font-size:22px}
+.t-h3 .nb-text,.t-th3 .nb-text{font-size:var(--fs-xl)}
+.t-h4 .nb-text{font-size:17px}
+.t-code .nb-text{font-size:var(--fs-ui)}
+.nb-meta,.nb-status,.nb-crumbs{font-size:var(--fs-sm)}
+.nb-menu button{font-size:var(--fs-ui)}
+/* small text set directly in the code: never below the scale */
+.content [style*="font-size: 10"],.content [style*="font-size: 11"],.content [style*="font-size: 12"],dialog [style*="font-size: 10"],dialog [style*="font-size: 11"],dialog [style*="font-size: 12"]{font-size:var(--fs-sm)!important}
+.content [style*="font-size: 13"],dialog [style*="font-size: 13"]{font-size:var(--fs-sm)!important}
+.content [style*="font-size: 14"],dialog [style*="font-size: 14"]{font-size:var(--fs-ui)!important}
+
+/* ---- spacing and surfaces ---- */
+.content{padding:var(--s6) clamp(16px,3vw,var(--s8)) 64px}
+.ph{margin-bottom:var(--s6);gap:var(--s4)}
+.panel{padding:var(--s5);border-radius:var(--r-lg);border-color:var(--line)}
+.panel h2{margin:0 0 var(--s3)}
+.grid,.stats{gap:var(--s4)}
+.stats{grid-template-columns:repeat(auto-fit,minmax(130px,1fr));margin-bottom:var(--s6)}
+.stat{padding:var(--s4);border-radius:var(--r-lg)}
+.tb{gap:var(--s2);margin-bottom:var(--s4)}
+.btn,.in{border-radius:var(--r-md)}
+.btn .ic{width:16px;height:16px}
+.pill,.tkey,.dv-loz{border-radius:var(--r-sm)}
+.card,.dv-card,.note-card,.pcard,.post,.tablewrap,.cal,.chat{border-radius:var(--r-lg)}
+dialog{border-radius:var(--r-xl)}
+.g-dash,.g2,.g3,.grid{align-items:start}
+/* hover is a quiet surface change, never a lift */
+.card:hover,.pcard:hover,button.stat:hover,.note-card:hover,.dv-card:hover{transform:none}
+
+/* ---- the phone sizes of the same scale ---- */
+@media (max-width:640px){
+  .ph h1,.hello h1{font-size:24px}
+  .stat .v{font-size:22px}
+  .nb-title{font-size:30px}
+  .t-h1 .nb-text,.t-th1 .nb-text{font-size:24px}
+  .t-h2 .nb-text,.t-th2 .nb-text{font-size:20px}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (pointer:coarse){ .in,input,select,textarea,.side-search-in{font-size:16px} }
+.nav a .cnt,.nav-head .cnt,.chat-item .cnt,.panel .cnt,.side-chip .cnt{font-size:12px}
+.linkbtn{font-size:var(--fs-sm)}
 </style>
 </head>
 <body>
@@ -1815,6 +1922,7 @@ const ICONS = {
   squarePen: '<path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.38 2.62a1 1 0 0 1 3 3l-9.01 9.02a2 2 0 0 1-.86.5l-2.87.84a.5.5 0 0 1-.62-.62l.84-2.87a2 2 0 0 1 .5-.86z"/>',
   chevronRight: '<path d="m9 18 6-6-6-6"/>',
   calendarDays: '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/>',
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
   checkSquare: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/>'
 };
 function ic(name, size){
@@ -1913,6 +2021,8 @@ function h(tag, attrs, ...kids){
     if (kid == null || kid === false) continue;
     el.append(kid.nodeType ? kid : String(kid));
   }
+  // "+ New task" style buttons: the plus comes from the icon set, not a typed "+"
+  if (tag === "button" && el.firstChild && el.firstChild.nodeType === 3 && /^\+\s/.test(el.firstChild.textContent)) { el.firstChild.textContent = el.firstChild.textContent.replace(/^\+\s+/, ""); el.prepend(ic("plus", 16)); }
   // a phone, SMS or email link inside a clickable row or card opens the phone or mail app, not the row as well
   if (tag === "a" && /^(tel|sms|mailto):/i.test(el.getAttribute("href") || "")) el.addEventListener("click", e => e.stopPropagation());
   // pictures load when they come into view and never hold up the page
@@ -8608,7 +8718,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11bc";
+const APP_VERSION = "2026-11bd";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
