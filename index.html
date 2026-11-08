@@ -1745,6 +1745,21 @@ dialog{border-radius:var(--r-xl)}
 @media (pointer:coarse){ .in,input,select,textarea,.side-search-in{font-size:16px} }
 .nav a .cnt,.nav-head .cnt,.chat-item .cnt,.panel .cnt,.side-chip .cnt{font-size:12px}
 .linkbtn{font-size:var(--fs-sm)}
+
+/* Claude helpers */
+.ai-row{display:flex;gap:var(--s2);flex-wrap:wrap}
+.ai-note{font-size:var(--fs-sm)}
+.ai-eng{display:flex;flex-direction:column;gap:var(--s2)}
+.ai-eng-head{display:grid;grid-template-columns:1fr 1fr;gap:var(--s3);font-size:var(--fs-sm);color:var(--ink2)}
+.ai-eng-row{display:grid;grid-template-columns:1fr 1fr;gap:var(--s3);align-items:start;padding:var(--s2) 0;border-top:1px solid var(--line)}
+.ai-eng-row > .pill{grid-column:1 / -1;justify-self:start}
+.ai-cell{font-size:var(--fs-body);line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.ai-eng-row .ai-cell:first-of-type{color:var(--ink2)}
+.ai-dash .ic,.ai-row .ic{color:var(--p)}
+.hello > .ai-dash{align-self:center}
+.toast-undo{background:none;border:0;color:#C9C3FB;font:inherit;font-weight:600;cursor:pointer;padding:0 0 0 8px;text-decoration:underline}
+.toast:has(.toast-undo){pointer-events:auto}
+@media (max-width:640px){ .ai-eng-head,.ai-eng-row{grid-template-columns:1fr} .ai-eng-head b:first-child{display:none} }
 </style>
 </head>
 <body>
@@ -1923,6 +1938,8 @@ const ICONS = {
   chevronRight: '<path d="m9 18 6-6-6-6"/>',
   calendarDays: '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/>',
   plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  sparkle: '<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/>',
+  languages: '<path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>',
   checkSquare: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/>'
 };
 function ic(name, size){
@@ -2840,6 +2857,8 @@ const MOD = {
       if (isTaskHandler(rec.vertical)) out.push(h("button", { type: "button", class: "btn sm " + (rec.archived ? "soft" : "danger"), onclick: () => archiveTask(rec, !rec.archived) }, rec.archived ? "Restore" : "Archive"));
       out.push(h("button", { type: "button", class: "btn sm", onclick: () => copyText(taskKey(rec) + " " + rec.title, "Copied") }, "Copy ID"));
       if (access(MOD.tasks).canCreate) out.push(h("button", { type: "button", class: "btn sm", onclick: () => duplicateTask(rec) }, "Duplicate"));
+      out.push(h("button", { type: "button", class: "btn sm", onclick: () => taskSummary(rec) }, ic("sparkle", 16), "Summarize"));
+      if (access(MOD.tasks, rec).canEdit) out.push(h("button", { type: "button", class: "btn sm", onclick: () => taskEnglish(rec) }, ic("languages", 16), "Convert to English"));
       return out;
     },
     detail: (rec, box) => {
@@ -5556,10 +5575,21 @@ async function renderNotePage(el, id){
   const chain = []; for (let p = note.parent_id && byId("notes", note.parent_id), k = 0; p && k < 8; p = p.parent_id && byId("notes", p.parent_id), k++) chain.unshift(p);
   const status = h("span", { class: "nb-status muted" });
   const exportBtn = h("button", { type: "button", class: "btn sm", "aria-haspopup": "menu", onclick: e => { e.stopPropagation(); nbMenu(exportBtn, [["pdf", "PDF"], ["html", "HTML"], ["md", "Markdown & CSV"], ["word", "Word file"]].map(([k, l]) => [l, () => nbExport(k, Object.assign({}, note, { title }), blocks)]), "Export as"); } }, ic("share", 15), "Export");
+  const engBtn = editable ? h("button", { type: "button", class: "btn sm", title: "Rewrite this note in proper English", onclick: async () => {
+    if (state.dirty) { clearTimeout(state.saveT); await save(); }
+    const pieces = blocks.filter(b => b.html && !["page", "divider", "code"].includes(b.type)).map(b => ({ id: b.id, html: b.html }));
+    englishFlow(title, pieces, async (newTitle, newPieces) => {
+      const snap = { title, blocks: JSON.parse(JSON.stringify(blocks)) };
+      title = newTitle; titleEl.textContent = title;
+      for (const b of blocks) if (newPieces.has(String(b.id))) b.html = newPieces.get(String(b.id));
+      state.dirty = true; await save(); draw();
+      toastUndo("Note converted to English.", async () => { title = snap.title; titleEl.textContent = title; blocks = snap.blocks; state.dirty = true; await save(); draw(); });
+    });
+  } }, ic("languages", 15), "English") : null;
   el.append(h("div", { class: "nb-top" },
     h("nav", { class: "nb-crumbs", "aria-label": "Where this note is" }, h("a", { href: "#notes" }, "Notes"), chain.map(p => [h("span", { class: "nb-sep" }, "/"), h("a", { href: "#note=" + p.id }, p.title || "Untitled")]), h("span", { class: "nb-sep" }, "/"), h("span", {}, title || "Untitled")),
     h("span", { class: "grow" }), status,
-    h("button", { type: "button", class: "btn sm", onclick: () => openRecord("notes", note.id, null, { form: true }) }, ic("users", 15), editable ? "Share & details" : "Details"), exportBtn));
+    engBtn, h("button", { type: "button", class: "btn sm", onclick: () => openRecord("notes", note.id, null, { form: true }) }, ic("users", 15), editable ? "Share & details" : "Details"), exportBtn));
   if (!rich && editable) el.append(h("div", { class: "panel nb-warn" }, "Headings, lists and toggles are kept for this visit only until ", h("b", {}, "upgrade-2026-11bc.sql"), " has been run in Supabase. The text itself is saved."));
 
   const titleEl = h("h1", { class: "nb-title", contenteditable: editable ? "true" : "false", "data-placeholder": "Untitled", spellcheck: "true" }, title);
@@ -8718,7 +8748,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11bd";
+const APP_VERSION = "2026-11be";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -10014,7 +10044,7 @@ function drawDevTask(id){
   const left = h("div", { class: "dv-left" }, devNotes(t),
     h("div", { class: "dv-sec dv-files" }, filesSection("tasks", t.id, A.canEdit || A.L >= 1 || isOwner(t) || t.tester_id === S.me.id)),
     devActivity(t));
-  const right = h("div", { class: "dv-right" }, flowBox(t), devPeople(t),
+  const right = h("div", { class: "dv-right" }, aiTaskButtons(t, devCanEdit(t, "title")), flowBox(t), devPeople(t),
     h("div", { class: "dv-stamp" }, h("span", {}, "Created " + fmtAgo(t.created_at) + (t.created_by ? " by " + pname(t.created_by) : "")), t.updated_at ? h("span", {}, "Updated " + fmtAgo(t.updated_at)) : null,
       isAdmin() ? h("button", { type: "button", class: "linkbtn", id: "devMore", onclick: () => openRecord("tasks", t.id, null, { form: true }) }, "All fields (admin)") : null));
   openDialog("", [devTitle(t), h("div", { class: "dv-view" }, left, right)], null);
@@ -10162,6 +10192,102 @@ function workMd(text){
     list = null; out.push(h("p", { class: "ws-p" }, inline(line)));
   }
   return out;
+}
+/* ---------------------------------------------------------------------
+   Claude helpers (server function "ai-assist"): Convert to English, and Summarize for tasks and dashboards.
+   Only what's on your screen is sent. Nothing changes until you press Replace.
+   --------------------------------------------------------------------- */
+async function callAI(body){
+  const { data, error } = await sb.functions.invoke("ai-assist", { body });
+  if (error){
+    let msg = error.message || "Request failed";
+    try { const j = await error.context.json(); if (j && j.error) msg = j.error; } catch (e) {}
+    if (/Failed to send|not found|404|FunctionsFetchError|Failed to fetch/i.test(msg)) msg = "Claude isn’t set up yet: the “ai-assist” function needs to be deployed in Supabase.";
+    throw new Error(msg);
+  }
+  if (data && data.error) throw new Error(data.error);
+  return data;
+}
+// a summary in its own window; the window opens at once and fills in when Claude answers
+async function showAISummary(kind, title, text){
+  const body = h("div", { class: "ws-body ai-sum" }, h("div", { class: "loading" }, h("span", { class: "spinner" }), "Claude is reading it…"));
+  const keepDlg = S.dlg;   // a task's summary goes back to the task after
+  openDialog("Summary" + (title ? " · " + title : ""), [body], [h("span", { class: "muted ai-note" }, "Written by Claude from what’s on this screen. Check anything important."), h("span", { class: "sp" }),
+    h("button", { type: "button", class: "btn", onclick: () => { closeDlg(); if (keepDlg && keepDlg.tbl === "tasks") openRecord("tasks", keepDlg.id); } }, "Close")], true);
+  try { const r = await callAI({ action: "summarize", kind, title, text: text.slice(0, 60000) }); body.replaceChildren(...workMd(r.summary)); }
+  catch (e) { body.replaceChildren(h("p", { class: "err" }, String(e.message || e))); }
+}
+// side by side: what's there now, and Claude's English; Replace saves it
+async function englishFlow(title, pieces, apply){
+  const box = h("div", { class: "ai-eng" }, h("div", { class: "loading" }, h("span", { class: "spinner" }), "Converting to English…"));
+  const replaceBtn = h("button", { type: "button", class: "btn pri", disabled: true }, "Replace with English");
+  openDialog("Convert to English", [box], [h("span", { class: "sp" }), h("button", { type: "button", class: "btn", onclick: closeDlg }, "Cancel"), replaceBtn]);
+  let r;
+  try { r = await callAI({ action: "english", title, pieces }); }
+  catch (e) { box.replaceChildren(h("p", { class: "err" }, String(e.message || e))); return; }
+  const byPid = new Map((r.pieces || []).map(p => [String(p.id), p.html]));
+  const rowsOut = [];
+  if (title && r.title && r.title.trim() !== title.trim()) rowsOut.push(["Title", nbEsc(title), nbEsc(r.title)]);
+  for (const p of pieces) { const en = byPid.get(String(p.id)); if (en != null && nbText(en).trim() !== nbText(p.html).trim()) rowsOut.push(["", p.html, nbClean(en)]); }
+  if (!rowsOut.length) { box.replaceChildren(h("p", {}, "This is already in English. Nothing to change.")); return; }
+  const cell = html => { const d = h("div", { class: "ai-cell" }); d.innerHTML = nbClean(html) || "&nbsp;"; return d; };
+  box.replaceChildren(h("div", { class: "ai-eng-head" }, h("b", {}, "Now"), h("b", {}, "In English")),
+    ...rowsOut.map(([label, a, b]) => h("div", { class: "ai-eng-row" }, label ? h("span", { class: "pill" }, label) : null, cell(a), cell(b))));
+  replaceBtn.disabled = false;
+  replaceBtn.addEventListener("click", async () => {
+    replaceBtn.disabled = true;
+    const newPieces = new Map(); for (const p of pieces) { const en = byPid.get(String(p.id)); if (en != null) newPieces.set(String(p.id), nbClean(en)); }
+    try { await apply(r.title && r.title.trim() ? r.title.trim() : title, newPieces); closeDlg(); }
+    catch (e) { replaceBtn.disabled = false; fail(e, "Couldn’t save the English version"); }
+  });
+}
+// a task: English for the title and the description; the summary reads its details, comments and history
+const htmlLines = t => nbEsc(String(t || "")).replace(/\n/g, "<br>");
+const linesHtml = h2 => nbText(String(h2 || "").replace(/<br>/g, "\n"));
+function taskEnglish(t){
+  englishFlow(t.title || "", t.description ? [{ id: "description", html: htmlLines(t.description) }] : [], async (title, pieces) => {
+    const before = { title: t.title, description: t.description };
+    const patch = { title };
+    if (pieces.has("description")) patch.description = linesHtml(pieces.get("description"));
+    await updateRow("tasks", t.id, patch);
+    toastUndo("Task converted to English.", async () => { await updateRow("tasks", t.id, before); rerender(); });
+    rerender(); openRecord("tasks", t.id);
+  });
+}
+async function taskSummary(t){
+  let events = [], cm = [];
+  try { events = ok(await sb.from("task_events").select("field,old_value,new_value,at,actor_id").eq("task_id", t.id).order("at").limit(300)) || []; } catch (e) {}
+  try { cm = ok(await sb.from("comments").select("body,created_at,author_id").eq("tbl", "tasks").eq("entity_id", t.id).order("created_at").limit(300)) || []; } catch (e) {}
+  const lines = [taskKey(t) + " " + t.title, "Status: " + t.status + (t.priority ? " · Priority: " + t.priority : "") + (t.due_date ? " · Due: " + t.due_date : "") + (t.blocked ? " · Blocked: " + (t.blocked_reason || "yes") : ""),
+    "Owner: " + (pname(t.assignee_id) || "nobody") + ((t.collaborators || []).length ? " · Helping: " + t.collaborators.map(pname).join(", ") : "") + (t.reviewer_id ? " · Reviewer: " + pname(t.reviewer_id) : ""),
+    t.description ? "Description:\n" + t.description : "",
+    events.length ? "History:\n" + events.map(e => String(e.at).slice(0, 16).replace("T", " ") + " " + (pname(e.actor_id) || "someone") + " changed " + e.field + ": " + (e.old_value || "–") + " → " + (e.new_value || "–")).join("\n") : "",
+    cm.length ? "Comments:\n" + cm.map(c => String(c.created_at).slice(0, 16).replace("T", " ") + " " + (pname(c.author_id) || "someone") + ": " + c.body).join("\n") : ""].filter(Boolean).join("\n\n");
+  showAISummary("task", taskKey(t), lines);
+}
+function aiTaskButtons(t, canEdit){
+  return h("div", { class: "ai-row" },
+    h("button", { type: "button", class: "btn sm", onclick: () => taskSummary(t) }, ic("sparkle", 16), "Summarize"),
+    canEdit ? h("button", { type: "button", class: "btn sm", title: "Rewrite the title and description in proper English", onclick: () => taskEnglish(t) }, ic("languages", 16), "Convert to English") : null);
+}
+// a toast with Undo
+function toastUndo(msg, undo){
+  const t = $("toast"); t.replaceChildren(msg, " ", h("button", { type: "button", class: "toast-undo", onclick: async () => { t.classList.remove("show"); try { await undo(); toast("Restored."); } catch (e) { fail(e, "Couldn’t undo"); } } }, "Undo"));
+  t.classList.add("show"); clearTimeout(toastUndo.t); toastUndo.t = setTimeout(() => t.classList.remove("show"), 8000);
+}
+// dashboards: one button that reads what's on the page
+const AI_DASH = { dashboard: "Home", overview: "Company overview", sales: "Sales dashboard", marketing: "Marketing dashboard", "dev-board": "Development & QA board", "crm-analytics": "Analytics", tasks: "Tasks" };
+function addDashSummary(page, route){
+  if (!AI_DASH[route]) return;
+  const btn = h("button", { type: "button", class: "btn ai-dash", onclick: () => {
+    const c = $("content"); const text = (c.innerText || "").replace(/\n{3,}/g, "\n\n").trim();
+    showAISummary("dashboard", AI_DASH[route], text);
+  } }, ic("sparkle", 16), "Summarize");
+  const acts = page.querySelector(".ph .acts, .dv-top .grow + *, .dv-top");
+  const ph = page.querySelector(".ph, .hello, .dv-top");
+  if (ph && ph.classList.contains("ph")) { let a = ph.querySelector(".acts"); if (!a) { a = h("div", { class: "acts" }); ph.append(a); } a.prepend(btn); }
+  else if (ph) ph.append(btn);
+  else page.prepend(h("div", { class: "ai-dash-row" }, btn));
 }
 async function renderAdminWork(el){
   adminHeader(el, "Work summary", "Everything one person worked on in a day, a week or a month: Claude’s summary at the top, every detail underneath.");
@@ -10777,6 +10903,7 @@ async function rerender(){
   }
   if (seq !== renderSeq) { if (page._chatEls) page._chatEls.pending = false; if (route === "chat" && typeof visibleChat === "function") visibleChat(); return; }   // a newer draft won: follow the one on screen
   clearTimeout(loadingT);
+  try { if (canSee(route)) addDashSummary(page, route); } catch (e) {}   // the Summarize button on dashboards
   el.replaceChildren(page);
   if (route === "chat" && page._chatEls) { page._chatEls.pending = false; chatEls = page._chatEls; }
   if (lastRoute === route) window.scrollTo(0, sy);

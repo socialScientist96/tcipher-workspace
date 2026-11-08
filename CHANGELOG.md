@@ -1,5 +1,11 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11be (8 Nov 2026): Claude helpers — Convert to English and Summarize
+Needs: deploy `ai-assist-function.ts` as Edge Function **ai-assist**; the secret **ANTHROPIC_API_KEY** (same one as the work summary); upload `index.html` and `sw.js`.
+- **Convert to English** on tasks (title and description; in the Development task view and the full task form) and on notes (title and every block). Claude rewrites Hindi, Hinglish ("ride booked ki 3 notification ayi…") or rough English as clear, proper English, keeping names, task IDs, numbers, links and formatting. You see **Now / In English side by side**; nothing changes until **Replace**, and an **Undo** follows. Chat messages are left alone.
+- **Summarize** on any task (its details, history and comments) and on Home, Company overview, Tasks, the Sales and Marketing dashboards, Analytics and the Development board (what's on the screen). Opens in a window; only what you can already see is sent.
+- Uses claude-opus-5-5 with server-side fallback (a declined request is retried on another model in the same call).
+
 ## Version 2026-11bd (8 Nov 2026): the whole site on one design system (Unslop)
 Needs: upload `index.html` and `sw.js`.
 - **One type scale everywhere:** 12.5 (IDs, counts), 13 (captions, labels), 14 (buttons, menu, secondary text), 15 (reading text), 16 (panel titles, notes), 20 (dialog titles), 26 (key figures), 28 (page titles), 36 (note titles). Poppins for headings, menu and buttons; Roboto for text. Sizes are now exactly what's set (no per-font scaling), and small text set inside pages can't fall below the scale.
