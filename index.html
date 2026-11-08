@@ -3924,7 +3924,7 @@ async function openRecord(key, id, preset, opts){
   openDialog(title.length > 70 ? title.slice(0, 70) + "…" : title, body, foot);
   // a note opens here first; Expand opens it as a full page (headings, toggles, sub-pages, export)
   if (key === "notes" && rec) { const db = dlg().querySelector(".db"); if (db) db.prepend(noteRequestsBar(rec)); }
-  if (key === "notes" && rec) { const dh = dlg().querySelector(".dh"); if (dh) dh.insertBefore(h("button", { type: "button", class: "btn sm nb-expand", title: "Open as a full page", onclick: () => { closeDlg(); go("note=" + rec.id); } }, ic("expand", 16), "Expand"), dh.lastChild); }
+  if (key === "notes" && rec) { const dh = dlg().querySelector(".dh"); if (dh) dh.insertBefore(h("button", { type: "button", class: "btn sm nb-expand", title: "Open as a full page", onclick: () => { closeDlg(); go("note=" + rec.id); } }, ic("expand", 16), "Open Detailed Editor"), dh.lastChild); }
   S.dlg = rec ? { tbl: M.table, id: rec.id } : null;
   const first = form.querySelector("input:not([type=checkbox]),textarea,select");
   if (!rec && first) setTimeout(() => first.focus(), 30);
@@ -5471,7 +5471,7 @@ function notesBoard(el, A){
     for (const card of grid.querySelectorAll(".note-card[data-id]")){
       const n = byId("notes", card.dataset.id); if (!n || n.owner_id !== S.me.id) continue;
       const more = h("button", { type: "button", class: "iconbtn note-more", "aria-label": "More actions for " + (n.title || "Untitled"), onclick: e => { e.stopPropagation(); nbMenu(more, [
-        [h("span", {}, ic("expand", 16), "Open as page"), () => go("note=" + n.id)],
+        [h("span", {}, ic("expand", 16), "Open Detailed Editor"), () => go("note=" + n.id)],
         [h("span", {}, ic("archive2", 16), n.archived ? "Restore" : "Archive"), async () => {
           if (!("archived" in n)) { toast("Archiving needs upgrade-2026-11bf.sql to be run in Supabase first."); return; }
           try { await updateRow("notes", n.id, { archived: !n.archived, archived_at: n.archived ? null : new Date().toISOString() }); draw(); renderShellNotes();
