@@ -1,5 +1,11 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11bh (8 Nov 2026): Back on note pages; archive and delete from lists; Archived filters
+Needs: upload `index.html` and `sw.js` (Archive on notes needs `upgrade-2026-11bf.sql`).
+- **Back** button at the top left of a full-page note: returns to where you came from, or to the parent page / Notes.
+- **Notes list:** each of your note cards has a ••• menu: Open as page, **Archive** / Restore (with Undo), **Delete** (asks first; sub-pages go with it). Card previews show the words without the #, - and 1. markers.
+- **Archived filters everywhere you can archive:** Notes › Archived, Tasks › Archived (as before), and a new **Archived** switch on the Development board (shows all archived work, however long ago it was done).
+
 ## Version 2026-11bg (8 Nov 2026): notes open as a popup first; one menu style everywhere
 Needs: upload `index.html` and `sw.js`.
 - **Notes open as the popup again**, with everything it had (title, text, who can see it, pin, sharing, links, comments, files). **Expand** in the popup opens the full Notion-style page. The sidebar's Notes list still opens pages directly. Editing the text in the popup updates the page's blocks too.

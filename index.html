@@ -1779,6 +1779,16 @@ dialog{border-radius:var(--r-xl)}
 
 .nb-expand{margin-left:auto;margin-right:var(--s2)}
 .dh .nb-expand + .iconbtn{margin-left:0}
+
+.nb-back{padding-left:var(--s2)}
+@media (max-width:760px){ .nb-top .nb-crumbs{flex-basis:100%;order:9} }
+
+.note-wrap{position:relative;display:flex}
+.note-wrap > .note-card{flex:1;min-width:0}
+.note-more{position:absolute;top:8px;right:8px;width:32px;height:32px;border-color:transparent;background:transparent;opacity:.6}
+.note-wrap:hover .note-more,.note-more:focus-visible{opacity:1;background:var(--white);border-color:var(--line)}
+.note-card .nt{padding-right:32px}
+@media (pointer:coarse){ .note-more{opacity:1;width:40px;height:40px} }
 </style>
 </head>
 <body>
@@ -1966,6 +1976,7 @@ const ICONS = {
   archive2: '<rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
   more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
   expand: '<path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/>',
+  chevronLeft: '<path d="m15 18-6-6 6-6"/>',
   checkSquare: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/>'
 };
 function ic(name, size){
@@ -5410,14 +5421,35 @@ function notesBoard(el, A){
     if (!list.length) grid.append(h("div", { class: "panel empty", style: "grid-column:1 / -1" }, h("b", {}, u.scope === "shared" ? "Nothing shared with you yet" : "No notes yet"), "Jot down ideas, meeting prep, specs or to-dos. Notes are private unless you share them."));
     for (const n of list){
       const t = byId("tasks", n.task_id), pr = byId("projects", n.project_id), mt = byId("meetings", n.meeting_id);
-      grid.append(h("button", { type: "button", class: "note-card" + (n.pinned && n.owner_id === S.me.id ? " pinned" : ""), onclick: () => openRecord("notes", n.id) },
+      grid.append(h("button", { type: "button", class: "note-card" + (n.pinned && n.owner_id === S.me.id ? " pinned" : ""), "data-id": n.id, onclick: () => openRecord("notes", n.id) },
         h("div", { class: "nt" }, n.pinned && n.owner_id === S.me.id ? ic("pin", 14) : "", n.title || "Untitled"),
-        h("div", { class: "nb" }, renderRich(String(n.body || "").slice(0, 260) + (String(n.body || "").length > 260 ? "…" : ""))),
+        h("div", { class: "nb" }, renderRich((t => t.slice(0, 260) + (t.length > 260 ? "…" : ""))(String(n.body || "").replace(/^\s*(#{1,4}|[-*•]|\d+[.)]|\[[ x]\])\s+/gim, "")))),
         h("div", { class: "nm" }, pill(VIS_LABEL[n.visibility] || n.visibility, n.visibility === "Private" ? "grey" : "info"),
           t ? h("span", { class: "tkey" }, taskKey(t)) : null, pr ? h("span", {}, pr.name) : null, mt ? h("span", {}, mt.title) : null,
           h("span", { class: "grow" }), n.owner_id !== S.me.id ? personChip(n.owner_id) : null, h("span", { class: "muted" }, fmtAgo(n.updated_at)))));
     }
   }
+  const cardMenus = () => {
+    for (const card of grid.querySelectorAll(".note-card[data-id]")){
+      const n = byId("notes", card.dataset.id); if (!n || n.owner_id !== S.me.id) continue;
+      const more = h("button", { type: "button", class: "iconbtn note-more", "aria-label": "More actions for " + (n.title || "Untitled"), onclick: e => { e.stopPropagation(); nbMenu(more, [
+        [h("span", {}, ic("expand", 16), "Open as page"), () => go("note=" + n.id)],
+        [h("span", {}, ic("archive2", 16), n.archived ? "Restore" : "Archive"), async () => {
+          if (!("archived" in n)) { toast("Archiving needs upgrade-2026-11bf.sql to be run in Supabase first."); return; }
+          try { await updateRow("notes", n.id, { archived: !n.archived, archived_at: n.archived ? null : new Date().toISOString() }); draw(); renderShellNotes();
+            if (!n.archived) toast("Restored."); else toastUndo("Archived.", async () => { await updateRow("notes", n.id, { archived: false, archived_at: null }); draw(); renderShellNotes(); }); }
+          catch (er) { fail(er, "Couldn’t change it"); } }],
+        [h("span", {}, ic("trash", 16), "Delete"), async () => {
+          const kidsN = rows("notes").filter(x => x.parent_id === n.id).length;
+          if (!confirm("Delete “" + (n.title || "Untitled") + "”" + (kidsN ? " and its " + kidsN + " sub-page" + (kidsN === 1 ? "" : "s") : "") + "? This can’t be undone. (Archive it instead to keep it.)")) return;
+          try { await deleteRow("notes", n.id); if (S.cache.notes) S.cache.notes = S.cache.notes.filter(x => x.id !== n.id && x.parent_id !== n.id); toast("Deleted."); draw(); renderShellNotes(); }
+          catch (er) { fail(er, "Couldn’t delete"); } }, { danger: true }]
+      ], n.title || "Untitled"); } }, ic("more", 18));
+      const wrap = h("div", { class: "note-wrap" }); card.replaceWith(wrap); wrap.append(card, more);
+    }
+  };
+  const renderShellNotes = () => { shellKey = ""; renderShell(); };
+  const draw0 = draw; draw = () => { draw0(); cardMenus(); };
   q.addEventListener("input", () => { u.q = q.value; draw(); });
   el.append(h("div", { class: "tb" }, q, segmented([["all","All I can see"], ["mine","Mine"], ["shared","Shared with me"], ["archived","Archived"]], u.scope, v => { u.scope = v; draw(); })), grid);
   draw();
@@ -5643,6 +5675,11 @@ async function renderNotePage(el, id){
     });
   } }, ic("languages", 15), "Convert to English") : null;
   el.append(h("div", { class: "nb-top" },
+    h("button", { type: "button", class: "btn sm nb-back", title: "Back", "aria-label": "Back", onclick: () => {
+      // back to where you came from in the workspace; otherwise up to the parent page, or Notes
+      if (window.history.length > 1 && S.prevRoute && S.prevRoute !== S.route) history.back();
+      else go(note.parent_id && byId("notes", note.parent_id) ? "note=" + note.parent_id : "notes");
+    } }, ic("chevronLeft", 16), "Back"),
     h("nav", { class: "nb-crumbs", "aria-label": "Where this note is" }, h("a", { href: "#notes" }, "Notes"), chain.map(p => [h("span", { class: "nb-sep" }, "/"), h("a", { href: "#note=" + p.id }, p.title || "Untitled")]), h("span", { class: "nb-sep" }, "/"), h("span", {}, title || "Untitled")),
     h("span", { class: "grow" }), status,
     engBtn, h("button", { type: "button", class: "btn sm", onclick: () => openRecord("notes", note.id, null, { form: true }) }, ic("users", 15), editable ? "Share & details" : "Details"), exportBtn,
@@ -8829,7 +8866,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11bg";
+const APP_VERSION = "2026-11bh";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -9953,12 +9990,14 @@ async function renderDevBoard(el){
   el.append(h("div", { class: "dv-toolbar" }, q,
     h("div", { class: "dv-faces", role: "group", "aria-label": "Show one person’s work" }, people.slice(0, 12).map(p =>
       h("button", { type: "button", class: "dv-face" + (u.who === p.id ? " on" : ""), title: p.full_name, "aria-pressed": String(u.who === p.id), onclick: () => { u.who = u.who === p.id ? "" : p.id; rerender(); } }, avatar(p.id, "sm")))),
-    chip("mine", "Only my work"), iAmTester() ? chip("needqa", "Needs a tester") : null), body);
+    chip("mine", "Only my work"), iAmTester() ? chip("needqa", "Needs a tester") : null, chip("archived", "Archived")), body);
   draw();
 }
 function devBoard(u){
   const s = (u.q || "").toLowerCase(), since = Date.now() - DONE_DAYS * 864e5;
-  const list = devTasks().filter(t => (t.status !== "Done" || +new Date(t.completed_at || t.updated_at || 0) >= since)
+  // "Archived" shows only archived work (all of it, however long ago it was done); otherwise archived work stays hidden
+  const pool = u.archived ? (S.cache.tasks || []).filter(t => t.archived && t.vertical === "Development" && t.type !== "Epic") : devTasks();
+  const list = pool.filter(t => (u.archived || t.status !== "Done" || +new Date(t.completed_at || t.updated_at || 0) >= since)
     && (!s || (taskKey(t) + " " + t.title).toLowerCase().includes(s))
     && (!u.who || ownersOf(t).includes(u.who) || t.tester_id === u.who)
     && (!u.mine || isOwner(t) || t.tester_id === S.me.id)
@@ -10939,6 +10978,7 @@ async function rerender(){
   if (S.me) takeDeepLink();
   const route = (location.hash.replace(/^#/, "").replace(/\/debug$/, "") || "dashboard");
   if (S.route && S.route !== route && S.me) markSeen(S.route);
+  if (S.route && S.route !== route) S.prevRoute = S.route;
   if (route !== "chat") { chatEls = null; if (typeof C !== "undefined") { C.unreadFrom = {}; C.scrollToUnread = null; } }   // leaving Chat: the "New messages" line is redrawn fresh next time   // leaving a tab: everything you saw there is no longer "new"
   S.route = route;
   if (S.me) { markSeen(route); rememberRecent(route); }
