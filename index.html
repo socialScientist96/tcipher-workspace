@@ -1792,6 +1792,15 @@ dialog{border-radius:var(--r-xl)}
 
 .nb-menu .av{flex:none}
 .nb-mtitle{margin-left:auto;font-size:var(--fs-sm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:45%}
+
+.nb-noaccess{max-width:520px;margin:48px auto;text-align:center;padding:var(--s8) var(--s6)}
+.nb-noaccess h2{font-size:var(--fs-xl);margin:var(--s3) 0 var(--s2)}
+.nb-lock{width:56px;height:56px;border-radius:50%;background:var(--p-soft);color:var(--p);display:inline-grid;place-items:center}
+.nb-noaccess-acts{display:flex;gap:var(--s2);justify-content:center;flex-wrap:wrap;margin-top:var(--s4)}
+.nb-requests{display:flex;flex-direction:column;gap:var(--s2);margin-bottom:var(--s3)}
+.nb-req{display:flex;align-items:center;gap:var(--s2);flex-wrap:wrap;padding:var(--s3);border:1px solid var(--p-soft2);background:var(--p-soft);border-radius:var(--r-lg);font-size:var(--fs-ui)}
+.nb-req .x{flex:1;min-width:160px}
+.nb-req.done{background:var(--ok-t);border-color:transparent;color:var(--ok)}
 </style>
 </head>
 <body>
@@ -3410,7 +3419,7 @@ const MOD = {
       { k: "body", l: "Note", t: "textarea", full: true, rows: 10, mentions: true },
       { k: "visibility", l: "Who can see it", t: "select", show: r => !r.owner_id || r.owner_id === S.me.id, o: [["Private","Only me"],["People","Specific people"],["Vertical","My vertical (and admins)"],["Company","Everyone"]], req: true, def: "Private" },
       { k: "pinned", l: "Pin", t: "bool", cb: "Pin to my Home page" },
-      { k: "shared_with", l: "Share with (can view)", t: "users", full: true, show: r => r.visibility === "People" && (!r.owner_id || r.owner_id === S.me.id) },
+      { k: "shared_with", l: "Can view", t: "users", full: true, show: r => !r.owner_id || r.owner_id === S.me.id },
       { k: "editors", l: "Can edit", t: "users", full: true, show: r => (!r.owner_id || r.owner_id === S.me.id) && notesHaveEditors() },
       { k: "task_id", l: "Linked task", t: "ref", ref: "tasks", none: "No task" },
       { k: "project_id", l: "Linked project", t: "ref", ref: "projects", none: "No project" },
@@ -3423,7 +3432,6 @@ const MOD = {
       if (d.body !== undefined) d.mentions = [...new Set([...((prev && prev.mentions) || []), ...mentionIds(d.body, { tbl: "notes", rec: Object.assign({ owner_id: S.me.id }, prev || {}, d) })])];
       if (!prev) d.owner_id = S.me.id;
       d.vertical = (prev && prev.vertical) || S.me.vertical || null;
-      if (d.visibility && d.visibility !== "People") d.shared_with = [];
     },
     after: (rec, prev) => {
       const tagged = (rec.mentions || []).filter(id => !(prev && (prev.mentions || []).includes(id)));
@@ -3766,6 +3774,7 @@ async function openRecord(key, id, preset, opts){
   let rec = id ? byId(M.table, id) : null;
   if (id && !rec){
     try { rec = ok(await sb.from(M.table).select("*").eq("id", id).maybeSingle()); if (rec) upsertCache(M.table, rec); } catch (e) {}
+    if (!rec && key === "notes") { closeDlg(); go("note=" + id); return; }   // the page explains, and offers "Request access"
     if (!rec) { toast("That " + M.one + " isn’t available any more."); return; }
   }
   // Development tasks open in the simpler, Jira-style view (the full form is one click away from there)
@@ -3893,6 +3902,7 @@ async function openRecord(key, id, preset, opts){
   const title = rec ? ((M.keyOf ? M.keyOf(rec) + "  " : "") + (rec[M.title] ? String(rec[M.title]) : (M.one[0].toUpperCase() + M.one.slice(1)))) : "New " + M.one;
   openDialog(title.length > 70 ? title.slice(0, 70) + "…" : title, body, foot);
   // a note opens here first; Expand opens it as a full page (headings, toggles, sub-pages, export)
+  if (key === "notes" && rec) { const db = dlg().querySelector(".db"); if (db) db.prepend(noteRequestsBar(rec)); }
   if (key === "notes" && rec) { const dh = dlg().querySelector(".dh"); if (dh) dh.insertBefore(h("button", { type: "button", class: "btn sm nb-expand", title: "Open as a full page", onclick: () => { closeDlg(); go("note=" + rec.id); } }, ic("expand", 16), "Expand"), dh.lastChild); }
   S.dlg = rec ? { tbl: M.table, id: rec.id } : null;
   const first = form.querySelector("input:not([type=checkbox]),textarea,select");
@@ -5631,7 +5641,24 @@ async function renderNotePage(el, id){
   await ensure(["notes", "tasks", "projects", "meetings"]);
   let note = byId("notes", id);
   if (!note){ try { note = ok(await sb.from("notes").select("*").eq("id", id).maybeSingle()); if (note) upsertCache("notes", note); } catch (e) {} }
-  if (!note){ el.append(h("div", { class: "panel empty" }, h("b", {}, "That note isn’t available"), "It may have been deleted, or it isn’t shared with you."), h("p", {}, h("a", { href: "#notes" }, "Back to Notes"))); return; }
+  if (!note){
+    // no access (for example after being tagged): ask the owner for it
+    const msg = h("p", { class: "muted" }, "Only the people it’s shared with can open it. You can ask the owner for access.");
+    const reqBtn = h("button", { type: "button", class: "btn pri", onclick: async () => {
+      reqBtn.disabled = true;
+      try {
+        const { data, error } = await sb.rpc("request_note_access", { p_note: id });
+        if (error) throw error;
+        const say = { requested: "Request sent. You’ll get a notification when the owner answers.", already: "You’ve already asked. You’ll get a notification when the owner answers.",
+          not_found: "This note no longer exists.", has_access: "You already have access.", signed_out: "Sign in again, then try once more." }[data] || "Request sent.";
+        msg.textContent = say; reqBtn.textContent = data === "has_access" ? "Open" : "Requested";
+        if (data === "has_access") { reqBtn.disabled = false; reqBtn.onclick = () => rerender(); }
+      } catch (e) { reqBtn.disabled = false; msg.textContent = /request_note_access|function/i.test(String(e.message || "")) ? "Asking for access needs upgrade-2026-11bi.sql to be run in Supabase first." : friendly(e); }
+    } }, ic("users", 16), "Request access");
+    el.append(h("div", { class: "panel nb-noaccess" }, h("div", { class: "nb-lock" }, ic("shield", 28)), h("h2", {}, "You don’t have access to this note"), msg,
+      h("div", { class: "nb-noaccess-acts" }, reqBtn, h("a", { class: "btn", href: "#notes" }, "Back to Notes"))));
+    return;
+  }
   const rich = "blocks" in note;   // the database has been upgraded for pages
   const isOwnerNote = note.owner_id === S.me.id;
   const editable = isOwnerNote || (note.editors || []).includes(S.me.id);
@@ -5696,6 +5723,7 @@ async function renderNotePage(el, id){
     h("span", { class: "grow" }), status,
     sumBtn, engBtn, h("button", { type: "button", class: "btn sm", onclick: () => openRecord("notes", note.id, null, { form: true }) }, ic("users", 15), isOwnerNote ? "Share & details" : "Details"), exportBtn,
     isOwnerNote ? (pageMenuBtn = h("button", { type: "button", class: "iconbtn nb-more", "aria-label": "More actions", title: "Archive, delete…", onclick: e => { e.stopPropagation(); pageMenu(); } }, ic("more", 18))) : null));
+  el.append(noteRequestsBar(note));
   if (note.archived) el.append(h("div", { class: "panel nb-archived" }, ic("archive2", 16), h("span", {}, "This page is archived. It’s hidden from Notes and the sidebar."), editable ? h("button", { type: "button", class: "btn sm", onclick: () => setArchived(false) }, "Restore") : null));
   if (!rich && editable) el.append(h("div", { class: "panel nb-warn" }, "Headings, lists and toggles are kept for this visit only until ", h("b", {}, "upgrade-2026-11bc.sql"), " has been run in Supabase. The text itself is saved."));
 
@@ -5976,6 +6004,39 @@ function nbMenuKey(key){
   btns.forEach((b, k) => b.classList.toggle("on", k === nbMenuSel)); btns[nbMenuSel].scrollIntoView({ block: "nearest" });
 }
 document.addEventListener("keydown", e => { if (e.key === "Escape" && nbMenuOpen()) closeNbMenu(); });
+// requests to open one of your notes: Can view, Can edit or Decline
+function noteRequestsBar(note, after){
+  const box = h("div", { class: "nb-requests", hidden: true });
+  if (!note || note.owner_id !== S.me.id) return box;
+  (async () => {
+    let reqs = [];
+    try { reqs = ok(await sb.from("note_access_requests").select("id,requester_id,created_at").eq("note_id", note.id).eq("status", "pending").order("created_at")) || []; } catch (e) { return; }
+    if (!reqs.length) return;
+    const answer = async (r, grant, row) => {
+      row.querySelectorAll("button").forEach(b => b.disabled = true);
+      try {
+        if (grant){
+          const key = grant === "edit" ? "editors" : "shared_with";
+          const list = [...new Set([...(note[key] || []), r.requester_id])];
+          const upd = await updateRow("notes", note.id, { [key]: list }); Object.assign(note, upd, { id: note.id });
+        }
+        ok(await sb.from("note_access_requests").update({ status: grant ? "approved" : "declined", granted: grant || "", decided_at: new Date().toISOString(), decided_by: S.me.id }).eq("id", r.id));
+        await notify([r.requester_id], grant ? pname(S.me.id) + " gave you " + (grant === "edit" ? "edit" : "view") + " access to a note: " + (note.title || "Untitled") : pname(S.me.id) + " declined your request for: " + (note.title || "Untitled"), "", "notes", note.id);
+        row.replaceWith(h("div", { class: "nb-req done" }, ic("check", 16), pname(r.requester_id) + (grant ? (grant === "edit" ? " can now edit." : " can now view.") : ": declined.")));
+        if (after) after();
+      } catch (e) { row.querySelectorAll("button").forEach(b => b.disabled = false); fail(e, "Couldn’t answer"); }
+    };
+    box.replaceChildren(...reqs.map(r => {
+      const row = h("div", { class: "nb-req" }, avatar(r.requester_id, "sm"), h("span", { class: "x" }, h("b", {}, pname(r.requester_id) || "Someone"), " asked for access · " + fmtAgo(r.created_at)));
+      row.append(h("button", { type: "button", class: "btn sm", onclick: () => answer(r, "view", row) }, "Can view"),
+        h("button", { type: "button", class: "btn sm pri", onclick: () => answer(r, "edit", row) }, "Can edit"),
+        h("button", { type: "button", class: "btn sm ghost", onclick: () => answer(r, "", row) }, "Decline"));
+      return row;
+    }));
+    box.hidden = false;
+  })();
+  return box;
+}
 // a new note opens straight away as an empty page
 async function newNotePage(parent){
   try {
@@ -8894,7 +8955,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11bi";
+const APP_VERSION = "2026-11bj";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));

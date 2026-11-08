@@ -3,7 +3,8 @@
 ## Version 2026-11bi (8 Nov 2026): tag people in notes; view or edit sharing; summarize notes
 Needs: run `upgrade-2026-11bi.sql` (also adds the archive columns, so 11bf is no longer needed separately); redeploy `ai-assist-function.ts` (for the note summary wording); upload `index.html` and `sw.js`.
 - **@ to tag in note pages:** type @ and a few letters; pick the person; their name goes into the note and they get a notification ("… tagged you in a note").
-- **Share › Can view or Can edit:** "Share with (can view)" as before, plus **Can edit**. Editors can open the note and change its content; only the owner can change sharing, archive or delete it (enforced in the database). New editors get a notification. The page says "you can edit" or "view only".
+- **Share › Can view or Can edit:** people under **Can view** can open the note whatever its visibility setting; people under **Can edit** can also change its content. Only the owner can change sharing, archive or delete it (enforced in the database). New editors get a notification. The page says "you can edit" or "view only".
+- **Tagging no longer gives access.** A tagged person is notified; if they can't open the note, its page says "You don't have access to this note" with **Request access**. The owner is notified and sees a bar on the note (page and popup): **Can view**, **Can edit** or **Decline**; the person is notified of the answer. One request per person per day.
 - **Summarize** on every note page: Claude's short summary with key points and action items.
 
 ## Version 2026-11bh (8 Nov 2026): Back on note pages; archive and delete from lists; Archived filters
