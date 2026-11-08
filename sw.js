@@ -7,7 +7,7 @@
 // 4 seconds or fails (the fresh copy still replaces it in the background, and the app shows its
 // "new version available" bar when that happens).
 // To switch this off for everyone: delete this file from the site. Browsers drop the cache on their next visit.
-const CACHE = "tc-shell-v21";
+const CACHE = "tc-shell-v22";
 const PAGE_WAIT_MS = 4000;
 
 self.addEventListener("install", () => self.skipWaiting());

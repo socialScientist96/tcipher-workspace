@@ -1,5 +1,11 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11bg (8 Nov 2026): notes open as a popup first; one menu style everywhere
+Needs: upload `index.html` and `sw.js`.
+- **Notes open as the popup again**, with everything it had (title, text, who can see it, pin, sharing, links, comments, files). **Expand** in the popup opens the full Notion-style page. The sidebar's Notes list still opens pages directly. Editing the text in the popup updates the page's blocks too.
+- **One menu style everywhere:** the task window's ••• menu (now with **Priority ›** opening to the side, Copy ID, Copy link, Summarize, Convert to English, Archive, Delete), the chat **Meet** menu and **your status** menu use the same Notion-style menu as notes.
+- The notes page button reads **Convert to English**.
+
 ## Version 2026-11bf (8 Nov 2026): notes menus like Notion, Archive and Delete
 Needs: run `upgrade-2026-11bf.sql` (for Archive); upload `index.html` and `sw.js`.
 - **Turn into and Color open to the side** of the block menu (pointing at them is enough), with a › at the right edge, like Notion. The block menu items have icons.

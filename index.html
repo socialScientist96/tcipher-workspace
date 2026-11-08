@@ -1773,6 +1773,12 @@ dialog{border-radius:var(--r-xl)}
 .nb-more{width:32px;height:32px}
 .nb-archived{display:flex;align-items:center;gap:var(--s2);border-color:var(--warn);margin-bottom:var(--s3);font-size:var(--fs-ui)}
 .nb-archived .btn{margin-left:auto}
+
+.nb-dot{width:8px;height:8px;border-radius:50%;background:var(--ink3);display:inline-block;margin:0 4px}
+.nb-dot.ok{background:#22A06B}
+
+.nb-expand{margin-left:auto;margin-right:var(--s2)}
+.dh .nb-expand + .iconbtn{margin-left:0}
 </style>
 </head>
 <body>
@@ -1959,6 +1965,7 @@ const ICONS = {
   arrowDown: '<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>',
   archive2: '<rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
   more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+  expand: '<path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/>',
   checkSquare: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/>'
 };
 function ic(name, size){
@@ -3397,6 +3404,7 @@ const MOD = {
     ],
     render: (el, A) => notesBoard(el, A),
     before: (d, prev) => {
+      if (d.body !== undefined && prev && d.blocks === undefined && "blocks" in prev && String(d.body) !== String(prev.body || "")) d.blocks = nbFromBody(d.body);
       if (d.body !== undefined) d.mentions = [...new Set([...((prev && prev.mentions) || []), ...mentionIds(d.body, { tbl: "notes", rec: Object.assign({ owner_id: S.me.id }, prev || {}, d) })])];
       if (!prev) d.owner_id = S.me.id;
       d.vertical = (prev && prev.vertical) || S.me.vertical || null;
@@ -3746,7 +3754,6 @@ async function openRecord(key, id, preset, opts){
   // Development tasks open in the simpler, Jira-style view (the full form is one click away from there)
   if (key === "tasks" && rec && rec.vertical === "Development" && !(opts && opts.form) && typeof openDevTask === "function") { openDevTask(rec.id); return; }
   // a new task starts with the simple form (the full one is behind "More options")
-  if (key === "notes" && !(opts && opts.form)) { if (rec) go("note=" + rec.id); else newNotePage(); return; }
   if (key === "tasks" && !rec && !(opts && opts.form) && typeof taskCreate === "function") { taskCreate(preset); return; }
   const A = access(M, rec);
   const editable = rec ? A.canEdit : A.canCreate;
@@ -3868,6 +3875,8 @@ async function openRecord(key, id, preset, opts){
 
   const title = rec ? ((M.keyOf ? M.keyOf(rec) + "  " : "") + (rec[M.title] ? String(rec[M.title]) : (M.one[0].toUpperCase() + M.one.slice(1)))) : "New " + M.one;
   openDialog(title.length > 70 ? title.slice(0, 70) + "…" : title, body, foot);
+  // a note opens here first; Expand opens it as a full page (headings, toggles, sub-pages, export)
+  if (key === "notes" && rec) { const dh = dlg().querySelector(".dh"); if (dh) dh.insertBefore(h("button", { type: "button", class: "btn sm nb-expand", title: "Open as a full page", onclick: () => { closeDlg(); go("note=" + rec.id); } }, ic("expand", 16), "Expand"), dh.lastChild); }
   S.dlg = rec ? { tbl: M.table, id: rec.id } : null;
   const first = form.querySelector("input:not([type=checkbox]),textarea,select");
   if (!rec && first) setTimeout(() => first.focus(), 30);
@@ -5401,7 +5410,7 @@ function notesBoard(el, A){
     if (!list.length) grid.append(h("div", { class: "panel empty", style: "grid-column:1 / -1" }, h("b", {}, u.scope === "shared" ? "Nothing shared with you yet" : "No notes yet"), "Jot down ideas, meeting prep, specs or to-dos. Notes are private unless you share them."));
     for (const n of list){
       const t = byId("tasks", n.task_id), pr = byId("projects", n.project_id), mt = byId("meetings", n.meeting_id);
-      grid.append(h("button", { type: "button", class: "note-card" + (n.pinned && n.owner_id === S.me.id ? " pinned" : ""), onclick: () => go("note=" + n.id) },
+      grid.append(h("button", { type: "button", class: "note-card" + (n.pinned && n.owner_id === S.me.id ? " pinned" : ""), onclick: () => openRecord("notes", n.id) },
         h("div", { class: "nt" }, n.pinned && n.owner_id === S.me.id ? ic("pin", 14) : "", n.title || "Untitled"),
         h("div", { class: "nb" }, renderRich(String(n.body || "").slice(0, 260) + (String(n.body || "").length > 260 ? "…" : ""))),
         h("div", { class: "nm" }, pill(VIS_LABEL[n.visibility] || n.visibility, n.visibility === "Private" ? "grey" : "info"),
@@ -5632,7 +5641,7 @@ async function renderNotePage(el, id){
       state.dirty = true; await save(); draw();
       toastUndo("Note converted to English.", async () => { title = snap.title; titleEl.textContent = title; blocks = snap.blocks; state.dirty = true; await save(); draw(); });
     });
-  } }, ic("languages", 15), "English") : null;
+  } }, ic("languages", 15), "Convert to English") : null;
   el.append(h("div", { class: "nb-top" },
     h("nav", { class: "nb-crumbs", "aria-label": "Where this note is" }, h("a", { href: "#notes" }, "Notes"), chain.map(p => [h("span", { class: "nb-sep" }, "/"), h("a", { href: "#note=" + p.id }, p.title || "Untitled")]), h("span", { class: "nb-sep" }, "/"), h("span", {}, title || "Untitled")),
     h("span", { class: "grow" }), status,
@@ -8338,12 +8347,7 @@ function chatMeetButton(){
   const b = h("button", { type: "button", class: "btn sm chat-meet", title: "Start or schedule a Google Meet with this conversation" }, ic("video"), h("span", { class: "bl" }, "Meet"));
   b.addEventListener("click", e => {
     e.stopPropagation();
-    const menu = h("div", { class: "status-menu", role: "menu" },
-      h("button", { type: "button", role: "menuitem", onclick: () => { menu.remove(); startMeetNow(); } }, ic("video"), "Start a meeting now"),
-      h("button", { type: "button", role: "menuitem", onclick: () => { menu.remove(); scheduleMeet(); } }, ic("calendar"), "Schedule a meeting…"));
-    document.body.append(menu);
-    const r = b.getBoundingClientRect(); menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 240)) + "px"; menu.style.top = (r.bottom + 6) + "px";
-    setTimeout(() => document.addEventListener("click", () => menu.remove(), { once: true }), 0);
+    nbMenu(b, [[h("span", {}, ic("video", 16), "Start a meeting now"), () => startMeetNow()], [h("span", {}, ic("calendar", 16), "Schedule a meeting…"), () => scheduleMeet()]], "Google Meet");
   });
   return b;
 }
@@ -8696,13 +8700,11 @@ function drawMyStatus(){
   const btn = h("button", { type: "button", class: "mystatus st-" + s.tone, title: "Change your status" }, h("span", { class: "dot" }), h("span", { class: "x" }, s.label));
   btn.addEventListener("click", e => {
     e.stopPropagation();
-    const menu = h("div", { class: "status-menu", role: "menu" },
-      away ? h("button", { type: "button", role: "menuitem", onclick: () => { menu.remove(); backNow(); } }, "I’m back") : h("button", { type: "button", role: "menuitem", onclick: () => { menu.remove(); imHere(); } }, "● Available"),
-      h("button", { type: "button", role: "menuitem", onclick: () => { menu.remove(); startLunch(); } }, ic("coffee"), "Lunch break (" + WH().lunch + " min)"),
-      h("button", { type: "button", role: "menuitem", onclick: () => { menu.remove(); openOutOfOffice(); } }, ic("logOut"), "Out of office until…"));
-    document.body.append(menu);
-    const r = btn.getBoundingClientRect(); menu.style.left = r.left + "px"; menu.style.bottom = (window.innerHeight - r.top + 6) + "px";
-    setTimeout(() => document.addEventListener("click", () => menu.remove(), { once: true }), 0);
+    nbMenu(btn, [
+      away ? [h("span", {}, ic("check", 16), "I’m back"), () => backNow()] : [h("span", {}, h("span", { class: "nb-dot ok" }), "Available"), () => imHere()],
+      [h("span", {}, ic("coffee", 16), "Lunch break (" + WH().lunch + " min)"), () => startLunch()],
+      [h("span", {}, ic("logOut", 16), "Out of office until…"), () => openOutOfOffice()]
+    ], "Your status");
   });
   slot.replaceChildren(btn);
 }
@@ -8827,7 +8829,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11bf";
+const APP_VERSION = "2026-11bg";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -10135,10 +10137,21 @@ function drawDevTask(id){
     if (!confirm("Delete this task? This can’t be undone.")) return;
     try { await deleteRow("tasks", t.id); S.devOpen = null; closeDlg(); toast("Deleted."); rerender(); } catch (e) { fail(e, "Couldn’t delete"); } } }, "Delete"));
   if (devCanEdit(t, "archived")) items.unshift(h("button", { type: "button", class: "dv-menuitem", onclick: () => devSave(t, { archived: !t.archived }, t.archived ? "Restored." : "Archived.") }, t.archived ? "Restore" : "Archive"));
-  if (dh && items.length) {
-    const menu = h("div", { class: "dv-menu", hidden: true }, items);
-    const mb = h("button", { type: "button", class: "iconbtn", "aria-label": "More actions", id: "devMenuBtn", onclick: e => { e.stopPropagation(); menu.hidden = !menu.hidden; } }, "•••");
-    dh.insertBefore(h("div", { class: "dv-menuwrap" }, mb, menu), dh.lastChild);
+  if (dh) {
+    // the same menu as notes: icons, and choices that open to the side
+    const PRI = ["Critical", "High", "Medium", "Low"];
+    const mb = h("button", { type: "button", class: "iconbtn", "aria-label": "More actions", id: "devMenuBtn", onclick: e => { e.stopPropagation(); nbMenu(mb, [
+      devCanEdit(t, "priority") ? [h("span", {}, ic("flag", 16), "Priority"), null, { sub: () => PRI.map(p => [h("span", {}, p, t.priority === p ? h("span", { class: "nb-tick" }, "✓") : null), () => devSave(t, { priority: p }, "Priority: " + p + ".")]), subHeading: "Priority" }] : null,
+      [h("span", {}, ic("copy", 16), "Copy ID and title"), () => copyText(taskKey(t) + " " + t.title, "Copied")],
+      [h("span", {}, ic("share", 16), "Copy link"), () => copyText(location.origin + location.pathname + "#open/tasks/" + t.id, "Link copied")],
+      [h("span", {}, ic("sparkle", 16), "Summarize"), () => taskSummary(t)],
+      devCanEdit(t, "title") ? [h("span", {}, ic("languages", 16), "Convert to English"), () => taskEnglish(t)] : null,
+      devCanEdit(t, "archived") ? [h("span", {}, ic("archive2", 16), t.archived ? "Restore" : "Archive"), () => devSave(t, { archived: !t.archived }, t.archived ? "Restored." : "Archived.")] : null,
+      A.canDelete ? [h("span", {}, ic("trash", 16), "Delete"), async () => {
+        if (!confirm("Delete this task? This can’t be undone.")) return;
+        try { await deleteRow("tasks", t.id); S.devOpen = null; closeDlg(); toast("Deleted."); rerender(); } catch (e) { fail(e, "Couldn’t delete"); } }, { danger: true }] : null
+    ].filter(Boolean), taskKey(t)); } }, ic("more", 18));
+    dh.insertBefore(mb, dh.lastChild);
   }
   S.dlg = { tbl: "tasks", id: t.id };
   const db = d.querySelector(".db"); if (db && keep) db.scrollTop = keep;
