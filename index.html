@@ -1852,7 +1852,6 @@ dialog{border-radius:var(--r-xl)}
 .nb-dropline{position:absolute;left:0;right:0;height:3px;border-radius:2px;background:var(--p);pointer-events:none;z-index:5}
 .nb-handle{touch-action:none}
 body.nb-moving,body.nb-moving *{cursor:grabbing!important;user-select:none!important;-webkit-user-select:none!important}
-.nb-blocks.nb-dropping{outline:2px dashed var(--p);outline-offset:8px;border-radius:var(--r-md)}
 </style>
 </head>
 <body>
@@ -5797,9 +5796,10 @@ async function renderNotePage(el, id){
 
   const titleEl = h("h1", { class: "nb-title", contenteditable: editable ? "true" : "false", "data-placeholder": "Untitled", spellcheck: "true" }, title);
   const wrap = h("div", { class: "nb-blocks" });
-  el.append(h("article", { class: "nb-page" + (editable ? "" : " readonly") }, titleEl,
+  const article = h("article", { class: "nb-page" + (editable ? "" : " readonly") });
+  el.append(article); article.append(titleEl,
     h("div", { class: "nb-meta muted" }, "By " + (pname(note.owner_id) || "someone") + " · edited " + fmtAgo(note.updated_at) + " · " + (VIS_LABEL[note.visibility] || note.visibility) +
-      ((note.editors || []).length ? " · " + note.editors.length + " can edit" : "") + (!isOwnerNote && editable ? " · you can edit" : !editable ? " · view only" : "")), wrap));
+      ((note.editors || []).length ? " · " + note.editors.length + " can edit" : "") + (!isOwnerNote && editable ? " · you can edit" : !editable ? " · view only" : "")), wrap);
 
   const crumbHere = el.querySelector(".nb-crumbs > span:last-child");
   titleEl.addEventListener("input", () => { title = titleEl.textContent.replace(/\n/g, " ").trim(); if (crumbHere) crumbHere.textContent = title || "Untitled"; $("crumb").textContent = title || "Note"; queueSave(); });
@@ -5967,13 +5967,31 @@ async function renderNotePage(el, id){
     document.body.append(input); input.click();
   }
   // drop pictures or videos anywhere on the page
-  wrap.addEventListener("dragover", e => { if (editable && e.dataTransfer && [...e.dataTransfer.types].includes("Files")) { e.preventDefault(); wrap.classList.add("nb-dropping"); } });
-  wrap.addEventListener("dragleave", e => { if (!wrap.contains(e.relatedTarget)) wrap.classList.remove("nb-dropping"); });
-  wrap.addEventListener("drop", e => {
-    if (!editable || !e.dataTransfer || !e.dataTransfer.files || !e.dataTransfer.files.length) return;
-    e.preventDefault(); e.stopPropagation(); wrap.classList.remove("nb-dropping");
-    const row = e.target.closest && e.target.closest(".nb-block"); let at = row ? +row.dataset.i : blocks.length - 1;
-    for (const f of [...e.dataTransfer.files]) { uploadMedia(f, at); at++; }
+  // Like Notion: drag pictures or videos from your computer anywhere on the page (even below the last line);
+  // a purple line shows exactly where they'll go, between the blocks.
+  let fileLine = null, fileBefore = null;
+  const dropSpot = y => {
+    const rows = [...wrap.children].filter(r => r.classList.contains("nb-block")), w = wrap.getBoundingClientRect();
+    for (const r of rows) { const rc = r.getBoundingClientRect(); if (y < rc.top + rc.height / 2) return { before: +r.dataset.i, top: rc.top - w.top }; }
+    const last = rows[rows.length - 1]; return { before: blocks.length, top: last ? last.getBoundingClientRect().bottom - w.top : 0 };
+  };
+  const clearFileLine = () => { if (fileLine) fileLine.remove(); fileLine = null; fileBefore = null; };
+  const hasFiles = e => editable && e.dataTransfer && [...(e.dataTransfer.types || [])].includes("Files");
+  article.addEventListener("dragover", e => {
+    if (!hasFiles(e)) return;
+    e.preventDefault(); e.dataTransfer.dropEffect = "copy";
+    const spot = dropSpot(e.clientY); fileBefore = spot.before;
+    if (!fileLine || !fileLine.isConnected) { fileLine = h("div", { class: "nb-dropline" }); wrap.append(fileLine); }
+    fileLine.style.top = Math.round(spot.top - 1) + "px";
+  });
+  article.addEventListener("dragleave", e => { if (!article.contains(e.relatedTarget)) clearFileLine(); });
+  article.addEventListener("drop", e => {
+    if (!hasFiles(e)) return;
+    e.preventDefault(); e.stopPropagation();
+    const before = fileBefore != null ? fileBefore : dropSpot(e.clientY).before; clearFileLine();
+    const files = [...(e.dataTransfer.files || [])]; if (!files.length) return;
+    let at = before - 1;   // each one goes in after the block above the line (an empty line there becomes the picture)
+    for (const f of files) { uploadMedia(f, at); at++; }
   });
   /* Moving a block: hold the six dots and drag (mouse, pen or finger). A purple line shows exactly where it will land;
      near the top or bottom of the screen the page scrolls. A toggle moves with everything inside it. Esc cancels. */
@@ -9162,7 +9180,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11bq";
+const APP_VERSION = "2026-11br";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));

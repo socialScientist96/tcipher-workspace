@@ -1,5 +1,10 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11br (8 Nov 2026): drop pictures exactly where you want, like Notion
+Needs: upload `index.html` and `sw.js`. No database change.
+- **Dragging pictures or videos in from your computer** (Finder, Desktop, another app) now shows a purple line between the blocks, exactly where they'll go, and drops them there: above the first line, between any two blocks, or below the last line. You can drop anywhere on the page, not only on the text. Several files go in one after another, in order.
+- Replaces the dashed outline around the whole page, which put the picture under whichever block you were over.
+
 ## Version 2026-11bq (8 Nov 2026): moving blocks in notes, fixed
 Needs: upload `index.html` and `sw.js`. No database change.
 - **Drag the six dots to move a block**, rebuilt: a purple line shows exactly where it will land, and it lands there (dragging down used to put it one place lower than the line showed). The page scrolls when you drag near the top or bottom. A toggle moves with everything inside it. Esc cancels. A click on the dots still opens the block menu.
