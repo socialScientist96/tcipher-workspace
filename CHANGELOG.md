@@ -1,5 +1,9 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11bv (8 Nov 2026): calendars off the sidebar list
+Needs: upload `index.html` and `sw.js`.
+- **Calendar** and **Team calendar** are no longer listed in the sidebar (or in Recents). Both pages still work: the calendar icon at the top of the sidebar opens Calendar, and links to either page keep working.
+
 ## Version 2026-11bu (8 Nov 2026): Clients in its own sidebar group
 Needs: upload `index.html` and `sw.js`.
 - New **Clients** group in the sidebar, after Sales: **Clients**, **Requests & bugs** (the support tickets, including everything clients send from their portal) and **Contacts**. Clients and Contacts moved out of Sales.

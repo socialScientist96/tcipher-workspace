@@ -9442,7 +9442,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11bu";
+const APP_VERSION = "2026-11bv";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -11417,6 +11417,8 @@ const ROUTE_ICON = { tickets: "bug", dashboard: "home", overview: "layoutGrid", 
   clients: "briefcase", contacts: "contact", activities: "activity", proposals: "fileText", targets: "target", "crm-analytics": "barChart", marketing: "megaphone",
   campaigns: "send", content: "calendarDays", seo_keywords: "search", social_stats: "share", people: "users", leave_requests: "sun", holidays: "gift",
   attendance: "clock", meetings: "video", documents: "folder", "admin-users": "shield" };
+// pages kept (and still reachable by link) but not listed in the sidebar (2026-11bv)
+const SIDE_HIDDEN = new Set(["calendar", "team-calendar"]);
 const GROUP_ICON = { "Development & QA": "code", Communication: "message", Sales: "trendingUp", Clients: "briefcase", Marketing: "megaphone", Company: "building", Admin: "shield" };
 let sideQuery = "";
 function recentRoutes(){ try { return JSON.parse(localStorage.getItem("tc_recent_" + S.me.id) || "[]"); } catch (e) { return []; } }
@@ -11511,13 +11513,13 @@ function renderShell(){
   side.append(h("div", { class: "side-quick" }, quick("dashboard", "home"), quick("chat", "message"), quick("calendar", "calendar")));
   const nav = h("nav", { class: "nav", "aria-label": "Main" });
   // recently opened pages (this browser), like a notebook's recents
-  const rec = recentRoutes().filter(r => canSee(r) && !["dashboard", "chat", "calendar"].includes(r)).slice(0, 2);   // just the last two places
+  const rec = recentRoutes().filter(r => canSee(r) && !["dashboard", "chat", "calendar"].includes(r) && !SIDE_HIDDEN.has(r)).slice(0, 2);   // just the last two places
   if (rec.length) nav.append(h("div", { class: "nav-group recents" }, h("h4", {}, "Recents"),
     rec.map(r => h("a", { href: "#" + r, class: isOn(r) ? "on" : null, onclick: closeSide }, h("span", { class: "nic" }, ic(ROUTE_ICON[r] || "file", 18)), h("span", { class: "nl" }, label(r))))));
   for (const [group, items] of NAV){
     // items shared by Sales and Marketing show under your own team only (admins see them under both)
     const shared = ["leads","ig_leads","crm-analytics"];
-    const visible = items.filter(([r]) => r !== "dashboard" && canSee(r) && !(shared.includes(r) && ((group === "Sales" && !(isAdmin() || lvl("sales") >= 1)) || (group === "Marketing" && !(isAdmin() || lvl("marketing") >= 1)))));
+    const visible = items.filter(([r]) => r !== "dashboard" && !SIDE_HIDDEN.has(r) && canSee(r) && !(shared.includes(r) && ((group === "Sales" && !(isAdmin() || lvl("sales") >= 1)) || (group === "Marketing" && !(isAdmin() || lvl("marketing") >= 1)))));
     if (!visible.length) continue;
     const links = visible.map(([r, l]) => {
       const badge = navBadge(r);
