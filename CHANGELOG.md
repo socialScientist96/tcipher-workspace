@@ -1,5 +1,15 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11bc (8 Nov 2026): notes as pages, like Notion
+Needs: run `upgrade-2026-11bc.sql` (until then notes still save their text, and the page says formatting is kept for that visit only); upload `index.html` and `sw.js`.
+- **Every note opens as a full page you write in directly**: a big title, then blocks. Saves by itself as you type ("Saving… / Saved", or "Saved on this device" on a bad connection).
+- **Blocks:** text, headings 1–4, bulleted / numbered / to-do lists, toggle lists and toggle headings 1–3 (sections that open and close), quote, callout, code, divider, and **sub-pages** (a page inside a page).
+- **Type "/"** for the block menu, or use shortcuts at the start of a line: `#`, `##`, `###`, `-`, `1.`, `[]`, `>` (toggle), `"` (quote), ```` ``` ```` (code), `---`. Tab / Shift+Tab indent; Enter on an empty list item ends the list; Ctrl/⌘+D duplicates a block; bold, italic, underline and links work with the usual keys.
+- **The ⋮⋮ handle** beside each block: Turn into, Color (text and background colours), Duplicate, Move up / down, Delete; drag it to move the block.
+- **Sidebar › Notes opens into the list of pages**, with sub-pages nested under their page, and **New page** at the bottom.
+- **Export** any note as **PDF** (the print window, "Save as PDF"), **HTML**, **Markdown & CSV** (a .zip with both) or a **Word file** (.docx).
+- Sharing, links to tasks / projects / meetings, comments and files stay under **Share & details**. Older notes open as pages too: their lines become paragraphs, lists and headings.
+
 ## Version 2026-11bb (8 Nov 2026): nothing lost on a bad connection
 Needs: upload `index.html` and `sw.js`.
 - **Saves that fail because of the connection are kept on the device.** Creating or editing tasks, leads, deals, clients, contacts, notes, documents, meetings, leave, attendance, comments, time logs and the other work records: if the connection drops or is too slow, the change is kept on this device, shown as saved, and a bar says "N unsynced changes · **Sync now**".

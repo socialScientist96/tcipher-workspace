@@ -1541,6 +1541,103 @@ th{font-size:13px}
 .syncbar .nb-dot{width:8px;height:8px;border-radius:50%;background:#F5B544;flex:none}
 .syncbar .btn{background:#fff;color:#18181B;border-color:#fff;min-height:32px}
 @media (max-width:960px){ .syncbar{left:8px;right:8px;bottom:calc(72px + env(safe-area-inset-bottom,0px));justify-content:space-between} }
+
+/* Sidebar › Notes, opened into its pages */
+.nav-row{position:relative}
+.nav-row > a{padding-right:40px}
+.nav-exp{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:28px;height:28px;display:grid;place-items:center;border:0;background:none;border-radius:6px;color:#91918E;cursor:pointer;padding:0}
+.nav-exp:hover{background:#E9E9E7;color:#37352F}
+.nav-exp .ic{transition:transform .2s var(--ease)}
+.nav-exp.open .ic{transform:rotate(90deg)}
+.nav-tree{margin:0 0 6px 18px;padding-left:6px;border-left:1px solid #E3E3E0;display:flex;flex-direction:column}
+.nav-tree-item{display:flex;align-items:center;gap:6px;min-height:30px;padding:3px 6px 3px calc(4px + var(--d,0) * 14px);border-radius:6px;color:#5F5E5B;text-decoration:none;font-size:14px;border:0;background:none;width:100%;text-align:left;cursor:pointer;font-family:var(--font-main);font-size-adjust:var(--adj-main)}
+.nav-tree-item > .ic{color:var(--p);flex:none}
+.nav-tree-item .nl{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-tree-item:hover{background:#EFEFED;color:#37352F}
+.nav-tree-item.on{background:#EFEFED;color:#37352F;font-weight:600}
+.nav-tree-item.new,.nav-tree-item.more{color:#91918E}
+.nav-tree-tog{width:20px;height:20px;flex:none;display:grid;place-items:center;border:0;background:none;border-radius:4px;color:#A5A4A0;cursor:pointer;padding:0}
+.nav-tree-tog:hover{background:#E3E3E0;color:#37352F}
+.nav-tree-tog .ic{transition:transform .2s var(--ease)}
+.nav-tree-tog.open .ic{transform:rotate(90deg)}
+.nav-tree-tog.none{cursor:default}
+.nav-tree-empty{color:#91918E;font-size:13px;padding:4px 8px}
+.side.searching .nav-tree,.side.searching .nav-exp{display:none}
+@media (pointer:coarse){ .nav-tree-item{min-height:44px} .nav-exp{width:40px;height:40px} .nav-tree-tog{width:32px;height:32px} }
+
+/* Notes as pages */
+.nb-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:-4px 0 8px}
+.nb-top .grow{flex:1}
+.nb-crumbs{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:14px;color:var(--ink2);min-width:0}
+.nb-crumbs a{color:var(--ink2);text-decoration:none;border-radius:4px;padding:2px 4px}
+.nb-crumbs a:hover{background:var(--tint);color:var(--ink)}
+.nb-sep{color:var(--ink3)}
+.nb-status{font-size:13px;min-width:60px;text-align:right}
+.nb-warn{border-color:var(--warn);margin-bottom:12px;font-size:14px}
+.nb-page{max-width:780px;margin:24px auto 80px;padding:0 8px}
+.nb-title{font-family:var(--font-main);font-size-adjust:var(--adj-main);font-size:40px;font-weight:600;line-height:1.2;margin:0 0 4px;outline:none;letter-spacing:-.01em;word-break:break-word}
+.nb-title:empty::before{content:attr(data-placeholder);color:var(--ink3)}
+.nb-meta{font-size:13px;margin-bottom:24px}
+.nb-blocks{display:flex;flex-direction:column}
+.nb-block{position:relative;display:flex;align-items:flex-start;gap:6px;margin-left:calc(var(--lvl,0) * 26px);padding:2px 0;border-radius:4px}
+.nb-block.drop{box-shadow:0 -2px 0 var(--p)}
+.nb-block.dragging{opacity:.4}
+.nb-gutter{position:absolute;left:-52px;top:3px;display:flex;gap:2px;opacity:0;transition:opacity .15s var(--ease)}
+.nb-block:hover .nb-gutter,.nb-block:focus-within .nb-gutter{opacity:1}
+.nb-handle,.nb-add{width:22px;height:24px;display:grid;place-items:center;border:0;background:none;border-radius:4px;color:var(--ink3);cursor:pointer;padding:0;font-size:13px;letter-spacing:-2px;line-height:1}
+.nb-add{font-size:18px;letter-spacing:0}
+.nb-handle{cursor:grab}
+.nb-handle:hover,.nb-add:hover{background:var(--tint);color:var(--ink)}
+.nb-text{flex:1;min-width:0;outline:none;min-height:1.6em;line-height:1.6;font-size:16px;white-space:pre-wrap;word-break:break-word;padding:1px 2px}
+.nb-text:empty::before{content:attr(data-placeholder);color:var(--ink3)}
+.nb-block:not(:focus-within) .nb-text:empty::before{content:""}
+.nb-block.t-text:only-child .nb-text:empty::before{content:attr(data-placeholder)}
+.nb-text a{color:var(--p-ink)}
+.nb-text code{font-family:var(--mono);font-size-adjust:none;font-size:.88em;background:var(--tint);padding:1px 4px;border-radius:4px;color:#C2303F}
+.t-h1 .nb-text,.t-th1 .nb-text{font-family:var(--font-main);font-size-adjust:var(--adj-main);font-size:30px;font-weight:600;line-height:1.3;margin-top:18px}
+.t-h2 .nb-text,.t-th2 .nb-text{font-family:var(--font-main);font-size-adjust:var(--adj-main);font-size:24px;font-weight:600;line-height:1.3;margin-top:14px}
+.t-h3 .nb-text,.t-th3 .nb-text{font-family:var(--font-main);font-size-adjust:var(--adj-main);font-size:20px;font-weight:600;line-height:1.35;margin-top:10px}
+.t-h4 .nb-text{font-family:var(--font-main);font-size-adjust:var(--adj-main);font-size:17px;font-weight:600;margin-top:8px}
+.nb-mark{flex:none;min-width:22px;text-align:center;line-height:1.6;font-size:16px;color:var(--ink)}
+.nb-mark.num{font-variant-numeric:tabular-nums;text-align:right;padding-right:2px}
+.nb-check{flex:none;width:18px;height:18px;margin:4px 4px 0 2px;accent-color:var(--p)}
+.nb-block.done .nb-text{color:var(--ink3);text-decoration:line-through}
+.nb-tog{flex:none;width:24px;height:26px;display:grid;place-items:center;border:0;background:none;border-radius:4px;color:var(--ink2);cursor:pointer;padding:0}
+.t-th1 .nb-tog{margin-top:22px}.t-th2 .nb-tog{margin-top:18px}.t-th3 .nb-tog{margin-top:12px}
+.nb-tog:hover{background:var(--tint)}
+.nb-tog .ic{transition:transform .2s var(--ease)}
+.nb-tog.open .ic{transform:rotate(90deg)}
+.t-quote{border-left:3px solid var(--ink);padding-left:14px;margin-top:4px;margin-bottom:4px}
+.t-callout{background:var(--tint);border-radius:8px;padding:12px 14px;margin:6px 0}
+.t-code .nb-text{font-family:var(--mono);font-size-adjust:none;font-size:14px;background:#F7F7F8;border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:4px 0}
+.nb-hr{flex:1;border:0;border-top:1px solid var(--line);margin:12px 0}
+.nb-pagelink{display:flex;align-items:center;gap:8px;flex:1;padding:4px 4px;border-radius:6px;color:var(--ink);text-decoration:none;font-weight:500;border-bottom:1px solid var(--line)}
+.nb-pagelink .ic{color:var(--p)}
+.nb-pagelink:hover{background:var(--tint)}
+/* colours, as in Notion */
+.c-gray .nb-text{color:#787774}.c-brown .nb-text{color:#9F6B53}.c-orange .nb-text{color:#D9730D}.c-yellow .nb-text{color:#CB912F}.c-green .nb-text{color:#448361}
+.c-blue .nb-text{color:#337EA9}.c-purple .nb-text{color:#9065B0}.c-pink .nb-text{color:#C14C8A}.c-red .nb-text{color:#D44C47}
+.c-gray_bg{background:#F1F1EF}.c-yellow_bg{background:#FBF3DB}.c-green_bg{background:#EDF3EC}.c-blue_bg{background:#E7F3F8}.c-purple_bg{background:#F6F3F9}.c-red_bg{background:#FDEBEC}
+/* block and "/" menus */
+.nb-menu{position:fixed;z-index:3000;width:min(300px,calc(100vw - 16px));max-height:360px;overflow-y:auto;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.14);padding:4px}
+.nb-menu-h{font-size:12px;color:var(--ink3);padding:6px 10px 4px;font-family:var(--font-main);font-size-adjust:var(--adj-main)}
+.nb-menu button{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;text-align:left;padding:7px 10px;border-radius:6px;font-size:14px;color:var(--ink);cursor:pointer;min-height:36px}
+.nb-menu button > span{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.nb-menu button:hover,.nb-menu button.on{background:var(--tint)}
+.nb-glyph{width:28px;height:24px;flex:none;display:grid;place-items:center;border:1px solid var(--line);border-radius:5px;font-size:11px;color:var(--ink2);background:#fff;font-family:var(--font-main)}
+.nb-swatch{width:24px;height:24px;flex:none;display:grid;place-items:center;border:1px solid var(--line);border-radius:5px;font-weight:600}
+.nb-swatch.c-gray{color:#787774}.nb-swatch.c-brown{color:#9F6B53}.nb-swatch.c-orange{color:#D9730D}.nb-swatch.c-yellow{color:#CB912F}.nb-swatch.c-green{color:#448361}.nb-swatch.c-blue{color:#337EA9}.nb-swatch.c-purple{color:#9065B0}.nb-swatch.c-pink{color:#C14C8A}.nb-swatch.c-red{color:#D44C47}
+.nb-tick{margin-left:auto;color:var(--p)}
+.nb-page.readonly .nb-gutter{display:none}
+@media (max-width:760px){
+  .nb-page{margin-top:12px;padding:0}
+  .nb-title{font-size:30px}
+  .nb-gutter{position:static;opacity:1;order:9;margin-left:auto}
+  .nb-add{display:none}
+  .nb-block{margin-left:calc(var(--lvl,0) * 18px)}
+  .t-h1 .nb-text,.t-th1 .nb-text{font-size:26px}.t-h2 .nb-text,.t-th2 .nb-text{font-size:22px}
+}
+@media (pointer:coarse){ .nb-handle{width:36px;height:36px} .nb-tog{width:36px;height:36px} .nb-menu button{min-height:44px} }
 </style>
 </head>
 <body>
@@ -3501,6 +3598,7 @@ async function openRecord(key, id, preset, opts){
   // Development tasks open in the simpler, Jira-style view (the full form is one click away from there)
   if (key === "tasks" && rec && rec.vertical === "Development" && !(opts && opts.form) && typeof openDevTask === "function") { openDevTask(rec.id); return; }
   // a new task starts with the simple form (the full one is behind "More options")
+  if (key === "notes" && !(opts && opts.form)) { if (rec) go("note=" + rec.id); else newNotePage(); return; }
   if (key === "tasks" && !rec && !(opts && opts.form) && typeof taskCreate === "function") { taskCreate(preset); return; }
   const A = access(M, rec);
   const editable = rec ? A.canEdit : A.canCreate;
@@ -5147,7 +5245,7 @@ function notesBoard(el, A){
   function draw(){
     grid.replaceChildren();
     const s = u.q.trim().toLowerCase();
-    let list = rows("notes").slice();
+    let list = rows("notes").filter(n => !n.parent_id || !byId("notes", n.parent_id));
     if (u.scope === "mine") list = list.filter(n => n.owner_id === S.me.id);
     if (u.scope === "shared") list = list.filter(n => n.owner_id !== S.me.id);
     if (s) list = list.filter(n => (n.title + " " + n.body).toLowerCase().includes(s));
@@ -5155,7 +5253,7 @@ function notesBoard(el, A){
     if (!list.length) grid.append(h("div", { class: "panel empty", style: "grid-column:1 / -1" }, h("b", {}, u.scope === "shared" ? "Nothing shared with you yet" : "No notes yet"), "Jot down ideas, meeting prep, specs or to-dos. Notes are private unless you share them."));
     for (const n of list){
       const t = byId("tasks", n.task_id), pr = byId("projects", n.project_id), mt = byId("meetings", n.meeting_id);
-      grid.append(h("button", { type: "button", class: "note-card" + (n.pinned && n.owner_id === S.me.id ? " pinned" : ""), onclick: () => openRecord("notes", n.id) },
+      grid.append(h("button", { type: "button", class: "note-card" + (n.pinned && n.owner_id === S.me.id ? " pinned" : ""), onclick: () => go("note=" + n.id) },
         h("div", { class: "nt" }, n.pinned && n.owner_id === S.me.id ? ic("pin", 14) : "", n.title || "Untitled"),
         h("div", { class: "nb" }, renderRich(String(n.body || "").slice(0, 260) + (String(n.body || "").length > 260 ? "…" : ""))),
         h("div", { class: "nm" }, pill(VIS_LABEL[n.visibility] || n.visibility, n.visibility === "Private" ? "grey" : "info"),
@@ -5166,6 +5264,433 @@ function notesBoard(el, A){
   q.addEventListener("input", () => { u.q = q.value; draw(); });
   el.append(h("div", { class: "tb" }, q, segmented([["all","All I can see"], ["mine","Mine"], ["shared","Shared with me"]], u.scope, v => { u.scope = v; draw(); })), grid);
   draw();
+}
+
+/* ---------------------------------------------------------------------
+   Notes as pages (Notion-style). A note is a list of blocks:
+   { id, type, html, level, checked, open, color, page }
+   type: text | h1 | h2 | h3 | h4 | bulleted | numbered | todo | toggle | th1 | th2 | th3 | quote | callout | code | divider | page
+   "level" indents a block; a toggle (or toggle heading) folds every following block with a deeper level.
+   The plain-text "body" is kept in sync, so search, @mentions and the cards keep working.
+   --------------------------------------------------------------------- */
+const NB_TYPES = [
+  ["text", "Text", "T"], ["h1", "Heading 1", "H1"], ["h2", "Heading 2", "H2"], ["h3", "Heading 3", "H3"], ["h4", "Heading 4", "H4"],
+  ["page", "Page", "▢"], ["bulleted", "Bulleted list", "•"], ["numbered", "Numbered list", "1."], ["todo", "To-do list", "☐"],
+  ["toggle", "Toggle list", "▸"], ["th1", "Toggle heading 1", "▸H1"], ["th2", "Toggle heading 2", "▸H2"], ["th3", "Toggle heading 3", "▸H3"],
+  ["quote", "Quote", "“"], ["callout", "Callout", "!"], ["code", "Code", "</>"], ["divider", "Divider", "—"]
+];
+const NB_COLORS = [["", "Default"], ["gray", "Gray"], ["brown", "Brown"], ["orange", "Orange"], ["yellow", "Yellow"], ["green", "Green"], ["blue", "Blue"], ["purple", "Purple"], ["pink", "Pink"], ["red", "Red"],
+  ["gray_bg", "Gray background"], ["yellow_bg", "Yellow background"], ["green_bg", "Green background"], ["blue_bg", "Blue background"], ["purple_bg", "Purple background"], ["red_bg", "Red background"]];
+const nbToggle = t => t === "toggle" || t === "th1" || t === "th2" || t === "th3";
+const nbId = () => "b" + Math.random().toString(36).slice(2, 10);
+// only simple inline formatting survives (bold, italic, underline, strike, code, links); everything else becomes text
+function nbClean(html){
+  const box = document.createElement("div"); box.innerHTML = String(html || "");
+  const walk = node => {
+    for (const ch of [...node.childNodes]){
+      if (ch.nodeType === 3) continue;
+      if (ch.nodeType !== 1) { ch.remove(); continue; }
+      const tag = ch.tagName.toLowerCase();
+      walk(ch);
+      const keep = { b: "b", strong: "b", i: "i", em: "i", u: "u", s: "s", strike: "s", code: "code", a: "a", br: "br" }[tag];
+      if (!keep) { ch.replaceWith(...ch.childNodes); continue; }
+      const el = document.createElement(keep);
+      if (keep === "a") { const href = safeUrl(ch.getAttribute("href") || ""); if (!href) { ch.replaceWith(...ch.childNodes); continue; } el.setAttribute("href", href); el.setAttribute("target", "_blank"); el.setAttribute("rel", "noopener"); }
+      el.append(...ch.childNodes); ch.replaceWith(el);
+    }
+  };
+  walk(box);
+  return box.innerHTML.replace(/(<br>)+$/, "");
+}
+const nbText = html => { const d = document.createElement("div"); d.innerHTML = String(html || "").replace(/<br>/g, "\n"); return d.textContent; };
+const nbEsc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+// an older note (plain text only) opens as blocks: lines become paragraphs, lists and headings
+function nbFromBody(body){
+  const out = [];
+  for (const line of String(body || "").split("\n")){
+    const m = line.match(/^(\s*)(#{1,4}\s|[-*•]\s|\d+[.)]\s|\[[ x]\]\s)?(.*)$/i);
+    const lvl = Math.min(4, Math.floor((m[1] || "").replace(/\t/g, "  ").length / 2)), mark = (m[2] || "").trim();
+    let type = "text", checked = false;
+    if (/^#{1,4}$/.test(mark)) type = "h" + mark.length;
+    else if (/^[-*•]$/.test(mark)) type = "bulleted";
+    else if (/^\d+[.)]$/.test(mark)) type = "numbered";
+    else if (/^\[[ x]\]$/i.test(mark)) { type = "todo"; checked = /x/i.test(mark); }
+    out.push({ id: nbId(), type, html: nbEsc(m[3]), level: lvl, checked });
+  }
+  while (out.length > 1 && !out[out.length - 1].html && out[out.length - 1].type === "text") out.pop();
+  return out.length ? out : [{ id: nbId(), type: "text", html: "", level: 0 }];
+}
+function nbNumbers(blocks){
+  const nums = []; const counters = [];
+  blocks.forEach((b, i) => {
+    if (b.type === "numbered"){ const prev = blocks[i - 1]; counters[b.level] = prev && prev.type === "numbered" && prev.level === b.level ? (counters[b.level] || 0) + 1 : (prev && prev.level > b.level && counters[b.level] ? counters[b.level] + 1 : 1); counters.length = b.level + 1; nums[i] = counters[b.level]; }
+    else if (!(b.level > 0 && blocks[i - 1] && blocks[i - 1].level >= b.level)) counters.length = Math.min(counters.length, b.level);
+  });
+  return nums;
+}
+// ---- export ----
+function nbToMarkdown(title, blocks){
+  const nums = nbNumbers(blocks);
+  const md = h => nbText(String(h || "").replace(/<(b|strong)>(.*?)<\/\1>/g, "**$2**").replace(/<(i|em)>(.*?)<\/\1>/g, "*$2*").replace(/<s>(.*?)<\/s>/g, "~~$1~~").replace(/<code>(.*?)<\/code>/g, "`$1`").replace(/<a href="([^"]*)"[^>]*>(.*?)<\/a>/g, "[$2]($1)"));
+  const lines = ["# " + (title || "Untitled"), ""];
+  blocks.forEach((b, i) => {
+    const pad = "  ".repeat(b.level || 0), t = md(b.html);
+    const L = { text: t, h1: "# " + t, h2: "## " + t, h3: "### " + t, h4: "#### " + t, th1: "# " + t, th2: "## " + t, th3: "### " + t, bulleted: "- " + t, numbered: (nums[i] || 1) + ". " + t,
+      todo: "- [" + (b.checked ? "x" : " ") + "] " + t, toggle: "- " + t, quote: "> " + t, callout: "> **Note:** " + t, code: "```\n" + nbText(b.html) + "\n```", divider: "---",
+      page: "📄 " + ((byId("notes", b.page) || {}).title || "Untitled page") }[b.type] ?? t;
+    lines.push(pad + L);
+  });
+  return lines.join("\n").replace(/\n{3,}/g, "\n\n") + "\n";
+}
+function nbToCsv(blocks){
+  const cell = v => /[",\n]/.test(v = String(v ?? "")) || /^[=+\-@]/.test(v) ? '"' + (/^[=+\-@]/.test(v) ? "'" : "") + v.replace(/"/g, '""') + '"' : v;
+  return ["Order,Type,Level,Done,Text"].concat(blocks.map((b, i) => [i + 1, (NB_TYPES.find(t => t[0] === b.type) || [, b.type])[1], b.level || 0, b.type === "todo" ? (b.checked ? "Yes" : "No") : "", b.type === "page" ? ((byId("notes", b.page) || {}).title || "Untitled page") : nbText(b.html)].map(cell).join(","))).join("\r\n") + "\r\n";
+}
+function nbToHtml(title, blocks, forPrint){
+  const nums = nbNumbers(blocks);
+  const body = blocks.map((b, i) => {
+    const st = "margin-left:" + ((b.level || 0) * 24) + "px", h = b.html || "";
+    if (b.type === "divider") return '<hr style="' + st + '">';
+    if (b.type === "page") return '<p style="' + st + '">📄 ' + nbEsc((byId("notes", b.page) || {}).title || "Untitled page") + "</p>";
+    const tag = { h1: "h1", h2: "h2", h3: "h3", h4: "h4", th1: "h1", th2: "h2", th3: "h3" }[b.type];
+    if (tag) return "<" + tag + ' style="' + st + '">' + h + "</" + tag + ">";
+    if (b.type === "bulleted" || b.type === "toggle") return '<p style="' + st + '">• ' + h + "</p>";
+    if (b.type === "numbered") return '<p style="' + st + '">' + (nums[i] || 1) + ". " + h + "</p>";
+    if (b.type === "todo") return '<p style="' + st + '">' + (b.checked ? "☑ <s>" + h + "</s>" : "☐ " + h) + "</p>";
+    if (b.type === "quote") return '<blockquote style="' + st + ';border-left:3px solid #999;padding-left:12px;margin-right:0">' + h + "</blockquote>";
+    if (b.type === "callout") return '<div style="' + st + ';background:#F4F4F5;border-radius:8px;padding:12px 14px;margin:8px 0">' + h + "</div>";
+    if (b.type === "code") return '<pre style="' + st + ';background:#F4F4F5;border-radius:8px;padding:12px 14px;white-space:pre-wrap;font-family:Menlo,Consolas,monospace;font-size:13px">' + nbEsc(nbText(h)) + "</pre>";
+    return '<p style="' + st + '">' + (h || "&nbsp;") + "</p>";
+  }).join("\n");
+  return '<!doctype html><html><head><meta charset="utf-8"><title>' + nbEsc(title || "Untitled") + '</title><style>body{font-family:Roboto,Arial,sans-serif;max-width:760px;margin:40px auto;padding:0 24px;color:#18181B;line-height:1.6;font-size:15px}h1,h2,h3,h4{font-family:Poppins,Arial,sans-serif;line-height:1.25;margin:1.2em 0 .4em}p{margin:.3em 0}code{background:#F4F4F5;padding:1px 4px;border-radius:4px}' + (forPrint ? "@page{margin:18mm}" : "") + '</style></head><body><h1 style="font-size:32px;margin-top:0">' + nbEsc(title || "Untitled") + "</h1>\n" + body + "</body></html>";
+}
+// a .zip without compression, for the Word file and for Markdown + CSV together
+function nbZip(files){
+  const enc = new TextEncoder(), crcT = nbZip.t || (nbZip.t = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; }));
+  const crc = d => { let c = 0xFFFFFFFF; for (const x of d) c = crcT[(c ^ x) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+  const parts = [], central = []; let off = 0;
+  const u16 = n => [n & 255, (n >>> 8) & 255], u32 = n => [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255];
+  for (const [name, text] of files){
+    const data = typeof text === "string" ? enc.encode(text) : text, nm = enc.encode(name), c = crc(data);
+    const head = [0x50, 0x4B, 3, 4, ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0x21), ...u32(c), ...u32(data.length), ...u32(data.length), ...u16(nm.length), ...u16(0)];
+    parts.push(new Uint8Array(head), nm, data);
+    central.push(new Uint8Array([0x50, 0x4B, 1, 2, ...u16(20), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0x21), ...u32(c), ...u32(data.length), ...u32(data.length), ...u16(nm.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(off)]), nm);
+    off += head.length + nm.length + data.length;
+  }
+  const cLen = central.reduce((s, p) => s + p.length, 0);
+  return new Blob([...parts, ...central, new Uint8Array([0x50, 0x4B, 5, 6, 0, 0, 0, 0, ...u16(files.length), ...u16(files.length), ...u32(cLen), ...u32(off), 0, 0])]);
+}
+function nbToDocx(title, blocks){
+  const x = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const nums = nbNumbers(blocks);
+  // inline formatting becomes Word runs
+  const runs = (html, base) => {
+    const box = document.createElement("div"); box.innerHTML = html || ""; const out = [];
+    const walk = (node, f) => { for (const ch of node.childNodes){ if (ch.nodeType === 3) { if (ch.textContent) out.push([ch.textContent, f]); continue; } if (ch.nodeType !== 1) continue; const t = ch.tagName.toLowerCase(); if (t === "br") { out.push(["\n", f]); continue; } walk(ch, Object.assign({}, f, { b: f.b || t === "b", i: f.i || t === "i", u: f.u || t === "u", s: f.s || t === "s", code: f.code || t === "code" })); } };
+    walk(box, base || {});
+    return out.map(([t, f]) => '<w:r><w:rPr>' + (f.b ? "<w:b/>" : "") + (f.i ? "<w:i/>" : "") + (f.u ? '<w:u w:val="single"/>' : "") + (f.s ? "<w:strike/>" : "") + (f.code ? '<w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/>' : "") + (f.sz ? '<w:sz w:val="' + f.sz + '"/>' : "") + "</w:rPr>" +
+      t.split("\n").map((p, k) => (k ? "<w:br/>" : "") + '<w:t xml:space="preserve">' + x(p) + "</w:t>").join("") + "</w:r>").join("");
+  };
+  const para = (inner, ind, extra) => '<w:p><w:pPr>' + (ind ? '<w:ind w:left="' + ind + '"/>' : "") + (extra || "") + "</w:pPr>" + inner + "</w:p>";
+  const SZ = { h1: 36, h2: 30, h3: 26, h4: 24, th1: 36, th2: 30, th3: 26 };
+  let body = para(runs(x(title || "Untitled"), { b: true, sz: 48 }), 0, '<w:spacing w:after="240"/>');
+  blocks.forEach((b, i) => {
+    const ind = (b.level || 0) * 360;
+    if (b.type === "divider") { body += para("", ind, '<w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="BBBBBB"/></w:pBdr>'); return; }
+    if (b.type === "page") { body += para(runs(x("📄 " + ((byId("notes", b.page) || {}).title || "Untitled page"))), ind); return; }
+    if (SZ[b.type]) { body += para(runs(b.html, { b: true, sz: SZ[b.type] }), ind, '<w:spacing w:before="240" w:after="80"/>'); return; }
+    const prefix = { bulleted: "• ", toggle: "▸ ", numbered: (nums[i] || 1) + ". ", todo: b.checked ? "☑ " : "☐ " }[b.type] || "";
+    if (b.type === "code") { body += para(runs(x(nbText(b.html)), { code: true }), ind, '<w:shd w:val="clear" w:color="auto" w:fill="F4F4F5"/>'); return; }
+    const shade = b.type === "callout" ? '<w:shd w:val="clear" w:color="auto" w:fill="F4F4F5"/>' : b.type === "quote" ? '<w:pBdr><w:left w:val="single" w:sz="18" w:space="8" w:color="999999"/></w:pBdr>' : "";
+    body += para(runs(x(prefix)) + runs(b.html, { s: b.type === "todo" && b.checked }), ind + (b.type === "quote" ? 240 : 0), shade);
+  });
+  const doc = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>' + body +
+    '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>';
+  return nbZip([
+    ["[Content_Types].xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>'],
+    ["_rels/.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>'],
+    ["word/document.xml", doc]
+  ]);
+}
+function nbDownload(name, blob){
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+}
+function nbExport(kind, note, blocks){
+  const title = note.title || "Untitled", file = (title.replace(/[\\/:*?"<>|]+/g, " ").trim().slice(0, 80) || "Note");
+  if (kind === "html") nbDownload(file + ".html", new Blob([nbToHtml(title, blocks)], { type: "text/html" }));
+  else if (kind === "md") nbDownload(file + ".zip", nbZip([[file + ".md", nbToMarkdown(title, blocks)], [file + ".csv", "﻿" + nbToCsv(blocks)]]));
+  else if (kind === "word") nbDownload(file + ".docx", new Blob([nbToDocx(title, blocks)], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
+  else if (kind === "pdf"){
+    // the browser's own print window: choose "Save as PDF"
+    const w = window.open("about:blank", "_blank");
+    if (!w) { toast("Allow pop-ups for this site to save a PDF."); return; }
+    w.opener = null; w.document.write(nbToHtml(title, blocks, true)); w.document.close();
+    setTimeout(() => { try { w.focus(); w.print(); } catch (e) {} }, 400);
+  }
+}
+
+// ---- the page ----
+async function renderNotePage(el, id){
+  await ensure(["notes", "tasks", "projects", "meetings"]);
+  let note = byId("notes", id);
+  if (!note){ try { note = ok(await sb.from("notes").select("*").eq("id", id).maybeSingle()); if (note) upsertCache("notes", note); } catch (e) {} }
+  if (!note){ el.append(h("div", { class: "panel empty" }, h("b", {}, "That note isn’t available"), "It may have been deleted, or it isn’t shared with you."), h("p", {}, h("a", { href: "#notes" }, "Back to Notes"))); return; }
+  const rich = "blocks" in note;   // the database has been upgraded for pages
+  const editable = note.owner_id === S.me.id;
+  let blocks = rich && Array.isArray(note.blocks) && note.blocks.length ? note.blocks.map(b => Object.assign({ id: nbId(), type: "text", html: "", level: 0 }, b)) : nbFromBody(note.body);
+  let title = note.title || "";
+  const state = { saveT: null, dirty: false, saving: false };
+
+  // breadcrumb: Notes › parent › … › this page
+  const chain = []; for (let p = note.parent_id && byId("notes", note.parent_id), k = 0; p && k < 8; p = p.parent_id && byId("notes", p.parent_id), k++) chain.unshift(p);
+  const status = h("span", { class: "nb-status muted" });
+  const exportBtn = h("button", { type: "button", class: "btn sm", "aria-haspopup": "menu", onclick: e => { e.stopPropagation(); nbMenu(exportBtn, [["pdf", "PDF"], ["html", "HTML"], ["md", "Markdown & CSV"], ["word", "Word file"]].map(([k, l]) => [l, () => nbExport(k, Object.assign({}, note, { title }), blocks)]), "Export as"); } }, ic("share", 15), "Export");
+  el.append(h("div", { class: "nb-top" },
+    h("nav", { class: "nb-crumbs", "aria-label": "Where this note is" }, h("a", { href: "#notes" }, "Notes"), chain.map(p => [h("span", { class: "nb-sep" }, "/"), h("a", { href: "#note=" + p.id }, p.title || "Untitled")]), h("span", { class: "nb-sep" }, "/"), h("span", {}, title || "Untitled")),
+    h("span", { class: "grow" }), status,
+    h("button", { type: "button", class: "btn sm", onclick: () => openRecord("notes", note.id, null, { form: true }) }, ic("users", 15), editable ? "Share & details" : "Details"), exportBtn));
+  if (!rich && editable) el.append(h("div", { class: "panel nb-warn" }, "Headings, lists and toggles are kept for this visit only until ", h("b", {}, "upgrade-2026-11bc.sql"), " has been run in Supabase. The text itself is saved."));
+
+  const titleEl = h("h1", { class: "nb-title", contenteditable: editable ? "true" : "false", "data-placeholder": "Untitled", spellcheck: "true" }, title);
+  const wrap = h("div", { class: "nb-blocks" });
+  el.append(h("article", { class: "nb-page" + (editable ? "" : " readonly") }, titleEl,
+    h("div", { class: "nb-meta muted" }, "By " + (pname(note.owner_id) || "someone") + " · edited " + fmtAgo(note.updated_at) + " · " + (VIS_LABEL[note.visibility] || note.visibility)), wrap));
+
+  const crumbHere = el.querySelector(".nb-crumbs > span:last-child");
+  titleEl.addEventListener("input", () => { title = titleEl.textContent.replace(/\n/g, " ").trim(); if (crumbHere) crumbHere.textContent = title || "Untitled"; $("crumb").textContent = title || "Note"; queueSave(); });
+  titleEl.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); focusBlock(0, 0); } });
+
+  // ---- saving ----
+  function setStatus(t){ status.textContent = t; }
+  function queueSave(){ if (!editable) return; state.dirty = true; setStatus("Editing…"); clearTimeout(state.saveT); state.saveT = setTimeout(save, 800); }
+  async function save(){
+    if (!state.dirty || state.saving) return;
+    state.saving = true; state.dirty = false; setStatus("Saving…");
+    const prev = Object.assign({}, note);
+    const d = { title: title || "Untitled", body: nbToMarkdown("", blocks).replace(/^# Untitled\n\n?/, "").replace(/^# \n\n?/, "").trim() };
+    if (rich) d.blocks = blocks.map(({ id, type, html, level, checked, open, color, page }) => ({ id, type, html, level: level || 0, checked: !!checked, open: open !== false, color: color || "", page: page || null }));
+    try { MOD.notes.before(d, prev); } catch (e) {}
+    try {
+      const row = await updateRow("notes", note.id, d);
+      note = Object.assign(note, row, { id: note.id });
+      try { MOD.notes.after(note, prev); } catch (e) {}
+      setStatus(row._unsynced ? "Saved on this device" : "Saved");
+    } catch (e) { state.dirty = true; setStatus("Not saved"); fail(e, "Couldn’t save the note"); }
+    state.saving = false;
+    if (state.dirty) queueSave();
+  }
+  // save before leaving the page
+  const leave = () => { if (state.dirty) { clearTimeout(state.saveT); save(); } window.removeEventListener("hashchange", leave); };
+  window.addEventListener("hashchange", leave);
+
+  // ---- drawing ----
+  function hiddenSet(){
+    const hidden = new Set(); let foldAt = null;
+    blocks.forEach((b, i) => {
+      if (foldAt !== null && (b.level || 0) > foldAt) { hidden.add(i); return; }
+      foldAt = null;
+      if (nbToggle(b.type) && b.open === false) foldAt = b.level || 0;
+    });
+    return hidden;
+  }
+  function draw(focusIdx, caret){
+    const nums = nbNumbers(blocks), hidden = hiddenSet();
+    wrap.replaceChildren(...blocks.map((b, i) => hidden.has(i) ? null : blockEl(b, i, nums[i])).filter(Boolean));
+    if (focusIdx != null) focusBlock(focusIdx, caret);
+  }
+  function blockEl(b, i, num){
+    const row = h("div", { class: "nb-block t-" + b.type + (b.color ? " c-" + b.color : ""), "data-i": i, style: "--lvl:" + (b.level || 0) });
+    if (editable){
+      const handle = h("button", { type: "button", class: "nb-handle", title: "Drag to move · click for options", "aria-label": "Block options", draggable: "true",
+        onclick: e => { e.stopPropagation(); blockMenu(handle, i); } }, "⋮⋮");
+      handle.addEventListener("dragstart", e => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(i)); row.classList.add("dragging"); });
+      handle.addEventListener("dragend", () => row.classList.remove("dragging"));
+      const add = h("button", { type: "button", class: "nb-add", title: "Add a block below", "aria-label": "Add a block below", onclick: () => { insertAfter(i, { type: "text" }); } }, "+");
+      row.append(h("div", { class: "nb-gutter" }, add, handle));
+      row.addEventListener("dragover", e => { e.preventDefault(); row.classList.add("drop"); });
+      row.addEventListener("dragleave", () => row.classList.remove("drop"));
+      row.addEventListener("drop", e => { e.preventDefault(); row.classList.remove("drop"); const from = +e.dataTransfer.getData("text/plain"); if (Number.isInteger(from) && from !== i) moveBlock(from, i); });
+    }
+    if (b.type === "divider") { row.append(h("hr", { class: "nb-hr" })); return row; }
+    if (b.type === "page"){
+      const p = byId("notes", b.page);
+      row.append(h("a", { class: "nb-pagelink", href: "#note=" + b.page }, ic("fileText", 18), h("span", {}, p ? (p.title || "Untitled") : "Page not available")));
+      return row;
+    }
+    // the marker in front: bullet, number, checkbox or toggle arrow
+    if (b.type === "bulleted") row.append(h("span", { class: "nb-mark" }, ["•", "◦", "▪"][(b.level || 0) % 3]));
+    if (b.type === "numbered") row.append(h("span", { class: "nb-mark num" }, (num || 1) + "."));
+    if (b.type === "todo") row.append(h("input", { type: "checkbox", class: "nb-check", checked: !!b.checked, disabled: !editable, "aria-label": "Done", onchange: e => { b.checked = e.target.checked; row.classList.toggle("done", b.checked); queueSave(); } }));
+    if (nbToggle(b.type)) row.append(h("button", { type: "button", class: "nb-tog" + (b.open !== false ? " open" : ""), "aria-label": b.open !== false ? "Close" : "Open", "aria-expanded": String(b.open !== false),
+      onclick: () => { b.open = b.open === false; queueSave(); draw(); } }, ic("chevronRight", 16)));
+    if (b.type === "callout") row.append(h("span", { class: "nb-mark" }, "💡"));
+    if (b.type === "todo" && b.checked) row.classList.add("done");
+    const ed = h(b.type === "code" ? "pre" : "div", { class: "nb-text", contenteditable: editable ? "true" : "false", spellcheck: b.type === "code" ? "false" : "true",
+      "data-placeholder": i === 0 && blocks.length === 1 ? "Start writing, or type / for headings, lists, toggles…" : (NB_TYPES.find(t => t[0] === b.type) || [, , ""])[1] && b.type !== "text" ? (NB_TYPES.find(t => t[0] === b.type) || [, ""])[1] : "" });
+    ed.innerHTML = b.html || "";
+    if (editable) wire(ed, b, i);
+    row.append(ed);
+    // a closed toggle with nothing inside says so
+    return row;
+  }
+  // ---- editing ----
+  const caretAt = el => { const s = getSelection(); if (!s.rangeCount || !el.contains(s.anchorNode)) return { start: 0, end: 0 }; const r = s.getRangeAt(0), pre = r.cloneRange(); pre.selectNodeContents(el); pre.setEnd(r.startContainer, r.startOffset); const start = pre.toString().length; return { start, end: start + r.toString().length }; };
+  function focusBlock(i, caret){
+    const ed = wrap.querySelector('.nb-block[data-i="' + i + '"] .nb-text'); if (!ed) return;
+    ed.focus();
+    const len = ed.textContent.length, want = caret === "end" || caret == null ? len : Math.min(caret, len);
+    const walker = document.createTreeWalker(ed, NodeFilter.SHOW_TEXT); let n, left = want, node = null, off = 0;
+    while ((n = walker.nextNode())) { if (left <= n.textContent.length) { node = n; off = left; break; } left -= n.textContent.length; }
+    const r = document.createRange(); if (node) r.setStart(node, off); else { r.selectNodeContents(ed); r.collapse(false); } r.collapse(true);
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+  }
+  function insertAfter(i, b, keepFocus){
+    const base = blocks[i] || { level: 0 };
+    const nb = Object.assign({ id: nbId(), type: "text", html: "", level: base.level || 0 }, b);
+    // the first line inside an open toggle goes one level in
+    if (base && nbToggle(base.type) && base.open !== false && !b.level && b.level !== 0) nb.level = (base.level || 0) + 1;
+    blocks.splice(i + 1, 0, nb); queueSave(); if (!keepFocus) draw(i + 1, 0); return nb;
+  }
+  function moveBlock(from, to){
+    // a toggle moves with everything folded under it
+    const lvl = blocks[from].level || 0; let end = from + 1;
+    if (nbToggle(blocks[from].type)) while (end < blocks.length && (blocks[end].level || 0) > lvl) end++;
+    const chunk = blocks.splice(from, end - from);
+    const at = to > from ? to - chunk.length + 1 : to;
+    blocks.splice(Math.max(0, Math.min(blocks.length, at)), 0, ...chunk); queueSave(); draw();
+  }
+  async function turnInto(i, type){
+    const b = blocks[i];
+    if (type === "page"){
+      if (!rich) { toast("Sub-pages need upgrade-2026-11bc.sql to be run in Supabase first."); return; }
+      try {
+        const child = await insertRow("notes", { title: nbText(b.html).trim() || "Untitled", body: "", blocks: [], parent_id: note.id, owner_id: S.me.id, visibility: note.visibility, shared_with: note.shared_with || [], vertical: note.vertical || null });
+        Object.assign(b, { type: "page", html: "", page: child.id }); queueSave(); draw(); await save();
+      } catch (e) { fail(e, "Couldn’t make the page"); }
+      return;
+    }
+    if (type === "divider") { b.type = "divider"; b.html = ""; if (i === blocks.length - 1) insertAfter(i, { type: "text" }, true); queueSave(); draw(i + 1, 0); return; }
+    b.type = type; if (nbToggle(type) && b.open === undefined) b.open = true; queueSave(); draw(i, "end");
+  }
+  function wire(ed, b, i){
+    ed.addEventListener("input", () => {
+      b.html = nbClean(ed.innerHTML);
+      // typing shortcuts at the start of a line, like Notion
+      const t = ed.textContent, sc = { "# ": "h1", "## ": "h2", "### ": "h3", "#### ": "h4", "- ": "bulleted", "* ": "bulleted", "1. ": "numbered", "[] ": "todo", "> ": "toggle", '" ': "quote", "``` ": "code" }[t.replace(/ /g, " ")];
+      if (sc && b.type === "text") { b.html = ""; b.type = sc; if (nbToggle(sc)) b.open = true; queueSave(); draw(i, 0); return; }
+      // the same when the text arrives in one go (pasted, or typed by a keyboard app): "## Heading" becomes a heading
+      const mm = b.type === "text" && t.replace(/ /g, " ").match(/^(####|###|##|#|-|\*|1\.|\[\]|>|"|```) (?=\S)/);
+      if (mm) {
+        const sc2 = { "#": "h1", "##": "h2", "###": "h3", "####": "h4", "-": "bulleted", "*": "bulleted", "1.": "numbered", "[]": "todo", ">": "toggle", '"': "quote", "```": "code" }[mm[1]];
+        b.html = nbEsc(t.replace(/ /g, " ").slice(mm[0].length)); b.type = sc2; if (nbToggle(sc2)) b.open = true; queueSave(); draw(i, "end"); return;
+      }
+      if (t === "---" && b.type === "text") { turnInto(i, "divider"); return; }
+      if (/(^|\s)\/[\w ]*$/.test(t.slice(0, caretAt(ed).start))) slashMenu(ed, i); else closeNbMenu();
+      queueSave();
+    });
+    ed.addEventListener("paste", e => {
+      // plain text only; several lines become several blocks
+      e.preventDefault();
+      const text = (e.clipboardData || window.clipboardData).getData("text/plain"); if (!text) return;
+      const lines = text.replace(/\r/g, "").split("\n");
+      document.execCommand("insertText", false, lines[0]);
+      if (lines.length > 1){ const more = nbFromBody(lines.slice(1).join("\n")).map(x => Object.assign(x, { level: (b.level || 0) + (x.level || 0) })); b.html = nbClean(ed.innerHTML); blocks.splice(i + 1, 0, ...more); queueSave(); draw(i + more.length, "end"); }
+      else { b.html = nbClean(ed.innerHTML); queueSave(); }
+    });
+    ed.addEventListener("keydown", e => {
+      if (nbMenuOpen() && ["ArrowDown", "ArrowUp", "Enter", "Escape"].includes(e.key)) { e.preventDefault(); nbMenuKey(e.key); return; }
+      const c = caretAt(ed), len = ed.textContent.length;
+      if (e.key === "Enter" && !e.shiftKey && b.type !== "code"){
+        e.preventDefault();
+        if (!ed.textContent && ["bulleted", "numbered", "todo", "toggle", "quote", "callout"].includes(b.type)) { if (b.level) b.level--; else b.type = "text"; queueSave(); draw(i, 0); return; }   // an empty list item ends the list
+        // split at the caret, keeping bold / italic / links on both sides
+        const s = getSelection(); const r = s.rangeCount ? s.getRangeAt(0) : null; let tail = "";
+        if (r && ed.contains(r.startContainer)) { r.deleteContents(); const after = document.createRange(); after.setStart(r.startContainer, r.startOffset); after.setEnd(ed, ed.childNodes.length); const box = document.createElement("div"); box.append(after.extractContents()); tail = nbClean(box.innerHTML); }
+        b.html = nbClean(ed.innerHTML);
+        const keepType = ["bulleted", "numbered", "todo"].includes(b.type) ? b.type : "text";
+        const nb = { id: nbId(), type: keepType, html: tail, level: b.level || 0 };
+        if (nbToggle(b.type) && b.open !== false) nb.level = (b.level || 0) + 1;
+        blocks.splice(i + 1, 0, nb); queueSave(); draw(i + 1, 0); return;
+      }
+      if (e.key === "Backspace" && c.start === 0 && c.end === 0){
+        if (b.type !== "text" && b.type !== "page") { e.preventDefault(); b.type = "text"; queueSave(); draw(i, 0); return; }
+        if (b.level) { e.preventDefault(); b.level--; queueSave(); draw(i, 0); return; }
+        if (i > 0){
+          e.preventDefault();
+          let j = i - 1; const hid = hiddenSet(); while (j > 0 && hid.has(j)) j--;
+          const prev = blocks[j];
+          if (prev.type === "divider" || prev.type === "page") { blocks.splice(j, 1); queueSave(); draw(j, 0); return; }
+          const at = nbText(prev.html).length; prev.html = nbClean((prev.html || "") + (b.html || "")); blocks.splice(i, 1); queueSave(); draw(j, at); return;
+        }
+      }
+      if (e.key === "Tab"){ e.preventDefault(); if (e.shiftKey) { if (b.level) b.level--; } else if (i > 0 && (b.level || 0) <= (blocks[i - 1].level || 0)) b.level = (b.level || 0) + 1; queueSave(); draw(i, c.start); return; }
+      if (e.key === "ArrowUp" && c.start === 0) { const hid = hiddenSet(); let j = i - 1; while (j >= 0 && (hid.has(j) || blocks[j].type === "divider" || blocks[j].type === "page")) j--; if (j >= 0) { e.preventDefault(); focusBlock(j, "end"); } else { e.preventDefault(); titleEl.focus(); } return; }
+      if (e.key === "ArrowDown" && c.end === len) { const hid = hiddenSet(); let j = i + 1; while (j < blocks.length && (hid.has(j) || blocks[j].type === "divider" || blocks[j].type === "page")) j++; if (j < blocks.length) { e.preventDefault(); focusBlock(j, 0); } return; }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "d") { e.preventDefault(); blocks.splice(i + 1, 0, Object.assign({}, b, { id: nbId() })); queueSave(); draw(i + 1, "end"); }
+    });
+    ed.addEventListener("blur", () => { b.html = nbClean(ed.innerHTML); });
+  }
+  // ---- menus: the block handle, "/" commands, and export ----
+  function blockMenu(anchor, i){
+    const b = blocks[i];
+    nbMenu(anchor, [
+      ["Turn into", () => nbMenu(anchor, NB_TYPES.map(([t, l, g]) => [h("span", {}, h("span", { class: "nb-glyph" }, g), l, b.type === t ? h("span", { class: "nb-tick" }, "✓") : null), () => turnInto(i, t)]), "Turn into")],
+      ["Color", () => nbMenu(anchor, NB_COLORS.map(([c, l]) => [h("span", {}, h("span", { class: "nb-swatch c-" + (c || "none") }, "A"), l, (b.color || "") === c ? h("span", { class: "nb-tick" }, "✓") : null), () => { b.color = c; queueSave(); draw(); }]), "Color")],
+      ["Duplicate", () => { blocks.splice(i + 1, 0, Object.assign({}, b, { id: nbId() })); queueSave(); draw(i + 1, "end"); }],
+      ["Move up", () => { if (i > 0) moveBlock(i, i - 1); }],
+      ["Move down", () => { if (i < blocks.length - 1) moveBlock(i, i + 1); }],
+      ["Delete", () => { if (b.type === "page" && !confirm("Remove the link to this page? The page itself stays (open it to delete it).")) return; blocks.splice(i, 1); if (!blocks.length) blocks.push({ id: nbId(), type: "text", html: "", level: 0 }); queueSave(); draw(Math.max(0, i - 1), "end"); }]
+    ], (NB_TYPES.find(t => t[0] === b.type) || [, "Block"])[1]);
+  }
+  function slashMenu(ed, i){
+    const t = ed.textContent.slice(0, caretAt(ed).start), m = t.match(/\/([\w ]*)$/), q = (m ? m[1] : "").toLowerCase().trim();
+    const list = NB_TYPES.filter(([, l]) => !q || l.toLowerCase().includes(q));
+    if (!list.length) { closeNbMenu(); return; }
+    nbMenu(ed, list.map(([ty, l, g]) => [h("span", {}, h("span", { class: "nb-glyph" }, g), l), () => {
+      // remove the "/word" that was typed, then change the block
+      const b = blocks[i]; const txt = nbText(b.html); const cut = txt.lastIndexOf("/" + (m ? m[1] : ""));
+      b.html = nbEsc(txt.slice(0, cut) + txt.slice(cut + 1 + (m ? m[1].length : 0))).replace(/\n/g, "<br>");
+      turnInto(i, ty);
+    }]), "Blocks", true);
+  }
+  draw();
+  // the page is put on screen just after this; then the cursor goes to the title of a new note
+  if (editable) setTimeout(() => { if (!titleEl.isConnected) return; if (!title) titleEl.focus(); }, 0);
+}
+// one small menu at a time, placed under what opened it (stays on screen on phones)
+let nbMenuEl = null, nbMenuSel = 0;
+const nbMenuOpen = () => !!(nbMenuEl && nbMenuEl.isConnected);
+function closeNbMenu(){ if (nbMenuEl) { nbMenuEl.remove(); nbMenuEl = null; } }
+function nbMenu(anchor, items, heading, keepFocus){
+  closeNbMenu();
+  const menu = h("div", { class: "nb-menu", role: "menu" }, heading ? h("div", { class: "nb-menu-h" }, heading) : null,
+    items.map(([label, fn], k) => h("button", { type: "button", role: "menuitem", class: k === 0 ? "on" : null, onmousedown: e => e.preventDefault(), onclick: e => { e.stopPropagation(); closeNbMenu(); fn(); } }, label)));
+  document.body.append(menu); nbMenuEl = menu; nbMenuSel = 0;
+  const r = anchor.getBoundingClientRect(), mw = Math.min(300, window.innerWidth - 16);
+  menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - mw - 8)) + "px";
+  const below = r.bottom + 6, mh = Math.min(menu.scrollHeight, 360);
+  menu.style.top = (below + mh > window.innerHeight - 8 && r.top - mh - 6 > 8 ? r.top - mh - 6 : Math.min(below, window.innerHeight - mh - 8)) + "px";
+  if (!keepFocus) { const first = menu.querySelector("button"); if (first) first.focus(); }
+  setTimeout(() => document.addEventListener("click", function off(e){ if (!menu.contains(e.target)) { closeNbMenu(); document.removeEventListener("click", off); } }), 0);
+}
+function nbMenuKey(key){
+  if (!nbMenuEl) return;
+  const btns = [...nbMenuEl.querySelectorAll("button")];
+  if (key === "Escape") { closeNbMenu(); return; }
+  if (key === "Enter") { const b = btns[nbMenuSel]; if (b) b.click(); return; }
+  nbMenuSel = (nbMenuSel + (key === "ArrowDown" ? 1 : -1) + btns.length) % btns.length;
+  btns.forEach((b, k) => b.classList.toggle("on", k === nbMenuSel)); btns[nbMenuSel].scrollIntoView({ block: "nearest" });
+}
+document.addEventListener("keydown", e => { if (e.key === "Escape" && nbMenuOpen()) closeNbMenu(); });
+// a new note opens straight away as an empty page
+async function newNotePage(parent){
+  try {
+    const d = { title: "", body: "", owner_id: S.me.id, visibility: parent ? parent.visibility : "Private", shared_with: parent ? (parent.shared_with || []) : [], vertical: S.me.vertical || null };
+    if (parent) d.parent_id = parent.id;
+    const row = await insertRow("notes", d);
+    go("note=" + row.id);
+  } catch (e) { fail(e, "Couldn’t start a note"); }
 }
 
 // for the preview's automated tests only
@@ -8083,7 +8608,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11bb";
+const APP_VERSION = "2026-11bc";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -9921,6 +10446,7 @@ const NAV = [
 ];
 function canSee(route){
   if (["dashboard","calendar","team-calendar","people","attendance","tasks","holidays","chat"].includes(route)) return true;
+  if (route.startsWith("note=")) return canSee("notes");
   if (route === "overview") return isAdmin();
   if (route === "dev" || route === "dev-board" || route === "dev-backlog" || route === "dev-reports") return isAdmin() || S.me.vertical === "Development" || lvl("projects") >= 1 || lvl("qa") >= 1;
   if (route === "sales") return isAdmin() || S.me.vertical === "Sales" || lvl("sales") >= 1;
@@ -9970,10 +10496,38 @@ function setSideHidden(hidden){
   document.body.classList.toggle("side-off", hidden);
   try { localStorage.setItem("tc_side_off", hidden ? "1" : ""); } catch (e) {}
 }
+// Sidebar › Notes opens into the list of notes, like pages in Notion; a page with sub-pages opens into those too
+const notesTreeOpen = () => { try { return localStorage.getItem("tc_notes_tree") === "1"; } catch (e) { return false; } };
+function notesTreeSet(){ try { return new Set(JSON.parse(localStorage.getItem("tc_notes_open") || "[]")); } catch (e) { return new Set(); } }
+function notesTree(link, side){
+  const open = notesTreeOpen();
+  const exp = h("button", { type: "button", class: "nav-exp" + (open ? " open" : ""), "aria-expanded": String(open), title: open ? "Hide notes" : "Show notes", "aria-label": open ? "Hide notes" : "Show notes",
+    onclick: e => { e.preventDefault(); e.stopPropagation(); try { localStorage.setItem("tc_notes_tree", open ? "" : "1"); } catch (x) {} shellKey = ""; renderShell(); } }, ic("chevronRight", 16));
+  const rowEl = h("div", { class: "nav-row" }, link, exp);
+  if (!open) return rowEl;
+  if (!S.loaded.has("notes")) { load("notes").then(() => { shellKey = ""; renderShell(); }).catch(() => {}); return [rowEl, h("div", { class: "nav-tree" }, h("span", { class: "nav-tree-empty" }, "Loading…"))]; }
+  const all = rows("notes"), kids = new Map();
+  for (const n of all) { const p = n.parent_id && byId("notes", n.parent_id) ? n.parent_id : ""; if (!kids.has(p)) kids.set(p, []); kids.get(p).push(n); }
+  for (const list of kids.values()) list.sort((a, b) => ((b.pinned && b.owner_id === S.me.id) - (a.pinned && a.owner_id === S.me.id)) || String(b.updated_at).localeCompare(String(a.updated_at)));
+  const cur = S.route.startsWith("note=") ? S.route.slice(5) : "";
+  const openSet = notesTreeSet();
+  for (let p = cur && byId("notes", cur); p && p.parent_id; p = byId("notes", p.parent_id)) openSet.add(p.parent_id);   // the open page's parents are open
+  const item = (n, depth) => {
+    const ch = kids.get(n.id) || [], isOpen = openSet.has(n.id);
+    const tog = ch.length ? h("button", { type: "button", class: "nav-tree-tog" + (isOpen ? " open" : ""), "aria-label": (isOpen ? "Hide" : "Show") + " pages inside " + (n.title || "Untitled"),
+      onclick: e => { e.preventDefault(); e.stopPropagation(); const st = notesTreeSet(); if (st.has(n.id)) st.delete(n.id); else st.add(n.id); try { localStorage.setItem("tc_notes_open", JSON.stringify([...st])); } catch (x) {} shellKey = ""; renderShell(); } }, ic("chevronRight", 14)) : h("span", { class: "nav-tree-tog none" });
+    const a = h("a", { href: "#note=" + n.id, class: "nav-tree-item" + (cur === n.id ? " on" : ""), style: "--d:" + depth, onclick: () => side.classList.remove("open") }, tog, ic("fileText", 16), h("span", { class: "nl" }, n.title || "Untitled"));
+    return [a, isOpen ? ch.slice(0, 50).map(c => item(c, depth + 1)) : null];
+  };
+  const top = (kids.get("") || []).slice(0, 30);
+  return [rowEl, h("div", { class: "nav-tree" }, top.map(n => item(n, 0)),
+    (kids.get("") || []).length > 30 ? h("a", { href: "#notes", class: "nav-tree-item more", onclick: () => side.classList.remove("open") }, h("span", { class: "nav-tree-tog none" }), h("span", { class: "nl" }, "All notes…")) : null,
+    h("button", { type: "button", class: "nav-tree-item new", onclick: () => { side.classList.remove("open"); newNotePage(); } }, h("span", { class: "nav-tree-tog none" }), ic("squarePen", 16), h("span", { class: "nl" }, "New page")))];
+}
 function renderShell(){
   bugButton();
   const side = $("side");
-  const label0 = (NAV.flatMap(([, i]) => i).find(([r]) => r === S.route) || [null, S.route.startsWith("admin-") ? "Admin panel" : ""])[1];
+  const label0 = S.route.startsWith("note=") ? ((byId("notes", S.route.slice(5)) || {}).title || "Note") : (NAV.flatMap(([, i]) => i).find(([r]) => r === S.route) || [null, S.route.startsWith("admin-") ? "Admin panel" : ""])[1];
   $("crumb").textContent = label0 || "";
   const unread0 = S.notifications.filter(n => !n.is_read).length;
   const dot0 = $("bell").querySelector(".dot");
@@ -9981,7 +10535,8 @@ function renderShell(){
   // rebuild the sidebar only when something in it actually changed
   const role = byId("roles", S.me.role_id);
   const key = JSON.stringify([S.route, S.me.full_name, S.me.vertical, S.me.is_admin, role && role.permissions, S.settings.company,
-    NAV.flatMap(([, i]) => i).map(([r]) => { const b = badgeInfo(r); return [b.due, b.fresh, b.bang ? 1 : 0]; }), JSON.stringify(navState())]);
+    NAV.flatMap(([, i]) => i).map(([r]) => { const b = badgeInfo(r); return [b.due, b.fresh, b.bang ? 1 : 0]; }), JSON.stringify(navState()),
+    notesTreeOpen() && S.loaded.has("notes") ? rows("notes").map(n => n.id + (n.title || "") + (n.parent_id || "")).join("|") + [...notesTreeSet()].join(",") : ""]);
   if (key === shellKey && side.children.length) return;
   shellKey = key;
   const oldNav = side.querySelector(".nav");
@@ -10022,7 +10577,8 @@ function renderShell(){
     const links = visible.map(([r, l]) => {
       const badge = navBadge(r);
       const on = S.route === r || (r === "admin-users" && S.route.startsWith("admin-"));
-      return h("a", { href: "#" + r, class: on ? "on" : null, "data-label": l.toLowerCase(), onclick: () => side.classList.remove("open") }, h("span", { class: "nic" }, ic(ROUTE_ICON[r] || "file", 18)), h("span", { class: "nl" }, l), badge);
+      const link = h("a", { href: "#" + r, class: on ? "on" : null, "data-label": l.toLowerCase(), onclick: () => side.classList.remove("open") }, h("span", { class: "nic" }, ic(ROUTE_ICON[r] || "file", 18)), h("span", { class: "nl" }, l), badge);
+      return r === "notes" ? notesTree(link, side) : link;
     });
     if (!group || group === "Admin") { nav.append(h("div", { class: "nav-group" }, h("h4", {}, group || "Workspace"), links)); continue; }
     // collapsible section: remembers open/closed, and shows the section's totals when closed
@@ -10093,6 +10649,7 @@ async function rerender(){
     else if (route === "admin-problems") await renderAdminProblems(page);
     else if (route === "admin-day") await renderAdminDay(page);
     else if (route === "admin-work") await renderAdminWork(page);
+    else if (route.startsWith("note=")) await renderNotePage(page, route.slice(5));
     else if (route === "admin-storage") await renderAdminStorage(page);
     else if (route === "team-calendar") await renderTeamCalendar(page);
     else if (route === "holidays") renderHolidays(page);
