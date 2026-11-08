@@ -1,5 +1,11 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11av (8 Nov 2026): Montserrat and Roboto
+Needs: upload `index.html` and `sw.js`.
+- **Montserrat** is the main font: page titles, headings, the sidebar menu, buttons, field labels, table headings and key figures.
+- **Roboto** is the second font: body text, descriptions, tables, chat messages, notes and everything you type.
+- Task IDs, counts and keyboard hints keep the fixed-width font (JetBrains Mono).
+
 ## Version 2026-11au (8 Nov 2026): white sidebar
 Needs: upload `index.html` and `sw.js`.
 - The sidebar's background is white (#FFFFFF), with the hairline edge separating it from the page. Layout unchanged.
