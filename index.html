@@ -1852,6 +1852,75 @@ dialog{border-radius:var(--r-xl)}
 .nb-dropline{position:absolute;left:0;right:0;height:3px;border-radius:2px;background:var(--p);pointer-events:none;z-index:5}
 .nb-handle{touch-action:none}
 body.nb-moving,body.nb-moving *{cursor:grabbing!important;user-select:none!important;-webkit-user-select:none!important}
+
+/* ---------- note pages styled like Notion (2026-11bs) ----------
+   White page, one reading column (708px), one typeface, Notion's sizes and spacing, a quiet top bar,
+   and the heading outline on the right edge. Only note pages (".nb-view") change. */
+.main:has(.nb-view),.main:has(.nb-view) .content{background:#fff}
+.main:has(.nb-view) .topbar{background:rgba(255,255,255,.94);border-bottom-color:transparent}
+.nb-view{--nb-ink:#2F2E2B;--nb-ink2:#73726E;--nb-ink3:#A5A4A0;--nb-hover:#F1F1EF;color:var(--nb-ink)}
+.nb-view .nb-top{flex-wrap:nowrap;gap:2px;margin:-6px -6px 0;min-height:40px}
+.nb-view .nb-top .btn,.nb-view .nb-top .iconbtn{background:transparent;border-color:transparent;box-shadow:none;color:var(--nb-ink2);font-weight:500;min-height:30px;height:30px;padding:0 8px;border-radius:6px;white-space:nowrap}
+.nb-view .nb-top .iconbtn{width:30px;padding:0}
+.nb-view .nb-top .btn:hover,.nb-view .nb-top .iconbtn:hover{background:var(--nb-hover);color:var(--nb-ink)}
+.nb-view .nb-top .btn .ic,.nb-view .nb-top .iconbtn .ic{color:currentColor}
+.nb-view .nb-crumbs{flex-wrap:nowrap;min-width:0;overflow:hidden;color:var(--nb-ink2)}
+.nb-view .nb-crumbs > *{white-space:nowrap}
+.nb-view .nb-crumbs > span:last-child{overflow:hidden;text-overflow:ellipsis;color:var(--nb-ink)}
+.nb-view .nb-status{color:var(--nb-ink3);white-space:nowrap}
+.nb-view .nb-page{max-width:708px;margin:64px auto 30vh;padding:0}
+.nb-view .nb-title,.nb-view .nb-text,.nb-view .nb-mark,.nb-view .nb-caption{font-family:var(--font-text);font-size-adjust:none}
+.nb-view .nb-title{font-size:40px;font-weight:700;line-height:1.2;letter-spacing:-.015em;color:var(--nb-ink);margin:0 0 6px}
+.nb-view .nb-meta{font-size:13px;color:var(--nb-ink3);margin-bottom:28px}
+.nb-view .nb-block{padding:0;margin-top:0;margin-bottom:0;--lh:24px;--mt:0px}
+.nb-view .nb-block.t-text{margin-top:4px;margin-bottom:4px}
+.nb-view .nb-text{font-size:16px;line-height:1.5;min-height:calc(1.5em + 6px);padding:3px 2px;color:inherit}
+.nb-view .t-h1 .nb-text,.nb-view .t-th1 .nb-text{font-size:30px;font-weight:700;line-height:1.3;margin-top:28px;letter-spacing:-.01em}
+.nb-view .t-h2 .nb-text,.nb-view .t-th2 .nb-text{font-size:24px;font-weight:700;line-height:1.3;margin-top:22px;letter-spacing:-.005em}
+.nb-view .t-h3 .nb-text,.nb-view .t-th3 .nb-text{font-size:20px;font-weight:600;line-height:1.3;margin-top:16px}
+.nb-view .t-h4 .nb-text{font-size:17px;font-weight:600;line-height:1.4;margin-top:10px}
+.nb-view .t-h1,.nb-view .t-th1{--lh:39px;--mt:28px}
+.nb-view .t-h2,.nb-view .t-th2{--lh:31.2px;--mt:22px}
+.nb-view .t-h3,.nb-view .t-th3{--lh:26px;--mt:16px}
+.nb-view .t-h4{--lh:23.8px;--mt:10px}
+.nb-view .nb-block:first-child .nb-text{margin-top:0}
+.nb-view .nb-block:first-child{--mt:0px}
+.nb-view .nb-gutter{top:calc(3px + var(--mt) + (var(--lh) - 24px) / 2)}
+.nb-view .nb-mark{font-size:16px;line-height:24px;padding-top:3px;min-width:24px;color:var(--nb-ink)}
+.nb-view .nb-mark.num{padding-right:4px}
+.nb-view .nb-check{margin-top:6px}
+.nb-view .nb-tog{height:24px;margin-top:calc(3px + var(--mt) + (var(--lh) - 24px) / 2)!important}
+.nb-view .t-quote{border-left:3px solid currentColor;padding-left:14px;margin:4px 0}
+.nb-view .t-callout{background:#F1F1EF;border-radius:6px;padding:12px 14px 12px 12px;margin:4px 0}
+.nb-view .t-code .nb-text{background:#F7F6F3;border:0;border-radius:6px;padding:16px 20px;font-size:14px;line-height:1.6}
+.nb-view .nb-hr{border-top-color:#E9E9E7;margin:12px 0}
+.nb-view .nb-pagelink{border-bottom:0;font-weight:500;padding:3px 2px;text-decoration:underline;text-decoration-color:#D3D1CB;text-underline-offset:3px}
+.nb-view .nb-caption{color:var(--nb-ink2)}
+.nb-view .nb-requests,.nb-view .nb-archived,.nb-view .nb-warn{max-width:708px;margin-left:auto;margin-right:auto}
+/* outline on the right edge */
+.nb-outline{position:fixed;right:14px;top:max(120px,32vh);z-index:30;display:flex;flex-direction:column;gap:0;padding:6px;border-radius:10px;max-height:56vh;overflow:hidden auto;width:28px;transition:width .12s}
+.nb-outline[hidden]{display:none}
+.nb-ol{display:flex;align-items:center;justify-content:flex-end;gap:10px;border:0;background:none;padding:0;min-height:18px;cursor:pointer;text-align:left;color:var(--nb-ink2);font:inherit;font-size:13px;border-radius:4px}
+.nb-ol-dash{flex:none;height:2px;border-radius:1px;background:#D3D1CB;width:16px}
+.nb-ol.l2 .nb-ol-dash{width:12px}.nb-ol.l3 .nb-ol-dash{width:8px}
+.nb-ol.on .nb-ol-dash{background:var(--nb-ink)}
+.nb-ol-text{display:none;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nb-outline:hover{width:240px;background:#fff;box-shadow:0 8px 28px rgba(15,15,15,.12),0 0 0 1px rgba(15,15,15,.06);padding:8px}
+.nb-outline:hover .nb-ol{justify-content:flex-start;min-height:28px;padding:0 8px}
+.nb-outline:hover .nb-ol-dash{display:none}
+.nb-outline:hover .nb-ol-text{display:block}
+.nb-outline:hover .nb-ol.l2{padding-left:20px}.nb-outline:hover .nb-ol.l3{padding-left:32px}
+.nb-outline:hover .nb-ol:hover{background:var(--nb-hover);color:var(--nb-ink)}
+.nb-outline:hover .nb-ol.on{color:var(--p)}
+@media (max-width:1099px){.nb-outline{display:none}}
+@media (max-width:720px){
+  .nb-view .nb-top .btn{font-size:0;gap:0;padding:0;justify-content:center}
+  .nb-view .nb-top .btn,.nb-view .nb-top .iconbtn{width:40px;min-width:40px;height:40px;min-height:40px}
+  .nb-view .nb-top .btn .ic{width:18px;height:18px}
+  .nb-view .nb-crumbs{display:none}
+  .nb-view .nb-page{margin-top:28px}
+  .nb-view .nb-title{font-size:32px}
+}
 </style>
 </head>
 <body>
@@ -5797,6 +5866,27 @@ async function renderNotePage(el, id){
   const titleEl = h("h1", { class: "nb-title", contenteditable: editable ? "true" : "false", "data-placeholder": "Untitled", spellcheck: "true" }, title);
   const wrap = h("div", { class: "nb-blocks" });
   const article = h("article", { class: "nb-page" + (editable ? "" : " readonly") });
+  el.classList.add("nb-view");
+  // Notion's outline on the right edge: a short line per heading; hover to read them, click to jump
+  const outline = h("nav", { class: "nb-outline", "aria-label": "Headings on this page", hidden: true });
+  const olActive = () => {
+    if (!outline.isConnected) { document.removeEventListener("scroll", olActive, true); return; }
+    let on = null;
+    for (const it of outline.children) { const r = wrap.querySelector('.nb-block[data-i="' + it.dataset.i + '"]'); if (r && r.getBoundingClientRect().top < 160) on = it; }
+    const se = document.scrollingElement; if (se && se.scrollHeight > innerHeight + 8 && se.scrollTop + innerHeight >= se.scrollHeight - 8) on = outline.lastChild;   // at the end: the last heading
+    for (const it of outline.children) it.classList.toggle("on", it === (on || outline.firstChild));
+  };
+  function drawOutline(){
+    const hs = blocks.map((b, i) => [b, i]).filter(([b]) => /^t?h[1-3]$/.test(b.type) && nbText(b.html).trim());
+    outline.hidden = hs.length < 2;
+    const top = Math.min(...hs.map(([b]) => +b.type.slice(-1)));   // indent under the biggest heading on the page
+    outline.replaceChildren(...hs.map(([b, i]) => h("button", { type: "button", class: "nb-ol l" + (+b.type.slice(-1) - top + 1), "data-i": i, title: nbText(b.html),
+      onclick: () => { const r = wrap.querySelector('.nb-block[data-i="' + i + '"]'); if (r) r.scrollIntoView({ behavior: "smooth", block: "start" }); } },
+      h("span", { class: "nb-ol-dash" }), h("span", { class: "nb-ol-text" }, nbText(b.html)))));
+    olActive();
+  }
+  document.addEventListener("scroll", olActive, true);
+  el.append(outline);
   el.append(article); article.append(titleEl,
     h("div", { class: "nb-meta muted" }, "By " + (pname(note.owner_id) || "someone") + " · edited " + fmtAgo(note.updated_at) + " · " + (VIS_LABEL[note.visibility] || note.visibility) +
       ((note.editors || []).length ? " · " + note.editors.length + " can edit" : "") + (!isOwnerNote && editable ? " · you can edit" : !editable ? " · view only" : "")), wrap);
@@ -5807,7 +5897,7 @@ async function renderNotePage(el, id){
 
   // ---- saving ----
   function setStatus(t){ status.textContent = t; }
-  function queueSave(){ if (!editable) return; state.dirty = true; setStatus("Editing…"); clearTimeout(state.saveT); state.saveT = setTimeout(save, 800); }
+  function queueSave(){ if (!editable) return; state.dirty = true; setStatus("Editing…"); clearTimeout(state.saveT); state.saveT = setTimeout(save, 800); clearTimeout(state.olT); state.olT = setTimeout(drawOutline, 500); }
   async function save(){
     if (!state.dirty || state.saving) return;
     state.saving = true; state.dirty = false; setStatus("Saving…");
@@ -5841,6 +5931,7 @@ async function renderNotePage(el, id){
   function draw(focusIdx, caret){
     const nums = nbNumbers(blocks), hidden = hiddenSet();
     wrap.replaceChildren(...blocks.map((b, i) => hidden.has(i) ? null : blockEl(b, i, nums[i])).filter(Boolean));
+    drawOutline();
     if (focusIdx != null) focusBlock(focusIdx, caret);
   }
   function blockEl(b, i, num){
@@ -9180,7 +9271,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11br";
+const APP_VERSION = "2026-11bs";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));

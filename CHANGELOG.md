@@ -1,5 +1,13 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11bs (8 Nov 2026): note pages look like Notion
+Needs: upload `index.html` and `sw.js`. No database change.
+- **Notion-style page:** white page (the top bar too), one reading column of 708px, and one typeface (Roboto) for the title, headings and text, as Notion uses one.
+- **Notion's sizes and spacing:** title 40px bold; headings 30 / 24 / 20px bold with room above them; text 16px with 1.5 line height; a little space between paragraphs and tighter list items; numbered and bulleted lists with hanging indents; nested items indent under their parent.
+- **Quiet top bar:** Back, the page path, Saved, Summarize, Convert to English, Share & details, Export and ⋯ are plain text buttons that grey on hover, in one row. On phones they become a row of icons (40px, easy to tap).
+- **Outline on the right edge** (wide screens), like Notion: a short line for each heading, the current one darker. Hover to see the headings, click one to jump to it.
+- Only note pages change; every other page looks as before.
+
 ## Version 2026-11br (8 Nov 2026): drop pictures exactly where you want, like Notion
 Needs: upload `index.html` and `sw.js`. No database change.
 - **Dragging pictures or videos in from your computer** (Finder, Desktop, another app) now shows a purple line between the blocks, exactly where they'll go, and drops them there: above the first line, between any two blocks, or below the last line. You can drop anywhere on the page, not only on the text. Several files go in one after another, in order.
