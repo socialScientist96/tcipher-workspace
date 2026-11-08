@@ -1,5 +1,9 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11aw (8 Nov 2026): Lora as the second font
+Needs: upload `index.html` and `sw.js`.
+- **Lora** replaces Roboto as the second font: body text, descriptions, tables, chat messages, notes and everything you type. Montserrat stays the main font.
+
 ## Version 2026-11av (8 Nov 2026): Montserrat and Roboto
 Needs: upload `index.html` and `sw.js`.
 - **Montserrat** is the main font: page titles, headings, the sidebar menu, buttons, field labels, table headings and key figures.
