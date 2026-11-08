@@ -1801,6 +1801,26 @@ dialog{border-radius:var(--r-xl)}
 .nb-req{display:flex;align-items:center;gap:var(--s2);flex-wrap:wrap;padding:var(--s3);border:1px solid var(--p-soft2);background:var(--p-soft);border-radius:var(--r-lg);font-size:var(--fs-ui)}
 .nb-req .x{flex:1;min-width:160px}
 .nb-req.done{background:var(--ok-t);border-color:transparent;color:var(--ok)}
+
+/* block handles like Notion: "+" and the six-dot grip, 24px each, centred on the block's first line */
+.nb-block{--lh:25.6px;--mt:0px}
+.t-h1,.t-th1{--lh:36.4px;--mt:18px}
+.t-h2,.t-th2{--lh:28.6px;--mt:14px}
+.t-h3,.t-th3{--lh:27px;--mt:10px}
+.t-h4{--lh:27.2px;--mt:8px}
+.t-callout{--mt:12px}
+.t-code{--mt:17px}
+.t-divider,.t-page{--lh:34px}
+.nb-gutter{left:-54px;top:calc(2px + var(--mt) + (var(--lh) - 24px) / 2);gap:2px;align-items:center}
+.t-callout .nb-gutter{left:-54px}
+.nb-handle,.nb-add{width:24px;height:24px;border-radius:4px;color:#A5A4A0;letter-spacing:0;font-size:0}
+.nb-handle .ic,.nb-add .ic{width:18px;height:18px}
+.nb-handle .ic circle{fill:currentColor;stroke:none}
+.nb-handle{width:20px;cursor:grab}
+.nb-handle:hover,.nb-add:hover{background:#EFEFED;color:#37352F}
+.nb-handle:active{cursor:grabbing}
+@media (max-width:760px){ .nb-gutter{position:static;top:auto;margin-top:calc(var(--mt) + (var(--lh) - 24px) / 2)} }
+@media (pointer:coarse){ .nb-handle{width:36px;height:36px} }
 </style>
 </head>
 <body>
@@ -1989,6 +2009,7 @@ const ICONS = {
   more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
   expand: '<path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/>',
   chevronLeft: '<path d="m15 18-6-6 6-6"/>',
+  grip: '<circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/>',
   checkSquare: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/>'
 };
 function ic(name, size){
@@ -5779,10 +5800,10 @@ async function renderNotePage(el, id){
     const row = h("div", { class: "nb-block t-" + b.type + (b.color ? " c-" + b.color : ""), "data-i": i, style: "--lvl:" + (b.level || 0) });
     if (editable){
       const handle = h("button", { type: "button", class: "nb-handle", title: "Drag to move · click for options", "aria-label": "Block options", draggable: "true",
-        onclick: e => { e.stopPropagation(); blockMenu(handle, i); } }, "⋮⋮");
+        onclick: e => { e.stopPropagation(); blockMenu(handle, i); } }, ic("grip", 18));
       handle.addEventListener("dragstart", e => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(i)); row.classList.add("dragging"); });
       handle.addEventListener("dragend", () => row.classList.remove("dragging"));
-      const add = h("button", { type: "button", class: "nb-add", title: "Add a block below", "aria-label": "Add a block below", onclick: () => { insertAfter(i, { type: "text" }); } }, "+");
+      const add = h("button", { type: "button", class: "nb-add", title: "Add a block below", "aria-label": "Add a block below", onclick: () => { insertAfter(i, { type: "text" }); } }, ic("plus", 18));
       row.append(h("div", { class: "nb-gutter" }, add, handle));
       row.addEventListener("dragover", e => { e.preventDefault(); row.classList.add("drop"); });
       row.addEventListener("dragleave", () => row.classList.remove("drop"));
@@ -8955,7 +8976,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11bj";
+const APP_VERSION = "2026-11bk";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));

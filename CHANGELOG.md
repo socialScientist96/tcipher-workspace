@@ -1,5 +1,9 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11bk (8 Nov 2026): note block handles like Notion
+Needs: upload `index.html` and `sw.js`.
+- The **+** and the **six-dot grip** beside each block are proper icons (18px in 24px buttons, grey, darker on hover) and sit centred on the block's first line for every type: text, headings 1–4, lists, to-dos, toggles, quotes, callouts and code.
+
 ## Version 2026-11bi (8 Nov 2026): tag people in notes; view or edit sharing; summarize notes
 Needs: run `upgrade-2026-11bi.sql` (also adds the archive columns, so 11bf is no longer needed separately); redeploy `ai-assist-function.ts` (for the note summary wording); upload `index.html` and `sw.js`.
 - **@ to tag in note pages:** type @ and a few letters; pick the person; their name goes into the note and they get a notification ("… tagged you in a note").
