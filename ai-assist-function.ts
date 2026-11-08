@@ -82,12 +82,16 @@ Deno.serve(async (req) => {
       }
 
       if (action === "summarize") {
-        const kind = body.kind === "dashboard" ? "dashboard" : "task";
+        const kind = body.kind === "dashboard" ? "dashboard" : body.kind === "note" ? "note" : "task";
         const name = String(body.title ?? "").slice(0, 300);
         const text = String(body.text ?? "");
         if (!text.trim()) return json({ error: "There's nothing to summarize." }, 400);
         if (text.length > MAX) return json({ error: "That's too much to summarize in one go." }, 413);
-        const system = kind === "task"
+        const system = kind === "note"
+          ? "You summarize one note from Tcipher Technologies' workspace for a busy teammate. Use only what the note says. " +
+            "Format: plain text, sections as lines starting with '## ', bullets as lines starting with '- '. Sections: At a glance (one or two sentences: what the note is about), Key points (the most important ideas, decisions or facts), Action items (to-dos, owners and dates, only if there are any). " +
+            "Write in English even if the note mixes in Hindi. Under 200 words. Use **bold** only for names and key terms."
+          : kind === "task"
           ? "You summarize one work item from Tcipher Technologies' workspace for a busy teammate. Use only the facts given. " +
             "Format: plain text, sections as lines starting with '## ', bullets as lines starting with '- '. Sections: At a glance (one or two sentences: what it is and where it stands), " +
             "What happened (key changes and decisions, newest last), Open questions (only if there are any), Next step. Write in English even if the input mixes in Hindi. Under 180 words. Use **bold** only for task IDs and names."

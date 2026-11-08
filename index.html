@@ -1789,6 +1789,9 @@ dialog{border-radius:var(--r-xl)}
 .note-wrap:hover .note-more,.note-more:focus-visible{opacity:1;background:var(--white);border-color:var(--line)}
 .note-card .nt{padding-right:32px}
 @media (pointer:coarse){ .note-more{opacity:1;width:40px;height:40px} }
+
+.nb-menu .av{flex:none}
+.nb-mtitle{margin-left:auto;font-size:var(--fs-sm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:45%}
 </style>
 </head>
 <body>
@@ -3400,14 +3403,15 @@ const MOD = {
     desc: "Private notes, or shared with specific people, your vertical or everyone. Type @ to tag someone.",
     needs: ["tasks","projects","meetings"], comments: true, files: true, everyoneReads: true,
     canCreateFn: () => true,
-    canEdit: (rec) => !rec || rec.owner_id === S.me.id,
+    canEdit: (rec) => !rec || rec.owner_id === S.me.id || (rec.editors || []).includes(S.me.id),
     canDelete: (rec) => !!rec && rec.owner_id === S.me.id,
     fields: [
       { k: "title", l: "Title", t: "text", req: true, full: true },
       { k: "body", l: "Note", t: "textarea", full: true, rows: 10, mentions: true },
-      { k: "visibility", l: "Who can see it", t: "select", o: [["Private","Only me"],["People","Specific people"],["Vertical","My vertical (and admins)"],["Company","Everyone"]], req: true, def: "Private" },
+      { k: "visibility", l: "Who can see it", t: "select", show: r => !r.owner_id || r.owner_id === S.me.id, o: [["Private","Only me"],["People","Specific people"],["Vertical","My vertical (and admins)"],["Company","Everyone"]], req: true, def: "Private" },
       { k: "pinned", l: "Pin", t: "bool", cb: "Pin to my Home page" },
-      { k: "shared_with", l: "Share with", t: "users", full: true, show: r => r.visibility === "People" },
+      { k: "shared_with", l: "Share with (can view)", t: "users", full: true, show: r => r.visibility === "People" && (!r.owner_id || r.owner_id === S.me.id) },
+      { k: "editors", l: "Can edit", t: "users", full: true, show: r => (!r.owner_id || r.owner_id === S.me.id) && notesHaveEditors() },
       { k: "task_id", l: "Linked task", t: "ref", ref: "tasks", none: "No task" },
       { k: "project_id", l: "Linked project", t: "ref", ref: "projects", none: "No project" },
       { k: "meeting_id", l: "Linked meeting", t: "ref", ref: "meetings", none: "No meeting" },
@@ -3426,6 +3430,8 @@ const MOD = {
       notify(tagged, pname(S.me.id) + " tagged you in a note: " + (rec.title || "Untitled"), String(rec.body || "").slice(0, 140), "notes", rec.id);
       const shared = rec.visibility === "People" ? (rec.shared_with || []).filter(id => !(prev && prev.visibility === "People" && (prev.shared_with || []).includes(id)) && !tagged.includes(id)) : [];
       notify(shared, pname(S.me.id) + " shared a note with you: " + (rec.title || "Untitled"), "", "notes", rec.id);
+      const newEditors = (rec.editors || []).filter(id => !(prev && (prev.editors || []).includes(id)) && !tagged.includes(id));
+      notify(newEditors, pname(S.me.id) + " gave you edit access to a note: " + (rec.title || "Untitled"), "", "notes", rec.id);
     }
   },
 
@@ -5404,6 +5410,7 @@ async function duplicateTask(rec){
 /* ---------------------------------------------------------------------
    Notes
    --------------------------------------------------------------------- */
+const notesHaveEditors = () => rows("notes").some(n => "editors" in n);
 const VIS_LABEL = { Private: "Only me", People: "Specific people", Vertical: "My vertical", Company: "Everyone" };
 function notesBoard(el, A){
   if (!S.ui.notes) S.ui.notes = { q: "", scope: "all" };
@@ -5626,7 +5633,8 @@ async function renderNotePage(el, id){
   if (!note){ try { note = ok(await sb.from("notes").select("*").eq("id", id).maybeSingle()); if (note) upsertCache("notes", note); } catch (e) {} }
   if (!note){ el.append(h("div", { class: "panel empty" }, h("b", {}, "That note isn’t available"), "It may have been deleted, or it isn’t shared with you."), h("p", {}, h("a", { href: "#notes" }, "Back to Notes"))); return; }
   const rich = "blocks" in note;   // the database has been upgraded for pages
-  const editable = note.owner_id === S.me.id;
+  const isOwnerNote = note.owner_id === S.me.id;
+  const editable = isOwnerNote || (note.editors || []).includes(S.me.id);
   let blocks = rich && Array.isArray(note.blocks) && note.blocks.length ? note.blocks.map(b => Object.assign({ id: nbId(), type: "text", html: "", level: 0 }, b)) : nbFromBody(note.body);
   let title = note.title || "";
   const state = { saveT: null, dirty: false, saving: false };
@@ -5636,6 +5644,10 @@ async function renderNotePage(el, id){
   const status = h("span", { class: "nb-status muted" });
   const exportBtn = h("button", { type: "button", class: "btn sm", "aria-haspopup": "menu", onclick: e => { e.stopPropagation(); nbMenu(exportBtn, [["pdf", "PDF"], ["html", "HTML"], ["md", "Markdown & CSV"], ["word", "Word file"]].map(([k, l]) => [l, () => nbExport(k, Object.assign({}, note, { title }), blocks)]), "Export as"); } }, ic("share", 15), "Export");
   let pageMenuBtn = null;
+  const sumBtn = h("button", { type: "button", class: "btn sm", title: "A short summary of this note by Claude", onclick: async () => {
+    if (state.dirty) { clearTimeout(state.saveT); await save(); }
+    showAISummary("note", title || "Untitled", nbToMarkdown(title, blocks));
+  } }, ic("sparkle", 15), "Summarize");
   const kids = () => rows("notes").filter(n => n.parent_id === note.id);
   async function setArchived(on){
     if (!("archived" in note)) { toast("Archiving needs upgrade-2026-11bf.sql to be run in Supabase first."); return; }
@@ -5682,15 +5694,16 @@ async function renderNotePage(el, id){
     } }, ic("chevronLeft", 16), "Back"),
     h("nav", { class: "nb-crumbs", "aria-label": "Where this note is" }, h("a", { href: "#notes" }, "Notes"), chain.map(p => [h("span", { class: "nb-sep" }, "/"), h("a", { href: "#note=" + p.id }, p.title || "Untitled")]), h("span", { class: "nb-sep" }, "/"), h("span", {}, title || "Untitled")),
     h("span", { class: "grow" }), status,
-    engBtn, h("button", { type: "button", class: "btn sm", onclick: () => openRecord("notes", note.id, null, { form: true }) }, ic("users", 15), editable ? "Share & details" : "Details"), exportBtn,
-    editable ? (pageMenuBtn = h("button", { type: "button", class: "iconbtn nb-more", "aria-label": "More actions", title: "Archive, delete…", onclick: e => { e.stopPropagation(); pageMenu(); } }, ic("more", 18))) : null));
+    sumBtn, engBtn, h("button", { type: "button", class: "btn sm", onclick: () => openRecord("notes", note.id, null, { form: true }) }, ic("users", 15), isOwnerNote ? "Share & details" : "Details"), exportBtn,
+    isOwnerNote ? (pageMenuBtn = h("button", { type: "button", class: "iconbtn nb-more", "aria-label": "More actions", title: "Archive, delete…", onclick: e => { e.stopPropagation(); pageMenu(); } }, ic("more", 18))) : null));
   if (note.archived) el.append(h("div", { class: "panel nb-archived" }, ic("archive2", 16), h("span", {}, "This page is archived. It’s hidden from Notes and the sidebar."), editable ? h("button", { type: "button", class: "btn sm", onclick: () => setArchived(false) }, "Restore") : null));
   if (!rich && editable) el.append(h("div", { class: "panel nb-warn" }, "Headings, lists and toggles are kept for this visit only until ", h("b", {}, "upgrade-2026-11bc.sql"), " has been run in Supabase. The text itself is saved."));
 
   const titleEl = h("h1", { class: "nb-title", contenteditable: editable ? "true" : "false", "data-placeholder": "Untitled", spellcheck: "true" }, title);
   const wrap = h("div", { class: "nb-blocks" });
   el.append(h("article", { class: "nb-page" + (editable ? "" : " readonly") }, titleEl,
-    h("div", { class: "nb-meta muted" }, "By " + (pname(note.owner_id) || "someone") + " · edited " + fmtAgo(note.updated_at) + " · " + (VIS_LABEL[note.visibility] || note.visibility)), wrap));
+    h("div", { class: "nb-meta muted" }, "By " + (pname(note.owner_id) || "someone") + " · edited " + fmtAgo(note.updated_at) + " · " + (VIS_LABEL[note.visibility] || note.visibility) +
+      ((note.editors || []).length ? " · " + note.editors.length + " can edit" : "") + (!isOwnerNote && editable ? " · you can edit" : !editable ? " · view only" : "")), wrap));
 
   const crumbHere = el.querySelector(".nb-crumbs > span:last-child");
   titleEl.addEventListener("input", () => { title = titleEl.textContent.replace(/\n/g, " ").trim(); if (crumbHere) crumbHere.textContent = title || "Untitled"; $("crumb").textContent = title || "Note"; queueSave(); });
@@ -5821,7 +5834,10 @@ async function renderNotePage(el, id){
         b.html = nbEsc(t.replace(/ /g, " ").slice(mm[0].length)); b.type = sc2; if (nbToggle(sc2)) b.open = true; queueSave(); draw(i, "end"); return;
       }
       if (t === "---" && b.type === "text") { turnInto(i, "divider"); return; }
-      if (/(^|\s)\/[\w ]*$/.test(t.slice(0, caretAt(ed).start))) slashMenu(ed, i); else closeNbMenu();
+      const upto = t.slice(0, caretAt(ed).start);
+      if (/(^|\s)\/[\w ]*$/.test(upto)) slashMenu(ed, i);
+      else if (/(^|\s)@[\p{L}\p{N}.]*$/u.test(upto)) mentionMenu(ed, upto.match(/@([\p{L}\p{N}.]*)$/u)[1]);
+      else closeNbMenu();
       queueSave();
     });
     ed.addEventListener("paste", e => {
@@ -5877,6 +5893,18 @@ async function renderNotePage(el, id){
       [h("span", {}, ic("arrowDown", 16), "Move down"), () => { if (i < blocks.length - 1) moveBlock(i, i + 1); }],
       [h("span", {}, ic("trash", 16), "Delete"), () => { if (b.type === "page" && !confirm("Remove the link to this page? The page itself stays (open it to delete it).")) return; blocks.splice(i, 1); if (!blocks.length) blocks.push({ id: nbId(), type: "text", html: "", level: 0 }); queueSave(); draw(Math.max(0, i - 1), "end"); }]
     ], (NB_TYPES.find(t => t[0] === b.type) || [, "Block"])[1]);
+  }
+  // "@" brings up people to tag; they're notified when the note saves
+  function mentionMenu(ed, q){
+    const ql = q.toLowerCase();
+    const list = activePeople().filter(p => p.id !== S.me.id && (!ql || p.full_name.toLowerCase().split(/\s+/).some(w => w.startsWith(ql)) || p.full_name.toLowerCase().includes(ql))).slice(0, 8);
+    if (!list.length) { closeNbMenu(); return; }
+    nbMenu(ed, list.map(p => [h("span", {}, avatar(p.id, "sm"), p.full_name, p.title ? h("span", { class: "muted nb-mtitle" }, p.title) : null), () => {
+      // replace the "@name" typed so far with the full name, keeping the rest of the line as it is
+      ed.focus(); const sel = getSelection();
+      for (let k = 0; k < q.length + 1; k++) sel.modify("extend", "backward", "character");
+      document.execCommand("insertText", false, "@" + p.full_name + " ");
+    }]), "Tag someone", true);
   }
   function slashMenu(ed, i){
     const t = ed.textContent.slice(0, caretAt(ed).start), m = t.match(/\/([\w ]*)$/), q = (m ? m[1] : "").toLowerCase().trim();
@@ -8866,7 +8894,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11bh";
+const APP_VERSION = "2026-11bi";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
