@@ -15,7 +15,7 @@
 <!-- open the connections to the database and the library early: saves a round trip or two on slow networks -->
 <link rel="preconnect" href="https://pfdnziybqaumnofjknsj.supabase.co" crossorigin>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&family=Lora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&family=Roboto:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" crossorigin="anonymous">
 <style>
 :root{
   color-scheme: light;
@@ -28,7 +28,7 @@
 }
 *,*::before,*::after{box-sizing:border-box}
 html,body{margin:0}
-body{background:var(--bg);color:var(--ink);font-family:Lora,Georgia,"Times New Roman",serif;font-size:14.5px;line-height:1.45;font-variant-numeric:tabular-nums}
+body{background:var(--bg);color:var(--ink);font-family:Roboto,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14.5px;line-height:1.45;font-variant-numeric:tabular-nums}
 button,input,select,textarea{font:inherit;color:inherit}
 a{color:var(--p)}
 :focus-visible{outline:2px solid var(--p);outline-offset:2px}
@@ -1404,9 +1404,9 @@ select.dv-loz{background-position:right 6px center!important;background-size:12p
 .nav-group h4{font-size:12.5px}
 @media (pointer:coarse){ .nav-head{min-height:44px} }
 
-/* fonts (2026-11aw): Montserrat is the main face — titles, headings, menu, buttons, labels, key figures;
-   Lora is the second — body text, tables, messages, notes and what you type. Task IDs stay in the mono face. */
-:root{--font-main:Montserrat,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;--font-text:Lora,Georgia,"Times New Roman",serif}
+/* fonts (2026-11ax): Poppins is the main face — titles, headings, menu, buttons, labels, key figures;
+   Roboto is the second — body text, tables, messages, notes and what you type. Task IDs stay in the mono face. */
+:root{--font-main:Poppins,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;--font-text:Roboto,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
 body{font-family:var(--font-text)}
 h1,h2,h3,h4,.ph h1,.hello h1,.panel h2,.dh h2,.section h3,.auth-side h1,.auth-card h2,
 .nav a,.nav-head,.nav-group h4,.side-chip,.side .brand-tag,.side .foot .who b,.topbar .crumb,
@@ -6993,7 +6993,7 @@ async function saveFetched(url, name, mime){
   saveFrom(href, name || "file"); setTimeout(() => URL.revokeObjectURL(href), 60000);
 }
 const tabPage = (title, body) => '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' + escHtml(title) + '</title>'
-  + '<style>body{margin:0;font-family:Lora,Georgia,serif;background:#F4F4FA;color:#1D1B2E}header{display:flex;align-items:center;gap:12px;padding:12px 18px;background:#1E1A4D;color:#fff}'
+  + '<style>body{margin:0;font-family:Roboto,Arial,sans-serif;background:#F4F4FA;color:#1D1B2E}header{display:flex;align-items:center;gap:12px;padding:12px 18px;background:#1E1A4D;color:#fff}'
   + 'header b{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}a.btn{background:#6450F5;color:#fff;text-decoration:none;padding:8px 14px;border-radius:8px;font-weight:600;font-size:14px}'
   + 'main{max-width:980px;margin:18px auto;padding:0 14px}pre{background:#fff;border:1px solid #E4E4F2;border-radius:10px;padding:16px;white-space:pre-wrap;word-wrap:break-word;font:13.5px/1.55 ui-monospace,Menlo,Consolas,monospace}'
   + '.box{background:#fff;border:1px solid #E4E4F2;border-radius:12px;padding:28px;text-align:center}</style></head><body>' + body + '</body></html>';
@@ -7859,7 +7859,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11aw";
+const APP_VERSION = "2026-11ax";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));

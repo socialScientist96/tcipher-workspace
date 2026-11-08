@@ -1,5 +1,9 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11ax (8 Nov 2026): Poppins and Roboto
+Needs: upload `index.html` and `sw.js`.
+- **Poppins** is the main font (titles, headings, menu, buttons, labels, key figures) and **Roboto** the second (body text, tables, chat, notes, fields), replacing Montserrat and Lora. Task IDs and counts keep the fixed-width font.
+
 ## Version 2026-11aw (8 Nov 2026): Lora as the second font
 Needs: upload `index.html` and `sw.js`.
 - **Lora** replaces Roboto as the second font: body text, descriptions, tables, chat messages, notes and everything you type. Montserrat stays the main font.
