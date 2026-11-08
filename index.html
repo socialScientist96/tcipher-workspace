@@ -1821,6 +1821,10 @@ dialog{border-radius:var(--r-xl)}
 .nb-handle:active{cursor:grabbing}
 @media (max-width:760px){ .nb-gutter{position:static;top:auto;margin-top:calc(var(--mt) + (var(--lh) - 24px) / 2)} }
 @media (pointer:coarse){ .nb-handle{width:36px;height:36px} }
+
+/* Board header: title on the left, Summarize and Create together on the right */
+.dv-top{justify-content:flex-start;gap:var(--s2)}
+.dv-top > :first-child{margin-right:auto}
 </style>
 </head>
 <body>
@@ -8976,7 +8980,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11bl";
+const APP_VERSION = "2026-11bm";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -10527,7 +10531,7 @@ function addDashSummary(page, route){
   const acts = page.querySelector(".ph .acts, .dv-top .grow + *, .dv-top");
   const ph = page.querySelector(".ph, .hello, .dv-top");
   if (ph && ph.classList.contains("ph")) { let a = ph.querySelector(".acts"); if (!a) { a = h("div", { class: "acts" }); ph.append(a); } a.prepend(btn); }
-  else if (ph) ph.append(btn);
+  else if (ph) { const pri = ph.querySelector(":scope > .btn.pri"); if (pri) pri.before(btn); else ph.append(btn); }   // beside the page's main button
   else page.prepend(h("div", { class: "ai-dash-row" }, btn));
 }
 async function renderAdminWork(el){
