@@ -116,6 +116,12 @@ Deno.serve(async (req) => {
       q(db.from("emails").select("to_email,subject,snippet,tbl,entity_id,sent_at").eq("user_id", uid).eq("direction", "out").gte("sent_at", from).lt("sent_at", to).order("sent_at").limit(1000)),
     ]);
 
+    // people appear in task and record changes as ids (reviewer, owner, tester…): show their names instead
+    const { data: everyone } = await db.from("profiles").select("id,full_name");
+    const pn = new Map(((everyone ?? []) as { id: string; full_name: string }[]).map(p => [p.id, p.full_name]));
+    const names2 = (v: unknown) => String(v ?? "").replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, id => pn.get(id.toLowerCase()) || "someone");
+    for (const r of tev) { r.old_value = names2(r.old_value); r.new_value = names2(r.new_value); }
+    for (const r of rev) { r.old_value = names2(r.old_value); r.new_value = names2(r.new_value); }
     // look up the names of everything mentioned
     const byTbl: Record<string, string[]> = {};
     const want = (tbl: string, id: string) => { if (tbl && id) (byTbl[tbl] ||= []).push(id); };
