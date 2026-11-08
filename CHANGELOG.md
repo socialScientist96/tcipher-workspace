@@ -1,5 +1,22 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11bt (8 Nov 2026): the client portal
+Needs, in this order: upload `index.html` and `sw.js`; run `upgrade-2026-11bt.sql`; redeploy `admin-users-function.ts` (invites) and `google-sync-function.ts` (emails to clients). The app is safe before the SQL runs: the portal parts stay hidden until then.
+- **Clients get their own login** at the same address. After signing in they see only their portal, never the workspace:
+  - **Home:** what's waiting on them, quick buttons (report a bug, request a feature, ask a question, request a meeting), open requests, the next meeting with a Join button, and their account manager's contact details.
+  - **Requests:** bugs, requirements and questions with status in plain words (Received, In progress, Waiting on you, Resolved, Closed), a conversation with the team on each, and screenshots or files (up to 10 at a time, 25 MB each). Replying to something resolved reopens it; answering "waiting on you" moves it back to In progress.
+  - **Meetings:** upcoming client meetings they're invited to, with Join links. **Request a meeting** with up to three times in their own time zone; the team confirms one.
+  - **Projects:** progress per project (worked out from the team's work items) and releases with notes.
+  - **Files:** what the team shares with them, and files they send.
+  - **Proposals:** sent proposals with amount, status and dates (drafts never show).
+  - **Updates** (the bell) and **email**: replies from the team, status changes and confirmed meetings, from the notifications mailbox. **Profile:** name, phone, email updates on or off, password.
+- **Inviting:** open a client › **Client portal** › pick a contact (or type a name and email) › **Invite to the portal**. Admins and the client's account owner can invite. The person gets an email with a set-password link; you can also copy the link and send it yourself. **Resend invite** and **Turn off / Turn on** per person.
+- **Requests arrive as support tickets** (Reported via: Portal), assigned to the account owner, who is notified; new **Type** field (Bug / Requirement / Question) and a **Client portal** tick to hide an internal ticket from the client.
+- **Replying:** comments on a client's ticket are **Internal note** by default; switch to **Reply to client** to send one to them (labelled "Sent to client"). Their messages show a "Client" label.
+- **Meeting requests** show on the client: pick one of the suggested times to open a pre-filled meeting (client call, the client person invited, so they get the Google invite), or Decline with a reason. The client is told either way. Client people can also be invited to any meeting (Attendees › Client portal).
+- **Files in the portal:** share contracts, designs or proposal PDFs with the client from the Client portal panel.
+- **How clients are kept out of everything else** (all tested): a client login is never an active staff account (enforced in the database, even against admins), so every existing rule, list and job leaves it out; clients read and write only through portal functions that check their company on every call; each company has its own file folder; internal comments and staff notifications can never reach a client. Client logins don't appear under Admin › Users; they're managed on the client.
+
 ## Version 2026-11bs (8 Nov 2026): note pages look like Notion
 Needs: upload `index.html` and `sw.js`. No database change.
 - **Notion-style page:** white page (the top bar too), one reading column of 708px, and one typeface (Roboto) for the title, headings and text, as Notion uses one.

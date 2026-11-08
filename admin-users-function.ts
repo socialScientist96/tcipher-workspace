@@ -2,6 +2,11 @@
 // Lets admins create logins, reset passwords, turn accounts off and on, and delete accounts
 // from the workspace's admin panel. Paste this into Supabase > Edge Functions >
 // Deploy a new function > Via Editor, name it exactly: admin-users
+//
+// Client portal (2026-11bt): admins and a client's account owner can also
+//   invite_client  — create (or re-send) a portal login for someone at that client and email them a set-password link
+//   client_access  — turn a portal login off or on
+// A portal login is never a staff login: the database keeps it out of everything except the portal.
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const cors = {
@@ -22,6 +27,9 @@ function secretKey(): string {
   return Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 }
 
+const APP_URL = Deno.env.get("APP_URL") ?? "https://internal.tcipher.com/";
+const randomPassword = () => Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => b.toString(16).padStart(2, "0")).join("");
+
 // how this session signed in: "aal2" means the two-step code was entered
 function aalOf(jwt: string): string {
   try { const p = jwt.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"); return String(JSON.parse(atob(p + "===".slice((p.length + 3) % 4))).aal || "aal1"); }
@@ -37,20 +45,80 @@ Deno.serve(async (req) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // Who is calling? Must be a signed-in, active admin.
+    // Who is calling? Must be a signed-in, active staff member (admin for everything except the client portal actions).
     const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
     if (!token) return json({ error: "Sign in again to manage users." }, 401);
     const { data: who, error: whoErr } = await admin.auth.getUser(token);
     if (whoErr || !who?.user) return json({ error: "Your session has expired. Sign in again." }, 401);
-    const { data: me } = await admin.from("profiles").select("is_admin,is_active").eq("id", who.user.id).single();
-    if (!me?.is_admin || !me?.is_active) return json({ error: "Only admins can manage users." }, 403);
+    const { data: me } = await admin.from("profiles").select("is_admin,is_active,client_id,full_name").eq("id", who.user.id).single();
+    if (!me?.is_active || me?.client_id) return json({ error: "Only the team can manage users." }, 403);
     // an admin who has two-step sign-in must have used it in this session, so a stolen password alone can't manage users
-    const { data: mine } = await admin.auth.admin.mfa.listFactors({ userId: who.user.id });
-    if ((mine?.factors ?? []).some((f: { status: string }) => f.status === "verified") && aalOf(token) !== "aal2")
-      return json({ error: "Enter your two-step sign-in code first: sign out, then sign in again." }, 403);
+    if (me.is_admin) {
+      const { data: mine } = await admin.auth.admin.mfa.listFactors({ userId: who.user.id });
+      if ((mine?.factors ?? []).some((f: { status: string }) => f.status === "verified") && aalOf(token) !== "aal2")
+        return json({ error: "Enter your two-step sign-in code first: sign out, then sign in again." }, 403);
+    }
 
     const body = await req.json().catch(() => ({}));
     const action = String(body.action ?? "");
+
+    // ---------- client portal: admins, or the client's account owner ----------
+    const mayManageClient = async (clientId: string) => {
+      if (me.is_admin) return true;
+      const { data: c } = await admin.from("clients").select("owner_id").eq("id", clientId).maybeSingle();
+      return !!c && c.owner_id === who.user.id;
+    };
+    if (action === "invite_client") {
+      const client_id = String(body.client_id ?? "");
+      const email = String(body.email ?? "").trim().toLowerCase();
+      const full_name = String(body.full_name ?? "").trim().slice(0, 120);
+      const phone = String(body.phone ?? "").trim().slice(0, 40);
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "Enter a valid email address." }, 400);
+      if (!full_name) return json({ error: "Enter the person’s name." }, 400);
+      const { data: client } = await admin.from("clients").select("id,name,owner_id").eq("id", client_id).maybeSingle();
+      if (!client) return json({ error: "That client wasn’t found." }, 400);
+      if (!(await mayManageClient(client_id))) return json({ error: "Only admins and this client’s account owner can invite people to the portal." }, 403);
+
+      // the same email may already have a login
+      const { data: existing } = await admin.from("profiles").select("id,client_id").ilike("email", email.replace(/[\\%_]/g, (c) => "\\" + c)).limit(1).maybeSingle();
+      let id = existing?.id as string | undefined;
+      if (existing && !existing.client_id) return json({ error: "This email belongs to a team login, so it can’t be a client login." }, 400);
+      if (existing && existing.client_id !== client_id) return json({ error: "This email already has a portal login for another client." }, 400);
+      if (!id) {
+        const { data, error } = await admin.auth.admin.createUser({ email, password: randomPassword(), email_confirm: true, user_metadata: { full_name } });
+        if (error) return json({ error: error.message }, 400);
+        id = data.user!.id;
+      }
+      // the database turns this into a portal-only login (never active as staff)
+      const { error: pErr } = await admin.from("profiles").update({ full_name, ...(phone ? { phone } : {}), client_id, portal_active: true, email_notifications: "all" }).eq("id", id);
+      if (pErr) return json({ error: "The login was created, but couldn’t be linked to the client: " + pErr.message }, 400);
+      await admin.auth.admin.updateUserById(id, { ban_duration: "none" });
+
+      const { data: link, error: lErr } = await admin.auth.admin.generateLink({ type: "recovery", email, options: { redirectTo: APP_URL } });
+      if (lErr) return json({ error: "The login is ready, but the invite link couldn’t be made: " + lErr.message }, 400);
+      const url = link.properties?.action_link ?? "";
+      // emailed by the notification mailbox within a few minutes (the same way all notification emails go out)
+      await admin.from("notifications").insert({ user_id: id,
+        title: "You’re invited to the Tcipher client portal",
+        body: (me.full_name || "The Tcipher team") + " invited you to follow " + client.name + "’s requests, bugs, meetings and projects with Tcipher in one place.\n\n" +
+          "1. Set your password with this link (it works once, for a limited time): " + url + "\n" +
+          "2. After that, sign in any time at " + APP_URL + " with " + email + ".\n\nIf the link has expired, ask " + (me.full_name || "your contact at Tcipher") + " to send a new invite." });
+      return json({ ok: true, id, link: url, resent: !!existing });
+    }
+    if (action === "client_access") {
+      const id = String(body.id ?? "");
+      const { data: p } = await admin.from("profiles").select("id,client_id").eq("id", id).maybeSingle();
+      if (!p || !p.client_id) return json({ error: "That isn’t a portal login." }, 400);
+      if (!(await mayManageClient(p.client_id))) return json({ error: "Only admins and this client’s account owner can change portal access." }, 403);
+      const on = !!body.on;
+      const { error } = await admin.auth.admin.updateUserById(id, { ban_duration: on ? "none" : "876000h" });
+      if (error) return json({ error: error.message }, 400);
+      await admin.from("profiles").update({ portal_active: on }).eq("id", id);
+      return json({ ok: true });
+    }
+
+    // everything below: admins only
+    if (!me.is_admin) return json({ error: "Only admins can manage users." }, 403);
 
     if (action === "create") {
       const email = String(body.email ?? "").trim().toLowerCase();

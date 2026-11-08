@@ -1921,6 +1921,159 @@ body.nb-moving,body.nb-moving *{cursor:grabbing!important;user-select:none!impor
   .nb-view .nb-page{margin-top:28px}
   .nb-view .nb-title{font-size:32px}
 }
+
+/* ---------- client portal (2026-11bt) ---------- */
+.portal{min-height:100vh;background:#fff;color:var(--ink)}
+.portal a.btn,.portal a.btn:hover{text-decoration:none}
+.pt-top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:var(--s3);padding:10px clamp(16px,4vw,40px);background:rgba(255,255,255,.95);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.pt-top .grow{flex:1}
+.pt-brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink)}
+.pt-brand img{height:26px;width:auto}
+.pt-for{font-family:var(--font-main);font-size:var(--fs-sm);color:var(--ink2);border-left:1px solid var(--line);padding-left:10px}
+.pt-me{display:flex;align-items:center;gap:8px;text-decoration:none;color:var(--ink);font-size:var(--fs-ui);padding:4px 8px;border-radius:8px}
+.pt-me:hover{background:var(--tint)}
+.pt-bell .dot{position:absolute;top:6px;right:7px;width:8px!important;height:8px!important;min-width:0!important;padding:0!important;border-radius:50%;background:var(--bad);border:2px solid #fff;box-sizing:content-box}
+.pt-nav{display:flex;gap:4px;padding:0 clamp(16px,4vw,40px);border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none;background:#fff}
+.pt-nav::-webkit-scrollbar{display:none}
+.pt-nav a{display:flex;align-items:center;gap:7px;padding:12px 10px;color:var(--ink2);text-decoration:none;font-size:var(--fs-ui);font-weight:500;border-bottom:2px solid transparent;white-space:nowrap}
+.pt-nav a:hover{color:var(--ink)}
+.pt-nav a.on{color:var(--p);border-bottom-color:var(--p)}
+.pt-main{max-width:1080px;margin:0 auto;padding:var(--s6) clamp(16px,4vw,40px) 80px}
+.pt-view{display:flex;flex-direction:column;gap:var(--s4)}
+.pt-view h1{font-size:var(--fs-page);margin:0;line-height:1.2}
+.pt-view h2{font-size:var(--fs-lg);margin:0 0 var(--s3)}
+.pt-view h3{font-size:var(--fs-ui);margin:0 0 var(--s2);color:var(--ink2);font-weight:600}
+.pt-hello p{margin:6px 0 0}
+.pt-head{display:flex;align-items:flex-end;justify-content:space-between;gap:var(--s3);flex-wrap:wrap}
+.pt-head p{margin:6px 0 0}
+.pt-head-acts{display:flex;gap:8px}
+.pt-back{display:inline-flex;align-items:center;gap:4px;color:var(--ink2);text-decoration:none;font-size:var(--fs-ui);margin-bottom:-6px}
+.pt-back:hover{color:var(--ink)}
+.pt-banner{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:var(--r-md);font-size:var(--fs-ui)}
+.pt-banner span{flex:1}
+.pt-banner.bad{background:var(--bad-t);color:var(--bad)}
+.pt-banner.ok{background:var(--ok-t);color:var(--ok)}
+.pt-acts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--s3)}
+.pt-act{display:flex;gap:12px;align-items:flex-start;padding:14px;border:1px solid var(--line);border-radius:var(--r-lg);text-decoration:none;color:var(--ink);background:#fff;transition:border-color .15s,box-shadow .15s}
+.pt-act:hover{border-color:var(--p-soft2);box-shadow:0 4px 14px rgba(20,20,40,.06)}
+.pt-act > span:last-child{display:flex;flex-direction:column;gap:2px;font-size:var(--fs-ui);min-width:0}
+.pt-act .muted{font-size:var(--fs-sm)}
+.pt-act-ic{flex:none;width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:var(--p-soft);color:var(--p)}
+.pt-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--s3)}
+.pt-stat{display:flex;flex-direction:column;gap:4px;padding:14px 16px;border-radius:var(--r-lg);background:var(--tint);text-decoration:none;color:var(--ink);font-size:var(--fs-sm)}
+.pt-stat b{font-size:var(--fs-xl);font-family:var(--font-main)}
+.pt-stat.bad b{color:var(--bad)}
+.pt-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:var(--s4);align-items:start}
+.pt-side{display:flex;flex-direction:column;gap:var(--s3)}
+.pt-card p{margin:2px 0}
+.pt-owner{display:flex;flex-direction:column}
+.pt-contact{display:flex;align-items:center;gap:8px;color:var(--ink2);text-decoration:none;font-size:var(--fs-ui);padding:4px 0;word-break:break-all}
+.pt-contact:hover{color:var(--p)}
+.pt-sec-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--s2)}
+.pt-sec-h h2{margin:0}
+.pt-list{display:flex;flex-direction:column}
+.pt-row{display:flex;align-items:center;gap:12px;padding:12px 6px;border-bottom:1px solid var(--line);text-decoration:none;color:var(--ink);border-radius:6px}
+.pt-row:last-child{border-bottom:0}
+.pt-row:hover{background:var(--tint)}
+.pt-row-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.pt-row-main b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pt-row-main .muted{font-size:var(--fs-sm)}
+.pt-kind{flex:none;width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:var(--tint);color:var(--ink2)}
+.pt-kind.k-bug{background:var(--bad-t);color:var(--bad)}
+.pt-kind.k-requirement{background:var(--p-soft);color:var(--p)}
+.pt-kind.k-question{background:var(--info-t);color:var(--info)}
+.pt-meta .pt-kind{width:24px;height:24px;border-radius:6px}
+.pt-none{padding:var(--s4) 0;color:var(--ink2);font-size:var(--fs-ui)}
+.pt-none p{margin:0 0 10px}
+.pt-empty{text-align:center;padding:var(--s8)}
+.pt-filter{display:flex}
+.pt-form{display:flex;flex-direction:column;gap:var(--s3);max-width:720px}
+.pt-form .fl{display:flex;flex-direction:column;gap:6px;font-size:var(--fs-ui);font-weight:500}
+.pt-form .fl small{font-weight:400}
+.pt-form-foot{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.pt-form-foot > .muted{margin-right:auto;font-size:var(--fs-sm)}
+.pt-attach{display:flex;flex-direction:column;gap:8px;align-items:flex-start;margin-right:auto}
+.pt-chips{display:flex;flex-wrap:wrap;gap:6px}
+.pt-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 6px 4px 10px;border-radius:999px;background:var(--tint);font-size:var(--fs-sm);max-width:100%}
+.pt-chip button{border:0;background:none;cursor:pointer;color:var(--ink2);display:grid;place-items:center;width:24px;height:24px;border-radius:50%}
+.pt-chip button:hover{background:var(--tint2)}
+.pt-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;font-size:var(--fs-ui)}
+.pt-meta .muted{font-size:var(--fs-sm)}
+.pt-body{font-size:var(--fs-body);line-height:1.6;white-space:pre-wrap;word-break:break-word}
+.pt-desc .pt-files{margin-top:var(--s3)}
+.pt-files{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.pt-file{display:flex;flex-direction:column;gap:4px;border:1px solid var(--line);border-radius:var(--r-md);padding:10px;background:#fff;text-align:left;cursor:pointer;font:inherit;font-size:var(--fs-sm);min-width:0;color:var(--ink)}
+.pt-file:hover{border-color:var(--p-soft2)}
+.pt-thumb{display:block;height:96px;border-radius:6px;background:var(--tint) center/cover no-repeat}
+.pt-file-ic{width:36px;height:36px;border-radius:8px;display:grid;place-items:center;background:var(--tint);color:var(--ink2)}
+.pt-file-name{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pt-file-link{font-size:var(--fs-meta);color:var(--p);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pt-thread{display:flex;flex-direction:column;gap:10px;margin-bottom:var(--s3)}
+.pt-msg{max-width:82%;padding:10px 14px;border-radius:12px;background:var(--tint)}
+.pt-msg.team{background:#F4F2FD}
+.pt-msg.mine{align-self:flex-end;background:var(--p-soft)}
+.pt-msg-h{display:flex;align-items:center;gap:8px;font-size:var(--fs-sm);margin-bottom:4px}
+.pt-msg-h .pill{font-size:11px}
+.pt-reply{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:var(--s3)}
+.pt-meet{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--line)}
+.pt-meet:last-child{border-bottom:0}
+.pt-date{flex:none;width:52px;height:56px;border-radius:10px;background:var(--p-soft);color:var(--p);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1}
+.pt-date b{font-size:20px;font-family:var(--font-main)}
+.pt-date span{font-size:var(--fs-meta);text-transform:uppercase}
+.pt-meet-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;font-size:var(--fs-ui)}
+.pt-meet-main .muted{font-size:var(--fs-sm)}
+.pt-meet details,.pt-rel details{font-size:var(--fs-sm);margin-top:4px}
+.pt-meet summary,.pt-rel summary{cursor:pointer;color:var(--ink2)}
+.pt-nolink{font-size:var(--fs-sm)}
+.pt-req{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.pt-req:last-child{border-bottom:0}
+.pt-req-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;align-items:flex-start;font-size:var(--fs-ui)}
+.pt-req-main .muted{font-size:var(--fs-sm)}
+.pt-slots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.pt-slots label{display:flex;flex-direction:column;gap:4px;font-weight:400;font-size:var(--fs-sm)}
+.pt-prog{display:flex;flex-direction:column;gap:6px;padding:12px 0;border-bottom:1px solid var(--line)}
+.pt-prog:last-child{border-bottom:0}
+.pt-prog.compact{padding:8px 0;border:0}
+.pt-prog-h{display:flex;justify-content:space-between;gap:8px;font-size:var(--fs-ui)}
+.pt-prog .muted{font-size:var(--fs-sm)}
+.pt-bar{height:8px;border-radius:999px;background:var(--tint);overflow:hidden}
+.pt-bar span{display:block;height:100%;border-radius:999px;background:var(--p);transition:width .4s}
+.pt-rel{padding:12px 0;border-bottom:1px solid var(--line)}
+.pt-rel:last-child{border-bottom:0}
+.pt-rel-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:var(--fs-ui)}
+.pt-rel-h .muted{font-size:var(--fs-sm)}
+.pt-upload{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:var(--s3)}
+.pt-table{width:100%;border-collapse:collapse;font-size:var(--fs-ui)}
+.pt-table th{text-align:left;font-weight:500;color:var(--ink2);font-size:var(--fs-sm);padding:8px;border-bottom:1px solid var(--line)}
+.pt-table td{padding:10px 8px;border-bottom:1px solid var(--line)}
+.pt-npanel{position:fixed;top:58px;right:clamp(8px,4vw,40px);z-index:40;width:min(380px,calc(100vw - 16px));max-height:70vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 16px 40px rgba(20,20,40,.14)}
+.pt-n-h{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff}
+.pt-n{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:none;padding:10px 14px;cursor:pointer;font:inherit;font-size:var(--fs-sm);color:var(--ink)}
+.pt-n:hover{background:var(--tint)}
+.pt-n.unread{background:#F7F5FF}
+.pt-n.unread b::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--p);margin-right:6px;vertical-align:middle}
+.pt-n b{font-weight:500}
+.pt-n-t{font-size:var(--fs-meta)}
+/* the team's side */
+.pt-staff h4{font-size:var(--fs-sm);color:var(--ink2);margin:14px 0 6px;font-weight:600}
+.pt-staff-list{display:flex;flex-direction:column;gap:2px;margin-bottom:8px}
+.pt-staff-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 0;border-bottom:1px solid var(--line);font-size:var(--fs-ui)}
+.pt-staff-row.pt-col{flex-direction:column;align-items:flex-start}
+.pt-staff-row.pt-col > span:first-child{flex:none}
+.pt-staff-row > span:first-child{flex:1;min-width:0}
+.pt-staff-acts{display:flex;gap:6px;flex-wrap:wrap}
+.pt-staff-invite{display:flex;flex-direction:column;gap:8px;align-items:flex-start;padding:10px;border-radius:var(--r-md);background:var(--tint);margin-top:6px}
+.pt-staff-2{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
+.multi-h{display:block;width:100%;font-size:var(--fs-meta);color:var(--ink3);margin:6px 0 2px;text-transform:uppercase;letter-spacing:.04em}
+@media (max-width:900px){.pt-grid{grid-template-columns:1fr}.pt-acts,.pt-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){
+  .pt-for,.pt-me-name{display:none}
+  .pt-acts{grid-template-columns:1fr}
+  .pt-slots,.pt-staff-2{grid-template-columns:1fr}
+  .pt-msg{max-width:100%}
+  .pt-head-acts{width:100%}.pt-head-acts .btn{flex:1;justify-content:center}
+  .pt-nav a span{font-size:var(--fs-sm)}
+}
 </style>
 </head>
 <body>
@@ -1977,6 +2130,7 @@ body.nb-moving,body.nb-moving *{cursor:grabbing!important;user-select:none!impor
 </section>
 
 <!-- App -->
+<div class="portal" id="portal" hidden></div>
 <div class="shell" id="app" hidden>
   <aside class="side" id="side"></aside>
   <div class="main">
@@ -2448,7 +2602,7 @@ function upsertCache(t, row){
 }
 
 async function notify(userIds, title, body, tbl, entityId){
-  const ids = [...new Set((userIds || []).filter(id => id && id !== S.me.id))];
+  const ids = [...new Set((userIds || []).filter(id => id && id !== S.me.id && !(person(id) || {}).client_id))];
   if (!ids.length) return;
   try { await sb.from("notifications").insert(ids.map(user_id => ({ user_id, title, body: body || "", tbl: tbl || "", entity_id: entityId || null }))); }
   catch (e) { console.warn("notify", e); }
@@ -2590,6 +2744,12 @@ function fieldInput(f, val, rec){
       const set = new Set(val || []);
       for (const p of activePeople()) box.append(h("label", {}, h("input", { type: "checkbox", value: p.id, checked: set.has(p.id) }), p.full_name));
       if (!activePeople().length) box.append(h("span", { class: "muted" }, "No people yet."));
+      // people at clients (portal logins): those already invited stay invited; meetings can invite any of them
+      const clientPeople = rows("profiles").filter(p => p.client_id && (set.has(p.id) || (f.k === "attendees" && p.portal_active)));
+      if (clientPeople.length) {
+        box.append(h("span", { class: "multi-h" }, "Client portal"));
+        for (const p of clientPeople) box.append(h("label", {}, h("input", { type: "checkbox", value: p.id, checked: set.has(p.id) }), p.full_name + " · " + (refLabel("clients", p.client_id) || "client")));
+      }
       return box;
     }
     case "ref": {
@@ -3087,12 +3247,14 @@ const MOD = {
     desc: "Client issues and requests, from first report to resolution.", needs: ["clients","projects"], comments: true, files: true,
     fields: [
       { k: "title", l: "Issue", t: "text", req: true, full: true },
+      { k: "kind", l: "Type", t: "select", o: ["Bug","Requirement","Question"], req: true, def: "Bug", filter: true, show: () => ticketsHavePortal() },
       { k: "description", l: "Description", t: "textarea", full: true },
       { k: "client_id", l: "Client", t: "ref", ref: "clients", filter: true },
       { k: "project_id", l: "Project", t: "ref", ref: "projects" },
       { k: "priority", l: "Priority", t: "select", o: PRIORITY, req: true, def: "Medium", filter: true },
       { k: "status", l: "Status", t: "select", o: ["Open","In progress","Waiting on client","Resolved","Closed"], req: true, def: "Open" },
-      { k: "channel", l: "Reported via", t: "select", o: ["Email","Phone","WhatsApp","Portal","Meeting"], req: true, def: "Email" },
+      { k: "channel", l: "Reported via", t: "select", o: ["Email","Phone","WhatsApp","Portal","Meeting"], req: true, def: "Email", filter: true },
+      { k: "client_visible", l: "Client portal", t: "bool", cb: "Show in the client’s portal (they see the title, details, status and replies sent to them)", def: true, show: r => ticketsHavePortal() && !!r.client_id },
       { k: "assignee_id", l: "Assigned to", t: "user", filter: true },
       { k: "due_date", l: "Respond by", t: "date" }
     ],
@@ -4007,6 +4169,7 @@ async function openRecord(key, id, preset, opts){
       saveBtns.forEach(b => { b.disabled = true; b.dataset.label = b.textContent; b.textContent = "Saving…"; });
       try {
         const saved = rec ? await updateRow(M.table, rec.id, data) : await insertRow(M.table, data);
+        if (opts && typeof opts.onSaved === "function") { try { await opts.onSaved(saved); } catch (e2) { console.warn(e2); } }
         if (thenFiles) openRecord(key, saved.id); else closeDlg();
         toast(rec ? "Saved." : (M.one[0].toUpperCase() + M.one.slice(1)) + " created.");
         rerender();
@@ -4024,6 +4187,7 @@ async function openRecord(key, id, preset, opts){
   openDialog(title.length > 70 ? title.slice(0, 70) + "…" : title, body, foot);
   // a note opens here first; Expand opens it as a full page (headings, toggles, sub-pages, export)
   if (key === "notes" && rec) { const db = dlg().querySelector(".db"); if (db) db.prepend(noteRequestsBar(rec)); }
+  if (key === "clients" && rec && S.portalReady) { const db = dlg().querySelector(".db"); if (db) db.append(portalPanel(rec)); }
   if (key === "notes" && rec) { const dh = dlg().querySelector(".dh"); if (dh) dh.insertBefore(h("button", { type: "button", class: "btn sm nb-expand", title: "Open as a full page", onclick: () => { closeDlg(); go("note=" + rec.id); } }, ic("expand", 16), "Open Detailed Editor"), dh.lastChild); }
   S.dlg = rec ? { tbl: M.table, id: rec.id } : null;
   const first = form.querySelector("input:not([type=checkbox]),textarea,select");
@@ -4048,9 +4212,14 @@ function commentsSection(tbl, id){
   attachMentions(ta);
   const post = h("button", { type: "button", class: "btn pri sm" }, "Post comment");
   const withKinds = ["leads","deals"].includes(tbl);
+  const tk = tbl === "tickets" ? byId("tickets", id) : null;
+  const toClient = !!(tk && tk.client_id && tk.client_visible !== false && ticketsHavePortal());
+  let audience = "internal";
+  const audSeg = toClient ? segmented([["internal", "Internal note"], ["client", "Reply to client"]], audience, v => { audience = v; ta.placeholder = v === "client" ? "Reply to the client: they’ll see this in their portal and get an email" : "Internal note: only the team sees this"; post.textContent = v === "client" ? "Send to client" : "Post comment"; }) : null;
   let kind = "Info";
   const kindSeg = withKinds ? segmented([["Info","Info"], ["Action","Action needed"], ["Escalation","Escalation"]], kind, v => { kind = v; }) : null;
-  sec.append(list, h("div", { style: "display:flex;flex-direction:column;gap:8px;margin-top:8px;align-items:flex-end" }, ta, h("div", { style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end" }, kindSeg, post)));
+  if (toClient) ta.placeholder = "Internal note: only the team sees this";
+  sec.append(list, h("div", { style: "display:flex;flex-direction:column;gap:8px;margin-top:8px;align-items:flex-end" }, ta, h("div", { style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end" }, audSeg, kindSeg, post)));
   async function refresh(){
     try {
       const cs = ok(await sb.from("comments").select("*").eq("tbl", tbl).eq("entity_id", id).order("created_at")) || [];
@@ -4059,6 +4228,7 @@ function commentsSection(tbl, id){
       for (const c of cs) list.append(h("div", { class: "cmt" }, avatar(c.author_id, "sm"),
         h("div", { class: "bd" }, h("div", { class: "hd" }, h("b", {}, pname(c.author_id) || "Someone"), c.kind && c.kind !== "Info" ? h("span", { class: "pill " + (c.kind === "Escalation" ? "bad" : "ok"), style: "font-size:11px" }, c.kind === "Action" ? "Action needed" : c.kind) : null, fmtAgo(c.created_at),
           c.via_email ? h("span", { class: "viaemail", title: "Posted by replying to an email" }, " · via email") : null,
+          (person(c.author_id) || {}).client_id ? h("span", { class: "pill info", style: "font-size:11px;margin-left:6px" }, "Client") : c.client_visible ? h("span", { class: "pill ok", style: "font-size:11px;margin-left:6px", title: "The client sees this in their portal" }, "Sent to client") : null,
           ((c.author_id === S.me.id && tbl !== "tasks") || S.me.is_admin) ? h("button", { type: "button", class: "del", onclick: async () => { try { ok(await sb.from("comments").delete().eq("id", c.id)); refresh(); } catch (e) { fail(e); } } }, " · Delete") : null),
           h("p", {}, renderRich(c.body)))));
     } catch (e) { list.replaceChildren(h("p", { class: "nothing" }, "Comments couldn’t be loaded.")); }
@@ -4068,7 +4238,7 @@ function commentsSection(tbl, id){
     post.disabled = true;
     try {
       const mentioned = mentionIds(body, { tbl, rec: byId(tbl, id) || {} });
-      ok(await sb.from("comments").insert({ tbl, entity_id: id, body, author_id: S.me.id, mentions: mentioned, ...(withKinds ? { kind } : {}) }));
+      ok(await sb.from("comments").insert({ tbl, entity_id: id, body, author_id: S.me.id, mentions: mentioned, ...(withKinds ? { kind } : {}), ...(toClient && audience === "client" ? { client_visible: true } : {}) }));
       if (withKinds && kind === "Escalation"){ const rec0 = byId(tbl, id) || {}; notify(peopleWith(tbl === "deals" ? "sales" : "leads", 3).map(p => p.id).filter(x => x !== S.me.id), "Escalation on " + (rec0.lead_number ? rec0.lead_number + " " : "") + (rec0.name || rec0.title || ""), body.slice(0, 140), tbl, id); }
       ta.value = "";
       const M = Object.values(MOD).find(m => m.table === tbl);
@@ -5542,6 +5712,7 @@ async function duplicateTask(rec){
    Notes
    --------------------------------------------------------------------- */
 const notesHaveEditors = () => rows("notes").some(n => "editors" in n);
+const ticketsHavePortal = () => S.portalReady === true || rows("tickets").some(t => "client_visible" in t);
 const VIS_LABEL = { Private: "Only me", People: "Specific people", Vertical: "My vertical", Company: "Everyone" };
 function notesBoard(el, A){
   if (!S.ui.notes) S.ui.notes = { q: "", scope: "all" };
@@ -9271,7 +9442,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11bs";
+const APP_VERSION = "2026-11bt";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -9317,7 +9488,7 @@ function bugButton(){
     b = h("button", { type: "button", id: "bugBtn", class: "bugbtn", "aria-label": "Report a problem", title: "Report a problem", onclick: () => openReportDialog() }, h("span", { class: "bi", "aria-hidden": "true" }, ic("bug", 14)), h("span", { class: "bt" }, "Report a problem"));
     document.body.append(b);
   }
-  b.hidden = !S.me;
+  b.hidden = !S.me || !!S.portal;   // the team's tool; clients write to us through their portal
 }
 // a picture of the page as it is now, made in the browser (no permission question). The tool loads only when needed.
 const SHOT_LIB = "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js";
@@ -10921,7 +11092,7 @@ function renderAdminUsers(el){
   function draw(){
     body.replaceChildren();
     const s = u.q.toLowerCase();
-    const list = rows("profiles").filter(p => (u.show === "all" || (u.show === "active" ? p.is_active : !p.is_active)) && (!s || (p.full_name + p.email + p.title).toLowerCase().includes(s)));
+    const list = rows("profiles").filter(p => !p.client_id && (u.show === "all" || (u.show === "active" ? p.is_active : !p.is_active)) && (!s || (p.full_name + p.email + p.title).toLowerCase().includes(s)));
     const tb = h("tbody");
     for (const p of list) tb.append(h("tr", { class: "click", tabindex: "0", onclick: () => openUserEditor(p.id), onkeydown: e => { if (e.key === "Enter") openUserEditor(p.id); } },
       h("td", {}, personChip(p.id)), h("td", {}, p.email), h("td", {}, p.is_admin ? h("span", { class: "pill" }, "Admin") : (refLabel("roles", p.role_id) || h("span", { class: "muted" }, "No role"))),
@@ -11535,9 +11706,523 @@ function onChange(payload){
 async function loadSettings(){ try { const r = ok(await sb.from("settings").select("data").eq("id", 1).maybeSingle()); S.settings = (r && r.data) || {}; } catch (e) { S.settings = S.settings || {}; } }
 
 /* ---------------------------------------------------------------------
+   Client portal (2026-11bt)
+   People at a client company sign in with their own login and see only this: their requirements and bugs,
+   meetings, project progress, releases, files and proposals. Everything comes from the portal_* database
+   functions, which check the company on every call; the staff workspace never starts for them.
+   --------------------------------------------------------------------- */
+const P = { data: null, at: 0, seq: 0, notes: [], timer: null, links: new Map(), hooked: false, lastRoute: "" };
+const P_STATUS = { "Open": ["Received", "info"], "In progress": ["In progress", "warn"], "Waiting on client": ["Waiting on you", "bad"], "Resolved": ["Resolved", "ok"], "Closed": ["Closed", "grey"] };
+const P_KIND = { Bug: ["Bug", "bug"], Requirement: ["Requirement", "sparkle"], Question: ["Question", "message"] };
+const P_PRIORITY = [["Low", "Low"], ["Medium", "Normal"], ["High", "High"], ["Critical", "Urgent: something is down"]];
+const P_REQ = { Requested: ["Waiting for the team", "info"], Confirmed: ["Confirmed", "ok"], Declined: ["Not possible", "bad"], Cancelled: ["Cancelled", "grey"] };
+const P_TABS = [["home", "Home", "home"], ["requests", "Requests", "bug"], ["meetings", "Meetings", "calendar"], ["projects", "Projects", "briefcase"], ["files", "Files", "paperclip"], ["proposals", "Proposals", "fileText"]];
+const P_MAX_FILE = 25 * 1048576;
+// like append, but leaves out empty parts (append would print "null")
+const pAdd = (el, ...kids) => el.append(...kids.flat().filter(x => x != null && x !== false));
+const pPill = (map, s) => { const [l, c] = map[s] || [s, "grey"]; return h("span", { class: "pill " + c }, l); };
+const pOpen = t => !["Resolved", "Closed"].includes(t.status);
+const pFirst = n => String(n || "").trim().split(/\s+/)[0] || "there";
+const pWhen = iso => { const d = new Date(iso); return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }) + ", " + d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }); };
+const pTz = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "your time zone"; } catch (e) { return "your time zone"; } };
+function pErr(e){ const m = friendly(e); return /client accounts/i.test(m) ? "Your portal access is turned off. Ask your contact at Tcipher." : m; }
+
+async function pLoad(force){
+  if (!force && P.data && Date.now() - P.at < 15000) return P.data;
+  const { data, error } = await sb.rpc("portal_overview");
+  if (error) throw error;
+  P.data = data; P.at = Date.now(); return data;
+}
+function pRoute(){
+  const raw = decodeURIComponent(location.hash.slice(1)); let m;
+  if ((m = raw.match(/^open\/tickets\/([\w-]+)/))) return "ticket/" + m[1];
+  if (/^open\/(meetings|meeting_requests)\//.test(raw)) return "meetings";
+  if (raw.startsWith("p/")) return raw.slice(2) || "home";
+  return "home";
+}
+const pGo = r => { location.hash = "#p/" + r; };
+
+async function startPortal(me){
+  S.portal = true; S.me = me; P.data = null; P.at = 0;
+  document.title = "Client portal – Tcipher";
+  const root = $("portal"); root.replaceChildren(); showScreen("portal");
+  if (!P.hooked) {
+    P.hooked = true;
+    window.addEventListener("hashchange", () => { if (S.portal) pRender(); });
+    document.addEventListener("visibilitychange", () => { if (S.portal && document.visibilityState === "visible") { P.at = 0; pBell(); if (["home", "requests", "meetings", "projects", "files", "proposals"].includes(pRoute())) pRender(); } });
+  }
+  { const b = document.getElementById("bugBtn"); if (b) b.hidden = true; }
+  if (!/^#(p\/|open\/)/.test(location.hash)) history.replaceState(null, "", "#p/home");
+  await pRender();
+  pBell(); pPresence();
+  clearInterval(P.timer); P.timer = setInterval(() => { if (!S.portal) return; pBell(); pPresence(); }, 60000);
+}
+function stopPortal(){ S.portal = false; clearInterval(P.timer); P.timer = null; P.data = null; P.links.clear(); const r = $("portal"); if (r) r.replaceChildren(); }
+// while someone is looking at the portal, their updates aren't emailed as well
+function pPresence(){ if (S.me) sb.from("presence").upsert({ user_id: S.me.id, last_seen_at: new Date().toISOString() }, { onConflict: "user_id" }).then(() => {}, () => {}); }
+
+function pShell(root){
+  const bell = h("button", { type: "button", class: "iconbtn pt-bell", "aria-label": "Updates", onclick: e => { e.stopPropagation(); pBellPanel(); } }, ic("bell", 18), h("span", { class: "dot", hidden: true }));
+  root.append(
+    h("header", { class: "pt-top" },
+      h("a", { class: "pt-brand", href: "#p/home", "aria-label": "Client portal home" }, h("img", { src: LOGO_DARK, alt: "Tcipher" }), h("span", { class: "pt-for" }, "Client portal")),
+      h("span", { class: "grow" }),
+      bell,
+      h("a", { class: "pt-me", href: "#p/profile", title: "Your profile" }, avatar(S.me.id, "sm"), h("span", { class: "pt-me-name" }, S.me.full_name))),
+    h("nav", { class: "pt-nav", "aria-label": "Portal" }, P_TABS.map(([r, l, i]) => h("a", { href: "#p/" + r, "data-r": r }, ic(i, 16), h("span", {}, l)))),
+    h("main", { class: "pt-main", id: "ptMain" }),
+    h("div", { class: "pt-npanel", id: "ptNotes", hidden: true }));
+}
+async function pRender(){
+  const root = $("portal"); if (!root) return;
+  if (!root.firstChild) pShell(root);
+  const route = pRoute(), [page, arg, arg2] = route.split("/");
+  root.querySelectorAll(".pt-nav a").forEach(a => a.classList.toggle("on", a.dataset.r === (page === "ticket" ? "requests" : page)));
+  const main = $("ptMain"), seq = ++P.seq;
+  if (!P.data) main.replaceChildren(h("div", { class: "loading" }, h("span", { class: "spinner" }), "Loading…"));
+  let d;
+  try { d = await pLoad(); }
+  catch (e) { if (seq === P.seq) main.replaceChildren(h("div", { class: "panel pt-empty" }, h("h2", {}, "Couldn’t load your portal"), h("p", { class: "muted" }, pErr(e)), h("button", { type: "button", class: "btn", onclick: () => { P.at = 0; pRender(); } }, "Try again"))); return; }
+  if (seq !== P.seq) return;
+  const v = h("div", { class: "pt-view" });
+  try {
+    if (page === "requests" && arg === "new") pNewTicket(v, d, arg2);
+    else if (page === "requests") pRequests(v, d, arg);
+    else if (page === "ticket") await pTicket(v, d, arg);
+    else if (page === "meetings" && arg === "new") pNewMeeting(v, d);
+    else if (page === "meetings") pMeetings(v, d);
+    else if (page === "projects") pProjects(v, d);
+    else if (page === "files") pFiles(v, d);
+    else if (page === "proposals") pProposals(v, d);
+    else if (page === "profile") pProfile(v, d);
+    else pHome(v, d);
+  } catch (e) { v.replaceChildren(h("div", { class: "panel pt-empty" }, h("p", {}, pErr(e)))); }
+  if (seq !== P.seq) return;
+  main.replaceChildren(v);
+  if (P.lastRoute !== route) { window.scrollTo(0, 0); P.lastRoute = route; }
+}
+const pHead = (title, sub, ...actions) => h("div", { class: "pt-head" }, h("div", {}, h("h1", {}, title), sub ? h("p", { class: "muted" }, sub) : null), actions.length ? h("div", { class: "pt-head-acts" }, actions) : null);
+const pEmpty = (text, action) => h("div", { class: "pt-none" }, h("p", {}, text), action || null);
+function pTicketRow(t){
+  const [kl, ki] = P_KIND[t.kind] || [t.kind, "bug"];
+  return h("a", { class: "pt-row", href: "#p/ticket/" + t.id },
+    h("span", { class: "pt-kind k-" + String(t.kind).toLowerCase(), title: kl }, ic(ki, 16)),
+    h("span", { class: "pt-row-main" }, h("b", {}, t.title),
+      h("span", { class: "muted" }, [kl, t.project, "updated " + fmtAgo(t.updated_at), t.replies ? t.replies + (t.replies === 1 ? " message" : " messages") : ""].filter(Boolean).join(" · "))),
+    pPill(P_STATUS, t.status));
+}
+// the next time each of their meetings happens (repeating ones too)
+function pUpcoming(d){
+  const out = [], start = today();
+  for (const m of d.meetings || []) {
+    for (let i = 0; i < 120; i++) {
+      const day = addDays(start, i); if (!occursOn(m, day)) continue;
+      // today's one counts until it has finished
+      if (i === 0 && m.start_time) { const [hh, mm] = String(m.start_time).split(":").map(Number); const end = new Date(); end.setHours(hh, mm + (m.duration_min || 30), 0, 0); if (end < new Date()) continue; }
+      out.push({ m, day }); break;
+    }
+  }
+  return out.sort((a, b) => (a.day + (a.m.start_time || "")).localeCompare(b.day + (b.m.start_time || "")));
+}
+const pMeetWhen = (m, day) => fmtDate(day) + (m.start_time ? ", " + fmtTimeOfDay(m.start_time) : "") + (m.duration_min ? " · " + m.duration_min + " min" : "");
+
+function pHome(v, d){
+  const open = d.tickets.filter(pOpen), waiting = d.tickets.filter(t => t.status === "Waiting on client"), next = pUpcoming(d)[0];
+  const stat = (label, value, href, tone) => h("a", { class: "pt-stat" + (tone ? " " + tone : ""), href }, h("span", { class: "muted" }, label), h("b", {}, value));
+  const act = (icon, title, text, href) => h("a", { class: "pt-act", href }, h("span", { class: "pt-act-ic" }, ic(icon, 18)), h("span", {}, h("b", {}, title), h("span", { class: "muted" }, text)));
+  pAdd(v, 
+    h("div", { class: "pt-hello" }, h("h1", {}, "Hi " + pFirst(d.me.name)), h("p", { class: "muted" }, (d.client.name || "") + " · your requests, meetings and projects with Tcipher, in one place.")),
+    waiting.length ? h("div", { class: "pt-banner bad" }, ic("flag", 16), h("span", {}, h("b", {}, waiting.length === 1 ? "1 item is waiting on you. " : waiting.length + " items are waiting on you. "), "The team needs your answer to continue."),
+      h("a", { class: "btn sm", href: waiting.length === 1 ? "#p/ticket/" + waiting[0].id : "#p/requests/waiting" }, "Open")) : null,
+    h("div", { class: "pt-acts" },
+      act("bug", "Report a bug", "Something isn’t working", "#p/requests/new/Bug"),
+      act("sparkle", "Request a feature", "A change or something new", "#p/requests/new/Requirement"),
+      act("message", "Ask a question", "Anything about your project", "#p/requests/new/Question"),
+      act("calendar", "Request a meeting", "Suggest times that suit you", "#p/meetings/new")),
+    h("div", { class: "pt-stats" },
+      stat("Open requests", String(open.length), "#p/requests"),
+      stat("Waiting on you", String(waiting.length), "#p/requests/waiting", waiting.length ? "bad" : ""),
+      stat("Next meeting", next ? fmtDate(next.day) : "None planned", "#p/meetings"),
+      stat("Projects", String(d.projects.length), "#p/projects")));
+  const recent = d.tickets.slice(0, 6);
+  const side = h("div", { class: "pt-side" });
+  if (d.owner) side.append(h("div", { class: "panel pt-card" }, h("h3", {}, "Your account manager"),
+    h("p", { class: "pt-owner" }, h("b", {}, d.owner.name), d.owner.title ? h("span", { class: "muted" }, d.owner.title) : null),
+    d.owner.email ? h("a", { class: "pt-contact", href: "mailto:" + d.owner.email }, ic("mail", 15), d.owner.email) : null,
+    d.owner.phone ? h("a", { class: "pt-contact", href: telHref(d.owner.phone) }, ic("phone", 15), d.owner.phone) : null));
+  if (next) side.append(h("div", { class: "panel pt-card" }, h("h3", {}, "Next meeting"), h("p", {}, h("b", {}, next.m.title)), h("p", { class: "muted" }, pMeetWhen(next.m, next.day)),
+    next.m.link ? h("a", { class: "btn pri sm", href: next.m.link, target: "_blank", rel: "noopener" }, ic("video", 15), "Join") : null));
+  if (d.projects.length) side.append(h("div", { class: "panel pt-card" }, h("h3", {}, "Projects"), d.projects.slice(0, 4).map(p => pProgress(p, true)), h("a", { class: "linkbtn", href: "#p/projects" }, "See all")));
+  pAdd(v, h("div", { class: "pt-grid" },
+    h("section", { class: "panel" }, h("div", { class: "pt-sec-h" }, h("h2", {}, "Recent requests"), h("a", { class: "btn sm", href: "#p/requests/new" }, ic("plus", 15), "New")),
+      recent.length ? h("div", { class: "pt-list" }, recent.map(pTicketRow)) : pEmpty("Nothing yet. Report a bug, ask for a feature or ask a question, and follow it here.")),
+    side));
+}
+
+function pRequests(v, d, filter){
+  let f = ["open", "waiting", "done", "all"].includes(filter) ? filter : "open";
+  const list = h("div", { class: "pt-list" });
+  const draw = () => {
+    const rows = d.tickets.filter(t => f === "all" || (f === "open" ? pOpen(t) : f === "waiting" ? t.status === "Waiting on client" : !pOpen(t)));
+    list.replaceChildren(...(rows.length ? rows.map(pTicketRow) : [pEmpty(f === "waiting" ? "Nothing is waiting on you." : f === "done" ? "Nothing finished yet." : "No open requests.")]));
+  };
+  pAdd(v, pHead("Requests", "Bugs, feature requests and questions you’ve sent us, and where each one stands.", h("a", { class: "btn pri", href: "#p/requests/new" }, ic("plus", 16), "New request")),
+    h("div", { class: "pt-filter" }, segmented([["open", "Open"], ["waiting", "Waiting on you"], ["done", "Done"], ["all", "All"]], f, x => { f = x; history.replaceState(null, "", "#p/requests/" + x); draw(); })),
+    h("section", { class: "panel" }, list));
+  draw();
+}
+
+function pFilePicker(note){
+  const files = [];
+  const input = h("input", { type: "file", multiple: true, hidden: true, accept: "image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.ppt,.pptx" });
+  const chips = h("div", { class: "pt-chips" });
+  const draw = () => chips.replaceChildren(...files.map((f, i) => h("span", { class: "pt-chip" }, ic(/^image\//.test(f.type) ? "image" : /^video\//.test(f.type) ? "film" : "file", 14), f.name, h("span", { class: "muted" }, fmtSize(f.size)),
+    h("button", { type: "button", "aria-label": "Remove " + f.name, onclick: () => { files.splice(i, 1); draw(); } }, ic("x", 14)))));
+  input.addEventListener("change", () => {
+    for (const f of input.files) {
+      if (f.size > P_MAX_FILE) { toast(f.name + " is over 25 MB."); continue; }
+      if (files.length >= 10) { toast("Up to 10 files at a time."); break; }
+      files.push(f);
+    }
+    input.value = ""; draw();
+  });
+  const btn = h("button", { type: "button", class: "btn sm", onclick: () => input.click() }, ic("paperclip", 15), note || "Attach files");
+  return { el: h("div", { class: "pt-attach" }, btn, input, chips), files, clear: () => { files.length = 0; draw(); } };
+}
+async function pUpload(file, ticketId){
+  const cid = P.data.client.id, safe = file.name.replace(/[^\w.\-]+/g, "_").slice(-80) || "file";
+  const path = "portal/" + cid + "/" + (ticketId ? "t/" + ticketId : "c") + "/" + Date.now() + "-" + uid() + "-" + safe;
+  const up = await sb.storage.from(FILE_BUCKET).upload(path, file, { contentType: file.type || "application/octet-stream", upsert: false });
+  if (up.error) throw up.error;
+  const { error } = await sb.rpc("portal_attach", { p_ticket: ticketId || null, p_path: path, p_name: file.name, p_size: file.size, p_mime: file.type || "" });
+  if (error) throw error;
+}
+async function pUploadAll(files, ticketId, status){
+  let failed = 0;
+  for (let i = 0; i < files.length; i++) {
+    if (status) status.textContent = "Uploading " + (i + 1) + " of " + files.length + "…";
+    try { await pUpload(files[i], ticketId); } catch (e) { failed++; console.warn(e); }
+  }
+  if (failed) toast(failed === 1 ? "One file couldn’t be uploaded. Try adding it again." : failed + " files couldn’t be uploaded. Try adding them again.");
+}
+
+function pNewTicket(v, d, kind0){
+  let kind = P_KIND[kind0] ? kind0 : "Bug";
+  const HINT = {
+    Bug: "What happened, and what did you expect?\n\nSteps to see it:\n1. \n2. \n\nWhere: (page, phone or computer, browser)",
+    Requirement: "What should it do, and why does it matter?\n\nWho will use it:\nWhen do you need it:",
+    Question: "Ask anything about your project." };
+  const title = h("input", { class: "in", maxlength: "200", placeholder: "A short title, e.g. “Login button does nothing on Android”" });
+  const details = h("textarea", { class: "in", rows: 9, maxlength: "8000", placeholder: HINT[kind] });
+  const project = d.projects.length ? h("select", { class: "in" }, h("option", { value: "" }, d.projects.length === 1 ? d.projects[0].name : "Not sure / general"), d.projects.length > 1 ? d.projects.map(p => h("option", { value: p.id }, p.name)) : null) : null;
+  if (project && d.projects.length === 1) project.firstChild.value = d.projects[0].id;
+  const prio = h("select", { class: "in" }, P_PRIORITY.map(([vv, l]) => h("option", { value: vv, selected: vv === "Medium" }, l)));
+  const fp = pFilePicker("Add screenshots or files");
+  const err = h("p", { class: "err", hidden: true }), status = h("span", { class: "muted" });
+  const send = h("button", { type: "submit", class: "btn pri" }, "Send to the team");
+  const label = (t, el, help) => h("label", { class: "fl" }, t, el, help ? h("small", { class: "muted" }, help) : null);
+  const form = h("form", { class: "panel pt-form", onsubmit: async e => {
+    e.preventDefault(); err.hidden = true;
+    if (title.value.trim().length < 3) { err.textContent = "Give it a short title."; err.hidden = false; title.focus(); return; }
+    send.disabled = true; status.textContent = "Sending…";
+    try {
+      const { data: id, error } = await sb.rpc("portal_new_ticket", { p_kind: kind, p_title: title.value.trim(), p_details: details.value.trim(), p_priority: prio.value, p_project: project && project.value ? project.value : null });
+      if (error) throw error;
+      if (fp.files.length) await pUploadAll(fp.files, id, status);
+      P.at = 0; toast("Sent. The team has been notified."); pGo("ticket/" + id);
+    } catch (x) { err.textContent = pErr(x); err.hidden = false; send.disabled = false; status.textContent = ""; }
+  } },
+    h("div", { class: "fl" }, "What is it?", segmented(Object.entries(P_KIND).map(([k, [l]]) => [k, l]), kind, k => { kind = k; details.placeholder = HINT[k]; })),
+    label("Title", title),
+    project ? label("Project", project) : null,
+    label("How urgent?", prio),
+    label("Details", details, "The more detail, the faster we can help. Don’t include passwords."),
+    fp.el, err,
+    h("div", { class: "pt-form-foot" }, status, h("a", { class: "btn ghost", href: "#p/requests" }, "Cancel"), send));
+  pAdd(v, pHead("New request", "Goes straight to your account manager and the team."), form);
+  setTimeout(() => title.focus(), 30);
+}
+
+async function pLink(path){
+  const hit = P.links.get(path); if (hit && hit.until > Date.now()) return hit.url;
+  const { data, error } = await sb.storage.from(FILE_BUCKET).createSignedUrl(path, 3600);
+  if (error) throw error;
+  P.links.set(path, { url: data.signedUrl, until: Date.now() + 50 * 60000 }); return data.signedUrl;
+}
+function pFileTile(f){
+  const isImg = /^image\/(png|jpe?g|gif|webp)$/.test(f.mime || "");
+  const tile = h("button", { type: "button", class: "pt-file" + (isImg ? " img" : ""), title: f.name, onclick: async () => { try { window.open(await pLink(f.path), "_blank", "noopener"); } catch (e) { toast(pErr(e)); } } },
+    isImg ? h("span", { class: "pt-thumb" }) : h("span", { class: "pt-file-ic" }, ic(/^video\//.test(f.mime || "") ? "film" : "file", 18)),
+    h("span", { class: "pt-file-name" }, f.name), h("span", { class: "muted" }, fmtSize(f.size || 0) + (f.by ? " · " + (f.from_team ? "Tcipher" : f.by) : "")));
+  if (isImg) pLink(f.path).then(u => { tile.querySelector(".pt-thumb").style.backgroundImage = "url(\"" + u.replace(/"/g, "%22") + "\")"; }, () => {});
+  return tile;
+}
+
+async function pTicket(v, d, id){
+  const { data: t, error } = await sb.rpc("portal_ticket", { p_id: id });
+  if (error) throw error;
+  if (!t) { pAdd(v, pEmpty("This item isn’t available.", h("a", { class: "btn", href: "#p/requests" }, "Back to requests"))); return; }
+  const [kl, ki] = P_KIND[t.kind] || [t.kind, "bug"];
+  const prioL = (P_PRIORITY.find(p => p[0] === t.priority) || [, t.priority])[1];
+  pAdd(v, h("a", { class: "pt-back", href: "#p/requests" }, ic("chevronLeft", 16), "Requests"),
+    h("div", { class: "pt-head" }, h("div", {}, h("h1", {}, t.title),
+      h("div", { class: "pt-meta" }, h("span", { class: "pt-kind k-" + String(t.kind).toLowerCase() }, ic(ki, 14)), kl, pPill(P_STATUS, t.status),
+        h("span", { class: "muted" }, [t.opened_by ? "by " + t.opened_by : "added by the team", fmtDate(String(t.created_at).slice(0, 10), true), t.project, prioL ? "Priority: " + prioL : ""].filter(Boolean).join(" · "))))));
+  if (t.status === "Waiting on client") pAdd(v, h("div", { class: "pt-banner bad" }, ic("flag", 16), h("span", {}, h("b", {}, "The team is waiting for your answer. "), "Reply below to keep it moving.")));
+  if (t.status === "Resolved") pAdd(v, h("div", { class: "pt-banner ok" }, ic("check", 16), h("span", {}, h("b", {}, "Marked as resolved. "), "If it isn’t fixed for you, reply below and we’ll reopen it.")));
+  pAdd(v, h("section", { class: "panel pt-desc" }, h("h3", {}, "Details"), t.description ? h("div", { class: "pt-body" }, renderRich(t.description)) : h("p", { class: "muted" }, "No details were added."),
+    t.files.length ? h("div", { class: "pt-files" }, t.files.map(pFileTile)) : null));
+  const thread = h("div", { class: "pt-thread" }, t.comments.length ? t.comments.map(c => h("div", { class: "pt-msg" + (c.mine ? " mine" : c.team ? " team" : "") },
+    h("div", { class: "pt-msg-h" }, h("b", {}, c.mine ? "You" : c.author), c.team ? h("span", { class: "pill info" }, "Tcipher") : null, h("span", { class: "muted" }, fmtAgo(c.created_at))),
+    h("div", { class: "pt-body" }, renderRich(c.body)))) : h("p", { class: "muted" }, "No messages yet. The team will reply here, and you’ll get an email."));
+  const ta = h("textarea", { class: "in", rows: 3, maxlength: "4000", placeholder: t.status === "Waiting on client" ? "Your answer…" : "Write a message to the team…" });
+  const fp = pFilePicker(); const status = h("span", { class: "muted" });
+  const send = h("button", { type: "button", class: "btn pri", onclick: async () => {
+    const body = ta.value.trim();
+    if (!body && !fp.files.length) { ta.focus(); return; }
+    send.disabled = true; status.textContent = "Sending…";
+    try {
+      if (body) { const { error: e1 } = await sb.rpc("portal_reply", { p_ticket: t.id, p_body: body }); if (e1) throw e1; }
+      if (fp.files.length) { await pUploadAll(fp.files, t.id, status); if (!body) await sb.rpc("portal_reply", { p_ticket: t.id, p_body: "Added " + fp.files.length + (fp.files.length === 1 ? " file." : " files.") }); }
+      P.at = 0; toast("Sent."); pRender();
+    } catch (x) { toast(pErr(x)); send.disabled = false; status.textContent = ""; }
+  } }, ic("send", 15), "Send");
+  pAdd(v, h("section", { class: "panel" }, h("h3", {}, "Conversation"), thread, h("div", { class: "pt-reply" }, ta, h("div", { class: "pt-form-foot" }, fp.el, status, send))));
+}
+
+function pMeetings(v, d){
+  const up = pUpcoming(d), past = (d.meetings || []).filter(m => (m.repeat || "Does not repeat") === "Does not repeat" && m.meeting_date < today()).reverse();
+  const card = ({ m, day }) => h("div", { class: "pt-meet" },
+    h("div", { class: "pt-date" }, h("b", {}, parseD(day).getDate()), h("span", {}, parseD(day).toLocaleDateString("en-IN", { month: "short" }))),
+    h("div", { class: "pt-meet-main" }, h("b", {}, m.title), h("span", { class: "muted" }, pMeetWhen(m, day) + (m.repeat && m.repeat !== "Does not repeat" ? " · repeats" : "")),
+      m.agenda ? h("details", {}, h("summary", {}, "Agenda"), h("div", { class: "pt-body" }, renderRich(m.agenda))) : null),
+    m.link ? h("a", { class: "btn pri sm", href: m.link, target: "_blank", rel: "noopener" }, ic("video", 15), "Join") : h("span", { class: "muted pt-nolink" }, "Link to follow"));
+  const req = r => h("div", { class: "pt-req" },
+    h("div", { class: "pt-req-main" }, h("b", {}, r.topic), pPill(P_REQ, r.status),
+      h("span", { class: "muted" }, (r.status === "Requested" ? "You suggested: " : "Suggested: ") + (r.slots || []).map(pWhen).join(" · ")),
+      r.answer ? h("span", {}, "Answer: " + r.answer) : null),
+    r.status === "Requested" ? h("button", { type: "button", class: "btn sm ghost", onclick: async () => {
+      if (!confirm("Cancel this meeting request?")) return;
+      const { error } = await sb.rpc("portal_cancel_meeting_request", { p_id: r.id }); if (error) { toast(pErr(error)); return; }
+      P.at = 0; toast("Request cancelled."); pRender();
+    } }, "Cancel") : null);
+  pAdd(v, pHead("Meetings", "Calls with the Tcipher team. Ask for one any time.", h("a", { class: "btn pri", href: "#p/meetings/new" }, ic("calendar", 16), "Request a meeting")),
+    h("section", { class: "panel" }, h("h2", {}, "Upcoming"), up.length ? h("div", { class: "pt-list" }, up.map(card)) : pEmpty("No meetings planned.")),
+    (d.requests || []).length ? h("section", { class: "panel" }, h("h2", {}, "Your requests"), h("div", { class: "pt-list" }, d.requests.map(req))) : null,
+    past.length ? h("section", { class: "panel" }, h("details", {}, h("summary", {}, h("h2", { style: "display:inline" }, "Past meetings (" + past.length + ")")),
+      h("div", { class: "pt-list" }, past.map(m => h("div", { class: "pt-req" }, h("div", { class: "pt-req-main" }, h("b", {}, m.title), h("span", { class: "muted" }, pMeetWhen(m, m.meeting_date)))))))) : null);
+}
+function pNewMeeting(v, d){
+  const topic = h("input", { class: "in", maxlength: "200", placeholder: "e.g. Sprint demo, scope for phase 2" });
+  const details = h("textarea", { class: "in", rows: 4, maxlength: "4000", placeholder: "What would you like to cover? Who will join from your side?" });
+  const min = new Date(Date.now() + 60 * 60000), pad = n => String(n).padStart(2, "0");
+  const minStr = min.getFullYear() + "-" + pad(min.getMonth() + 1) + "-" + pad(min.getDate()) + "T" + pad(min.getHours()) + ":00";
+  const slots = [0, 1, 2].map(() => h("input", { class: "in", type: "datetime-local", min: minStr, step: "900" }));
+  const err = h("p", { class: "err", hidden: true });
+  const send = h("button", { type: "submit", class: "btn pri" }, "Send request");
+  pAdd(v, h("a", { class: "pt-back", href: "#p/meetings" }, ic("chevronLeft", 16), "Meetings"),
+    pHead("Request a meeting", "Suggest up to three times. Your account manager confirms one and sends a calendar invite with a Google Meet link."),
+    h("form", { class: "panel pt-form", onsubmit: async e => {
+      e.preventDefault(); err.hidden = true;
+      const picked = slots.map(s => s.value).filter(Boolean).map(x => new Date(x));
+      if (topic.value.trim().length < 3) { err.textContent = "Say what the meeting is about."; err.hidden = false; return; }
+      if (!picked.length) { err.textContent = "Suggest at least one time."; err.hidden = false; return; }
+      if (picked.some(x => isNaN(x) || x < Date.now() + 30 * 60000)) { err.textContent = "Pick times at least 30 minutes from now."; err.hidden = false; return; }
+      send.disabled = true;
+      const { error } = await sb.rpc("portal_request_meeting", { p_topic: topic.value.trim(), p_details: details.value.trim(), p_slots: picked.map(x => x.toISOString()) });
+      if (error) { err.textContent = pErr(error); err.hidden = false; send.disabled = false; return; }
+      P.at = 0; toast("Request sent. You’ll get an email when it’s confirmed."); pGo("meetings");
+    } },
+      h("label", { class: "fl" }, "Topic", topic),
+      h("label", { class: "fl" }, "Details (optional)", details),
+      h("div", { class: "fl" }, "Times that suit you", h("div", { class: "pt-slots" }, slots.map((s, i) => h("label", {}, h("span", { class: "muted" }, i ? "Or" : "First choice"), s))),
+        h("small", { class: "muted" }, "In your time zone (" + pTz() + ").")),
+      err, h("div", { class: "pt-form-foot" }, h("a", { class: "btn ghost", href: "#p/meetings" }, "Cancel"), send)));
+  setTimeout(() => topic.focus(), 30);
+}
+
+function pProgress(p, compact){
+  const pct = p.tasks ? Math.round(p.done / p.tasks * 100) : 0;
+  return h("div", { class: "pt-prog" + (compact ? " compact" : "") },
+    h("div", { class: "pt-prog-h" }, h("b", {}, p.name), h("span", { class: "muted" }, p.tasks ? pct + "%" : (p.status || ""))),
+    h("div", { class: "pt-bar", role: "progressbar", "aria-valuenow": String(pct), "aria-valuemin": "0", "aria-valuemax": "100", "aria-label": p.name + " progress" }, h("span", { style: "width:" + pct + "%" })),
+    compact ? null : h("span", { class: "muted" }, [p.status, p.tasks ? p.done + " of " + p.tasks + " work items done" : "Work hasn’t been planned in detail yet",
+      p.start_date ? "started " + fmtDate(p.start_date, true) : "", p.end_date ? "target " + fmtDate(p.end_date, true) : ""].filter(Boolean).join(" · ")));
+}
+function pProjects(v, d){
+  pAdd(v, pHead("Projects", "Progress is worked out from the team’s work items, so it moves as work gets done."),
+    h("section", { class: "panel" }, d.projects.length ? h("div", { class: "pt-list" }, d.projects.map(p => pProgress(p))) : pEmpty("No projects yet.")),
+    h("section", { class: "panel" }, h("h2", {}, "Releases"), d.releases.length ? h("div", { class: "pt-list" }, d.releases.map(r => h("div", { class: "pt-rel" },
+      h("div", { class: "pt-rel-h" }, h("b", {}, (r.version ? "v" + String(r.version).replace(/^v/i, "") : "") + (r.name ? " " + r.name : "")), pPill({ Released: ["Released", "ok"], Ready: ["Ready", "info"], "In QA": ["Testing", "warn"], Planned: ["Planned", "grey"], "Rolled back": ["Rolled back", "bad"] }, r.status),
+        h("span", { class: "muted" }, [r.project, r.environment, r.release_date ? fmtDate(r.release_date, true) : ""].filter(Boolean).join(" · "))),
+      r.notes ? h("details", {}, h("summary", {}, "Release notes"), h("div", { class: "pt-body" }, renderRich(r.notes))) : null))) : pEmpty("No releases yet.")));
+}
+function pFiles(v, d){
+  const fp = pFilePicker("Choose files"); const status = h("span", { class: "muted" });
+  const up = h("button", { type: "button", class: "btn pri", onclick: async () => {
+    if (!fp.files.length) { fp.el.querySelector("button").click(); return; }
+    up.disabled = true; await pUploadAll(fp.files, null, status); fp.clear(); status.textContent = ""; up.disabled = false; P.at = 0; toast("Shared with the team."); pRender();
+  } }, ic("share", 15), "Share with the team");
+  const team = d.files.filter(f => f.from_team && !f.ticket_id), rest = d.files.filter(f => !(f.from_team && !f.ticket_id));
+  pAdd(v, pHead("Files", "Documents the team shares with you, and files you’ve sent."),
+    h("section", { class: "panel" }, h("h2", {}, "From Tcipher"), team.length ? h("div", { class: "pt-files" }, team.map(pFileTile)) : pEmpty("Nothing shared yet.")),
+    h("section", { class: "panel" }, h("h2", {}, "Your files"), h("div", { class: "pt-upload" }, fp.el, status, up),
+      rest.length ? h("div", { class: "pt-files" }, rest.map(f => { const t = pFileTile(f); if (f.ticket) t.append(h("a", { class: "pt-file-link", href: "#p/ticket/" + f.ticket_id, onclick: e => e.stopPropagation() }, f.ticket)); return t; })) : pEmpty("No files yet.")));
+}
+function pProposals(v, d){
+  const tone = { Sent: ["Waiting for you", "info"], Accepted: ["Accepted", "ok"], Rejected: ["Declined", "bad"], Expired: ["Expired", "grey"] };
+  pAdd(v, pHead("Proposals", "Quotes and proposals we’ve sent you. Ask your account manager for the documents, or find them under Files."),
+    h("section", { class: "panel" }, d.proposals.length ? h("div", { class: "tablewrap" }, h("table", { class: "pt-table" },
+      h("thead", {}, h("tr", {}, ["Proposal", "Amount", "Status", "Sent", "Valid until"].map(x => h("th", {}, x)))),
+      h("tbody", {}, d.proposals.map(q => h("tr", {}, h("td", {}, h("b", {}, q.title), q.number ? h("span", { class: "muted" }, " · " + q.number) : null), h("td", {}, money(q.amount)),
+        h("td", {}, pPill(tone, q.status)), h("td", {}, q.sent_on ? fmtDate(q.sent_on, true) : "–"), h("td", {}, q.valid_until ? fmtDate(q.valid_until, true) : "–")))))) : pEmpty("No proposals yet.")));
+}
+function pProfile(v, d){
+  const name = h("input", { class: "in", value: d.me.name, maxlength: "120" }), phone = h("input", { class: "in", value: d.me.phone, maxlength: "40", type: "tel" });
+  const mail = h("select", { class: "in" }, h("option", { value: "all", selected: d.me.email_notifications !== "off" }, "Email me every update"), h("option", { value: "off", selected: d.me.email_notifications === "off" }, "No emails (I’ll check the portal)"));
+  const pw1 = h("input", { class: "in", type: "password", autocomplete: "new-password", placeholder: "At least 8 characters" }), pw2 = h("input", { class: "in", type: "password", autocomplete: "new-password" });
+  pAdd(v, pHead("Your profile", d.me.email),
+    h("form", { class: "panel pt-form", onsubmit: async e => {
+      e.preventDefault();
+      try {
+        ok(await sb.from("profiles").update({ full_name: name.value.trim() || d.me.name, phone: phone.value.trim(), email_notifications: mail.value }).eq("id", S.me.id));
+        S.me.full_name = name.value.trim() || d.me.name; P.at = 0; toast("Saved.");
+        const n = document.querySelector(".pt-me-name"); if (n) n.textContent = S.me.full_name;
+      } catch (x) { toast(pErr(x)); }
+    } }, h("h2", {}, "Details"), h("label", { class: "fl" }, "Name", name), h("label", { class: "fl" }, "Phone", phone), h("label", { class: "fl" }, "Email updates", mail),
+      h("div", { class: "pt-form-foot" }, h("button", { type: "submit", class: "btn pri" }, "Save"))),
+    h("form", { class: "panel pt-form", onsubmit: async e => {
+      e.preventDefault();
+      if (pw1.value.length < 8) { toast("Use at least 8 characters."); return; }
+      if (pw1.value !== pw2.value) { toast("The two passwords don’t match."); return; }
+      const { error } = await sb.auth.updateUser({ password: pw1.value }); if (error) { toast(pErr(error)); return; }
+      pw1.value = pw2.value = ""; toast("Password changed.");
+    } }, h("h2", {}, "Password"), h("label", { class: "fl" }, "New password", pw1), h("label", { class: "fl" }, "Type it again", pw2),
+      h("div", { class: "pt-form-foot" }, h("button", { type: "submit", class: "btn" }, "Change password"))),
+    h("div", { class: "pt-form-foot" }, h("button", { type: "button", class: "btn", onclick: () => sb.auth.signOut() }, ic("logOut", 15), "Sign out")));
+}
+
+// updates (the bell)
+async function pBell(){
+  try {
+    const rows = ok(await sb.from("notifications").select("id,title,body,tbl,entity_id,is_read,created_at").eq("user_id", S.me.id).order("created_at", { ascending: false }).limit(30)) || [];
+    P.notes = rows;
+    const dot = document.querySelector(".pt-bell .dot"); if (dot) dot.hidden = !rows.some(n => !n.is_read);
+    if (!$("ptNotes").hidden) pBellPanel(true);
+  } catch (e) {}
+}
+function pBellPanel(keep){
+  const panel = $("ptNotes"); if (!panel) return;
+  if (!keep && !panel.hidden) { panel.hidden = true; return; }
+  const close = () => { panel.hidden = true; document.removeEventListener("click", outside, true); };
+  const outside = e => { if (!panel.contains(e.target) && !e.target.closest(".pt-bell")) close(); };
+  const openOne = async n => {
+    close();
+    if (!n.is_read) { n.is_read = true; sb.from("notifications").update({ is_read: true }).eq("id", n.id).then(() => pBell(), () => {}); }
+    pGo(n.tbl === "tickets" && n.entity_id ? "ticket/" + n.entity_id : ["meetings", "meeting_requests"].includes(n.tbl) ? "meetings" : "home");
+  };
+  panel.replaceChildren(h("div", { class: "pt-n-h" }, h("b", {}, "Updates"), P.notes.some(n => !n.is_read) ? h("button", { type: "button", class: "linkbtn", onclick: async () => {
+      await sb.from("notifications").update({ is_read: true }).eq("user_id", S.me.id).eq("is_read", false); P.notes.forEach(n => { n.is_read = true; }); pBell(); pBellPanel(true);
+    } }, "Mark all read") : null),
+    P.notes.length ? h("div", { class: "pt-n-list" }, P.notes.map(n => h("button", { type: "button", class: "pt-n" + (n.is_read ? "" : " unread"), onclick: () => openOne(n) },
+      h("b", {}, n.title), n.body ? h("span", { class: "muted" }, String(n.body).split("\n")[0].slice(0, 140)) : null, h("span", { class: "muted pt-n-t" }, fmtAgo(n.created_at))))) : h("p", { class: "muted", style: "padding:12px" }, "No updates yet."));
+  panel.hidden = false;
+  setTimeout(() => document.addEventListener("click", outside, true), 0);
+}
+
+/* ---------- the team's side of the portal ---------- */
+// in a client's record: who has portal access, inviting people, meeting requests and files shared with the client
+function portalPanel(rec){
+  const sec = h("div", { class: "section pt-staff" }, h("h3", {}, "Client portal"));
+  const body = h("div", {}, h("p", { class: "nothing" }, "Loading…"));
+  sec.append(h("p", { class: "muted", style: "margin:-4px 0 10px;font-size:13px" }, "People at " + rec.name + " sign in to see their requests and bugs, meetings, project progress, releases, shared files and proposals. They never see anything else in the workspace."), body);
+  const canManage = isAdmin() || rec.owner_id === S.me.id;
+  async function draw(){
+    let people = [], reqs = [], files = [];
+    try {
+      [people, reqs, files] = await Promise.all([
+        sb.from("profiles").select("id,full_name,email,phone,portal_active,client_id").eq("client_id", rec.id).order("full_name").then(r => ok(r) || []),
+        sb.from("meeting_requests").select("*").eq("client_id", rec.id).order("created_at", { ascending: false }).limit(20).then(r => r.error ? [] : (r.data || []), () => []),
+        sb.from("files").select("*").eq("tbl", "clients").eq("entity_id", rec.id).like("path", "portal/%").order("created_at", { ascending: false }).then(r => ok(r) || [])]);
+    } catch (e) { body.replaceChildren(h("p", { class: "nothing" }, /client_id|meeting_requests|does not exist|schema cache/i.test(String(e.message || e)) ? "Run upgrade-2026-11bt.sql in Supabase to turn on the client portal." : "Couldn’t load: " + friendly(e))); return; }
+    for (const p of people) upsertCache("profiles", Object.assign({}, person(p.id) || {}, p));
+    const out = [];
+    // people with access
+    out.push(h("h4", {}, "People with access"), people.length ? h("div", { class: "pt-staff-list" }, people.map(p => h("div", { class: "pt-staff-row" },
+      h("span", {}, h("b", {}, p.full_name), h("span", { class: "muted" }, " · " + p.email)), h("span", { class: "pill " + (p.portal_active ? "ok" : "grey") }, p.portal_active ? "Active" : "Off"),
+      canManage ? h("span", { class: "pt-staff-acts" },
+        h("button", { type: "button", class: "btn sm ghost", title: "Email a new set-password link", onclick: () => invite({ full_name: p.full_name, email: p.email, phone: p.phone }) }, "Resend invite"),
+        h("button", { type: "button", class: "btn sm ghost", onclick: async () => {
+          try { await callAdmin({ action: "client_access", id: p.id, on: !p.portal_active }); toast(p.portal_active ? "Access turned off." : "Access turned on."); draw(); } catch (e) { fail(e); }
+        } }, p.portal_active ? "Turn off" : "Turn on")) : null))) : h("p", { class: "nothing" }, "Nobody yet."));
+    if (canManage) {
+      const contacts = rows("contacts").filter(c => c.client_id === rec.id && c.email && !people.some(p => (p.email || "").toLowerCase() === c.email.toLowerCase()));
+      const nm = h("input", { class: "in", placeholder: "Name", maxlength: "120" }), em = h("input", { class: "in", type: "email", placeholder: "Email", maxlength: "200" });
+      const pick = contacts.length ? h("select", { class: "in", onchange: e => { const c = contacts.find(x => x.id === e.target.value); nm.value = c ? c.name : ""; em.value = c ? c.email : ""; } },
+        h("option", { value: "" }, "Pick a contact…"), contacts.map(c => h("option", { value: c.id }, c.name + " · " + c.email))) : null;
+      out.push(h("div", { class: "pt-staff-invite" }, pick, h("div", { class: "pt-staff-2" }, nm, em),
+        h("button", { type: "button", class: "btn soft sm", onclick: () => invite({ full_name: nm.value.trim(), email: em.value.trim() }) }, ic("userPlus", 15), "Invite to the portal")));
+    } else out.push(h("p", { class: "nothing" }, "Admins and this client’s account owner can invite people."));
+    // meeting requests
+    const open = reqs.filter(r => r.status === "Requested");
+    out.push(h("h4", {}, "Meeting requests"), reqs.length ? h("div", { class: "pt-staff-list" }, reqs.slice(0, 8).map(r => h("div", { class: "pt-staff-row pt-col" },
+      h("span", {}, h("b", {}, r.topic), " ", h("span", { class: "pill " + ((P_REQ[r.status] || [])[1] || "grey") }, r.status), h("span", { class: "muted" }, " · from " + (pname(r.requested_by) || "the client") + ", " + fmtAgo(r.created_at))),
+      r.details ? h("span", { class: "muted" }, r.details) : null,
+      r.status === "Requested" ? h("span", { class: "pt-staff-acts" }, (r.slots || []).map(s => h("button", { type: "button", class: "btn sm soft", title: "Create the meeting at this time", onclick: () => confirmAt(r, s) }, pWhen(s))),
+        h("button", { type: "button", class: "btn sm ghost", onclick: async () => {
+          const why = prompt("Why can’t it happen? (the client sees this; optional)", ""); if (why === null) return;
+          try { ok(await sb.from("meeting_requests").update({ status: "Declined", answer: why.trim().slice(0, 1000) }).eq("id", r.id)); toast("Declined. The client was told."); draw(); } catch (e) { fail(e); }
+        } }, "Decline")) : r.answer ? h("span", { class: "muted" }, "Answer: " + r.answer) : null))) : h("p", { class: "nothing" }, "None yet."));
+    // files shared with the client
+    const fileIn = h("input", { type: "file", multiple: true, hidden: true });
+    fileIn.addEventListener("change", async () => {
+      const fs = [...fileIn.files]; fileIn.value = ""; let n = 0;
+      for (const f of fs) {
+        if (f.size > 50 * 1048576) { toast(f.name + " is over 50 MB."); continue; }
+        try {
+          const path = "portal/" + rec.id + "/shared/" + Date.now() + "-" + uid() + "-" + (f.name.replace(/[^\w.\-]+/g, "_").slice(-80) || "file");
+          ok(await sb.storage.from(FILE_BUCKET).upload(path, f, { contentType: f.type || "application/octet-stream", upsert: false }));
+          ok(await sb.from("files").insert({ tbl: "clients", entity_id: rec.id, name: f.name, path, size: f.size, mime: f.type || "", uploaded_by: S.me.id, storage: "supabase" }));
+          n++;
+        } catch (e) { fail(e, "Couldn’t share " + f.name); }
+      }
+      if (n) { toast(n === 1 ? "Shared with the client." : n + " files shared with the client."); draw(); }
+    });
+    out.push(h("h4", {}, "Files in the portal"), h("p", { class: "muted", style: "font-size:13px;margin:-2px 0 6px" }, "Contracts, designs, reports or proposal PDFs: the client sees these under Files."),
+      files.length ? h("div", { class: "pt-staff-list" }, files.map(f => h("div", { class: "pt-staff-row" },
+        h("button", { type: "button", class: "linkbtn", onclick: async () => { try { window.open(await storeLink(f), "_blank", "noopener"); } catch (e) { fail(e); } } }, f.name),
+        h("span", { class: "muted" }, fmtSize(f.size || 0) + " · " + (person(f.uploaded_by) && person(f.uploaded_by).client_id ? "from the client" : "shared by " + (pname(f.uploaded_by) || "the team"))),
+        (f.uploaded_by === S.me.id || isAdmin()) ? h("button", { type: "button", class: "btn sm ghost", onclick: async () => { if (!confirm("Remove " + f.name + " from the portal?")) return; try { await storeDelete(f); draw(); } catch (e) { fail(e); } } }, "Remove") : null))) : h("p", { class: "nothing" }, "None yet."),
+      h("button", { type: "button", class: "btn sm", onclick: () => fileIn.click() }, ic("share", 15), "Share a file with the client"), fileIn);
+    body.replaceChildren(...out);
+  }
+  async function invite(who){
+    if (!who.full_name || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(who.email || "")) { toast("Enter their name and a valid email."); return; }
+    try {
+      const r = await callAdmin({ action: "invite_client", client_id: rec.id, full_name: who.full_name, email: who.email, phone: who.phone || "" });
+      openDialog("Invite sent", [h("p", {}, (r.resent ? "A new invite is on its way to " : "An invite is on its way to ") + who.email + ". It arrives from the notifications mailbox within a few minutes."),
+        h("p", { class: "muted" }, "If it doesn’t arrive, you can send them this one-time link yourself (WhatsApp, email). It lets them set their password, and expires after a while:"),
+        h("div", { style: "display:flex;gap:8px" }, h("input", { class: "in", readonly: true, value: r.link || "" }), h("button", { type: "button", class: "btn", onclick: () => { navigator.clipboard.writeText(r.link || "").then(() => toast("Link copied."), () => toast("Couldn’t copy.")); } }, ic("copy", 15), "Copy"))],
+        [h("button", { type: "button", class: "btn pri", onclick: () => { closeDlg(); openRecord("clients", rec.id); } }, "Done")], true);
+    } catch (e) { fail(e, "Couldn’t invite"); }
+  }
+  async function confirmAt(r, slot){
+    const t = new Date(slot), pad = n => String(n).padStart(2, "0");
+    const attendees = [...new Set([S.me.id, rec.owner_id, r.requested_by].filter(Boolean))];
+    await openRecord("meetings", null, { title: r.topic, kind: "Client call", client_id: rec.id, meeting_date: t.getFullYear() + "-" + pad(t.getMonth() + 1) + "-" + pad(t.getDate()),
+      start_time: pad(t.getHours()) + ":" + pad(t.getMinutes()), duration_min: 30, attendees, agenda: r.details || "" },
+      { onSaved: async m => {
+        try { ok(await sb.from("meeting_requests").update({ status: "Confirmed", meeting_id: m.id }).eq("id", r.id)); toast("Meeting created. The client was told."); } catch (e) { fail(e, "The meeting was created, but the request wasn’t updated"); }
+      } });
+  }
+  draw();
+  return sec;
+}
+
+/* ---------------------------------------------------------------------
    Sign-in and startup
    --------------------------------------------------------------------- */
-function showScreen(which){ for (const id of ["boot","setup","login","inactive","mfa","app"]) $(id).hidden = id !== which; if (which === "login") showCaptcha(); }
+function showScreen(which){ for (const id of ["boot","setup","login","inactive","mfa","app","portal"]) $(id).hidden = id !== which; if (which === "login") showCaptcha(); }
 
 async function startSession(session){
   try {
@@ -11551,8 +12236,11 @@ async function startSession(session){
       if (r.error) throw r.error;
       me = r.data;
     }
+    // someone at a client company: their portal, never the workspace
+    if (me && me.client_id){ if (!me.portal_active) { S.me = null; showScreen("inactive"); return; } await startPortal(me); return; }
     if (!me || !me.is_active){ S.me = null; showScreen("inactive"); return; }
-    S.me = me; bootN = 0;
+    S.me = me; bootN = 0; S.portal = false;
+    sb.from("meeting_requests").select("id", { head: true, count: "exact" }).limit(1).then(r => { S.portalReady = !r.error; }, () => {});
     if (me.is_admin) mfaFactor().then(f => { S.mfaOn = !!f; if (S.route.startsWith("admin")) rerender(); }).catch(() => {});
     document.title = (S.settings.company || "Workspace") + " – Workspace";
     showScreen("app");
@@ -11637,6 +12325,7 @@ function endSession(){
   shellKey = ""; resetSeenCache(); stopPresence(); Object.assign(C, { ready: false, channels: [], reads: {}, msgs: {}, more: {}, unread: {}, mentions: {}, last: {}, active: null, drafts: {}, hidden: null, reacts: {}, replyTo: {}, uploads: {} }); chatEls = null;
   clearTimeout(wsRetryT); wsRetryT = null; liveDownSince = 0;
   if (channel) { const c = channel; channel = null; sb.removeChannel(c); }
+  stopPortal();
   S.me = null; S.cache = {}; S.loaded = new Set(); S.notifications = []; S.ui = {};
   closeDlg(); showScreen("login");
 }
@@ -11806,7 +12495,7 @@ function wire(){
   $("bell").addEventListener("click", e => { e.stopPropagation(); const p = $("npanel"); p.hidden = !p.hidden; if (!p.hidden) drawNotifications(); });
   document.addEventListener("click", e => { const p = $("npanel"); if (!p.hidden && !p.contains(e.target)) p.hidden = true; });
   $("dlg").addEventListener("close", () => { S.dlg = null; });
-  window.addEventListener("hashchange", () => { if (S.me) { closeDlg(); rerender(); } });
+  window.addEventListener("hashchange", () => { if (S.me && !S.portal) { closeDlg(); rerender(); } });
   let day = today(); setInterval(() => { if (S.me && today() !== day) { day = today(); rerender(); } }, 60000);
 }
 

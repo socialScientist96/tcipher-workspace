@@ -486,7 +486,7 @@ async function sendPendingEmails(row: Any, token: string) {
     .lt("created_at", cutoff).gt("created_at", oldest).order("created_at", { ascending: true }).limit(MAIL_BATCH * 3)) || [];
   if (!list.length) return 0;
   const ids = [...new Set(list.map((n: Any) => n.user_id))];
-  const people = new Map<string, Any>((must(await db.from("profiles").select("id,email,full_name,is_active,email_notifications").in("id", ids)) || []).map((p: Any) => [p.id, p]));
+  const people = new Map<string, Any>((must(await db.from("profiles").select("id,email,full_name,is_active,email_notifications,client_id,portal_active").in("id", ids)) || []).map((p: Any) => [p.id, p]));
   const personal = new Map<string, string>((must(await db.from("profile_private").select("user_id,personal_email").in("user_id", ids)) || []).map((p: Any) => [p.user_id, p.personal_email]));
   const seen = new Map<string, string>((must(await db.from("presence").select("user_id,last_seen_at").in("user_id", ids)) || []).map((p: Any) => [p.user_id, p.last_seen_at]));
   const canReply = String(row.scopes || "").includes("gmail.readonly");
@@ -495,7 +495,8 @@ async function sendPendingEmails(row: Any, token: string) {
     if (sent >= MAIL_BATCH || count >= MAIL_DAILY_CAP) break;
     const p = people.get(n.user_id);
     const skip = async (why: string) => { await db.from("notifications").update({ email_status: why }).eq("id", n.id); };
-    if (!p || !p.is_active) { await skip("skipped: inactive"); continue; }
+    const portal = !!(p && p.client_id && p.portal_active);   // a client with portal access (2026-11bt)
+    if (!p || (!p.is_active && !portal)) { await skip("skipped: inactive"); continue; }
     const pref = p.email_notifications || "all";
     if (pref === "off") { await skip("skipped: off"); continue; }
     if (pref === "direct" && !isDirect(n)) { await skip("skipped: not direct"); continue; }
@@ -507,18 +508,19 @@ async function sendPendingEmails(row: Any, token: string) {
     const fresh = must(await db.from("notifications").select("is_read,emailed_at").eq("id", n.id).maybeSingle());
     if (!fresh || fresh.is_read || fresh.emailed_at) continue;
     let replyTo = "", tokenRow: Any = null;
-    const replyable = canReply && n.entity_id && n.tbl && (n.tbl === "chat" || !["leave_requests", "connect-google", "team-day", "emails"].includes(n.tbl));
+    const replyable = !portal && canReply && n.entity_id && n.tbl && (n.tbl === "chat" || !["leave_requests", "connect-google", "team-day", "emails"].includes(n.tbl));
     if (replyable) {
       tokenRow = { token: randomToken(), user_id: n.user_id, channel_id: n.tbl === "chat" ? n.entity_id : null, tbl: n.tbl === "chat" ? null : n.tbl, entity_id: n.tbl === "chat" ? null : n.entity_id };
       const ins = await db.from("email_reply_tokens").insert(tokenRow);
       if (!ins.error) replyTo = replyAddress(row.google_email, tokenRow.token); else tokenRow = null;
     }
     const link = APP_URL + (n.tbl && n.entity_id ? "#open/" + encodeURIComponent(n.tbl) + "/" + encodeURIComponent(n.entity_id) : "");
-    const text = [String(n.title || "Notification"), n.body ? "\n" + String(n.body) : "", "\n\nOpen it in the workspace: " + link,
+    const text = [String(n.title || "Notification"), n.body ? "\n" + String(n.body) : "", portal ? (n.tbl ? "\n\nOpen it in your client portal: " + link : "") : "\n\nOpen it in the workspace: " + link,
       replyTo ? "\n\nReply to this email to answer" + (n.tbl === "chat" ? " in the chat." : " with a comment.") : "",
-      "\n\n—\nYou get these emails because you weren’t in the workspace. Change what you get in My profile › Notification emails."].join("");
+      portal ? "\n\n—\nYou get these emails from the Tcipher client portal. Change them in the portal under Profile › Email updates."
+        : "\n\n—\nYou get these emails because you weren’t in the workspace. Change what you get in My profile › Notification emails."].join("");
     try {
-      await g(token, GMAIL + "messages/send", { method: "POST", body: JSON.stringify({ raw: mimeText("Tcipher Workspace <" + row.google_email + ">", to, String(n.title || "New notification"), text, replyTo) }) });
+      await g(token, GMAIL + "messages/send", { method: "POST", body: JSON.stringify({ raw: mimeText((portal ? "Tcipher" : "Tcipher Workspace") + " <" + row.google_email + ">", to, String(n.title || "New notification"), text, replyTo) }) });
       await db.from("notifications").update({ emailed_at: new Date().toISOString(), email_status: "sent" }).eq("id", n.id);
       if (n.tbl === "chat") await db.from("chat_email_log").upsert({ user_id: n.user_id, channel_id: n.entity_id, last_emailed_at: new Date().toISOString() }, { onConflict: "user_id,channel_id" });
       sent++; count++;
