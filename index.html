@@ -1829,7 +1829,16 @@ dialog{border-radius:var(--r-xl)}
 /* pictures and videos in notes */
 .nb-figure{flex:1;min-width:0;margin:6px 0}
 .nb-media{border-radius:var(--r-md);overflow:hidden;background:var(--tint)}
-.nb-img{display:block;max-width:100%;max-height:640px;margin:0 auto;cursor:zoom-in}
+.nb-mbox{position:relative;margin:0 auto;max-width:100%}
+.nb-img{display:block;width:100%;height:auto;cursor:zoom-in}
+.nb-resize{position:absolute;top:0;bottom:2.2em;width:24px;display:flex;align-items:center;justify-content:center;cursor:ew-resize;touch-action:none;opacity:0;transition:opacity .15s;z-index:2}
+.nb-resize::after{content:"";width:6px;height:min(48px,40%);border-radius:3px;background:rgba(255,255,255,.95);border:1px solid rgba(0,0,0,.25);box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.nb-resize-l{left:2px}.nb-resize-r{right:2px}
+.nb-mbox:hover .nb-resize,.nb-mbox.nb-resizing .nb-resize{opacity:1}
+@media (hover:none){.nb-resize{opacity:.85;width:32px}}
+.nb-mbox.nb-resizing{user-select:none}
+.nb-mbox.nb-resizing .nb-img{cursor:ew-resize}
+.nb-mbox.nb-resizing::before{content:attr(data-pct);position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.7);color:#fff;font-size:var(--fs-meta);padding:2px 8px;border-radius:var(--r-sm);z-index:3}
 .nb-video{display:block;width:100%;max-height:520px;background:#000}
 .nb-media-wait{display:flex;align-items:center;gap:var(--s2);padding:var(--s6);color:var(--ink2);font-size:var(--fs-ui);justify-content:center;min-height:120px}
 .nb-media-wait.err{color:var(--bad)}
@@ -5611,7 +5620,7 @@ function nbToHtml(title, blocks, forPrint){
     const st = "margin-left:" + ((b.level || 0) * 24) + "px", h = b.html || "";
     if (b.type === "divider") return '<hr style="' + st + '">';
     if (b.type === "page") return '<p style="' + st + '">📄 ' + nbEsc((byId("notes", b.page) || {}).title || "Untitled page") + "</p>";
-    if (nbMedia(b.type)) { const link = b.file && nbLinks.get(b.file); return '<figure style="' + st + ';margin:12px 0">' + (b.type === "image" && link ? '<img src="' + nbEsc(link.url) + '" style="max-width:100%;border-radius:8px">' : "<p>[" + (b.type === "video" ? "Video" : "Picture") + ": " + nbEsc(b.name || "") + "]</p>") + (h ? '<figcaption style="color:#71717A;font-size:13px">' + h + "</figcaption>" : "") + "</figure>"; }
+    if (nbMedia(b.type)) { const link = b.file && nbLinks.get(b.file); return '<figure style="' + st + ';margin:12px 0">' + (b.type === "image" && link ? '<img src="' + nbEsc(link.url) + '" style="width:' + (b.width || 100) + '%;max-width:100%;border-radius:8px">' : "<p>[" + (b.type === "video" ? "Video" : "Picture") + ": " + nbEsc(b.name || "") + "]</p>") + (h ? '<figcaption style="color:#71717A;font-size:13px">' + h + "</figcaption>" : "") + "</figure>"; }
     const tag = { h1: "h1", h2: "h2", h3: "h3", h4: "h4", th1: "h1", th2: "h2", th3: "h3" }[b.type];
     if (tag) return "<" + tag + ' style="' + st + '">' + h + "</" + tag + ">";
     if (b.type === "bulleted" || b.type === "toggle") return '<p style="' + st + '">• ' + h + "</p>";
@@ -5800,7 +5809,7 @@ async function renderNotePage(el, id){
     state.saving = true; state.dirty = false; setStatus("Saving…");
     const prev = Object.assign({}, note);
     const d = { title: title || "Untitled", body: nbToMarkdown("", blocks).replace(/^# Untitled\n\n?/, "").replace(/^# \n\n?/, "").trim() };
-    if (rich) d.blocks = blocks.filter(b => !b._uploading).map(({ id, type, html, level, checked, open, color, page, file, name }) => ({ id, type, html, level: level || 0, checked: !!checked, open: open !== false, color: color || "", page: page || null, file: file || null, name: name || "" }));
+    if (rich) d.blocks = blocks.filter(b => !b._uploading).map(({ id, type, html, level, checked, open, color, page, file, name, width }) => ({ id, type, html, level: level || 0, checked: !!checked, open: open !== false, color: color || "", page: page || null, file: file || null, name: name || "", width: width || null }));
     try { MOD.notes.before(d, prev); } catch (e) {}
     try {
       const row = await updateRow("notes", note.id, d);
@@ -5852,14 +5861,44 @@ async function renderNotePage(el, id){
         media.append(h("div", { class: "nb-media-wait" }, h("span", { class: "spinner" }), "Loading…"));
         nbMediaLink(b.file, b.type === "video").then(url => {
           const el = b.type === "video" ? h("video", { class: "nb-video", src: url, controls: true, preload: "metadata", playsinline: true }) : h("img", { class: "nb-img", src: url, alt: nbText(b.html) || b.name || "Picture" });
-          if (b.type === "image") el.addEventListener("click", () => window.open(url, "_blank", "noopener"));
+          if (b.type === "image") {
+            el.addEventListener("click", () => { if (!box.classList.contains("nb-resizing")) window.open(url, "_blank", "noopener"); });
+            // a tall phone photo starts at a comfortable height instead of filling the whole column
+            el.addEventListener("load", () => { if (!b.width && el.naturalHeight > el.naturalWidth * 1.2) box.style.width = Math.round(560 * el.naturalWidth / el.naturalHeight) + "px"; }, { once: true });
+          }
           media.replaceChildren(el);
         }, e => media.replaceChildren(h("div", { class: "nb-media-wait err" }, String(e.message || e))));
       }
       const cap = h("div", { class: "nb-text nb-caption", contenteditable: editable && !b._uploading ? "true" : "false", "data-placeholder": editable ? "Add a caption" : "" });
       cap.innerHTML = b.html || "";
       if (editable) wire(cap, b, i);
-      row.append(h("figure", { class: "nb-figure" }, media, cap));
+      // drag either side bar to make it bigger or smaller (it stays centred); double-click a bar for full width
+      const box = h("div", { class: "nb-mbox" }, media, cap);
+      if (b.width) box.style.width = b.width + "%";
+      const fig = h("figure", { class: "nb-figure" }, box);
+      if (editable && b.file && !b._uploading) for (const side of ["l", "r"]) {
+        const bar = h("span", { class: "nb-resize nb-resize-" + side, role: "separator", "aria-label": "Drag to resize", title: "Drag to resize · double-click for full width" });
+        bar.addEventListener("pointerdown", e => {
+          if (e.button) return; e.preventDefault(); bar.setPointerCapture(e.pointerId);
+          const full = fig.getBoundingClientRect().width, w0 = box.getBoundingClientRect().width, x0 = e.clientX; let pct = null;
+          box.classList.add("nb-resizing");
+          const move = ev => {
+            const w = Math.max(Math.min(120, full), Math.min(full, w0 + (ev.clientX - x0) * (side === "r" ? 2 : -2)));
+            pct = Math.round(w / full * 100); box.style.width = pct + "%"; box.dataset.pct = pct + "%";
+          };
+          const up = () => {
+            bar.removeEventListener("pointermove", move); bar.removeEventListener("pointerup", up); bar.removeEventListener("pointercancel", up);
+            setTimeout(() => box.classList.remove("nb-resizing"), 0);
+            if (pct == null) return;
+            b.width = pct >= 98 ? null : pct; if (!b.width) box.style.width = "";
+            state.dirty = true; save();
+          };
+          bar.addEventListener("pointermove", move); bar.addEventListener("pointerup", up); bar.addEventListener("pointercancel", up);
+        });
+        bar.addEventListener("dblclick", () => { b.width = null; box.style.width = ""; state.dirty = true; save(); });
+        box.append(bar);
+      }
+      row.append(fig);
       return row;
     }
     if (b.type === "page"){
@@ -9068,7 +9107,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11bn";
+const APP_VERSION = "2026-11bo";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));

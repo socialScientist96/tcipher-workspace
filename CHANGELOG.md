@@ -1,5 +1,11 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11bo (8 Nov 2026): resize pictures and videos in notes
+Needs: upload `index.html` and `sw.js`. No database change.
+- **Drag to resize:** hover over a picture or video in a note page and drag the white bar on either side to make it smaller or bigger; it stays centred and shows the size while you drag. The size is saved with the note, and everyone sees it the same way. Double-click a bar to go back to full width. On phones the bars are always visible.
+- Tall phone photos now start at a comfortable height instead of filling the whole column.
+- HTML and PDF exports keep the size.
+
 ## Version 2026-11bn (8 Nov 2026): pictures and videos in notes
 Needs: upload `index.html` and `sw.js`. No database change.
 - **Add pictures and videos to note pages**, like Notion: type **/image** or **/video** (or use **Turn into**) to pick a file; **paste** a picture or screenshot straight in; or **drag and drop** pictures and videos onto the page (a dashed outline shows where they'll go). An empty line becomes the picture; otherwise it goes below.
