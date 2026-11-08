@@ -1762,6 +1762,17 @@ dialog{border-radius:var(--r-xl)}
 .toast-undo{background:none;border:0;color:#C9C3FB;font:inherit;font-weight:600;cursor:pointer;padding:0 0 0 8px;text-decoration:underline}
 .toast:has(.toast-undo){pointer-events:auto}
 @media (max-width:640px){ .ai-eng-head,.ai-eng-row{grid-template-columns:1fr} .ai-eng-head b:first-child{display:none} }
+
+/* Notion-style menus: items with a side menu show an arrow at the right edge */
+.nb-menu button .ic{color:var(--ink2);flex:none}
+.nb-menu .nb-subarrow{margin-left:auto;display:inline-grid;place-items:center;color:var(--ink3)}
+.nb-menu button.has-sub.open{background:var(--tint)}
+.nb-menu button.danger,.nb-menu button.danger .ic{color:var(--bad)}
+.nb-sub{z-index:3001}
+
+.nb-more{width:32px;height:32px}
+.nb-archived{display:flex;align-items:center;gap:var(--s2);border-color:var(--warn);margin-bottom:var(--s3);font-size:var(--fs-ui)}
+.nb-archived .btn{margin-left:auto}
 </style>
 </head>
 <body>
@@ -1942,6 +1953,12 @@ const ICONS = {
   plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
   sparkle: '<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/>',
   languages: '<path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>',
+  refresh: '<path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M8 16H3v5"/>',
+  palette: '<circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.65-.75 1.65-1.69 0-.44-.18-.84-.44-1.13-.29-.29-.44-.65-.44-1.13a1.64 1.64 0 0 1 1.67-1.67h2c3.05 0 5.56-2.5 5.56-5.56C21.96 6.01 17.46 2 12 2z"/>',
+  arrowUp: '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
+  arrowDown: '<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>',
+  archive2: '<rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
+  more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
   checkSquare: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/>'
 };
 function ic(name, size){
@@ -5376,7 +5393,7 @@ function notesBoard(el, A){
   function draw(){
     grid.replaceChildren();
     const s = u.q.trim().toLowerCase();
-    let list = rows("notes").filter(n => !n.parent_id || !byId("notes", n.parent_id));
+    let list = rows("notes").filter(n => (!n.parent_id || !byId("notes", n.parent_id)) && (u.scope === "archived" ? n.archived : !n.archived));
     if (u.scope === "mine") list = list.filter(n => n.owner_id === S.me.id);
     if (u.scope === "shared") list = list.filter(n => n.owner_id !== S.me.id);
     if (s) list = list.filter(n => (n.title + " " + n.body).toLowerCase().includes(s));
@@ -5393,7 +5410,7 @@ function notesBoard(el, A){
     }
   }
   q.addEventListener("input", () => { u.q = q.value; draw(); });
-  el.append(h("div", { class: "tb" }, q, segmented([["all","All I can see"], ["mine","Mine"], ["shared","Shared with me"]], u.scope, v => { u.scope = v; draw(); })), grid);
+  el.append(h("div", { class: "tb" }, q, segmented([["all","All I can see"], ["mine","Mine"], ["shared","Shared with me"], ["archived","Archived"]], u.scope, v => { u.scope = v; draw(); })), grid);
   draw();
 }
 
@@ -5577,6 +5594,34 @@ async function renderNotePage(el, id){
   const chain = []; for (let p = note.parent_id && byId("notes", note.parent_id), k = 0; p && k < 8; p = p.parent_id && byId("notes", p.parent_id), k++) chain.unshift(p);
   const status = h("span", { class: "nb-status muted" });
   const exportBtn = h("button", { type: "button", class: "btn sm", "aria-haspopup": "menu", onclick: e => { e.stopPropagation(); nbMenu(exportBtn, [["pdf", "PDF"], ["html", "HTML"], ["md", "Markdown & CSV"], ["word", "Word file"]].map(([k, l]) => [l, () => nbExport(k, Object.assign({}, note, { title }), blocks)]), "Export as"); } }, ic("share", 15), "Export");
+  let pageMenuBtn = null;
+  const kids = () => rows("notes").filter(n => n.parent_id === note.id);
+  async function setArchived(on){
+    if (!("archived" in note)) { toast("Archiving needs upgrade-2026-11bf.sql to be run in Supabase first."); return; }
+    if (state.dirty) { clearTimeout(state.saveT); await save(); }
+    try {
+      const row = await updateRow("notes", note.id, { archived: on, archived_at: on ? new Date().toISOString() : null });
+      Object.assign(note, row, { id: note.id });
+      if (on) { toastUndo("Page archived.", async () => { await updateRow("notes", note.id, { archived: false, archived_at: null }); go("note=" + note.id); rerender(); }); go(note.parent_id && byId("notes", note.parent_id) ? "note=" + note.parent_id : "notes"); }
+      else { toast("Page restored."); rerender(); }
+    } catch (e) { fail(e, on ? "Couldn’t archive" : "Couldn’t restore"); }
+  }
+  async function deletePage(){
+    const n = kids().length;
+    if (!confirm("Delete “" + (title || "Untitled") + "”" + (n ? " and its " + n + " sub-page" + (n === 1 ? "" : "s") : "") + "? This can’t be undone. (Archive it instead to keep it.)")) return;
+    clearTimeout(state.saveT); state.dirty = false;
+    try {
+      await deleteRow("notes", note.id);
+      if (S.cache.notes) S.cache.notes = S.cache.notes.filter(x => x.id !== note.id && x.parent_id !== note.id);
+      toast("Page deleted."); go(note.parent_id && byId("notes", note.parent_id) ? "note=" + note.parent_id : "notes");
+    } catch (e) { fail(e, "Couldn’t delete"); }
+  }
+  const pageMenu = () => nbMenu(pageMenuBtn, [
+    [h("span", {}, ic("squarePen", 16), "New sub-page"), () => newNotePage(note)],
+    [h("span", {}, ic("copy", 16), "Copy link"), () => copyText(location.origin + location.pathname + "#note=" + note.id, "Link copied")],
+    [h("span", {}, ic("archive2", 16), note.archived ? "Restore" : "Archive"), () => setArchived(!note.archived)],
+    [h("span", {}, ic("trash", 16), "Delete"), () => deletePage(), { danger: true }]
+  ], "Page");
   const engBtn = editable ? h("button", { type: "button", class: "btn sm", title: "Rewrite this note in proper English", onclick: async () => {
     if (state.dirty) { clearTimeout(state.saveT); await save(); }
     const pieces = blocks.filter(b => b.html && !["page", "divider", "code"].includes(b.type)).map(b => ({ id: b.id, html: b.html }));
@@ -5591,7 +5636,9 @@ async function renderNotePage(el, id){
   el.append(h("div", { class: "nb-top" },
     h("nav", { class: "nb-crumbs", "aria-label": "Where this note is" }, h("a", { href: "#notes" }, "Notes"), chain.map(p => [h("span", { class: "nb-sep" }, "/"), h("a", { href: "#note=" + p.id }, p.title || "Untitled")]), h("span", { class: "nb-sep" }, "/"), h("span", {}, title || "Untitled")),
     h("span", { class: "grow" }), status,
-    engBtn, h("button", { type: "button", class: "btn sm", onclick: () => openRecord("notes", note.id, null, { form: true }) }, ic("users", 15), editable ? "Share & details" : "Details"), exportBtn));
+    engBtn, h("button", { type: "button", class: "btn sm", onclick: () => openRecord("notes", note.id, null, { form: true }) }, ic("users", 15), editable ? "Share & details" : "Details"), exportBtn,
+    editable ? (pageMenuBtn = h("button", { type: "button", class: "iconbtn nb-more", "aria-label": "More actions", title: "Archive, delete…", onclick: e => { e.stopPropagation(); pageMenu(); } }, ic("more", 18))) : null));
+  if (note.archived) el.append(h("div", { class: "panel nb-archived" }, ic("archive2", 16), h("span", {}, "This page is archived. It’s hidden from Notes and the sidebar."), editable ? h("button", { type: "button", class: "btn sm", onclick: () => setArchived(false) }, "Restore") : null));
   if (!rich && editable) el.append(h("div", { class: "panel nb-warn" }, "Headings, lists and toggles are kept for this visit only until ", h("b", {}, "upgrade-2026-11bc.sql"), " has been run in Supabase. The text itself is saved."));
 
   const titleEl = h("h1", { class: "nb-title", contenteditable: editable ? "true" : "false", "data-placeholder": "Untitled", spellcheck: "true" }, title);
@@ -5777,12 +5824,12 @@ async function renderNotePage(el, id){
   function blockMenu(anchor, i){
     const b = blocks[i];
     nbMenu(anchor, [
-      ["Turn into", () => nbMenu(anchor, NB_TYPES.map(([t, l, g]) => [h("span", {}, h("span", { class: "nb-glyph" }, g), l, b.type === t ? h("span", { class: "nb-tick" }, "✓") : null), () => turnInto(i, t)]), "Turn into")],
-      ["Color", () => nbMenu(anchor, NB_COLORS.map(([c, l]) => [h("span", {}, h("span", { class: "nb-swatch c-" + (c || "none") }, "A"), l, (b.color || "") === c ? h("span", { class: "nb-tick" }, "✓") : null), () => { b.color = c; queueSave(); draw(); }]), "Color")],
-      ["Duplicate", () => { blocks.splice(i + 1, 0, Object.assign({}, b, { id: nbId() })); queueSave(); draw(i + 1, "end"); }],
-      ["Move up", () => { if (i > 0) moveBlock(i, i - 1); }],
-      ["Move down", () => { if (i < blocks.length - 1) moveBlock(i, i + 1); }],
-      ["Delete", () => { if (b.type === "page" && !confirm("Remove the link to this page? The page itself stays (open it to delete it).")) return; blocks.splice(i, 1); if (!blocks.length) blocks.push({ id: nbId(), type: "text", html: "", level: 0 }); queueSave(); draw(Math.max(0, i - 1), "end"); }]
+      [h("span", {}, ic("refresh", 16), "Turn into"), null, { sub: () => NB_TYPES.map(([t, l, g]) => [h("span", {}, h("span", { class: "nb-glyph" }, g), l, b.type === t ? h("span", { class: "nb-tick" }, "✓") : null), () => turnInto(i, t)]), subHeading: "Turn into" }],
+      [h("span", {}, ic("palette", 16), "Color"), null, { sub: () => NB_COLORS.map(([c, l]) => [h("span", {}, h("span", { class: "nb-swatch c-" + (c || "none") }, "A"), l, (b.color || "") === c ? h("span", { class: "nb-tick" }, "✓") : null), () => { b.color = c; queueSave(); draw(); }]), subHeading: "Color" }],
+      [h("span", {}, ic("copy", 16), "Duplicate"), () => { blocks.splice(i + 1, 0, Object.assign({}, b, { id: nbId() })); queueSave(); draw(i + 1, "end"); }],
+      [h("span", {}, ic("arrowUp", 16), "Move up"), () => { if (i > 0) moveBlock(i, i - 1); }],
+      [h("span", {}, ic("arrowDown", 16), "Move down"), () => { if (i < blocks.length - 1) moveBlock(i, i + 1); }],
+      [h("span", {}, ic("trash", 16), "Delete"), () => { if (b.type === "page" && !confirm("Remove the link to this page? The page itself stays (open it to delete it).")) return; blocks.splice(i, 1); if (!blocks.length) blocks.push({ id: nbId(), type: "text", html: "", level: 0 }); queueSave(); draw(Math.max(0, i - 1), "end"); }]
     ], (NB_TYPES.find(t => t[0] === b.type) || [, "Block"])[1]);
   }
   function slashMenu(ed, i){
@@ -5800,21 +5847,51 @@ async function renderNotePage(el, id){
   // the page is put on screen just after this; then the cursor goes to the title of a new note
   if (editable) setTimeout(() => { if (!titleEl.isConnected) return; if (!title) titleEl.focus(); }, 0);
 }
-// one small menu at a time, placed under what opened it (stays on screen on phones)
-let nbMenuEl = null, nbMenuSel = 0;
+// one small menu at a time, placed under what opened it (stays on screen on phones).
+// An item can open a second menu to its side, like Notion's "Turn into" and "Color": give it { sub: () => items, subHeading }.
+let nbMenuEl = null, nbMenuSel = 0, nbSubEl = null;
 const nbMenuOpen = () => !!(nbMenuEl && nbMenuEl.isConnected);
-function closeNbMenu(){ if (nbMenuEl) { nbMenuEl.remove(); nbMenuEl = null; } }
+function closeNbSub(){ if (nbSubEl) { nbSubEl.remove(); nbSubEl = null; } if (nbMenuEl) nbMenuEl.querySelectorAll(".has-sub.open").forEach(b => b.classList.remove("open")); }
+function closeNbMenu(){ closeNbSub(); if (nbMenuEl) { nbMenuEl.remove(); nbMenuEl = null; } }
+function nbMenuItems(items, close){
+  return items.map(([label, fn, opt], k) => {
+    const sub = opt && opt.sub;
+    const b = h("button", { type: "button", role: "menuitem", class: (k === 0 ? "on " : "") + (sub ? "has-sub" : "") + (opt && opt.danger ? " danger" : ""), "aria-haspopup": sub ? "menu" : null,
+      onmousedown: e => e.preventDefault(),
+      onclick: e => { e.stopPropagation(); if (sub) { openNbSub(b, sub(), opt.subHeading); return; } close(); fn(); } },
+      label, sub ? h("span", { class: "nb-subarrow", "aria-hidden": "true" }, ic("chevronRight", 14)) : null);
+    // pointing at it opens the side menu; pointing at a plain item closes it
+    b.addEventListener("mouseenter", () => { if (sub) openNbSub(b, sub(), opt.subHeading); else if (nbSubEl && b.closest(".nb-menu") === nbMenuEl) closeNbSub(); });
+    return b;
+  });
+}
+function placeMenu(menu, r, side){
+  const mw = Math.min(300, window.innerWidth - 16), mh = Math.min(menu.scrollHeight, 380);
+  if (side){
+    // to the right of the item, or to the left when there's no room; under it on a phone
+    let left = r.right + 4; if (left + mw > window.innerWidth - 8) left = r.left - mw - 4;
+    if (left < 8) { menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - mw - 8)) + "px"; menu.style.top = Math.min(r.bottom + 4, window.innerHeight - mh - 8) + "px"; return; }
+    menu.style.left = left + "px"; menu.style.top = Math.max(8, Math.min(r.top - 6, window.innerHeight - mh - 8)) + "px"; return;
+  }
+  menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - mw - 8)) + "px";
+  const below = r.bottom + 6;
+  menu.style.top = (below + mh > window.innerHeight - 8 && r.top - mh - 6 > 8 ? r.top - mh - 6 : Math.min(below, window.innerHeight - mh - 8)) + "px";
+}
+function openNbSub(btn, items, heading){
+  if (nbSubEl && nbSubEl._from === btn) return;
+  closeNbSub();
+  btn.classList.add("open");
+  const sub = h("div", { class: "nb-menu nb-sub", role: "menu" }, heading ? h("div", { class: "nb-menu-h" }, heading) : null, nbMenuItems(items, closeNbMenu));
+  sub._from = btn; document.body.append(sub); nbSubEl = sub;
+  placeMenu(sub, btn.getBoundingClientRect(), true);
+}
 function nbMenu(anchor, items, heading, keepFocus){
   closeNbMenu();
-  const menu = h("div", { class: "nb-menu", role: "menu" }, heading ? h("div", { class: "nb-menu-h" }, heading) : null,
-    items.map(([label, fn], k) => h("button", { type: "button", role: "menuitem", class: k === 0 ? "on" : null, onmousedown: e => e.preventDefault(), onclick: e => { e.stopPropagation(); closeNbMenu(); fn(); } }, label)));
+  const menu = h("div", { class: "nb-menu", role: "menu" }, heading ? h("div", { class: "nb-menu-h" }, heading) : null, nbMenuItems(items, closeNbMenu));
   document.body.append(menu); nbMenuEl = menu; nbMenuSel = 0;
-  const r = anchor.getBoundingClientRect(), mw = Math.min(300, window.innerWidth - 16);
-  menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - mw - 8)) + "px";
-  const below = r.bottom + 6, mh = Math.min(menu.scrollHeight, 360);
-  menu.style.top = (below + mh > window.innerHeight - 8 && r.top - mh - 6 > 8 ? r.top - mh - 6 : Math.min(below, window.innerHeight - mh - 8)) + "px";
+  placeMenu(menu, anchor.getBoundingClientRect(), false);
   if (!keepFocus) { const first = menu.querySelector("button"); if (first) first.focus(); }
-  setTimeout(() => document.addEventListener("click", function off(e){ if (!menu.contains(e.target)) { closeNbMenu(); document.removeEventListener("click", off); } }), 0);
+  setTimeout(() => document.addEventListener("click", function off(e){ if (!menu.contains(e.target) && !(nbSubEl && nbSubEl.contains(e.target))) { closeNbMenu(); document.removeEventListener("click", off); } }), 0);
 }
 function nbMenuKey(key){
   if (!nbMenuEl) return;
@@ -8750,7 +8827,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11be";
+const APP_VERSION = "2026-11bf";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -10744,7 +10821,7 @@ function notesTree(link, side){
   const rowEl = h("div", { class: "nav-row" }, link, exp);
   if (!open) return rowEl;
   if (!S.loaded.has("notes")) { load("notes").then(() => { shellKey = ""; renderShell(); }).catch(() => {}); return [rowEl, h("div", { class: "nav-tree" }, h("span", { class: "nav-tree-empty" }, "Loading…"))]; }
-  const all = rows("notes"), kids = new Map();
+  const all = rows("notes").filter(n => !n.archived), kids = new Map();
   for (const n of all) { const p = n.parent_id && byId("notes", n.parent_id) ? n.parent_id : ""; if (!kids.has(p)) kids.set(p, []); kids.get(p).push(n); }
   for (const list of kids.values()) list.sort((a, b) => ((b.pinned && b.owner_id === S.me.id) - (a.pinned && a.owner_id === S.me.id)) || String(b.updated_at).localeCompare(String(a.updated_at)));
   const cur = S.route.startsWith("note=") ? S.route.slice(5) : "";

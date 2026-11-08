@@ -1,5 +1,11 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11bf (8 Nov 2026): notes menus like Notion, Archive and Delete
+Needs: run `upgrade-2026-11bf.sql` (for Archive); upload `index.html` and `sw.js`.
+- **Turn into and Color open to the side** of the block menu (pointing at them is enough), with a › at the right edge, like Notion. The block menu items have icons.
+- **Page menu (•••)** on every note you own: New sub-page, Copy link, **Archive** / Restore, **Delete** (asks first; sub-pages go with it).
+- **Archived pages** leave the Notes list and the sidebar; find them under **Notes › Archived**. An archived page shows a bar with **Restore**. Archiving has an Undo.
+
 ## Version 2026-11be (8 Nov 2026): Claude helpers — Convert to English and Summarize
 Needs: deploy `ai-assist-function.ts` as Edge Function **ai-assist**; the secret **ANTHROPIC_API_KEY** (same one as the work summary); upload `index.html` and `sw.js`.
 - **Convert to English** on tasks (title and description; in the Development task view and the full task form) and on notes (title and every block). Claude rewrites Hindi, Hinglish ("ride booked ki 3 notification ayi…") or rough English as clear, proper English, keeping names, task IDs, numbers, links and formatting. You see **Now / In English side by side**; nothing changes until **Replace**, and an **Undo** follows. Chat messages are left alone.
