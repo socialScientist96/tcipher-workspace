@@ -1514,6 +1514,27 @@ th{font-size:13px}
 .nav a .nic,.nav a.on .nic,.side-chip,.side-ic{color:var(--p)}
 .side-chip:hover,.side-chip.on,.side-ic:hover{color:var(--p-ink)}
 .side-search > .ic{color:var(--p)}
+
+/* Admin › Work summary */
+.ws-tb .in{width:auto}
+.ws-summary{margin-bottom:16px}
+.ws-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.ws-head h2{margin:0}
+.ws-meta{font-size:13px}
+.ws-body .ws-h{font-size:15px;margin:16px 0 6px;color:var(--ink)}
+.ws-body .ws-h:first-child{margin-top:4px}
+.ws-list{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
+.ws-p{margin:0 0 8px}
+.ws-note{margin:8px 0 0}
+.ws-filters{margin:0 0 12px;overflow-x:auto}
+.ws-filters .seg{flex-wrap:wrap}
+.ws-day{font-size:14px;color:var(--ink2);margin:16px 0 4px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.ws-day:first-child{margin-top:0}
+.ws-row{display:grid;grid-template-columns:48px auto minmax(0,1fr);gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--tint)}
+.ws-time{font-family:var(--mono);font-size-adjust:none;font-size:12.5px;color:var(--ink3)}
+.ws-area{justify-self:start}
+.ws-text{overflow-wrap:anywhere}
+@media (max-width:640px){ .ws-row{grid-template-columns:44px minmax(0,1fr)} .ws-area{display:none} }
 </style>
 </head>
 <body>
@@ -7978,7 +7999,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11az";
+const APP_VERSION = "2026-11ba";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -9406,8 +9427,90 @@ async function callAdmin(body){
   return data;
 }
 
+/* ---------------------------------------------------------------------
+   Admin › Work summary: everything one person worked on in a day, week or month.
+   A short summary written by Claude (server function "work-summary"), then every detail as a timeline.
+   --------------------------------------------------------------------- */
+function workMd(text){
+  // the summary comes back as "## Section" lines and "- bullet" lines; drawn as safe page elements (never as HTML)
+  const out = []; let list = null;
+  const inline = t => t.split(/(\*\*[^*]+\*\*)/g).filter(Boolean).map(x => /^\*\*[^*]+\*\*$/.test(x) ? h("strong", {}, x.slice(2, -2)) : x);
+  for (const raw of String(text || "").split("\n")){
+    const line = raw.trim();
+    if (!line) { list = null; continue; }
+    if (/^#{1,3}\s+/.test(line)) { list = null; out.push(h("h3", { class: "ws-h" }, inline(line.replace(/^#{1,3}\s+/, "")))); continue; }
+    if (/^[-*•]\s+/.test(line)) { if (!list) { list = h("ul", { class: "ws-list" }); out.push(list); } list.append(h("li", {}, inline(line.replace(/^[-*•]\s+/, "")))); continue; }
+    list = null; out.push(h("p", { class: "ws-p" }, inline(line)));
+  }
+  return out;
+}
+async function renderAdminWork(el){
+  adminHeader(el, "Work summary", "Everything one person worked on in a day, a week or a month: Claude’s summary at the top, every detail underneath.");
+  const u = S.ui.work || (S.ui.work = { user: "", period: "day", date: today(), area: "" });
+  const people = activePeople();
+  if (!people.length) { el.append(h("div", { class: "panel empty" }, h("b", {}, "No people yet"))); return; }
+  if (!people.some(p => p.id === u.user)) u.user = people[0].id;
+  const personSel = h("select", { class: "in", "aria-label": "Person", onchange: e => { u.user = e.target.value; load(false); } }, people.map(p => h("option", { value: p.id }, p.full_name)));
+  personSel.value = u.user;
+  const dateIn = h("input", { class: "in", type: "date", value: u.date, max: today(), "aria-label": "Day in the period", onchange: e => { u.date = e.target.value || today(); load(false); } });
+  el.append(h("div", { class: "tb ws-tb" }, personSel, segmented([["day", "Day"], ["week", "Week"], ["month", "Month"]], u.period, v => { u.period = v; load(false); }), dateIn,
+    h("button", { type: "button", class: "btn", title: "Ask Claude again with the latest activity", onclick: () => load(true) }, "Refresh summary")));
+  const out = h("div", { class: "ws-out" });
+  el.append(out);
+  let seq = 0;
+  async function load(refresh){
+    const my = ++seq;
+    out.replaceChildren(h("div", { class: "loading" }, h("span", { class: "spinner" }), "Reading " + (u.period === "day" ? "the day" : "the " + u.period) + " and writing the summary…"));
+    try {
+      const { data, error } = await sb.functions.invoke("work-summary", { body: { user_id: u.user, period: u.period, date: u.date, refresh: !!refresh } });
+      if (error){
+        let msg = error.message || "Request failed";
+        try { const j = await error.context.json(); if (j && j.error) msg = j.error; } catch (e) {}
+        if (/Failed to send|not found|404|FunctionsFetchError|Failed to fetch/i.test(msg)) msg = "The “work-summary” function isn’t set up yet. Deploy it in Supabase › Edge Functions, then try again.";
+        throw new Error(msg);
+      }
+      if (data && data.error) throw new Error(data.error);
+      if (my === seq) draw(data);
+    } catch (e) {
+      if (my === seq) out.replaceChildren(h("div", { class: "panel empty" }, h("b", {}, "Couldn’t load the work summary"), String(e.message || e)));
+    }
+  }
+  function draw(d){
+    const range = d.start === d.end ? fmtDate(d.start, true) : fmtDate(d.start) + " – " + fmtDate(d.end, true);
+    const s = d.stats || {};
+    const stat = (v, l) => h("div", { class: "stat" }, h("div", { class: "v" }, String(v)), h("div", { class: "l" }, l));
+    const sum = h("section", { class: "panel ws-summary" },
+      h("div", { class: "ws-head" }, h("h2", {}, d.person.name + " · " + range),
+        d.generated_at ? h("span", { class: "muted ws-meta" }, "Summary by Claude, " + fmtAgo(d.generated_at)) : null),
+      d.summary ? h("div", { class: "ws-body" }, workMd(d.summary)) : null,
+      d.note ? h("p", { class: "muted ws-note" }, d.note) : null);
+    const statsRow = h("div", { class: "stats" }, stat(s.hours || 0, "Hours logged"), stat(s.tasksDone || 0, "Tasks finished"), stat(s.tasksTouched || 0, "Tasks worked on"),
+      stat(s.comments || 0, "Comments"), stat(s.messages || 0, "Messages"), stat(s.emails || 0, "Emails sent"), stat(s.meetings || 0, "Meetings joined"),
+      d.period !== "day" ? stat(s.daysPresent || 0, "Days checked in") : null, s.recordsChanged ? stat(s.recordsChanged, "Records updated") : null);
+    // every detail, day by day, filterable by kind
+    const tl = d.timeline || [];
+    const areas = [...new Set(tl.map(l => l.area))];
+    if (u.area && !areas.includes(u.area)) u.area = "";
+    const list = h("div", { class: "ws-timeline" });
+    const drawList = () => {
+      list.replaceChildren();
+      const shown = tl.filter(l => !u.area || l.area === u.area);
+      if (!shown.length) { list.append(h("p", { class: "nothing" }, tl.length ? "Nothing of this kind." : "Nothing was recorded in this period.")); return; }
+      let day = "";
+      for (const l of shown){
+        const dd = l.at.slice(0, 10);
+        if (dd !== day) { day = dd; list.append(h("h3", { class: "ws-day" }, fmtDate(dd, true))); }
+        list.append(h("div", { class: "ws-row" }, h("span", { class: "ws-time" }, l.at.slice(11, 16)), h("span", { class: "pill ws-area" }, l.area), h("span", { class: "ws-text" }, l.text)));
+      }
+    };
+    const filters = areas.length > 1 ? segmented([["", "All (" + tl.length + ")"], ...areas.map(a => [a, a + " (" + tl.filter(l => l.area === a).length + ")"])], u.area, v => { u.area = v; drawList(); }) : null;
+    drawList();
+    out.replaceChildren(sum, statsRow, h("section", { class: "panel" }, h("h2", {}, "Every detail"), filters ? h("div", { class: "ws-filters" }, filters) : null, list));
+  }
+  load(false);
+}
 function adminHeader(el, title, desc, actions){
-  const tabs = [["admin-users","Users"], ["admin-roles","Roles & permissions"], ["admin-tasks","Task rules"], ["admin-google","Google"], ["admin-day","Day history"], ["admin-problems","Problems"], ["admin-storage","Storage"], ["admin-settings","Company settings"], ["admin-activity","Activity log"]];
+  const tabs = [["admin-users","Users"], ["admin-work","Work summary"], ["admin-roles","Roles & permissions"], ["admin-tasks","Task rules"], ["admin-google","Google"], ["admin-day","Day history"], ["admin-problems","Problems"], ["admin-storage","Storage"], ["admin-settings","Company settings"], ["admin-activity","Activity log"]];
   el.append(h("div", { class: "ph" }, h("div", {}, h("h1", {}, title), h("p", {}, desc)), actions ? h("div", { class: "acts" }, actions) : null));
   // the Admin panel's number is the sum of these, so each tab shows its own part
   const n = adminCounts();
@@ -9904,6 +10007,7 @@ async function rerender(){
     else if (route === "admin-google") await renderAdminGoogle(page);
     else if (route === "admin-problems") await renderAdminProblems(page);
     else if (route === "admin-day") await renderAdminDay(page);
+    else if (route === "admin-work") await renderAdminWork(page);
     else if (route === "admin-storage") await renderAdminStorage(page);
     else if (route === "team-calendar") await renderTeamCalendar(page);
     else if (route === "holidays") renderHolidays(page);

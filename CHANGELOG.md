@@ -1,5 +1,11 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11ba (8 Nov 2026): work summary for admins
+Needs: run `upgrade-2026-11ba.sql`; deploy `work-summary-function.ts` as Edge Function **work-summary**; add the secret **ANTHROPIC_API_KEY** (Edge Functions › Secrets); upload `index.html` and `sw.js`.
+- **Admin › Work summary:** pick a person and a day, week or month. At the top, Claude (claude-opus-5-5) writes an at-a-glance summary: done, in progress, communication, time and attendance, and what needs attention. Underneath, **every detail** as a timeline, day by day, filterable by kind, with totals (hours logged, tasks finished and worked on, comments, messages, emails, meetings, days checked in).
+- Reads the person's action log, task changes, comments, time logged, attendance and status, leave, meetings joined, test runs, sales and marketing record changes, emails sent from the workspace, and messages in channels and groups. **Private direct messages are never read.**
+- Summaries are saved (new table `work_summaries`, admins only), so reopening is instant; today / this week / this month refresh after 30 minutes or with **Refresh summary**. Server-side fallback is on, so a declined request is retried on another model in the same call.
+
 ## Version 2026-11az (8 Nov 2026): sidebar sections and font sizes
 Needs: upload `index.html` and `sw.js`.
 - **Sidebar sections** (Development & QA, Communication, Sales, Marketing, Company) each have an icon and an arrow that always shows: pointing right when closed, down when open. Their pages sit indented on a thin guide line underneath, so it's clear they belong to the section and that it can be closed.
