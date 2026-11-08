@@ -1,5 +1,10 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11bu (8 Nov 2026): Clients in its own sidebar group
+Needs: upload `index.html` and `sw.js`.
+- New **Clients** group in the sidebar, after Sales: **Clients**, **Requests & bugs** (the support tickets, including everything clients send from their portal) and **Contacts**. Clients and Contacts moved out of Sales.
+- **Recents** in the sidebar shows just the last 2 places.
+
 ## Version 2026-11bt (8 Nov 2026): the client portal
 Needs, in this order: upload `index.html` and `sw.js`; run `upgrade-2026-11bt.sql`; redeploy `admin-users-function.ts` (invites) and `google-sync-function.ts` (emails to clients). The app is safe before the SQL runs: the portal parts stay hidden until then.
 - **Clients get their own login** at the same address. After signing in they see only their portal, never the workspace:
