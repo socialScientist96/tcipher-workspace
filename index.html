@@ -1535,6 +1535,12 @@ th{font-size:13px}
 .ws-area{justify-self:start}
 .ws-text{overflow-wrap:anywhere}
 @media (max-width:640px){ .ws-row{grid-template-columns:44px minmax(0,1fr)} .ws-area{display:none} }
+
+/* changes kept on this device until the connection is back */
+.syncbar{position:fixed;left:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:58;display:flex;gap:10px;align-items:center;background:#18181B;color:#fff;padding:6px 6px 6px 14px;border-radius:999px;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.18)}
+.syncbar .nb-dot{width:8px;height:8px;border-radius:50%;background:#F5B544;flex:none}
+.syncbar .btn{background:#fff;color:#18181B;border-color:#fff;min-height:32px}
+@media (max-width:960px){ .syncbar{left:8px;right:8px;bottom:calc(72px + env(safe-area-inset-bottom,0px));justify-content:space-between} }
 </style>
 </head>
 <body>
@@ -1944,14 +1950,92 @@ async function load(t, force){
 const KEYED_BY_USER = new Set(["google_links", "presence", "user_status", "profile_private"]);
 const ensure = list => Promise.all([...new Set(list.filter(Boolean))].map(t => load(t)));
 
+/* Saving on a bad connection: if a save fails only because the connection dropped or was too slow, the change is
+   kept on this device ("unsynced changes") and sent again when the connection is back, or with the Sync button.
+   New records get their id here first, so sending one again can never make a second copy.
+   Changes the server turns down (not allowed, invalid) are never kept: those show their error as before. */
+const OUTBOX_TABLES = new Set(["activities","announcements","attendance","calendar_events","campaigns","clients","comments","contacts","content","deals","documents",
+  "features","leads","leave_requests","meetings","notes","projects","proposals","releases","seo_keywords","social_stats","sprints","targets","tasks","test_cases","tickets","work_logs"]);
+// a failure of the connection itself (the database library reports these as "TypeError: Failed to fetch" and the like, with no error code)
+const netDown = e => navigator.onLine === false || !!(e && (e.netSlow || e.name === "TypeError" ||
+  (!e.code && /Failed to fetch|NetworkError|Load failed|network connection was lost|ERR_NETWORK|ERR_INTERNET|too slow|didn’t answer in time|AbortError|timed? ?out/i.test(String(e.message || e)))));
+const outboxKey = () => "tc_outbox_" + (S.me ? S.me.id : "");
+function outbox(){ try { return JSON.parse(localStorage.getItem(outboxKey()) || "[]"); } catch (e) { return []; } }
+function setOutbox(list){ try { if (list.length) localStorage.setItem(outboxKey(), JSON.stringify(list)); else localStorage.removeItem(outboxKey()); } catch (e) {} drawSyncBar(); }
+function queueChange(op){
+  const list = outbox();
+  // a second edit to a record that's already waiting is folded into it
+  const same = list.find(x => x.t === op.t && x.rowId === op.rowId && (x.op === "insert" || x.op === "update"));
+  if (same && op.op === "update") Object.assign(same.data, op.data); else list.push(op);
+  setOutbox(list);
+}
 async function insertRow(t, data){
-  const row = ok(await sb.from(t).insert(data).select().single());
-  upsertCache(t, row); return row;
+  if (OUTBOX_TABLES.has(t) && !data.id) data = Object.assign({ id: crypto.randomUUID() }, data);
+  try {
+    const row = ok(await sb.from(t).insert(data).select().single());
+    upsertCache(t, row); return row;
+  } catch (e) {
+    if (!OUTBOX_TABLES.has(t) || !netDown(e)) throw e;
+    queueChange({ op: "insert", t, rowId: data.id, data, at: Date.now() });
+    const row = Object.assign({ created_at: new Date().toISOString(), updated_at: new Date().toISOString() }, data, { _unsynced: true });
+    upsertCache(t, row); toast("Saved on this device. It will be sent when the connection is back.");
+    return row;
+  }
 }
 async function updateRow(t, id, data){
-  const row = ok(await sb.from(t).update(data).eq("id", id).select().single());
-  upsertCache(t, row); return row;
+  try {
+    const row = ok(await sb.from(t).update(data).eq("id", id).select().single());
+    upsertCache(t, row); return row;
+  } catch (e) {
+    if (!OUTBOX_TABLES.has(t) || !netDown(e)) throw e;
+    queueChange({ op: "update", t, rowId: id, data: Object.assign({}, data), at: Date.now() });
+    const old = (S.cache[t] || []).find(r => r.id === id) || { id };
+    const row = Object.assign({}, old, data, { _unsynced: true });
+    upsertCache(t, row); toast("Saved on this device. It will be sent when the connection is back.");
+    return row;
+  }
 }
+let syncing = false;
+async function syncOutbox(manual){
+  if (syncing || !S.me) return;
+  let list = outbox(); if (!list.length) return;
+  syncing = true; drawSyncBar();
+  let sent = 0, refused = 0;
+  try {
+    while (list.length){
+      const op = list[0];
+      try {
+        const q = op.op === "insert" ? sb.from(op.t).insert(op.data).select().single() : sb.from(op.t).update(op.data).eq("id", op.rowId).select().single();
+        const { data: row, error } = await q;
+        if (error){
+          if (op.op === "insert" && error.code === "23505") { /* it had already arrived */ }
+          else if (netDown(error) || /fetch|network|timeout/i.test(String(error.message || ""))) break;
+          else { refused++; console.warn("A saved change was turned down:", op, error); }
+        } else if (row) { const { _unsynced, ...clean } = row; upsertCache(op.t, clean); }
+        sent++;
+      } catch (e) { if (netDown(e)) break; refused++; console.warn("A saved change was turned down:", op, e); }
+      list.shift(); setOutbox(list);
+    }
+  } finally {
+    syncing = false; drawSyncBar();
+    if (sent && !list.length) { toast(refused ? "Synced. " + refused + " change" + (refused === 1 ? " was" : "s were") + " turned down by the server." : "All changes are saved."); rerender(); }
+    else if (manual && list.length) toast("Still can’t reach the server. Your changes are kept on this device.");
+  }
+}
+function drawSyncBar(){
+  const n = S.me ? outbox().length : 0;
+  let bar = document.getElementById("syncBar");
+  if (!n) { if (bar) bar.remove(); return; }
+  if (!bar) { bar = h("div", { id: "syncBar", class: "syncbar", role: "status", "aria-live": "polite" }); document.body.append(bar); }
+  bar.replaceChildren(h("span", { class: "nb-dot", "aria-hidden": "true" }),
+    h("span", {}, n + " unsynced change" + (n === 1 ? "" : "s") + " on this device"),
+    h("button", { type: "button", class: "btn sm", disabled: syncing, onclick: () => syncOutbox(true) }, syncing ? "Syncing…" : "Sync now"));
+}
+window.addEventListener("online", () => syncOutbox(false));
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") syncOutbox(false); });
+setInterval(() => { if (navigator.onLine !== false) syncOutbox(false); }, 30000);
+// leaving the page with changes still waiting: the browser asks first
+window.addEventListener("beforeunload", e => { if (S.me && outbox().length && navigator.onLine === false) { e.preventDefault(); e.returnValue = ""; } });
 async function deleteRow(t, id){
   const files = ok(await sb.from("files").select("id,path,storage").eq("tbl", t).eq("entity_id", id)) || [];
   for (const f of files.filter(x => x.storage === "bunny")) { try { await storeDelete(f); } catch (e) { console.warn(e); } }
@@ -7999,7 +8083,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ba";
+const APP_VERSION = "2026-11bb";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -9974,6 +10058,7 @@ async function rerender(){
   if (route !== "chat") { chatEls = null; if (typeof C !== "undefined") { C.unreadFrom = {}; C.scrollToUnread = null; } }   // leaving Chat: the "New messages" line is redrawn fresh next time   // leaving a tab: everything you saw there is no longer "new"
   S.route = route;
   if (S.me) { markSeen(route); rememberRecent(route); }
+  if (S.me && !rerender.syncStarted) { rerender.syncStarted = true; drawSyncBar(); syncOutbox(false); }   // changes left from last time
   renderShell();
   const el = $("content");
   const focused = document.activeElement && document.activeElement.id && el.contains(document.activeElement) ? document.activeElement.id : null;

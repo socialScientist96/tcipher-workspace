@@ -1,5 +1,11 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11bb (8 Nov 2026): nothing lost on a bad connection
+Needs: upload `index.html` and `sw.js`.
+- **Saves that fail because of the connection are kept on the device.** Creating or editing tasks, leads, deals, clients, contacts, notes, documents, meetings, leave, attendance, comments, time logs and the other work records: if the connection drops or is too slow, the change is kept on this device, shown as saved, and a bar says "N unsynced changes · **Sync now**".
+- They're sent again automatically when the connection comes back, when you return to the tab, and every 30 seconds; or right away with **Sync now**. New records get their id on the device, so sending one twice never makes a copy.
+- Changes the server turns down (not allowed, invalid) still show their error as before and are never kept. If you try to close the page while offline with changes waiting, the browser asks first.
+
 ## Version 2026-11ba (8 Nov 2026): work summary for admins
 Needs: run `upgrade-2026-11ba.sql`; deploy `work-summary-function.ts` as Edge Function **work-summary**; add the secret **ANTHROPIC_API_KEY** (Edge Functions › Secrets); upload `index.html` and `sw.js`.
 - **Admin › Work summary:** pick a person and a day, week or month. At the top, Claude (claude-opus-5-5) writes an at-a-glance summary: done, in progress, communication, time and attendance, and what needs attention. Underneath, **every detail** as a timeline, day by day, filterable by kind, with totals (hours logged, tasks finished and worked on, comments, messages, emails, meetings, days checked in).
