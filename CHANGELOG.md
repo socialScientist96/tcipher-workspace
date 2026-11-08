@@ -1,5 +1,12 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11bn (8 Nov 2026): pictures and videos in notes
+Needs: upload `index.html` and `sw.js`. No database change.
+- **Add pictures and videos to note pages**, like Notion: type **/image** or **/video** (or use **Turn into**) to pick a file; **paste** a picture or screenshot straight in; or **drag and drop** pictures and videos onto the page (a dashed outline shows where they'll go). An empty line becomes the picture; otherwise it goes below.
+- Each one has an optional **caption** underneath. Press Enter in a caption to keep writing below. Click a picture to open it full size. Videos play in the note.
+- Anyone who can edit the note can add them; anyone who can open it can see them. They're stored like other note files (Google Drive or Supabase storage), up to 20 MB per picture and 100 MB per video. Other file types are refused, with a pointer to Share & details › Files.
+- Exports: PDF and HTML include the pictures (in a downloaded HTML file, the picture links expire after a while); Word, Markdown and CSV show "[Picture: name]" with the caption.
+
 ## Version 2026-11bk (8 Nov 2026): note block handles like Notion
 Needs: upload `index.html` and `sw.js`.
 - The **+** and the **six-dot grip** beside each block are proper icons (18px in 24px buttons, grey, darker on hover) and sit centred on the block's first line for every type: text, headings 1–4, lists, to-dos, toggles, quotes, callouts and code.
