@@ -1,5 +1,10 @@
 # Tcipher Workspace – changelog
 
+## Database 2026-11cd (9 Nov 2026): owners can be testers (database side)
+Needs: run `upgrade-2026-11cd.sql`. No app change.
+- The database refused "The people working on a task can't also be its tester" (rule C of security-fix-2.sql), so choosing yourself as tester on your own task failed even though the app offered it. Now the people working on a task can be its tester (Pick up, or choosing yourself in Tester (QA)).
+- Still protected: someone working on a task can't mark it Done themselves unless they are its tester.
+
 ## Version 2026-11cc (9 Nov 2026): phone or laptop
 Needs: upload `index.html` and `sw.js`; run `upgrade-2026-11cc.sql` (until then only the live "Online on …" label works; nothing breaks).
 - **Online status shows the device:** "Online on laptop", "Online on phone" (or "on laptop + phone" when both are open), live, in the sidebar, chat and People. When someone is away: "Active 10 min ago on phone".
