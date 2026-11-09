@@ -1,5 +1,9 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11by (9 Nov 2026): admins can pass or fail a task waiting for a tester
+Needs: upload `index.html` and `sw.js`.
+- A Development task in QA that no tester had picked up showed only "Waiting for a tester", with no buttons for admins, so it couldn't be cleared (the database already allowed admins to decide). Admins now see **✓ Approve** and **Back to development** on it, with a note saying so.
+
 ## Version 2026-11bx (9 Nov 2026): Tasks says what needs you
 Needs: upload `index.html` and `sw.js`.
 - **The top of Tasks names what the sidebar number is about:** "1 task needs you", then each task with why (waiting for you to test it, waiting for your review, due today, overdue by N days), who it's from, and an **Open** button. It disappears when nothing needs you.

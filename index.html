@@ -9495,7 +9495,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11bx";
+const APP_VERSION = "2026-11by";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -10844,7 +10844,9 @@ function flowBox(t){
     if (owner) row.append(btn("Move to QA", "pri", "devToQA", () => flowStep(t, "to_qa", null, "Moved to QA.")));
     else note = "Being built by " + (ownersOf(t).map(pname).join(", ") || "its owners") + ".";
   } else if (t.status === "In review") {
-    if (!t.tester_id) {
+    // an admin can always decide (the database allows it), even before a tester has picked it up
+    if (!t.tester_id && isAdmin()) note = "No tester has picked this up yet. As an admin you can approve it or send it back yourself.";
+    if (!t.tester_id && !isAdmin()) {
       note = "Waiting for a tester.";
       if (iAmTester()) row.append(btn("Pick up", "pri", "devPickUp", () => flowStep(t, "pick_up", null, "It’s yours to test.")));
     } else if (tester) {
