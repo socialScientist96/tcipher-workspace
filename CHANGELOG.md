@@ -1,5 +1,12 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11cn (10 Nov 2026): time in the workspace, counted right across browsers and devices
+Needs: upload `index.html` and `sw.js`; run `upgrade-2026-11cf.sql`; redeploy `work-summary-function.ts`.
+- Before, each person had one "last seen", so two browsers open at once overwrote each other and the device kept flipping. Now every browser checks in twice a minute while the workspace is on screen, and each minute is kept once per person with every device that had it open. Several browsers or devices at once are all counted, never doubled.
+- **Active vs. open:** a minute is active when the person typed, clicked or scrolled in the last 2 minutes.
+- **Work summary** boxes: In the workspace, Active, On laptop / On phone / On tablet (with active time on hover), and Parallel browsers. Claude's summary gets these totals too.
+- Still counts only the workspace itself. Work in other sites and apps comes in the next steps.
+
 ## Version 2026-11cm (9 Nov 2026): everything done on a phone shows in the work summary
 Needs: upload `index.html` and `sw.js`; run `upgrade-2026-11ce.sql`; redeploy `work-summary-function.ts`.
 - The app now says which device it runs on (phone, tablet or laptop) with every request, and the database keeps it with everything people do: check-ins and check-outs, chat messages, comments, task and record changes, anything created or deleted, time logged, status changes, QA test runs, meeting joins and leave requests.

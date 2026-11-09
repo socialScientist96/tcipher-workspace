@@ -8297,6 +8297,26 @@ function startPresence(){
   } catch (e) { console.warn("presence", e); }
   heartbeat();
   presenceTimer = setInterval(heartbeat, 60000);
+  startUsage();
+}
+/* ---------- time in the workspace (2026-11cn, upgrade-2026-11cf.sql) ----------
+   Every browser checks in twice a minute while the workspace is on screen, saying which device it is and whether the
+   person typed, clicked or scrolled in the last 2 minutes. The database keeps each minute once per person, so several
+   browsers or devices at once are all counted, never doubled. */
+const USAGE = { last: Date.now(), timer: null, off: false };
+const USAGE_ID = (() => { try { let v = localStorage.getItem("tc-browser"); if (!v) { v = Math.random().toString(36).slice(2, 12); localStorage.setItem("tc-browser", v); } return v; } catch (e) { return Math.random().toString(36).slice(2, 12); } })();
+["pointerdown", "keydown", "wheel", "touchstart", "scroll"].forEach(t => addEventListener(t, () => { USAGE.last = Date.now(); }, { passive: true, capture: true }));
+let usageMove = 0; addEventListener("pointermove", () => { const n = Date.now(); if (n - usageMove > 5000) { usageMove = n; USAGE.last = n; } }, { passive: true });
+async function usagePing(){
+  if (USAGE.off || !S.me || S.portal || document.visibilityState === "hidden") return;
+  try {
+    const r = await sb.rpc("usage_ping", { p_device: MY_DEVICE, p_active: Date.now() - USAGE.last < 120000, p_session: USAGE_ID });
+    if (r.error && /usage_ping|function|schema cache/i.test(r.error.message || "")) USAGE.off = true;   // not set up yet: stop asking
+  } catch (e) {}
+}
+function startUsage(){
+  if (USAGE.timer) clearInterval(USAGE.timer);
+  usagePing(); USAGE.timer = setInterval(usagePing, 30000);
 }
 function stopPresence(){
   if (presenceTimer) { clearInterval(presenceTimer); presenceTimer = null; }
@@ -8315,7 +8335,7 @@ async function heartbeat(){
   } catch (e) {}
   if (!heartbeat.n || ++heartbeat.n % 2 === 0) { heartbeat.n = heartbeat.n || 1; await load("presence", true); paintPresence(); }
 }
-document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && S.me) heartbeat(); });
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && S.me) { heartbeat(); usagePing(); } });
 const isOnline = id => ONLINE.has(id);
 function lastActive(id){
   if (typeof statusOf === "function") return statusOf(id).label;   // lunch, out of office, leave, back tomorrow…
@@ -10095,7 +10115,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11cm";
+const APP_VERSION = "2026-11cn";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -11717,12 +11737,23 @@ async function renderAdminWork(el){
     const devStats = h("span", { style: "display:contents" });
     statsRow.append(devStats);
     const pid = (d.person && d.person.id) || u.user;
-    if (pid) sb.from("device_usage").select("device,minutes").eq("user_id", pid).gte("day", d.start).lte("day", d.end).then(r => {
+    const hm2 = m => m >= 60 ? Math.floor(m / 60) + "h " + Math.round(m % 60) + "m" : Math.round(m) + "m";
+    const usageOld = () => sb.from("device_usage").select("device,minutes").eq("user_id", pid).gte("day", d.start).lte("day", d.end).then(r => {
       if (r.error || !r.data || !r.data.length) return;
       const tot = {}; for (const x of r.data) tot[x.device] = (tot[x.device] || 0) + +x.minutes;
-      const hm2 = m => m >= 60 ? Math.floor(m / 60) + "h " + Math.round(m % 60) + "m" : Math.round(m) + "m";
       devStats.replaceChildren(...["laptop", "phone", "tablet"].filter(k => tot[k]).map(k => stat(hm2(tot[k]), "On " + devWord(k))));
     }, () => {});
+    // every minute counted once, across all browsers and devices (upgrade-2026-11cf.sql); before that, the older totals
+    if (pid) sb.rpc("usage_summary", { p_user: pid, p_start: d.start, p_end: d.end }).then(r => {
+      const u2 = r && !r.error && r.data;
+      if (!u2 || !u2.open) { usageOld(); return; }
+      const tile = (v, l, tip, warn) => { const t = stat(v, l); t.title = tip; if (warn) t.classList.add("ws-phone"); return t; };
+      devStats.replaceChildren(
+        tile(hm2(u2.open), "In the workspace", "Time with the workspace on screen in any browser or device, each minute counted once"),
+        tile(hm2(u2.active), "Active", "Minutes with typing, clicking or scrolling in the last 2 minutes"),
+        ...["laptop", "phone", "tablet"].filter(k => u2[k]).map(k => tile(hm2(u2[k]), "On " + devWord(k), "On screen on a " + devWord(k) + " (" + hm2(u2[k + "_active"] || 0) + " active)", k !== "laptop")),
+        u2.parallel ? tile(hm2(u2.parallel), "Parallel browsers", "Minutes with the workspace open in two or more browsers or devices at once") : null);
+    }, () => usageOld());
     // every detail, day by day, filterable by kind
     const tl = d.timeline || [];
     const areas = [...new Set(tl.map(l => l.area))];

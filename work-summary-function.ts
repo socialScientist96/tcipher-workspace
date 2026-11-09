@@ -171,6 +171,13 @@ Deno.serve(async (req) => {
     for (const e of mails) { stats.emails++; add(e.sent_at, "Email", "To " + clip(e.to_email, 80) + ": " + clip(e.subject, 160) + (e.entity_id ? " (re " + nm(e.tbl, e.entity_id) + ")" : "") + (e.snippet ? " — " + clip(e.snippet, 200) : "")); }
     lines.sort((a, b) => a.at.localeCompare(b.at));
     stats.onPhone = lines.filter(l => l.device).length;
+    // time with the workspace on screen, each minute once across all browsers and devices (upgrade-2026-11cf)
+    const mins = await db.from("activity_minutes").select("devices,active,sessions").eq("user_id", uid).gte("day", start).lte("day", end).limit(50000);
+    if (!mins.error && mins.data?.length) {
+      const m = mins.data as { devices: number; active: number; sessions: string[] }[];
+      Object.assign(stats, { workspaceMinutes: m.length, activeMinutes: m.filter(x => x.active).length,
+        phoneMinutes: m.filter(x => x.devices & 6).length, parallelMinutes: m.filter(x => (x.sessions || []).length > 1).length });
+    }
     stats.hours = Math.round(stats.hours * 10) / 10;
 
     // the summary: saved, so reopening is instant; today / this week / this month are refreshed after 30 minutes
