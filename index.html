@@ -3171,9 +3171,9 @@ const MOD = {
       { k: "lead_id", l: "Lead", t: "ref", ref: "leads", none: "No lead", show: r => r.vertical !== "Development" || !!r.lead_id },
       { k: "deal_id", l: "Deal", t: "ref", ref: "deals", none: "No deal", show: r => r.vertical === "Sales" || !!r.deal_id },
       { k: "_h_people", l: "People", t: "heading" },
-      { k: "assignee_id", l: "Owner", t: "user", filter: true, def: () => S.me.id },
+      { k: "assignee_id", l: "Main owner", t: "user", filter: true, def: () => S.me.id },
       { k: "reviewer_id", l: "Reviewer", t: "user", none: "No review needed", def: defaultReviewer },
-      { k: "collaborators", l: "Collaborators (people helping on this task)", t: "users", full: true },
+      { k: "collaborators", l: "More owners (everyone else working on this task)", t: "users", full: true },
 
       { k: "_h_bug", l: "Bug report", t: "heading", show: r => r.type === "Bug" },
       { k: "severity", l: "Severity", t: "select", o: ["Blocker","Major","Minor","Trivial"], show: r => r.type === "Bug" },
@@ -3429,6 +3429,14 @@ const MOD = {
     label: "Clients", one: "client", table: "clients", area: "clients", title: "name",
     desc: "Companies you work with or are pitching to.", needs: ["deals","contacts","proposals"], comments: true, files: true,
     csv: true,
+    // private (2026-11ca): only people whose role includes clients, the account owner, and people given Team access see a client
+    sharedView: () => rows("clients").length > 0,
+    canEdit: (rec, L) => L >= 2 || (!!rec && rec.owner_id === S.me.id),
+    fieldEditable: (f, rec) => f.k !== "owner_id" || lvl("clients") >= 2 || !rec,
+    after: (saved, prev) => {
+      const added = (saved.team_access || []).filter(id => !((prev && prev.team_access) || []).includes(id));
+      if (added.length) notify(added, pname(S.me.id) + " gave you access to the client " + saved.name, "You can now see it under Clients.", "clients", saved.id);
+    },
     fields: [
       { k: "name", l: "Company name", t: "text", req: true, full: true },
       { k: "industry", l: "Industry", t: "text", ph: "e.g. Healthcare, E-commerce" },
@@ -3444,6 +3452,7 @@ const MOD = {
       { k: "zone", l: "Zone", t: "select", o: () => zones(), filter: true, show: () => zones().length > 0 },
       { k: "tax_id", l: "GSTIN / Tax ID", t: "text" },
       { k: "owner_id", l: "Account owner", t: "user", filter: true },
+      { k: "team_access", l: "Team access: who else can see this client (admins, the account owner and roles with client access always can)", t: "users", full: true, show: () => clientsHaveAccess() },
       { k: "notes", l: "Notes", t: "textarea", full: true }
     ],
     cols: ["name","status","industry","contact_name","phone","city","owner_id"],
@@ -3464,6 +3473,7 @@ const MOD = {
 
   contacts: {
     label: "Contacts", one: "contact", table: "contacts", area: "clients", title: "name",
+    sharedView: () => rows("contacts").length > 0,
     desc: "The people you deal with at each client and prospect.", needs: ["clients"], comments: true,
     csv: true,
     fields: [
@@ -3841,7 +3851,7 @@ async function convertLead(rec){
 function access(M, rec){
   const L = lvl(M.area);
   const isApprover = M.approval ? L >= 2 : false;
-  let canView = L >= 1 || M.personal || M.personalCreate || M.everyoneReads;
+  let canView = L >= 1 || M.personal || M.personalCreate || M.everyoneReads || !!(M.sharedView && M.sharedView());
   let canCreate = M.canCreateFn ? M.canCreateFn(L) : (L >= 2 || !!M.personal || !!M.personalCreate);
   let canEdit, canDelete;
   if (M.personal && M.approval){
@@ -3880,6 +3890,7 @@ function applyFilters(M, rs){
   for (const [k, v] of Object.entries(u.filters)){
     if (!v) continue;
     if (v === "__none") rs = rs.filter(r => !r[k]);
+    else if (M.key === "tasks" && k === "assignee_id") rs = rs.filter(r => r.assignee_id === v || (r.collaborators || []).includes(v));   // any of a task's owners
     else rs = rs.filter(r => r[k] === v || (Array.isArray(r[k]) && r[k].includes(v)));
   }
   if (M.views && M.viewFilter && ["upcoming","past"].includes(u.view)) rs = rs.filter(r => M.viewFilter(r, u.view));
@@ -3932,7 +3943,7 @@ async function renderModule(key, el){
   }
   for (const f of M.fields.filter(f => f.filter)){
     const sel = h("select", { class: "in", "aria-label": "Filter by " + f.l.toLowerCase() });
-    sel.append(h("option", { value: "" }, (f.t === "user" ? "Anyone" : "All") + " (" + f.l.toLowerCase() + ")"));
+    sel.append(h("option", { value: "" }, (f.t === "user" ? "Anyone" : "All") + " (" + (M.key === "tasks" && f.k === "assignee_id" ? "owner" : f.l.toLowerCase()) + ")"));
     if (f.t === "user") { for (const p of activePeople()) sel.append(h("option", { value: p.id }, p.full_name)); sel.append(h("option", { value: "__none" }, f.none || "Unassigned")); }
     else if (f.t === "ref") { for (const r of rows(f.ref).slice().sort((a, b) => REF_LABEL[f.ref](a).localeCompare(REF_LABEL[f.ref](b)))) sel.append(h("option", { value: r.id }, REF_LABEL[f.ref](r))); }
     else if (f.t === "tags") { for (const x of [...new Set(base.flatMap(r => r[f.k] || []))].sort()) sel.append(h("option", { value: x }, x)); }
@@ -5773,6 +5784,7 @@ function taskNeedsMe(t){
   return (mine && t.status !== "Done" && !!t.due_date && t.due_date <= today()) || (t.reviewer_id === me && t.status === "In review");
 }
 const notesHaveEditors = () => rows("notes").some(n => "editors" in n);
+const clientsHaveAccess = () => rows("clients").some(c => "team_access" in c);
 const ticketsHavePortal = () => S.portalReady === true || rows("tickets").some(t => "client_visible" in t);
 const VIS_LABEL = { Private: "Only me", People: "Specific people", Vertical: "My vertical", Company: "Everyone" };
 function notesBoard(el, A){
@@ -9586,7 +9598,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11bz";
+const APP_VERSION = "2026-11ca";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -10964,7 +10976,12 @@ function devPeople(t){
   const canTester = (isOwner(t) || isAdmin()) && t.status !== "Done";
   let testerEl;
   if (canTester) {
-    testerEl = h("select", { class: "in dv-in", id: "devTester", "aria-label": "Tester" }, h("option", { value: "" }, t.status === "In review" ? "No one yet (any tester can pick it up)" : "Choose later"), testers().map(p => h("option", { value: p.id }, p.full_name)));
+    // testers, and also the people working on the task (an owner can test it too)
+    const qa = testers(), onTask = ownersOf(t).filter(id => person(id) && person(id).is_active !== false && !qa.some(p => p.id === id));
+    if (t.tester_id && !qa.some(p => p.id === t.tester_id) && !onTask.includes(t.tester_id)) onTask.push(t.tester_id);
+    testerEl = h("select", { class: "in dv-in", id: "devTester", "aria-label": "Tester" }, h("option", { value: "" }, t.status === "In review" ? "No one yet (any tester can pick it up)" : "Choose later"),
+      qa.length ? h("optgroup", { label: "Testers" }, qa.map(p => h("option", { value: p.id }, p.full_name))) : null,
+      onTask.length ? h("optgroup", { label: "Working on this task" }, onTask.map(id => h("option", { value: id }, pname(id) + (id === S.me.id ? " (you)" : "")))) : null);
     testerEl.value = t.tester_id || "";
     testerEl.addEventListener("change", () => flowStep(t, "set_tester", { p_user: testerEl.value || null }, testerEl.value ? "Tester: " + pname(testerEl.value) + "." : "Tester removed."));
   } else testerEl = t.tester_id ? h("span", { class: "dv-ownerchip" }, avatar(t.tester_id, "sm"), pname(t.tester_id)) : h("span", { class: "dv-ph" }, "No tester yet");
@@ -12391,6 +12408,7 @@ async function startSession(session){
     if (!me || !me.is_active){ S.me = null; showScreen("inactive"); return; }
     S.me = me; bootN = 0; S.portal = false;
     sb.from("meeting_requests").select("id", { head: true, count: "exact" }).limit(1).then(r => { S.portalReady = !r.error; }, () => {});
+    if (!me.is_admin) Promise.all([load("clients"), load("contacts")]).then(() => renderShell(), () => {});   // clients you've been given access to
     if (me.is_admin) mfaFactor().then(f => { S.mfaOn = !!f; if (S.route.startsWith("admin")) rerender(); }).catch(() => {});
     document.title = (S.settings.company || "Workspace") + " – Workspace";
     showScreen("app");

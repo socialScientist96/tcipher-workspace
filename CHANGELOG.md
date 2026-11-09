@@ -1,5 +1,11 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11ca (9 Nov 2026): private clients, owners as testers, several owners
+Needs: upload `index.html` and `sw.js`; run `upgrade-2026-11ca.sql` (until then clients work as before, without Team access).
+- **Clients are private to the people given access.** A client, its contacts and its client-portal people are seen only by admins, people whose role includes "Sales: clients & contacts", the client's **account owner**, and people added to the client's new **Team access** list (enforced in the database). Everyone else doesn't see the client anywhere. People given access are notified, and the Clients section appears in their sidebar. The account owner can edit their client and its Team access, but can't hand it to someone else (only clients editors and admins can).
+- **The people working on a development task can also be its tester:** the Tester (QA) list has the testers and a "Working on this task" group.
+- **Several people on a task:** the full task form now says "Main owner" and "More owners (everyone else working on this task)" (the same people as the Owners chips on the board), and the Tasks "Anyone (owner)" filter finds a task under any of its owners, not only the first.
+
 ## Version 2026-11bz (9 Nov 2026): search messages in Chat
 Needs: upload `index.html` and `sw.js`.
 - **Search messages:** the Chat search box ("Search people, chats and messages") now also finds messages. Type two or more letters (or press Enter): matching messages from every chat you're in appear under **Messages**, newest first, with who sent them, which chat, when, and the words around the match highlighted. Only chats you're a member of are searched.
