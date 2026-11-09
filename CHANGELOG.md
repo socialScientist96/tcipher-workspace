@@ -5,6 +5,11 @@ Needs: run `upgrade-2026-11cd.sql`. No app change.
 - The database refused "The people working on a task can't also be its tester" (rule C of security-fix-2.sql), so choosing yourself as tester on your own task failed even though the app offered it. Now the people working on a task can be its tester (Pick up, or choosing yourself in Tester (QA)).
 - Still protected: someone working on a task can't mark it Done themselves unless they are its tester.
 
+## Version 2026-11ch (9 Nov 2026): Improve with AI for notes
+Needs: upload `index.html` and `sw.js`; redeploy `ai-assist-function.ts` (new "improve" action). Until then the button says the function needs updating.
+- **Improve with AI** on note pages: Claude tidies the note into clear headings, bulleted and numbered lists, action items (with who and when) and short paragraphs, joins lines that were split mid-sentence and removes stray copy-paste characters. It keeps every fact, name, number, date and link, keeps the note's language, and doesn't add or summarise anything away. Pictures, videos, embeds and sub-pages stay in the note.
+- You see **Before** and **After** side by side; nothing changes until you press **Replace with this**, and you can **Undo** right after.
+
 ## Version 2026-11cg (9 Nov 2026): fixes from the Problems list
 Needs: upload `index.html` and `sw.js`.
 - **Edit a development task:** an **Edit** button in the task's header (and "Edit all fields" at the bottom) opens every field: title, details, type, priority, dates, project and the rest. Hovering the title or notes now says "Click to edit". (Before, only admins had the full form.) The duplicate Convert to English button in the header is gone; it's under the title as before.

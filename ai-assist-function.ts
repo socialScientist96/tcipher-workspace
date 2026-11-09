@@ -3,6 +3,8 @@
 //   action "english"   — rewrites a task's or a note's text (Hindi, Hinglish or rough English) in clear, proper English.
 //                        Nothing is saved here: the app shows the result side by side and saves only if you press Replace.
 //   action "summarize" — a short summary of a task (its details, comments and history) or of a dashboard page.
+//   action "improve"   — tidies one note into clear headings, lists and paragraphs, keeping every fact and link.
+//                        Nothing is saved here: the app shows Before / After and saves only if you press Replace.
 // The app sends only what the person can already see on their screen.
 //
 // Deploy: Supabase > Edge Functions > Deploy a new function > Via Editor, name it exactly: ai-assist
@@ -40,14 +42,14 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const action = String(body.action ?? "");
     const client = new Anthropic();
-    const ask = async (system: string, user: string, schema?: Record<string, unknown>) => {
+    const ask = async (system: string, user: string, schema?: Record<string, unknown>, effort: "low" | "medium" = "low") => {
       // fallbacks: if Claude declines, the API re-runs the request on a fallback model in the same call
       const stream = client.beta.messages.stream({
         model: "claude-opus-5-5",
         max_tokens: 16000,
         betas: ["server-side-fallback-2026-07-01"],
         fallbacks: "default",
-        output_config: schema ? { effort: "low", format: { type: "json_schema", schema } } : { effort: "low" },
+        output_config: schema ? { effort, format: { type: "json_schema", schema } } : { effort },
         system,
         messages: [{ role: "user", content: user }],
       });
@@ -79,6 +81,48 @@ Deno.serve(async (req) => {
         // only the ids that were sent come back
         const ids = new Set(pieces.map((p: { id: string }) => p.id));
         return json({ title: String(parsed.title ?? title), pieces: (parsed.pieces ?? []).filter((p: { id: string }) => ids.has(String(p.id))) });
+      }
+
+      if (action === "improve") {
+        // the note as blocks; pictures, videos, embeds, sub-pages and dividers come as type "keep" and must stay
+        const title = String(body.title ?? "").slice(0, 300);
+        const TYPES = ["text", "h1", "h2", "h3", "h4", "bulleted", "numbered", "todo", "quote", "callout", "code", "keep"];
+        const blocks = (Array.isArray(body.blocks) ? body.blocks : []).slice(0, 600).map((b: Record<string, unknown>) => ({
+          id: String(b.id ?? ""), type: TYPES.includes(String(b.type)) ? String(b.type) : "text", html: String(b.html ?? "").slice(0, 8000),
+          level: Math.max(0, Math.min(6, Number(b.level) || 0)), checked: !!b.checked }));
+        const size = blocks.reduce((n: number, b: { html: string }) => n + b.html.length, 0);
+        if (!blocks.some((b: { type: string; html: string }) => b.type !== "keep" && b.html.trim())) return json({ error: "There's no text to improve." }, 400);
+        if (size > MAX) return json({ error: "That note is too long to improve in one go. Try it on a shorter note." }, 413);
+        const keepIds = blocks.filter((b: { type: string }) => b.type === "keep").map((b: { id: string }) => b.id);
+        const out = await ask(
+          "You tidy up one note from Tcipher Technologies' workspace so it is easy to read, like a well-kept Notion page. " +
+          "The input is the note's title and its blocks in order (type, html, level). Return the whole note as a new list of blocks.\n" +
+          "Rules:\n" +
+          "- Keep every fact, name, number, amount, date, link, decision and action item. Do not add information, do not summarise detail away, do not change the meaning. " +
+          "Keep the note's language and wording (Hindi or Hinglish stays as it is); only fix obvious typos and broken formatting.\n" +
+          "- Give it structure: h2 headings for the main sections and h3 for sub-sections (never h1; the note already has a title), bulleted or numbered lists for lists and steps, " +
+          "todo for action items (keep who and when), short paragraphs. Join lines that were split in the middle of a sentence; split long walls of text.\n" +
+          "- Remove empty blocks, duplicated lines and stray characters left from copy-paste (for example '**', '<<', '>>', '--', or '-' and '•' typed at the start of a line, which become list items instead).\n" +
+          "- level is the nesting of list items (0 = top level). checked is only for todo items that were already done.\n" +
+          "- html may contain only these tags: <b>, <i>, <u>, <s>, <code>, <a href>, <br>. Keep the existing links and bold text.\n" +
+          "- Blocks with type \"keep\" are pictures, videos, embeds, sub-pages or dividers. Each must appear exactly once in your output, as {type: \"keep\", keep_id: its id}, " +
+          "placed where it fits (normally where it was). For every other block, keep_id is \"\".",
+          JSON.stringify({ title, blocks }),
+          { type: "object", additionalProperties: false, required: ["blocks"], properties: { blocks: { type: "array", items: { type: "object", additionalProperties: false,
+            required: ["type", "html", "level", "checked", "keep_id"], properties: {
+              type: { type: "string", enum: TYPES.filter((t) => t !== "h1" && t !== "h4") },
+              html: { type: "string" }, level: { type: "integer" }, checked: { type: "boolean" }, keep_id: { type: "string" } } } } } },
+          "medium");
+        const parsed = JSON.parse(out);
+        // never lose a picture, video, embed or sub-page: each kept block appears once, missing ones go at the end
+        const seen = new Set<string>(); const result: Record<string, unknown>[] = [];
+        for (const b of (parsed.blocks ?? [])) {
+          if (b.type === "keep") { if (keepIds.includes(b.keep_id) && !seen.has(b.keep_id)) { seen.add(b.keep_id); result.push({ type: "keep", keep_id: b.keep_id }); } continue; }
+          if (!String(b.html ?? "").trim()) continue;
+          result.push({ type: b.type, html: String(b.html), level: Math.max(0, Math.min(6, Number(b.level) || 0)), checked: b.type === "todo" ? !!b.checked : false });
+        }
+        for (const id of keepIds) if (!seen.has(id)) result.push({ type: "keep", keep_id: id });
+        return json({ blocks: result });
       }
 
       if (action === "summarize") {

@@ -2155,6 +2155,18 @@ body.nb-moving,body.nb-moving *{cursor:grabbing!important;user-select:none!impor
 .nb-selbar[hidden]{display:none}
 .nb-selbar b{font-size:var(--fs-sm);margin-right:6px}
 @media (max-width:960px){.nb-selbar{bottom:calc(72px + env(safe-area-inset-bottom,0px))}}
+
+/* Improve with AI: Before / After (2026-11ch) */
+.ai-imp-cols{display:grid;grid-template-columns:1fr 1fr;gap:var(--s4)}
+.ai-imp-cols > div{min-width:0}
+.ai-imp-cols > div > b{display:block;font-size:var(--fs-sm);color:var(--ink2);margin-bottom:6px}
+.ai-imp-doc{border:1px solid var(--line);border-radius:var(--r-md);padding:12px 14px;max-height:56vh;overflow:auto;font-size:var(--fs-ui);line-height:1.5;background:#fff}
+.ai-imp-doc p{margin:2px 0}
+.ai-imp-doc h2{font-size:17px;margin:12px 0 4px}.ai-imp-doc h3{font-size:15px;margin:10px 0 3px}.ai-imp-doc h4,.ai-imp-doc h5{font-size:14px;margin:8px 0 2px}
+.ai-imp-doc .ai-imp-code{font-family:var(--mono);font-size:12.5px;background:#F7F6F3;padding:6px 8px;border-radius:6px}
+.ai-imp-keep{display:flex;align-items:center;gap:6px;font-size:var(--fs-sm);color:var(--ink2);background:var(--tint);border-radius:6px;padding:4px 8px;margin:4px 0}
+dialog:has(.ai-imp) {width:min(1100px,calc(100vw - 24px))}
+@media (max-width:760px){.ai-imp-cols{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -6220,6 +6232,50 @@ async function renderNotePage(el, id){
   const status = h("span", { class: "nb-status muted" });
   const exportBtn = h("button", { type: "button", class: "btn sm", "aria-haspopup": "menu", onclick: e => { e.stopPropagation(); nbMenu(exportBtn, [["pdf", "PDF"], ["html", "HTML"], ["md", "Markdown & CSV"], ["word", "Word file"]].map(([k, l]) => [l, () => nbExport(k, Object.assign({}, note, { title }), blocks)]), "Export as"); } }, ic("share", 15), "Export");
   let pageMenuBtn = null;
+  // Improve with AI (2026-11ch): Claude reorganises the note into headings, lists and paragraphs, keeping every fact;
+  // you compare Before / After and nothing changes until you press Replace
+  const aiBtn = editable ? h("button", { type: "button", class: "btn sm", title: "Claude tidies this note into clear headings, lists and paragraphs. You see it before anything changes.", onclick: async () => {
+    if (state.dirty) { clearTimeout(state.saveT); await save(); }
+    const keepKind = x => nbFigure(x.type) || ["page", "divider"].includes(x.type) || nbToggle(x.type);
+    const input = blocks.map(x => keepKind(x) ? { id: x.id, type: "keep", html: "[" + ((NB_TYPES.find(t => t[0] === x.type) || [, x.type])[1]) + (x.name ? ": " + x.name : x.url ? ": " + x.url : "") + "]" }
+      : { id: x.id, type: x.type === "th1" ? "h1" : x.type, html: x.html || "", level: x.level || 0, checked: !!x.checked });
+    const box = h("div", { class: "ai-imp" }, h("div", { class: "loading" }, h("span", { class: "spinner" }), "Claude is tidying the note…"));
+    const replaceBtn = h("button", { type: "button", class: "btn pri", disabled: true }, "Replace with this");
+    openDialog("Improve with AI", [box], [h("span", { class: "sp" }), h("button", { type: "button", class: "btn", onclick: closeDlg }, "Cancel"), replaceBtn]);
+    let r;
+    try { r = await callAI({ action: "improve", title, blocks: input }); }
+    catch (e) { box.replaceChildren(h("p", { class: "err" }, String(e.message || e))); return; }
+    const byId = new Map(blocks.map(x => [x.id, x]));
+    const next = [];
+    for (const x of r.blocks || []) {
+      if (x.type === "keep") { const o = byId.get(x.keep_id); if (o && !next.includes(o)) next.push(o); continue; }
+      next.push({ id: nbId(), type: NB_TYPES.some(t => t[0] === x.type) ? x.type : "text", html: nbLinkify(nbClean(x.html || "")), level: Math.max(0, Math.min(6, x.level || 0)), checked: !!x.checked });
+    }
+    for (const o of blocks) if (keepKind(o) && !next.includes(o)) next.push(o);   // nothing kept is ever lost
+    if (!next.some(x => !keepKind(x))) { box.replaceChildren(h("p", { class: "err" }, "Claude didn’t return anything usable. Nothing was changed.")); return; }
+    // a quick, read-only picture of a list of blocks
+    const preview = list => { const out = h("div", { class: "ai-imp-doc" }); const nums = nbNumbers(list);
+      list.forEach((x, k) => {
+        const pad = "padding-left:" + ((x.level || 0) * 18) + "px";
+        if (keepKind(x)) { out.append(h("div", { class: "ai-imp-keep", style: pad }, ic(x.type === "image" ? "image" : x.type === "video" ? "film" : x.type === "page" ? "fileText" : x.type === "divider" ? "more" : "share", 14), (NB_TYPES.find(t => t[0] === x.type) || [, x.type])[1] + (x.name ? ": " + x.name : ""))); return; }
+        const tag = /^t?h[1-4]$/.test(x.type) ? "h" + Math.min(4, +x.type.slice(-1) + 1) : "p";
+        const el = h(tag, { class: "ai-imp-" + x.type, style: pad });
+        const mark = x.type === "bulleted" ? "• " : x.type === "numbered" ? nums[k] + ". " : x.type === "todo" ? (x.checked ? "☑ " : "☐ ") : x.type === "quote" ? "│ " : "";
+        el.innerHTML = nbEsc(mark) + nbClean(x.html || ""); out.append(el);
+      });
+      return out; };
+    box.replaceChildren(
+      h("p", { class: "muted ai-eng-help" }, "Compare, then replace. Every fact, name and link is kept; pictures, videos, embeds and sub-pages stay. You can Undo right after."),
+      h("div", { class: "ai-imp-cols" }, h("div", {}, h("b", {}, "Before"), preview(blocks)), h("div", {}, h("b", {}, "After"), preview(next))));
+    replaceBtn.disabled = false;
+    replaceBtn.addEventListener("click", async () => {
+      replaceBtn.disabled = true;
+      const snap = JSON.parse(JSON.stringify(blocks));
+      blocks = next; state.dirty = true;
+      try { await save(); closeDlg(); draw(); toastUndo("Note tidied up.", async () => { blocks = snap; state.dirty = true; await save(); draw(); }); }
+      catch (e) { blocks = snap; replaceBtn.disabled = false; fail(e, "Couldn’t save"); }
+    });
+  } }, ic("sparkle", 15), "Improve with AI") : null;
   const sumBtn = h("button", { type: "button", class: "btn sm", title: "A short summary of this note by Claude", onclick: async () => {
     if (state.dirty) { clearTimeout(state.saveT); await save(); }
     showAISummary("note", title || "Untitled", nbToMarkdown(title, blocks));
@@ -6270,7 +6326,7 @@ async function renderNotePage(el, id){
     } }, ic("chevronLeft", 16), "Back"),
     h("nav", { class: "nb-crumbs", "aria-label": "Where this note is" }, h("a", { href: "#notes" }, "Notes"), chain.map(p => [h("span", { class: "nb-sep" }, "/"), h("a", { href: "#note=" + p.id }, p.title || "Untitled")]), h("span", { class: "nb-sep" }, "/"), h("span", {}, title || "Untitled")),
     h("span", { class: "grow" }), status,
-    sumBtn, engBtn, h("button", { type: "button", class: "btn sm", onclick: () => openRecord("notes", note.id, null, { form: true }) }, ic("users", 15), isOwnerNote ? "Share & details" : "Details"), exportBtn,
+    aiBtn, sumBtn, engBtn, h("button", { type: "button", class: "btn sm", onclick: () => openRecord("notes", note.id, null, { form: true }) }, ic("users", 15), isOwnerNote ? "Share & details" : "Details"), exportBtn,
     isOwnerNote ? (pageMenuBtn = h("button", { type: "button", class: "iconbtn nb-more", "aria-label": "More actions", title: "Archive, delete…", onclick: e => { e.stopPropagation(); pageMenu(); } }, ic("more", 18))) : null));
   el.append(noteRequestsBar(note));
   { // the toolbar sits right under the app's top bar, with a line under it once the page has scrolled
@@ -9925,7 +9981,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11cg";
+const APP_VERSION = "2026-11ch";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
