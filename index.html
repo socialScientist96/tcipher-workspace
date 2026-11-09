@@ -2153,6 +2153,11 @@ body.nb-moving,body.nb-moving *{cursor:grabbing!important;user-select:none!impor
 .nb-block.nb-picked{background:color-mix(in srgb, var(--p) 12%, transparent);border-radius:4px}
 .nb-selbar{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 10px 8px 14px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(15,15,15,.16);max-width:calc(100vw - 24px)}
 .nb-selbar[hidden]{display:none}
+.tracker-card{margin-bottom:16px}.tracker-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.tracker-head .sp{flex:1}
+.tracker-row{display:flex;align-items:center;gap:12px;padding:4px 0;font-size:13px;flex-wrap:wrap}.tracker-row .linkbtn{margin-left:auto}
+.ws-sites{display:grid;gap:6px;margin-top:8px}.ws-site{display:grid;grid-template-columns:minmax(120px,220px) 1fr 70px;gap:10px;align-items:center;font-size:13px}
+.ws-site .bar{height:8px;border-radius:4px;background:color-mix(in srgb, var(--p) 22%, transparent);overflow:hidden}.ws-site .bar i{display:block;height:100%;background:var(--p);border-radius:4px}
+.ws-site span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ws-site .num{text-align:right;color:var(--ink2,#52525B)}
 .ws-dev{margin-left:8px;font-size:11px;background:color-mix(in srgb, var(--warn) 16%, transparent);color:var(--ink);vertical-align:middle;display:inline-flex;align-items:center;gap:2px}
 .stat.ws-phone{border-color:var(--warn)}.stat.ws-phone .v{color:var(--warn)}
 .nb-box{position:fixed;z-index:59;background:color-mix(in srgb, var(--p) 10%, transparent);border:1px solid color-mix(in srgb, var(--p) 45%, transparent);border-radius:3px;pointer-events:none}
@@ -4740,6 +4745,73 @@ async function checkOut(row){
 }
 const hoursOf = r => r.check_in && r.check_out ? Math.max(0, (new Date(r.check_out) - new Date(r.check_in)) / 36e5) : null;
 
+/* ---------- Tcipher Tracker, the browser extension (2026-11cp, upgrade-2026-11cg.sql) ----------
+   The extension says hello on internal.tcipher.com (its content script); "Connect this browser" asks the database for a
+   key for this browser and hands it to the extension. The extension records website names only, while the browser is
+   in front and the person isn't idle; never page contents or incognito. */
+const TRACKER = { here: false, connected: false, version: "" };
+window.addEventListener("message", e => {
+  if (e.source !== window || e.origin !== location.origin || !e.data || e.data.source !== "tc-tracker") return;
+  if (e.data.type === "here") { TRACKER.here = true; TRACKER.connected = !!e.data.connected; TRACKER.version = e.data.version || ""; const c = document.getElementById("trackerCard"); if (c) c.replaceWith(trackerCard()); }
+  if (e.data.type === "connected" && TRACKER.onConnected) TRACKER.onConnected(!!e.data.ok);
+});
+try { window.postMessage({ source: "tc-workspace", type: "hello" }, location.origin); } catch (e) {}
+function browserName(){
+  const ua = navigator.userAgent;
+  const b = /Edg\//.test(ua) ? "Edge" : /OPR\//.test(ua) ? "Opera" : /Brave/.test(ua) || navigator.brave ? "Brave" : /Chrome\//.test(ua) ? "Chrome" : /Firefox\//.test(ua) ? "Firefox" : /Safari\//.test(ua) ? "Safari" : "Browser";
+  const os = /Mac OS X/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows" : /Linux/.test(ua) ? "Linux" : "";
+  return b + (os ? " on " + os : "");
+}
+const TRACKER_ZIP = "tcipher-tracker.zip";
+function trackerCard(){
+  const card = h("div", { class: "panel tracker-card", id: "trackerCard" });
+  const chromeLike = /Chrome\/|Edg\//.test(navigator.userAgent) && !/Mobile/.test(navigator.userAgent);
+  const steps = h("ol", { class: "muted", style: "margin:8px 0 0;padding-left:20px;font-size:13px" },
+    h("li", {}, h("a", { href: TRACKER_ZIP, download: "" }, "Download Tcipher Tracker"), " and unzip it."),
+    h("li", {}, "Open ", h("code", {}, /Edg\//.test(navigator.userAgent) ? "edge://extensions" : "chrome://extensions"), " and turn on ", h("b", {}, "Developer mode"), " (top right)."),
+    h("li", {}, "Press ", h("b", {}, "Load unpacked"), " and choose the unzipped ", h("b", {}, "tcipher-tracker"), " folder."),
+    h("li", {}, "Come back to this page and press ", h("b", {}, "Connect this browser"), "."));
+  const what = h("p", { class: "muted", style: "margin:6px 0 0;font-size:13px" }, "Records which websites you work on and for how long, for your work summary: website names only (github.com), only while this browser is in front and you’re not idle. Never page contents, and nothing from incognito windows. You can pause it from its icon.");
+  const mine = h("div", { class: "tracker-mine" });
+  if (!chromeLike) {
+    card.append(h("b", {}, "Browser tracker"), h("p", { class: "muted", style: "margin:6px 0 0" }, "Tcipher Tracker works in Chrome and Edge on a computer. Open the workspace there to set it up."));
+  } else if (!TRACKER.here) {
+    card.append(h("div", { class: "tracker-head" }, h("b", {}, "Browser tracker"), pill("Not installed in this browser", "warn")), what, steps);
+  } else {
+    const go = h("button", { type: "button", class: "btn pri" }, TRACKER.connected ? "Connect again" : "Connect this browser");
+    go.addEventListener("click", async () => {
+      go.disabled = true;
+      try {
+        const { data: key, error } = await sb.rpc("tracker_connect", { p_browser: browserName() });
+        if (error) throw error;
+        const done = new Promise(res => { TRACKER.onConnected = res; setTimeout(() => res(false), 5000); });
+        window.postMessage({ source: "tc-workspace", type: "connect", key, name: S.me.full_name }, location.origin);
+        if (!(await done)) throw new Error("The extension didn’t answer. Reload this page and try again.");
+        TRACKER.connected = true; toast("This browser is connected. Your website time now shows in your work summary.");
+        card.replaceWith(trackerCard());
+      } catch (e) {
+        go.disabled = false;
+        toast(/tracker_connect|schema cache|function/i.test(String(e.message || e)) ? "The tracker needs a database update (upgrade-2026-11cg.sql). Ask an admin." : String(e.message || e));
+      }
+    });
+    card.append(h("div", { class: "tracker-head" }, h("b", {}, "Browser tracker"),
+      TRACKER.connected ? pill("On in this browser", "ok") : pill("Installed, not connected", "warn"), h("span", { class: "sp" }), TRACKER.connected ? null : go), what, mine);
+  }
+  // my connected browsers, to turn one off
+  sb.from("tracker_keys").select("key_hash,browser,created_at,last_used_at").eq("user_id", S.me.id).is("revoked_at", null).order("created_at").then(r => {
+    if (r.error || !r.data || !r.data.length) return;
+    mine.replaceChildren(h("div", { class: "muted", style: "font-size:12.5px;margin-top:10px" }, "Your connected browsers"),
+      ...r.data.map(k => h("div", { class: "tracker-row" }, h("span", {}, k.browser || "Browser"),
+        h("span", { class: "muted" }, k.last_used_at ? "last sent " + fmtAgo(k.last_used_at) : "nothing sent yet"),
+        h("button", { type: "button", class: "linkbtn", onclick: async () => {
+          if (!confirm("Turn off the tracker in " + (k.browser || "this browser") + "? It stops recording until it’s connected again.")) return;
+          const { error } = await sb.rpc("tracker_disconnect", { p_key_hash: k.key_hash });
+          if (error) { toast(error.message); return; }
+          toast("Turned off."); card.replaceWith(trackerCard());
+        } }, "Turn off"))));
+  }, () => {});
+  return card;
+}
 function attendanceWidget(light){
   const r = myToday();
   const wrap = h("div", { class: "att" });
@@ -4793,6 +4865,7 @@ async function renderAttendance(el){
   el.append(h("div", { class: "ph" }, h("div", {}, h("h1", {}, "Attendance"), h("p", {}, "Daily check-in and check-out, with hours worked.")),
     canMarkAttendance() ? h("div", { class: "acts" }, h("button", { type: "button", class: "btn pri", onclick: () => openMarkAttendance() }, "Mark attendance")) : null));
   el.append(h("div", { class: "panel", style: "margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap" }, h("b", {}, "Today"), attendanceWidget()));
+  if (MY_DEVICE !== "phone" && !S.portal) el.append(trackerCard());
 
   const tb = h("div", { class: "tb" });
   if (L >= 1) tb.append(segmented([["today","Today’s team"], ["mine","My month"], ["all","Everyone’s month"]], u.scope, v => { u.scope = v; rerender(); }));
@@ -10182,7 +10255,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11co";
+const APP_VERSION = "2026-11cp";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -11841,7 +11914,18 @@ async function renderAdminWork(el){
     // "On phone": everything done from a phone or tablet (upgrade-2026-11ce)
     const filters = areas.length > 1 || onPhone ? segmented([["", "All (" + tl.length + ")"], ...(onPhone ? [["phone", "On phone (" + onPhone + ")"]] : []), ...areas.map(a => [a, a + " (" + tl.filter(l => l.area === a).length + ")"])], u.area, v => { u.area = v; drawList(); }) : null;
     drawList();
-    out.replaceChildren(sum, statsRow, h("section", { class: "panel" }, h("h2", {}, "Every detail"), filters ? h("div", { class: "ws-filters" }, filters) : null, list));
+    // websites, from Tcipher Tracker (upgrade-2026-11cg.sql)
+    const web = h("section", { class: "panel", hidden: true });
+    if (pid) sb.rpc("web_summary", { p_user: pid, p_start: d.start, p_end: d.end }).then(r => {
+      const w = r && !r.error && r.data; if (!w) return;
+      web.hidden = false;
+      const sites = w.sites || [], top = sites.length ? sites[0].seconds : 1;
+      const hmS = sec => hm2(sec / 60);
+      web.replaceChildren(h("h2", {}, "Websites"),
+        h("p", { class: "muted", style: "margin:2px 0 8px" }, w.minutes ? hm2(w.minutes) + " in the browser, from Tcipher Tracker" + (w.paused ? " · paused " + hm2(w.paused) : "") + "." : w.connected ? "Tcipher Tracker is connected, but nothing was recorded in this period." : "Tcipher Tracker isn’t connected for this person. They can set it up on the Attendance page."),
+        sites.length ? h("div", { class: "ws-sites" }, sites.map(x => h("div", { class: "ws-site" }, h("span", { title: x.domain }, x.domain), h("span", { class: "bar" }, h("i", { style: "width:" + Math.max(2, Math.round(100 * x.seconds / top)) + "%" })), h("span", { class: "num" }, hmS(x.seconds))))) : null);
+    }, () => {});
+    out.replaceChildren(sum, statsRow, web, h("section", { class: "panel" }, h("h2", {}, "Every detail"), filters ? h("div", { class: "ws-filters" }, filters) : null, list));
   }
   load(false);
 }

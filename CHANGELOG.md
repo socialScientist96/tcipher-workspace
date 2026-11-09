@@ -1,5 +1,12 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11cp (10 Nov 2026): Tcipher Tracker, the browser extension
+Needs: upload `index.html`, `sw.js` and `tcipher-tracker.zip`; run `upgrade-2026-11cg.sql`; redeploy `work-summary-function.ts`.
+- **Tcipher Tracker** (Chrome and Edge, source in `tracker-extension/`): records which website is in front and for how long, only while the browser is the window in use and the person isn't idle (2 minutes without keyboard or mouse). Website names only (github.com), never full addresses or page contents, nothing from incognito. Its icon shows today's sites, and Pause 15 min / 1 hour (pauses show in the summary). Kept and sent later when offline.
+- **Attendance › Browser tracker:** install steps (download, Load unpacked), **Connect this browser**, and your connected browsers with **Turn off**. Each browser gets its own key; the database keeps only a fingerprint of it.
+- **Work summary › Websites:** time in the browser, paused time, and the top sites with bars. Claude's summary mentions the main sites.
+- Not covered: desktop apps (VS Code, Slack, Figma desktop), phones, and browsers other than Chrome and Edge.
+
 ## Version 2026-11co (10 Nov 2026): late check-outs, forgotten check-outs, lunch ends by itself
 Needs: upload `index.html` and `sw.js`; run `upgrade-2026-11ch.sql`; redeploy `work-summary-function.ts`.
 - **Working late:** after midnight, Home shows "Still working since 9 Nov, 8:23 pm" with **Check out**, which closes yesterday's day at the real time. Attendance shows such a check-out as "2:10 am (next day)". (Until today's working hours start.)

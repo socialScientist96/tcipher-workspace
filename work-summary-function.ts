@@ -170,6 +170,17 @@ Deno.serve(async (req) => {
     for (const e of mails) { stats.emails++; add(e.sent_at, "Email", "To " + clip(e.to_email, 80) + ": " + clip(e.subject, 160) + (e.entity_id ? " (re " + nm(e.tbl, e.entity_id) + ")" : "") + (e.snippet ? " — " + clip(e.snippet, 200) : "")); }
     lines.sort((a, b) => a.at.localeCompare(b.at));
     stats.onPhone = lines.filter(l => l.device).length;
+    // websites from Tcipher Tracker (upgrade-2026-11cg): the top sites by time
+    let sitesLine = "";
+    const web = await db.from("web_minutes").select("domain,seconds").eq("user_id", uid).gte("day", start).lte("day", end).limit(100000);
+    if (!web.error && web.data?.length) {
+      const by = new Map<string, number>(); let paused = 0;
+      for (const w of web.data as { domain: string; seconds: number }[]) { if (w.domain === "(paused)") paused += w.seconds; else by.set(w.domain, (by.get(w.domain) || 0) + w.seconds); }
+      const top = [...by.entries()].sort((x, y) => y[1] - x[1]).slice(0, 15);
+      const hmS = (sec: number) => { const m = Math.round(sec / 60); return m >= 60 ? Math.floor(m / 60) + "h " + (m % 60) + "m" : m + "m"; };
+      Object.assign(stats, { browserMinutes: Math.round([...by.values()].reduce((x, y) => x + y, 0) / 60), trackerPausedMinutes: Math.round(paused / 60) });
+      sitesLine = "Website time from the browser tracker (website names only): " + top.map(([d, sec]) => d + " " + hmS(sec)).join(", ") + (paused ? "; paused " + hmS(paused) : "") + ".";
+    }
     // time with the workspace on screen, each minute once across all browsers and devices (upgrade-2026-11cf)
     const mins = await db.from("activity_minutes").select("devices,active,sessions").eq("user_id", uid).gte("day", start).lte("day", end).limit(50000);
     if (!mins.error && mins.data?.length) {
@@ -203,12 +214,13 @@ Deno.serve(async (req) => {
           output_config: { effort: "medium" },
           system: "You write work summaries for the admins of Tcipher Technologies, a software company with Development, Sales and Marketing teams. " +
             "You get one person's complete activity log for a period. Write a summary an admin can read at a glance: what the person worked on, what they finished, what is still open, and anything that needs attention. " +
+            "Website time, when given, shows where the person spent time in the browser outside the workspace: mention the main sites under Time and attendance, and say if the tracker was paused for long. " +
             "Use only the facts in the log; never guess. Name tasks and records the way the log does (for example TC-2230 and its title). Times are India time. " +
             "The company expects work to be done on a laptop. Log lines ending in 'ON PHONE' or 'ON TABLET' were done from a phone or tablet: list every one of them, with its time, under 'Done on phone', and mention the count in At a glance. " +
             "Format: plain text with these sections, each a line starting with '## ': At a glance (two or three sentences), Done on phone, Done, In progress, Communication, Time and attendance, Needs attention. " +
             "Under each section use short bullet lines starting with '- '. Skip a section that has nothing. Use **bold** only for task keys or names. Keep it under 350 words, not counting the Done on phone list.",
           messages: [{ role: "user", content: "Person: " + person.full_name + (person.title ? ", " + person.title : "") + (person.vertical ? " (" + person.vertical + ")" : "") +
-            "\nPeriod: " + period + ", " + label + "\nTotals: " + JSON.stringify(stats) + "\n\nActivity log:\n" + log }],
+            "\nPeriod: " + period + ", " + label + "\nTotals: " + JSON.stringify(stats) + (sitesLine ? "\n" + sitesLine : "") + "\n\nActivity log:\n" + log }],
         });
         const msg = await stream.finalMessage();
         if (msg.stop_reason === "refusal") note = "Claude couldn't write a summary for this period. The full timeline is below.";

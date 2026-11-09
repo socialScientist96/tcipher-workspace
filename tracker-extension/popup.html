@@ -1,0 +1,36 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Tcipher Tracker</title>
+<style>
+  :root { --p: #6450F5; --ink: #18181B; --mut: #71717A; --line: #E4E4E7; --warn: #B45309; }
+  * { box-sizing: border-box; }
+  body { margin: 0; width: 300px; font: 13px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: #fff; }
+  header { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  header img { width: 20px; height: 20px; }
+  header b { font-size: 14px; flex: 1; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #16A34A; }
+  .dot.off { background: #DC2626; } .dot.pause { background: var(--warn); }
+  main { padding: 12px 14px; }
+  .muted { color: var(--mut); }
+  .row { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; }
+  .row span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .total { font-size: 20px; font-weight: 600; margin: 2px 0 8px; }
+  .btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+  button, a.btn { font: inherit; border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 6px 10px; cursor: pointer; color: var(--ink); text-decoration: none; }
+  button.pri, a.pri { background: var(--p); border-color: var(--p); color: #fff; }
+  button:hover, a.btn:hover { filter: brightness(.97); }
+  .note { margin-top: 10px; font-size: 12px; }
+  .err { color: #B91C1C; }
+  footer { padding: 10px 14px; border-top: 1px solid var(--line); font-size: 11px; }
+</style>
+</head>
+<body>
+<header><img src="icons/icon32.png" alt=""><b>Tcipher Tracker</b><span class="dot" id="dot"></span></header>
+<main id="main"></main>
+<footer class="muted">Records website names only, while this browser is in front and you’re not idle. Never page contents or incognito windows.</footer>
+<script src="config.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>

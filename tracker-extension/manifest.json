@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Tcipher Tracker",
+  "version": "1.0.0",
+  "description": "Records which websites you work on and for how long, for your Tcipher work summary. Website names only; never page contents or incognito.",
+  "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "action": { "default_popup": "popup.html", "default_title": "Tcipher Tracker", "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png" } },
+  "background": { "service_worker": "background.js" },
+  "permissions": ["tabs", "idle", "alarms", "storage"],
+  "host_permissions": ["https://pfdnziybqaumnofjknsj.supabase.co/*"],
+  "content_scripts": [{ "matches": ["https://internal.tcipher.com/*"], "js": ["content.js"], "run_at": "document_idle" }],
+  "incognito": "not_allowed",
+  "minimum_chrome_version": "116"
+}
