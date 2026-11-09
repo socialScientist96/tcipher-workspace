@@ -5,6 +5,14 @@ Needs: run `upgrade-2026-11cd.sql`. No app change.
 - The database refused "The people working on a task can't also be its tester" (rule C of security-fix-2.sql), so choosing yourself as tester on your own task failed even though the app offered it. Now the people working on a task can be its tester (Pick up, or choosing yourself in Tester (QA)).
 - Still protected: someone working on a task can't mark it Done themselves unless they are its tester.
 
+## Version 2026-11cg (9 Nov 2026): fixes from the Problems list
+Needs: upload `index.html` and `sw.js`.
+- **Edit a development task:** an **Edit** button in the task's header (and "Edit all fields" at the bottom) opens every field: title, details, type, priority, dates, project and the rest. Hovering the title or notes now says "Click to edit". (Before, only admins had the full form.) The duplicate Convert to English button in the header is gone; it's under the title as before.
+- **Note pages:** the toolbar (Back, Summarize, Share, Export) stays at the top while you scroll, with a thin line under it.
+- **Paste from Google Docs, Word or a web page:** headings, bulleted and numbered lists (with their levels), checklists, quotes, code, dividers, tables (a line per row), bold, italic, underline and links come in as the matching blocks. Pictures are added to the note; if Google won't let one be copied, a note marks where it was.
+- **Select several blocks:** Shift-click a block's ⋮⋮ handle to select a range (Cmd/Ctrl-click to add or remove one). A bar then lets you **Turn into**, **Color**, **Duplicate** or **Delete** them all at once. Esc clears the selection; Delete removes the selected blocks (with Undo).
+- Links: an address typed and followed by Enter becomes a link right away.
+
 ## Version 2026-11cf (9 Nov 2026): clickable links and embeds in notes
 Needs: upload `index.html` and `sw.js`.
 - **Links work in notes:** web addresses you paste or type become links (when you leave the line), and clicking a link opens it in a new tab.

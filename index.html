@@ -2139,6 +2139,22 @@ body.nb-moving,body.nb-moving *{cursor:grabbing!important;user-select:none!impor
 .nb-bookmark span{font-size:var(--fs-sm);color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nb-bookmark:hover{background:var(--tint)}
 .t-embed{--lh:120px}
+
+/* development tasks: show that the title and notes can be edited (2026-11cg) */
+.dv-h.edit,.dv-desc.edit{position:relative}
+.dv-h.edit:hover::after,.dv-desc.edit:hover::after{content:"✎ Click to edit";position:absolute;right:8px;top:6px;font-size:12px;font-weight:500;color:var(--ink3);background:#F1F2F4;padding:0 4px;border-radius:4px}
+
+/* note pages: the toolbar (Back, Summarize, Share, Export…) stays at the top while you scroll (2026-11cg) */
+.nb-view .nb-top{position:sticky;top:var(--nb-top-at,57px);z-index:15;background:#fff;padding:8px 6px;margin:-8px -6px 0;box-shadow:0 1px 0 transparent;transition:box-shadow .15s}
+.nb-view .nb-top.stuck{box-shadow:0 1px 0 var(--line)}
+@media (max-width:960px){.nb-view .nb-top{top:0}}
+
+/* several blocks selected (2026-11cg) */
+.nb-block.nb-picked{background:color-mix(in srgb, var(--p) 12%, transparent);border-radius:4px}
+.nb-selbar{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 10px 8px 14px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(15,15,15,.16);max-width:calc(100vw - 24px)}
+.nb-selbar[hidden]{display:none}
+.nb-selbar b{font-size:var(--fs-sm);margin-right:6px}
+@media (max-width:960px){.nb-selbar{bottom:calc(72px + env(safe-area-inset-bottom,0px))}}
 </style>
 </head>
 <body>
@@ -5989,6 +6005,55 @@ function nbClean(html){
 const nbText = html => { const d = document.createElement("div"); d.innerHTML = String(html || "").replace(/<br>/g, "\n"); return d.textContent; };
 const nbEsc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 // an older note (plain text only) opens as blocks: lines become paragraphs, lists and headings
+// pasted HTML (Google Docs, Word, web pages) → note blocks: headings, lists with their levels, quotes, code,
+// dividers, tables (one line per row), bold/italic/underline/links, and pictures (fetched afterwards) (2026-11cg)
+function nbFromHtml(html){
+  const doc = new DOMParser().parseFromString(String(html || ""), "text/html");
+  doc.querySelectorAll("script,style,meta,link,title,head").forEach(x => x.remove());
+  // Google Docs wraps everything in <b style="font-weight:normal"> and marks bold/italic with styles
+  doc.querySelectorAll("b,strong").forEach(el => { if (/font-weight\s*:\s*(normal|[1-5]00)\b/i.test(el.getAttribute("style") || "")) el.replaceWith(...el.childNodes); });
+  doc.querySelectorAll("span").forEach(sp => {
+    const st = sp.getAttribute("style") || "";
+    const wrap = tag => { const w = doc.createElement(tag); w.append(...sp.childNodes); sp.append(w); };
+    if (/font-weight\s*:\s*(bold|[6-9]00)\b/i.test(st)) wrap("b");
+    if (/font-style\s*:\s*italic/i.test(st)) wrap("i");
+    if (/text-decoration[^;]*underline/i.test(st)) wrap("u");
+    if (/text-decoration[^;]*line-through/i.test(st)) wrap("s");
+  });
+  const out = [];
+  const clean = el => nbClean(el.innerHTML.replace(/\n/g, " ")).replace(/^(\s|&nbsp;|<br>)+|(\s|&nbsp;|<br>)+$/g, "");
+  const push = (type, el, level, extra) => {
+    const imgs = [...el.querySelectorAll("img")]; imgs.forEach(im => im.remove());
+    const html = clean(el);
+    if (nbText(html).trim()) out.push(Object.assign({ id: nbId(), type, html, level: level || 0 }, extra || {}));
+    for (const im of imgs) { const src = im.getAttribute("src") || ""; if (src) out.push({ id: nbId(), type: "text", html: "", level: level || 0, _img: src, _alt: im.getAttribute("alt") || "" }); }
+  };
+  const walk = (node, level) => {
+    for (const ch of [...node.children]) {
+      const tag = ch.tagName.toLowerCase();
+      if (/^h[1-6]$/.test(tag)) push("h" + Math.min(4, +tag[1]), ch, level);
+      else if (tag === "ul" || tag === "ol") {
+        for (const li of [...ch.children].filter(x => x.tagName === "LI")) {
+          const nested = [...li.children].filter(x => /^(UL|OL)$/.test(x.tagName)); nested.forEach(x => x.remove());
+          const aria = +(li.getAttribute("aria-level") || 0), lvl = aria ? aria - 1 : level;
+          const box = doc.createElement("div"); box.append(...li.childNodes);
+          const checked = /checked/i.test(li.getAttribute("aria-checked") || "") || !!box.querySelector("input[type=checkbox]:checked");
+          push(box.querySelector("input[type=checkbox]") || li.getAttribute("aria-checked") ? "todo" : tag === "ol" ? "numbered" : "bulleted", box, lvl, checked ? { checked: true } : null);
+          for (const n of nested) { const w = doc.createElement("div"); w.append(n); walk(w, lvl + 1); }   // sub-items one level in
+        }
+      }
+      else if (tag === "blockquote") push("quote", ch, level);
+      else if (tag === "pre") out.push({ id: nbId(), type: "code", html: nbEsc(ch.textContent.replace(/\n$/, "")).replace(/\n/g, "<br>"), level });
+      else if (tag === "hr") out.push({ id: nbId(), type: "divider", html: "", level });
+      else if (tag === "table") for (const tr of ch.querySelectorAll("tr")) { const row = doc.createElement("div"); row.innerHTML = [...tr.children].map(td => td.innerHTML).join(" · "); push("text", row, level); }
+      else if (tag === "img") push("text", Object.assign(doc.createElement("div"), { innerHTML: ch.outerHTML }), level);
+      else if (tag === "p" || ((tag === "div" || tag === "span") && !ch.querySelector("p,li,h1,h2,h3,h4,h5,h6,ul,ol,table,blockquote,pre,hr,div"))) push("text", ch, level);
+      else walk(ch, level);   // wrappers (Docs' outer <b>, divs, sections)
+    }
+  };
+  walk(doc.body, 0);
+  return out;
+}
 function nbFromBody(body){
   const out = [];
   for (const line of String(body || "").split("\n")){
@@ -6208,6 +6273,15 @@ async function renderNotePage(el, id){
     sumBtn, engBtn, h("button", { type: "button", class: "btn sm", onclick: () => openRecord("notes", note.id, null, { form: true }) }, ic("users", 15), isOwnerNote ? "Share & details" : "Details"), exportBtn,
     isOwnerNote ? (pageMenuBtn = h("button", { type: "button", class: "iconbtn nb-more", "aria-label": "More actions", title: "Archive, delete…", onclick: e => { e.stopPropagation(); pageMenu(); } }, ic("more", 18))) : null));
   el.append(noteRequestsBar(note));
+  { // the toolbar sits right under the app's top bar, with a line under it once the page has scrolled
+    const bar = el.querySelector(".nb-top"), tb = document.querySelector(".topbar");
+    if (bar) {
+      const place = () => { if (!bar.isConnected) { window.removeEventListener("scroll", onScroll); return; }
+        const fixed = tb && getComputedStyle(tb).position === "fixed"; el.style.setProperty("--nb-top-at", (fixed || !tb ? 0 : Math.round(tb.getBoundingClientRect().height)) + "px"); };
+      const onScroll = () => { if (!bar.isConnected) { window.removeEventListener("scroll", onScroll); return; } bar.classList.toggle("stuck", (document.scrollingElement || document.documentElement).scrollTop > 40); };
+      setTimeout(place, 0); window.addEventListener("scroll", onScroll, { passive: true });
+    }
+  }
   if (note.archived) el.append(h("div", { class: "panel nb-archived" }, ic("archive2", 16), h("span", {}, "This page is archived. It’s hidden from Notes and the sidebar."), editable ? h("button", { type: "button", class: "btn sm", onclick: () => setArchived(false) }, "Restore") : null));
   if (!rich && editable) el.append(h("div", { class: "panel nb-warn" }, "Headings, lists and toggles are kept for this visit only until ", h("b", {}, "upgrade-2026-11bc.sql"), " has been run in Supabase. The text itself is saved."));
 
@@ -6280,13 +6354,17 @@ async function renderNotePage(el, id){
     const nums = nbNumbers(blocks), hidden = hiddenSet();
     wrap.replaceChildren(...blocks.map((b, i) => hidden.has(i) ? null : blockEl(b, i, nums[i])).filter(Boolean));
     drawOutline();
+    if (typeof paintPicked === "function" && picked && picked.size) paintPicked();
     if (focusIdx != null) focusBlock(focusIdx, caret);
   }
   function blockEl(b, i, num){
     const row = h("div", { class: "nb-block t-" + b.type + (b.color ? " c-" + b.color : ""), "data-i": i, style: "--lvl:" + (b.level || 0) });
     if (editable){
       const handle = h("button", { type: "button", class: "nb-handle", title: "Drag to move · click for options", "aria-label": "Block options",
-        onclick: e => { e.stopPropagation(); if (handle.__dragged) return; blockMenu(handle, i); } }, ic("grip", 18));
+        onclick: e => { e.stopPropagation(); if (handle.__dragged) return;
+          if (e.shiftKey || e.metaKey || e.ctrlKey) { pickBlock(i, e.shiftKey); return; }
+          if (picked.size) clearPicked();
+          blockMenu(handle, i); } }, ic("grip", 18));
       handle.addEventListener("pointerdown", e => dragBlock(e, i, row, handle));
       const add = h("button", { type: "button", class: "nb-add", title: "Add a block below", "aria-label": "Add a block below", onclick: () => { insertAfter(i, { type: "text" }); } }, ic("plus", 18));
       row.append(h("div", { class: "nb-gutter" }, add, handle));
@@ -6379,6 +6457,7 @@ async function renderNotePage(el, id){
     if (b.type === "todo" && b.checked) row.classList.add("done");
     const ed = h(b.type === "code" ? "pre" : "div", { class: "nb-text", contenteditable: editable ? "true" : "false", spellcheck: b.type === "code" ? "false" : "true",
       "data-placeholder": i === 0 && blocks.length === 1 ? "Start writing, or type / for headings, lists, toggles…" : (NB_TYPES.find(t => t[0] === b.type) || [, , ""])[1] && b.type !== "text" ? (NB_TYPES.find(t => t[0] === b.type) || [, ""])[1] : "" });
+    if (b.type !== "code" && b.html) b.html = nbLinkify(b.html);   // an address typed before Enter becomes a link when the line is drawn
     ed.innerHTML = b.html || "";
     if (editable) wire(ed, b, i);
     row.append(ed);
@@ -6508,6 +6587,76 @@ async function renderNotePage(el, id){
     blocks.splice(before > from ? before - chunk.length : before, 0, ...chunk);
     queueSave(); draw(before > from ? before - chunk.length : before);
   }
+  // put pasted blocks in place (an empty line is replaced), then bring their pictures in
+  function pasteBlocks(i, got){
+    const base = blocks[i], lvl = base ? base.level || 0 : 0;
+    got.forEach(x => { x.level = (x.level || 0) + lvl; if (x.type !== "code") x.html = nbLinkify(x.html || ""); });
+    const replace = base && base.type === "text" && !nbText(base.html).trim();
+    blocks.splice(replace ? i : i + 1, replace ? 1 : 0, ...got);
+    queueSave(); draw(blocks.indexOf(got[got.length - 1]), "end");
+    const pics = got.filter(x => x._img);
+    if (pics.length) toast(pics.length === 1 ? "Bringing in the picture…" : "Bringing in " + pics.length + " pictures…");
+    for (const x of pics) {
+      const src = x._img; delete x._img;
+      // pictures inside the copied content (data: addresses) are read directly; others are downloaded if Google allows it
+      const getPic = /^data:/i.test(src) ? Promise.resolve().then(() => { const [head, data] = src.split(","), type = (head.match(/^data:([^;,]+)/) || [])[1] || "image/png";
+          const bin = /;base64/i.test(head) ? atob(data) : decodeURIComponent(data); const u8 = new Uint8Array(bin.length); for (let k = 0; k < bin.length; k++) u8[k] = bin.charCodeAt(k); return new Blob([u8], { type }); })
+        : fetch(src).then(r => { if (!r.ok) throw new Error("not available"); return r.blob(); });
+      getPic.then(bl => {
+        if (!/^image\//.test(bl.type)) throw new Error("not a picture");
+        const at = blocks.indexOf(x); if (at < 0) return;
+        uploadMedia(new File([bl], (x._alt || "picture").replace(/[^\w.-]+/g, "_").slice(0, 40) + "." + (bl.type.split("/")[1] || "png").replace("jpeg", "jpg"), { type: bl.type }), at, true);
+      }).catch(() => {
+        // the picture can't be copied from here (Google keeps it private): leave a note where it was
+        x.html = "<i>A picture couldn’t be copied" + (/^https?:/i.test(src) ? ": <a href=\"" + nbEsc(src) + "\">open it</a>" : "") + ". Paste or drag it in on its own.</i>";
+        queueSave(); draw();
+      });
+    }
+  }
+  /* several blocks at once (2026-11cg): Shift-click a block's ⋮⋮ handle to select a range, Cmd/Ctrl-click to add or
+     remove one. A bar then turns them all into another kind, colours, duplicates or deletes them. Esc clears it. */
+  var picked = new Set(), pickAnchor = null;   // var: the first draw can run before this line
+  const selbar = h("div", { class: "nb-selbar", hidden: true, role: "toolbar", "aria-label": "Selected blocks" });
+  article.append(selbar);
+  function pickedIdx(){ return blocks.map((x, k) => picked.has(x.id) ? k : -1).filter(k => k >= 0); }
+  function paintPicked(){
+    wrap.querySelectorAll(".nb-block").forEach(r => { const x = blocks[+r.dataset.i]; r.classList.toggle("nb-picked", !!x && picked.has(x.id)); });
+    const n = picked.size; selbar.hidden = n < 1;
+    if (!n) { selbar.replaceChildren(); return; }
+    const kinds = NB_TYPES.filter(([t]) => !["page", "divider"].includes(t) && !nbFigure(t));
+    const turnBtn = h("button", { type: "button", class: "btn sm", onclick: e => { e.stopPropagation(); nbMenu(turnBtn, kinds.map(([t, l, g]) => [h("span", {}, h("span", { class: "nb-glyph" }, g), l), () => applyPicked(x => { if (nbFigure(x.type) || ["page", "divider"].includes(x.type)) return; x.type = t; if (nbToggle(t)) x.open = x.open !== false; if (t === "todo") x.checked = !!x.checked; })]), "Turn " + n + " into"); } }, ic("refresh", 15), "Turn into");
+    const colBtn = h("button", { type: "button", class: "btn sm", onclick: e => { e.stopPropagation(); nbMenu(colBtn, NB_COLORS.map(([c, l]) => [h("span", {}, h("span", { class: "nb-swatch c-" + (c || "none") }, "A"), l), () => applyPicked(x => { x.color = c; })]), "Color"); } }, ic("palette", 15), "Color");
+    selbar.replaceChildren(h("b", {}, n + (n === 1 ? " block" : " blocks") + " selected"), turnBtn, colBtn,
+      h("button", { type: "button", class: "btn sm", onclick: () => { const idx = pickedIdx(); const copies = idx.map(k => Object.assign(JSON.parse(JSON.stringify(blocks[k])), { id: nbId() })); blocks.splice(idx[idx.length - 1] + 1, 0, ...copies); clearPicked(); queueSave(); draw(); toast(copies.length + " duplicated."); } }, ic("copy", 15), "Duplicate"),
+      h("button", { type: "button", class: "btn sm danger", onclick: () => deletePicked() }, ic("trash", 15), "Delete"),
+      h("button", { type: "button", class: "iconbtn", "aria-label": "Clear the selection", title: "Clear (Esc)", onclick: () => clearPicked() }, ic("x", 15)));
+  }
+  function applyPicked(fn){ for (const k of pickedIdx()) fn(blocks[k]); clearPicked(); queueSave(); draw(); }
+  function deletePicked(){
+    const idx = pickedIdx(); if (!idx.length) return;
+    if (idx.some(k => blocks[k].type === "page") && !confirm("Some of these are links to sub-pages. Remove the links? (The pages themselves stay.)")) return;
+    const snap = JSON.parse(JSON.stringify(blocks));
+    blocks = blocks.filter(x => !picked.has(x.id)); if (!blocks.length) blocks.push({ id: nbId(), type: "text", html: "", level: 0 });
+    clearPicked(); queueSave(); draw();
+    toastUndo(idx.length + (idx.length === 1 ? " block deleted." : " blocks deleted."), () => { blocks = snap; queueSave(); draw(); });
+  }
+  function clearPicked(){ picked.clear(); pickAnchor = null; paintPicked(); }
+  function pickBlock(i, range){
+    const x = blocks[i]; if (!x) return;
+    if (range && pickAnchor != null) {
+      const a = blocks.findIndex(y => y.id === pickAnchor); const [lo, hi] = a < 0 ? [i, i] : [Math.min(a, i), Math.max(a, i)];
+      for (let k = lo; k <= hi; k++) picked.add(blocks[k].id);
+    } else { if (picked.has(x.id)) picked.delete(x.id); else picked.add(x.id); pickAnchor = x.id; }
+    if (range && pickAnchor == null) { picked.add(x.id); pickAnchor = x.id; }
+    if (document.activeElement && wrap.contains(document.activeElement)) document.activeElement.blur();
+    paintPicked();
+  }
+  document.addEventListener("keydown", function onPickKey(e){
+    if (!article.isConnected) { document.removeEventListener("keydown", onPickKey); return; }
+    if (!picked.size) return;
+    if (e.key === "Escape") { e.preventDefault(); clearPicked(); }
+    else if ((e.key === "Backspace" || e.key === "Delete") && !(document.activeElement && (document.activeElement.isContentEditable || /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)))) { e.preventDefault(); deletePicked(); }
+  });
   wrap.addEventListener("click", e => {
     const a = e.target.closest && e.target.closest(".nb-text a[href]");
     if (!a || !editable) return;   // view-only notes open links by themselves
@@ -6560,6 +6709,12 @@ async function renderNotePage(el, id){
       e.preventDefault();
       const pasted = [...((e.clipboardData && e.clipboardData.files) || [])].filter(f => /^(image|video)\//.test(f.type));
       if (pasted.length) { let at = i; for (const f of pasted) { uploadMedia(f, at); at++; } return; }
+      // copied from Google Docs, Word or a web page: keep the headings, lists, formatting and pictures
+      const htmlData = e.clipboardData ? e.clipboardData.getData("text/html") : "";
+      if (htmlData && b.type !== "code" && !nbFigure(b.type) && /<(h[1-6]|li|img|table|blockquote|pre|hr)\b|<p[\s>][\s\S]*<p[\s>]/i.test(htmlData)) {
+        const got = nbFromHtml(htmlData);
+        if (got.length > 1 || (got.length === 1 && (got[0].type !== "text" || got[0]._img))) { b.html = nbClean(ed.innerHTML); pasteBlocks(i, got); return; }
+      }
       const text = (e.clipboardData || window.clipboardData).getData("text/plain"); if (!text) return;
       const one = text.trim();
       const putLine = line => { NB_URL_RE.lastIndex = 0; if (NB_URL_RE.test(line)) document.execCommand("insertHTML", false, nbLinkify(nbEsc(line))); else document.execCommand("insertText", false, line); };
@@ -9770,7 +9925,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11cf";
+const APP_VERSION = "2026-11cg";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -11071,7 +11226,7 @@ function drawDevTask(id){
     devActivity(t));
   const right = h("div", { class: "dv-right" }, aiTaskButtons(t, devCanEdit(t, "title")), flowBox(t), devPeople(t),
     h("div", { class: "dv-stamp" }, h("span", {}, "Created " + fmtAgo(t.created_at) + (t.created_by ? " by " + pname(t.created_by) : "")), t.updated_at ? h("span", {}, "Updated " + fmtAgo(t.updated_at)) : null,
-      isAdmin() ? h("button", { type: "button", class: "linkbtn", id: "devMore", onclick: () => openRecord("tasks", t.id, null, { form: true }) }, "All fields (admin)") : null));
+      devCanEdit(t, "title") ? h("button", { type: "button", class: "linkbtn", id: "devMore", onclick: () => openRecord("tasks", t.id, null, { form: true }) }, "Edit all fields") : null));
   openDialog("", [devTitle(t), h("div", { class: "dv-view" }, left, right)], null);
   const d = dlg(); d.classList.add("dv-wide");
   const crumbs = h("div", { class: "dv-crumbs" }, h("span", { class: "dv-key" }, taskKey(t)), flowLoz(t.status));
@@ -11096,7 +11251,8 @@ function drawDevTask(id){
         try { await deleteRow("tasks", t.id); S.devOpen = null; closeDlg(); toast("Deleted."); rerender(); } catch (e) { fail(e, "Couldn’t delete"); } }, { danger: true }] : null
     ].filter(Boolean), taskKey(t)); } }, ic("more", 18));
     dh.insertBefore(mb, dh.lastChild);
-    if (devCanEdit(t, "title")) dh.insertBefore(h("button", { type: "button", class: "btn sm dv-eng", title: "Rewrite the title and details in proper English", onclick: () => taskEnglish(t) }, ic("languages", 15), h("span", {}, "Convert to English")), mb);
+    // every field (title, details, priority, type, dates, project…) in one form, for anyone who may edit the task (2026-11cg)
+    if (devCanEdit(t, "title")) dh.insertBefore(h("button", { type: "button", class: "btn sm dv-eng", id: "devEdit", title: "Edit every detail of this task", onclick: () => openRecord("tasks", t.id, null, { form: true }) }, ic("pencil", 15), h("span", {}, "Edit")), mb);
   }
   S.dlg = { tbl: "tasks", id: t.id };
   const db = d.querySelector(".db"); if (db && keep) db.scrollTop = keep;
