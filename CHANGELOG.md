@@ -1,5 +1,10 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11bx (9 Nov 2026): Tasks says what needs you
+Needs: upload `index.html` and `sw.js`.
+- **The top of Tasks names what the sidebar number is about:** "1 task needs you", then each task with why (waiting for you to test it, waiting for your review, due today, overdue by N days), who it's from, and an **Open** button. It disappears when nothing needs you.
+- Hovering the number next to Tasks in the sidebar names the tasks too (e.g. "waiting for you to review or test (TC-2218)").
+
 ## Version 2026-11bw (9 Nov 2026): fixes from the Problems list, Tasks number, notifications
 Needs: upload `index.html` and `sw.js`.
 - **Chat header no longer slips under the top bar.** The chat page was 44px taller than the window, so scrolling past the end of the messages moved the whole page. It now fits the window exactly, and scrolling inside the chat stays inside it.

@@ -2082,6 +2082,17 @@ body.nb-moving,body.nb-moving *{cursor:grabbing!important;user-select:none!impor
   .pt-head-acts{width:100%}.pt-head-acts .btn{flex:1;justify-content:center}
   .pt-nav a span{font-size:var(--fs-sm)}
 }
+
+/* Tasks: what needs you (2026-11bx) */
+.needs-you{border-color:var(--bad-t);background:#FFF8F8;margin-bottom:var(--s3);padding:var(--s3) var(--s4)}
+.ny-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--bad);margin-bottom:6px}
+.ny-h .muted{color:var(--ink2);font-size:var(--fs-sm)}
+.ny-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:10px;width:100%;border:0;border-top:1px solid var(--line);background:none;padding:10px 4px;text-align:left;font:inherit;color:var(--ink);cursor:pointer;border-radius:6px}
+.ny-row:hover{background:#fff}
+.ny-key{font-family:var(--mono);font-size:var(--fs-sm);color:var(--ink2)}
+.ny-title{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ny-why{font-size:var(--fs-sm);color:var(--bad)}
+@media (max-width:720px){.ny-row{grid-template-columns:auto minmax(0,1fr)}.ny-why{grid-column:1/-1}.ny-row .btn{display:none}}
 </style>
 </head>
 <body>
@@ -3894,6 +3905,7 @@ async function renderModule(key, el){
   }
   if (A.canCreate) acts.append(h("button", { type: "button", class: "btn pri", onclick: () => openRecord(key, null) }, "+ New " + M.one));
   el.append(h("div", { class: "ph" }, h("div", {}, h("h1", {}, M.label), h("p", {}, M.desc)), acts));
+  if (key === "tasks") { const nb = needsYouBox(); if (nb) el.append(nb); }
 
   if (M.render) { M.render(el, A); return; }
 
@@ -5724,6 +5736,28 @@ async function duplicateTask(rec){
 /* ---------------------------------------------------------------------
    Notes
    --------------------------------------------------------------------- */
+// why a task needs you, in words
+function needReason(t){
+  const me = S.me.id, out = [];
+  if (t.reviewer_id === me && t.status === "In review") out.push(t.qa_state === "Retest" ? "fixed: waiting for you to retest it" : t.qa_state === "Failed" ? "failed testing: waiting for you" : t.qa_state ? "waiting for you to test it" : "waiting for your review");
+  if ((t.assignee_id === me || (t.collaborators || []).includes(me)) && t.status !== "Done" && t.due_date && t.due_date <= today()) {
+    const late = Math.round((parseD(today()) - parseD(t.due_date)) / 864e5);
+    out.push(late ? "overdue by " + late + (late === 1 ? " day" : " days") : "due today");
+  } else if (t.due_date && t.due_date < today() && t.status !== "Done") { const late = Math.round((parseD(today()) - parseD(t.due_date)) / 864e5); out.push("overdue by " + late + (late === 1 ? " day" : " days")); }
+  return out.join(" · ");
+}
+// the top of Tasks: exactly what the sidebar number is about, with a way to open each one
+function needsYouBox(){
+  const list = rows("tasks").filter(taskNeedsMe).sort((a, b) => (a.due_date || "9").localeCompare(b.due_date || "9"));
+  if (!list.length) return null;
+  return h("div", { class: "panel needs-you" },
+    h("div", { class: "ny-h" }, ic("flag", 16), h("b", {}, list.length === 1 ? "1 task needs you" : list.length + " tasks need you"), h("span", { class: "muted" }, "This is the number next to Tasks in the sidebar. It goes away when each one is done.")),
+    list.slice(0, 8).map(t => h("button", { type: "button", class: "ny-row", onclick: () => openRecord("tasks", t.id) },
+      h("span", { class: "ny-key" }, taskKey(t)), h("span", { class: "ny-title" }, t.title),
+      h("span", { class: "ny-why" }, needReason(t) + (t.assignee_id && t.assignee_id !== S.me.id ? " · from " + (pname(t.assignee_id) || "someone") : "")),
+      h("span", { class: "btn sm" }, "Open"))),
+    list.length > 8 ? h("p", { class: "muted", style: "margin:6px 0 0;font-size:13px" }, "…and " + (list.length - 8) + " more under “Needs you” below.") : null);
+}
 // what the sidebar's number on Tasks counts: your tasks due today or overdue, and tasks waiting for your review or test
 function taskNeedsMe(t){
   const me = S.me.id, mine = t.assignee_id === me || (t.collaborators || []).includes(me);
@@ -6720,7 +6754,8 @@ function badgeInfo(route){
     case "tasks": if (L("tasks")) {
       const ts = rows("tasks");
       add(ts.filter(t => myTask(t) && t.status !== "Done" && t.due_date && t.due_date <= t0).length, "due or overdue", "due");
-      add(ts.filter(t => t.reviewer_id === me && t.status === "In review").length, "waiting for your review", "due");
+      { const rv = ts.filter(t => t.reviewer_id === me && t.status === "In review");
+        add(rv.length, rv.length && rv.length <= 3 ? "waiting for you to review or test (" + rv.map(t => taskKey(t) || t.title).join(", ") + ")" : "waiting for your review", "due"); }
       add(ts.filter(t => t.created_by !== me && (myTask(t) || (t.mentions || []).includes(me) || t.reviewer_id === me) && isNewer(t.created_at, route)).length, "new for you", "new");
     } break;
     case "notes": if (L("notes")) add(rows("notes").filter(n => n.owner_id !== me && isNewer(n.updated_at, route)).length, "new or updated", "new"); break;
@@ -9460,7 +9495,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11bw";
+const APP_VERSION = "2026-11bx";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
