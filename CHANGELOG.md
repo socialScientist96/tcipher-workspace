@@ -1,5 +1,12 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11cm (9 Nov 2026): everything done on a phone shows in the work summary
+Needs: upload `index.html` and `sw.js`; run `upgrade-2026-11ce.sql`; redeploy `work-summary-function.ts`.
+- The app now says which device it runs on (phone, tablet or laptop) with every request, and the database keeps it with everything people do: check-ins and check-outs, chat messages, comments, task and record changes, anything created or deleted, time logged, status changes, QA test runs, meeting joins and leave requests.
+- **Work summary:** a **Done on phone** total at the top; an **On phone** filter in Every detail, with a phone or tablet tag on each line; and Claude's summary lists every one of them, with times, under **Done on phone**.
+- Direct messages stay private: the summary shows that one was sent from a phone, never what it said.
+- Not covered: things done before this change, and work the server does by itself (Google sync, emails it sends).
+
 ## Version 2026-11cl (9 Nov 2026): PDF name, take two
 Needs: upload `index.html` and `sw.js`.
 - Chrome still suggested "Tcipher Technologies – Workspace": it reads the tab's title a moment after it changes. The note's name is now set just before the print window opens, so Save as PDF suggests it.

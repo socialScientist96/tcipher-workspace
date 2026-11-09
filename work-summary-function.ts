@@ -52,7 +52,7 @@ function rangeOf(period: string, anchor: string): { start: string; end: string }
 const ist = (ts: string | null) => ts ? new Date(Date.parse(ts) + 5.5 * 3600000).toISOString().replace("T", " ").slice(0, 16) : "";
 const clip = (s: unknown, n = 600) => { const t = String(s ?? "").replace(/\s+/g, " ").trim(); return t.length > n ? t.slice(0, n) + "…" : t; };
 
-type Line = { at: string; area: string; text: string };
+type Line = { at: string; area: string; text: string; device?: string };
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -83,8 +83,10 @@ Deno.serve(async (req) => {
     const { start, end } = rangeOf(period, anchor);
     const from = start + "T00:00:00+05:30", to = addDays(end, 1) + "T00:00:00+05:30";
     const lines: Line[] = [];
-    const add = (at: string | null, area: string, text: string) => { if (at && text) lines.push({ at: ist(at), area, text }); };
-    const stats = { hours: 0, tasksDone: 0, tasksTouched: 0, comments: 0, messages: 0, emails: 0, meetings: 0, daysPresent: 0, recordsChanged: 0, tests: 0 };
+    // device: phone or tablet marks it as done away from a laptop (the company expects laptops); laptop and unknown aren't marked
+    const mob = (d: unknown) => d === "phone" || d === "tablet" ? String(d) : "";
+    const add = (at: string | null, area: string, text: string, device?: unknown) => { if (at && text) { const m = mob(device); lines.push(m ? { at: ist(at), area, text, device: m } : { at: ist(at), area, text }); } };
+    const stats = { onPhone: 0, hours: 0, tasksDone: 0, tasksTouched: 0, comments: 0, messages: 0, emails: 0, meetings: 0, daysPresent: 0, recordsChanged: 0, tests: 0 };
 
     // names for records mentioned in the timeline
     const NAME: Record<string, string> = { tasks: "title", leads: "name", deals: "title", clients: "name", contacts: "name", proposals: "title", content: "title", campaigns: "name", activities: "subject", meetings: "title", notes: "title", documents: "title", announcements: "title", leave_requests: "type" };
@@ -101,18 +103,22 @@ Deno.serve(async (req) => {
     const nm = (tbl: string, id: string) => nameCache.get(tbl + id) || (LABEL[tbl] ? "a " + LABEL[tbl].toLowerCase() : tbl);
 
     const q = async (p: PromiseLike<{ data: unknown; error: unknown }>) => { const r = await p; return ((r as { data: unknown }).data ?? []) as Record<string, any>[]; };
+    // which device each thing was done on (upgrade-2026-11ce; check-ins: upgrade-2026-11cc). Before those are run, leave it out.
+    const hasDev = !(await db.from("comments").select("device").limit(1)).error;
+    const hasAttDev = !(await db.from("attendance").select("check_in_device").limit(1)).error;
+    const D = hasDev ? ",device" : "";
     const [acts, tev, rev, cmts, logs, att, sts, leave, joins, runs, msgs, mails] = await Promise.all([
-      q(db.from("activity_log").select("tbl,action,entity_id,summary,at").eq("actor_id", uid).gte("at", from).lt("at", to).order("at").limit(3000)),
-      q(db.from("task_events").select("task_id,field,old_value,new_value,at").eq("actor_id", uid).gte("at", from).lt("at", to).order("at").limit(3000)),
-      q(db.from("record_events").select("tbl,entity_id,field,old_value,new_value,at").eq("actor_id", uid).gte("at", from).lt("at", to).order("at").limit(3000)),
-      q(db.from("comments").select("tbl,entity_id,body,created_at,kind").eq("author_id", uid).gte("created_at", from).lt("created_at", to).order("created_at").limit(2000)),
-      q(db.from("work_logs").select("task_id,minutes,note,work_date,created_at").eq("user_id", uid).gte("work_date", start).lte("work_date", end).order("work_date").limit(2000)),
-      q(db.from("attendance").select("day,check_in,check_out,mode,status,note").eq("user_id", uid).gte("day", start).lte("day", end).order("day")),
-      q(db.from("status_events").select("kind,at,until,note").eq("user_id", uid).gte("at", from).lt("at", to).order("at").limit(1000)),
-      q(db.from("leave_requests").select("type,start_date,end_date,half_day,status,reason,created_at").eq("user_id", uid).lte("start_date", end).gte("end_date", start)),
-      q(db.from("meeting_joins").select("title,joined_at,left_at,source").eq("user_id", uid).gte("joined_on", start).lte("joined_on", end).order("joined_at")),
-      q(db.from("test_runs").select("test_case_id,status,actual,at").eq("tester_id", uid).gte("at", from).lt("at", to).order("at").limit(2000)),
-      q(db.from("chat_messages").select("channel_id,body,created_at,attachments").eq("author_id", uid).is("unsent_at", null).gte("created_at", from).lt("created_at", to).order("created_at").limit(3000)),
+      q(db.from("activity_log").select("tbl,action,entity_id,summary,at" + D).eq("actor_id", uid).gte("at", from).lt("at", to).order("at").limit(3000)),
+      q(db.from("task_events").select("task_id,field,old_value,new_value,at" + D).eq("actor_id", uid).gte("at", from).lt("at", to).order("at").limit(3000)),
+      q(db.from("record_events").select("tbl,entity_id,field,old_value,new_value,at" + D).eq("actor_id", uid).gte("at", from).lt("at", to).order("at").limit(3000)),
+      q(db.from("comments").select("tbl,entity_id,body,created_at,kind" + D).eq("author_id", uid).gte("created_at", from).lt("created_at", to).order("created_at").limit(2000)),
+      q(db.from("work_logs").select("task_id,minutes,note,work_date,created_at" + D).eq("user_id", uid).gte("work_date", start).lte("work_date", end).order("work_date").limit(2000)),
+      q(db.from("attendance").select("day,check_in,check_out,mode,status,note" + (hasAttDev ? ",check_in_device,check_out_device" : "")).eq("user_id", uid).gte("day", start).lte("day", end).order("day")),
+      q(db.from("status_events").select("kind,at,until,note" + D).eq("user_id", uid).gte("at", from).lt("at", to).order("at").limit(1000)),
+      q(db.from("leave_requests").select("type,start_date,end_date,half_day,status,reason,created_at" + D).eq("user_id", uid).lte("start_date", end).gte("end_date", start)),
+      q(db.from("meeting_joins").select("title,joined_at,left_at,source" + D).eq("user_id", uid).gte("joined_on", start).lte("joined_on", end).order("joined_at")),
+      q(db.from("test_runs").select("test_case_id,status,actual,at" + D).eq("tester_id", uid).gte("at", from).lt("at", to).order("at").limit(2000)),
+      q(db.from("chat_messages").select("channel_id,body,created_at,attachments" + D).eq("author_id", uid).is("unsent_at", null).gte("created_at", from).lt("created_at", to).order("created_at").limit(3000)),
       q(db.from("emails").select("to_email,subject,snippet,tbl,entity_id,sent_at").eq("user_id", uid).eq("direction", "out").gte("sent_at", from).lt("sent_at", to).order("sent_at").limit(1000)),
     ]);
 
@@ -130,45 +136,48 @@ Deno.serve(async (req) => {
     await Promise.all(Object.entries(byTbl).map(([t, ids]) => names(t, ids)));
 
     // the timeline
-    for (const r of acts) add(r.at, "Activity", (r.summary || (r.action + " " + (LABEL[r.tbl] || r.tbl))) + (r.entity_id && !String(r.summary || "").includes(nm(r.tbl, r.entity_id)) ? " · " + nm(r.tbl, r.entity_id) : ""));
+    for (const r of acts) add(r.at, "Activity", (r.summary || (r.action + " " + (LABEL[r.tbl] || r.tbl))) + (r.entity_id && !String(r.summary || "").includes(nm(r.tbl, r.entity_id)) ? " · " + nm(r.tbl, r.entity_id) : ""), r.device);
     const touched = new Set<string>();
     for (const r of tev) {
       touched.add(r.task_id);
       if (r.field === "status" && /^done$/i.test(r.new_value)) stats.tasksDone++;
-      add(r.at, "Tasks", nm("tasks", r.task_id) + ": " + r.field + (r.old_value ? " " + clip(r.old_value, 120) + " →" : " →") + " " + clip(r.new_value, 200));
+      add(r.at, "Tasks", nm("tasks", r.task_id) + ": " + r.field + (r.old_value ? " " + clip(r.old_value, 120) + " →" : " →") + " " + clip(r.new_value, 200), r.device);
     }
     stats.tasksTouched = touched.size;
-    for (const r of rev) { stats.recordsChanged++; add(r.at, ["leads", "deals", "clients", "contacts", "proposals", "activities", "targets"].includes(r.tbl) ? "Sales" : ["campaigns", "content", "seo_keywords", "social_stats"].includes(r.tbl) ? "Marketing" : "Records", (LABEL[r.tbl] || r.tbl) + " " + nm(r.tbl, r.entity_id) + ": " + r.field + " " + clip(r.old_value, 100) + " → " + clip(r.new_value, 200)); }
-    for (const r of cmts) { stats.comments++; add(r.created_at, "Comments", "On " + (LABEL[r.tbl] || r.tbl).toLowerCase() + " " + nm(r.tbl, r.entity_id) + ": “" + clip(r.body) + "”"); }
-    for (const r of logs) { stats.hours += (r.minutes || 0) / 60; add(r.created_at || (r.work_date + "T12:00:00+05:30"), "Time", "Logged " + (Math.round((r.minutes || 0) / 6) / 10) + " h on " + nm("tasks", r.task_id) + (r.note ? " — " + clip(r.note, 200) : "")); }
+    for (const r of rev) { stats.recordsChanged++; add(r.at, ["leads", "deals", "clients", "contacts", "proposals", "activities", "targets"].includes(r.tbl) ? "Sales" : ["campaigns", "content", "seo_keywords", "social_stats"].includes(r.tbl) ? "Marketing" : "Records", (LABEL[r.tbl] || r.tbl) + " " + nm(r.tbl, r.entity_id) + ": " + r.field + " " + clip(r.old_value, 100) + " → " + clip(r.new_value, 200), r.device); }
+    for (const r of cmts) { stats.comments++; add(r.created_at, "Comments", "On " + (LABEL[r.tbl] || r.tbl).toLowerCase() + " " + nm(r.tbl, r.entity_id) + ": “" + clip(r.body) + "”", r.device); }
+    for (const r of logs) { stats.hours += (r.minutes || 0) / 60; add(r.created_at || (r.work_date + "T12:00:00+05:30"), "Time", "Logged " + (Math.round((r.minutes || 0) / 6) / 10) + " h on " + nm("tasks", r.task_id) + (r.note ? " — " + clip(r.note, 200) : ""), r.device); }
     for (const r of att) {
       if (r.check_in) stats.daysPresent++;
       const hrs = r.check_in && r.check_out ? " (" + (Math.round((Date.parse(r.check_out) - Date.parse(r.check_in)) / 360000) / 10) + " h)" : "";
-      add(r.check_in || (r.day + "T09:00:00+05:30"), "Attendance", r.day + ": " + (r.status || "Present") + (r.check_in ? ", in " + ist(r.check_in).slice(11) : "") + (r.check_out ? ", out " + ist(r.check_out).slice(11) : ", no check-out") + hrs + " · " + r.mode + (r.note ? " · " + clip(r.note, 120) : ""));
+      add(r.check_in || (r.day + "T09:00:00+05:30"), "Attendance", r.day + ": " + (r.status || "Present") + (r.check_in ? ", in " + ist(r.check_in).slice(11) : "") + (r.check_out ? ", out " + ist(r.check_out).slice(11) : ", no check-out") + hrs + " · " + r.mode + (r.note ? " · " + clip(r.note, 120) : "") + (mob(r.check_in_device) ? " · checked in on " + r.check_in_device : "") + (mob(r.check_out_device) ? " · checked out on " + r.check_out_device : ""), mob(r.check_in_device) || mob(r.check_out_device));
     }
-    for (const r of sts) add(r.at, "Attendance", "Status: " + r.kind + (r.until ? " until " + ist(r.until).slice(11) : "") + (r.note ? " · " + clip(r.note, 120) : ""));
-    for (const r of leave) add(r.created_at, "Leave", r.type + " " + r.start_date + (r.end_date !== r.start_date ? " to " + r.end_date : "") + (r.half_day ? " (half day)" : "") + " · " + r.status + (r.reason ? " · " + clip(r.reason, 160) : ""));
-    for (const r of joins) { stats.meetings++; add(r.joined_at, "Meetings", "Joined " + (r.title || "a meeting") + (r.left_at ? " until " + ist(r.left_at).slice(11) : "")); }
-    for (const r of runs) { stats.tests++; add(r.at, "QA", "Test run: " + r.status + (r.actual ? " — " + clip(r.actual, 200) : "")); }
+    for (const r of sts) add(r.at, "Attendance", "Status: " + r.kind + (r.until ? " until " + ist(r.until).slice(11) : "") + (r.note ? " · " + clip(r.note, 120) : ""), r.device);
+    for (const r of leave) add(r.created_at, "Leave", r.type + " " + r.start_date + (r.end_date !== r.start_date ? " to " + r.end_date : "") + (r.half_day ? " (half day)" : "") + " · " + r.status + (r.reason ? " · " + clip(r.reason, 160) : ""), r.device);
+    for (const r of joins) { stats.meetings++; add(r.joined_at, "Meetings", "Joined " + (r.title || "a meeting") + (r.left_at ? " until " + ist(r.left_at).slice(11) : ""), r.device); }
+    for (const r of runs) { stats.tests++; add(r.at, "QA", "Test run: " + r.status + (r.actual ? " — " + clip(r.actual, 200) : ""), r.device); }
     // messages in channels and groups only; direct messages stay private
     const chIds = [...new Set(msgs.map(m => m.channel_id))];
     const chans = chIds.length ? await q(db.from("chat_channels").select("id,kind,name").in("id", chIds)) : [];
     const chan = new Map(chans.map(c => [c.id, c]));
     for (const m of msgs) {
-      const c = chan.get(m.channel_id); if (!c || c.kind === "dm") continue;
+      const c = chan.get(m.channel_id); if (!c) continue;
+      // direct messages stay private: only that one was sent from a phone, never what it said
+      if (c.kind === "dm") { if (mob(m.device)) add(m.created_at, "Chat", "Direct message (private)", m.device); continue; }
       stats.messages++;
       const files = Array.isArray(m.attachments) && m.attachments.length ? " [" + m.attachments.length + " file" + (m.attachments.length > 1 ? "s" : "") + "]" : "";
-      add(m.created_at, "Chat", (c.kind === "group" ? "Group " : "#") + (c.name || "chat") + ": “" + clip(m.body, 400) + "”" + files);
+      add(m.created_at, "Chat", (c.kind === "group" ? "Group " : "#") + (c.name || "chat") + ": “" + clip(m.body, 400) + "”" + files, m.device);
     }
     for (const e of mails) { stats.emails++; add(e.sent_at, "Email", "To " + clip(e.to_email, 80) + ": " + clip(e.subject, 160) + (e.entity_id ? " (re " + nm(e.tbl, e.entity_id) + ")" : "") + (e.snippet ? " — " + clip(e.snippet, 200) : "")); }
     lines.sort((a, b) => a.at.localeCompare(b.at));
+    stats.onPhone = lines.filter(l => l.device).length;
     stats.hours = Math.round(stats.hours * 10) / 10;
 
     // the summary: saved, so reopening is instant; today / this week / this month are refreshed after 30 minutes
     const periodDone = end < todayIST();
     let summary = "", cached = false, generatedAt = "", note = "";
     const { data: saved } = await db.from("work_summaries").select("summary,generated_at,activity_count").eq("user_id", uid).eq("period", period).eq("start_day", start).maybeSingle();
-    if (saved && !refresh && saved.activity_count === lines.length && (periodDone || Date.now() - Date.parse(saved.generated_at) < 30 * 60000)) {
+    if (saved && !refresh && saved.activity_count === lines.length && (!stats.onPhone || /Done on phone/i.test(saved.summary || "")) && (periodDone || Date.now() - Date.parse(saved.generated_at) < 30 * 60000)) {
       summary = saved.summary; generatedAt = saved.generated_at; cached = true;
     } else if (!lines.length) {
       summary = ""; note = "Nothing was recorded for " + person.full_name + " in this period.";
@@ -176,7 +185,7 @@ Deno.serve(async (req) => {
       note = "The summary needs the ANTHROPIC_API_KEY secret (Supabase › Edge Functions › Secrets). The full timeline is below.";
     } else {
       const label = period === "day" ? start : start + " to " + end;
-      const log = lines.map(l => l.at + " · " + l.area + " · " + l.text).join("\n");
+      const log = lines.map(l => l.at + " · " + l.area + " · " + l.text + (l.device ? " · ON " + l.device.toUpperCase() : "")).join("\n");
       const client = new Anthropic();
       try {
         // fallbacks: if Claude declines the request, the API re-runs it on a fallback model in the same call
@@ -189,8 +198,9 @@ Deno.serve(async (req) => {
           system: "You write work summaries for the admins of Tcipher Technologies, a software company with Development, Sales and Marketing teams. " +
             "You get one person's complete activity log for a period. Write a summary an admin can read at a glance: what the person worked on, what they finished, what is still open, and anything that needs attention. " +
             "Use only the facts in the log; never guess. Name tasks and records the way the log does (for example TC-2230 and its title). Times are India time. " +
-            "Format: plain text with these sections, each a line starting with '## ': At a glance (two or three sentences), Done, In progress, Communication, Time and attendance, Needs attention. " +
-            "Under each section use short bullet lines starting with '- '. Skip a section that has nothing. Use **bold** only for task keys or names. Keep it under 350 words.",
+            "The company expects work to be done on a laptop. Log lines ending in 'ON PHONE' or 'ON TABLET' were done from a phone or tablet: list every one of them, with its time, under 'Done on phone', and mention the count in At a glance. " +
+            "Format: plain text with these sections, each a line starting with '## ': At a glance (two or three sentences), Done on phone, Done, In progress, Communication, Time and attendance, Needs attention. " +
+            "Under each section use short bullet lines starting with '- '. Skip a section that has nothing. Use **bold** only for task keys or names. Keep it under 350 words, not counting the Done on phone list.",
           messages: [{ role: "user", content: "Person: " + person.full_name + (person.title ? ", " + person.title : "") + (person.vertical ? " (" + person.vertical + ")" : "") +
             "\nPeriod: " + period + ", " + label + "\nTotals: " + JSON.stringify(stats) + "\n\nActivity log:\n" + log }],
         });
