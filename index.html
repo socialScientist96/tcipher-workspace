@@ -6219,7 +6219,14 @@ function nbExport(kind, note, blocks){
     fr.setAttribute("aria-hidden", "true"); fr.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
     document.body.append(fr);
     const d = fr.contentDocument; d.open(); d.write(nbToHtml(title, blocks, true)); d.close();
-    const go = () => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (e) { toast("Couldn’t open the print window."); } setTimeout(() => fr.remove(), 60000); };
+    // Chrome names the saved PDF after the page's title, not the frame's: use the note's name while the print window is open
+    const was = document.title;
+    const back = () => { document.title = was; };
+    const go = () => {
+      document.title = file;
+      try { fr.contentWindow.addEventListener("afterprint", back); fr.contentWindow.focus(); fr.contentWindow.print(); } catch (e) { toast("Couldn’t open the print window."); }
+      back(); setTimeout(() => fr.remove(), 60000);
+    };
     const imgs = [...d.images].filter(im => !im.complete);
     if (!imgs.length) setTimeout(go, 150);
     else { let left = imgs.length; const one = () => { if (--left === 0) go(); }; imgs.forEach(im => { im.onload = im.onerror = one; }); setTimeout(() => { if (left > 0) { left = -1; go(); } }, 4000); }
@@ -10082,7 +10089,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11cj";
+const APP_VERSION = "2026-11ck";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));

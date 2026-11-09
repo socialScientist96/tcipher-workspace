@@ -1,5 +1,9 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11ck (9 Nov 2026): the PDF is named after the note
+Needs: upload `index.html` and `sw.js`.
+- Save as PDF now suggests the note's name (e.g. "9 Nov Dev VONZUU Weekly Meeting With Kevin.pdf") instead of "Tcipher Technologies – Workspace". Characters a file name can't have, like ":" and "/", are left out.
+
 ## Version 2026-11cj (9 Nov 2026): branded PDF export for notes
 Needs: upload `index.html` and `sw.js`.
 - Export → PDF no longer prints "about:blank", the date and the web address at the page edges, and no longer opens a blank tab: the print window opens straight from the note.
