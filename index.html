@@ -2102,6 +2102,14 @@ body.nb-moving,body.nb-moving *{cursor:grabbing!important;user-select:none!impor
 .msg-hit-b{font-size:var(--fs-sm);color:var(--ink2);white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
 .msg-hit mark{background:#FDE9A6;color:inherit;border-radius:3px;padding:0 1px}
 .msg-none{font-size:12.5px;margin:2px 8px 6px}
+
+/* "⋯" on task cards (2026-11cb) */
+.dv-card,.card.tcard{position:relative}
+.tcard-menu{position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:6px;display:grid;place-items:center;color:var(--ink2);background:rgba(255,255,255,.92);opacity:0;transition:opacity .12s;z-index:2}
+.dv-card:hover .tcard-menu,.card.tcard:hover .tcard-menu,.tcard-menu:focus,.dv-card:focus-visible .tcard-menu{opacity:1}
+.tcard-menu:hover{background:var(--tint);color:var(--ink)}
+@media (hover:none){.tcard-menu{opacity:.85}}
+.dv-card .dv-title,.card.tcard .t{padding-right:24px}
 </style>
 </head>
 <body>
@@ -3137,7 +3145,7 @@ const MOD = {
     keyOf: r => taskKey(r),
     searchExtra: r => taskKey(r) + " " + (r.labels || []).join(" ") + " " + (r.branch || ""),
     canEdit: (rec) => !rec || isTaskHandler(rec.vertical) || (workersCanUpdate() && workerOnTask(rec)),
-    canDelete: () => false,                       // tasks are archived, never deleted
+    canDelete: (rec) => !!rec && isTaskHandler(rec.vertical),   // (2026-11cb) the database keeps a copy of every deleted task
     fieldEditable: (f, rec) => !rec || isTaskHandler(rec.vertical) || TASK_WORK_FIELDS.includes(f.k),
     allRowsWhen: u => u.quick === "archived",
     quick: [
@@ -4062,7 +4070,8 @@ function genericCard(titleKey, metaFn, personKey){
 }
 function taskCard(r){
   const proj = r.vertical === "Development" ? refLabel("projects", r.project_id) : (isAdmin() ? r.vertical : "");
-  return h("button", { type: "button", class: "card edge-" + String(r.priority || "medium").toLowerCase() },
+  return h("button", { type: "button", class: "card tcard edge-" + String(r.priority || "medium").toLowerCase() },
+    taskCardMenu(r, () => openRecord("tasks", r.id)),
     r.blocked ? h("span", { class: "flag" }, "Blocked" + (r.blocked_reason ? ": " + r.blocked_reason : "")) : null,
     openDeps(r).length ? h("span", { class: "flag", style: "background:var(--info-t);color:var(--info)" }, "Waits on " + openDeps(r).map(taskKey).join(", ")) : null,
     h("p", { class: "t" }, taskKey(r) ? h("span", { class: "tkey" }, taskKey(r)) : null, " ", r.title),
@@ -5720,6 +5729,29 @@ function historySection(rec){
     catch (e) { list.replaceChildren(h("p", { class: "nothing" }, "History couldn’t be loaded.")); }
   })();
   return sec;
+}
+// delete a task for good (a copy with its history is kept for admins in deleted_records)
+async function deleteTask(t){
+  if (!confirm("Delete " + (taskKey(t) || "this task") + " “" + String(t.title || "").slice(0, 80) + "”?\n\nIt’s removed for everyone, with its comments and files. This can’t be undone from the app (archiving keeps it instead).")) return;
+  try { await deleteRow("tasks", t.id); if (S.devOpen === t.id) { S.devOpen = null; closeDlg(); } toast((taskKey(t) || "Task") + " deleted."); rerender(); }
+  catch (e) { fail(e, "Couldn’t delete"); }
+}
+// the "⋯" on a task's card on a board: open, archive or restore, delete
+function taskCardMenu(t, open){
+  const canArchive = typeof devCanEdit === "function" ? devCanEdit(t, "archived") : access(MOD.tasks, t).canEdit;
+  const canDel = access(MOD.tasks, t).canDelete;
+  if (!canArchive && !canDel) return null;
+  const b = h("span", { class: "tcard-menu", role: "button", tabindex: "0", "aria-label": "More actions for " + (taskKey(t) || t.title), title: "Archive, delete…", draggable: "false" }, ic("more", 16));
+  const show = e => { e.preventDefault(); e.stopPropagation();
+    nbMenu(b, [
+      [h("span", {}, ic("expand", 16), "Open"), () => open()],
+      canArchive ? [h("span", {}, ic("archive2", 16), t.archived ? "Restore" : "Archive"), () => archiveTask(t, !t.archived)] : null,
+      canDel ? [h("span", {}, ic("trash", 16), "Delete"), () => deleteTask(t), { danger: true }] : null
+    ].filter(Boolean), taskKey(t) || "Task"); };
+  b.addEventListener("click", show);
+  b.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") show(e); });
+  b.addEventListener("mousedown", e => e.stopPropagation());
+  return b;
 }
 async function archiveTask(rec, archive){
   if (archive && !confirm("Archive " + (taskKey(rec) || "this task") + "? It disappears from boards and lists, but you can find it under Tasks › Archived and restore it. Its history is kept.")) return;
@@ -9598,7 +9630,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ca";
+const APP_VERSION = "2026-11cb";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -10762,6 +10794,7 @@ let devDrag = null;
 function devCard(t){
   const back = t.status === "In progress" && t.qa_state === "Failed";
   const card = h("button", { type: "button", class: "dv-card", draggable: "true", "data-id": t.id, onclick: () => openDevTask(t.id) },
+    taskCardMenu(t, () => openDevTask(t.id)),
     back ? h("span", { class: "dv-flag" }, "↩ Sent back by QA") : null,
     t.blocked ? h("span", { class: "dv-flag" }, ic("flag", 12), "Blocked") : null,
     h("span", { class: "dv-title" }, t.title),

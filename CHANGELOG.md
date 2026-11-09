@@ -1,5 +1,11 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11cb (9 Nov 2026): archive and delete tasks from the board
+Needs: upload `index.html` and `sw.js`.
+- **"⋯" on every task card** (Development board and the Tasks board): **Open**, **Archive** (or **Restore** in the Archived view) and **Delete**. It shows when you hover a card (always on phones).
+- **Tasks can now be deleted** by admins and the people who manage that team's tasks (the same people the database already allowed). You're asked first. Deleting removes it for everyone with its comments and files; the database keeps a copy with its history for admins. Archiving is still the gentle option: it hides the task and you can restore it from Archived.
+- Delete also appears in a task's own "⋯" menu for those people.
+
 ## Version 2026-11ca (9 Nov 2026): private clients, owners as testers, several owners
 Needs: upload `index.html` and `sw.js`; run `upgrade-2026-11ca.sql` (until then clients work as before, without Team access).
 - **Clients are private to the people given access.** A client, its contacts and its client-portal people are seen only by admins, people whose role includes "Sales: clients & contacts", the client's **account owner**, and people added to the client's new **Team access** list (enforced in the database). Everyone else doesn't see the client anywhere. People given access are notified, and the Clients section appears in their sidebar. The account owner can edit their client and its Team access, but can't hand it to someone else (only clients editors and admins can).
