@@ -1,5 +1,14 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11bw (9 Nov 2026): fixes from the Problems list, Tasks number, notifications
+Needs: upload `index.html` and `sw.js`.
+- **Chat header no longer slips under the top bar.** The chat page was 44px taller than the window, so scrolling past the end of the messages moved the whole page. It now fits the window exactly, and scrolling inside the chat stays inside it.
+- **Text colour in notes works again.** Colour (block menu › Color) had stopped showing after the Notion-style restyle: one of its rules overrode the colours.
+- **Notes cards are square**, with the preview fading out instead of making the card tall.
+- **Tasks number:** the number on Tasks counts your tasks due today or overdue and tasks waiting for your review or test. Tasks now has a **Needs you** filter showing exactly those, and clicking Tasks while it has a number opens that filter (it also opens first the first time you visit Tasks, if anything needs you).
+- **Notifications** stay on screen when you open them on a scrolled-down page (desktop; phones already did).
+- **Google Calendar sync** renews an expired sign-in and tries again, instead of failing with "Sign in again" after the computer wakes up.
+
 ## Version 2026-11bv (8 Nov 2026): calendars off the sidebar list
 Needs: upload `index.html` and `sw.js`.
 - **Calendar** and **Team calendar** are no longer listed in the sidebar (or in Recents). Both pages still work: the calendar icon at the top of the sidebar opens Calendar, and links to either page keep working.

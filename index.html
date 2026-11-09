@@ -245,6 +245,11 @@ a.tkey:hover{background:var(--tint2)}
 .note-card.pinned{border-color:var(--tint3);background:linear-gradient(180deg,var(--tint) 0,#fff 60px)}
 .note-card .nt{font-weight:700;font-size:15px}
 .note-card .nb{font-size:13.5px;color:var(--ink2);white-space:pre-wrap;overflow-wrap:anywhere;flex:1}
+/* square cards (2026-11bw): the preview fades out instead of making the card tall */
+.notes-grid .note-card{aspect-ratio:1/1;min-height:0;overflow:hidden}
+.notes-grid .note-card .nt{flex:none;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.notes-grid .note-card .nb{min-height:0;overflow:hidden;-webkit-mask-image:linear-gradient(#000 65%,transparent);mask-image:linear-gradient(#000 65%,transparent)}
+.notes-grid .note-card > :last-child{flex:none}
 .note-card .nm{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12.5px}
 .note-card .nm .grow{flex:1}
 .days{display:flex;gap:6px;flex-wrap:wrap}
@@ -314,6 +319,8 @@ tr.unread-row td{background:#F5FBF7;font-weight:600}
 .nav-head .cnt.due{background:#F0445A;color:#fff;border-radius:999px;padding:0 7px;font-size:11.5px;line-height:18px}
 .nav-head .cnt.new{background:var(--brand-light);color:var(--p-deep);border-radius:999px;padding:0 7px;font-size:11.5px;line-height:18px}
 /* chat */
+.content:has(> div > .chat){padding-bottom:0}
+.chat-msgs,.chat-list{overscroll-behavior:contain}
 .chat{display:grid;grid-template-columns:280px minmax(0,1fr);height:calc(100dvh - 150px);min-height:440px;background:#fff;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
 .chat-list{border-right:1px solid var(--line);overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:2px;background:#FBFBFE}
 .chat-list h4{margin:12px 6px 4px;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3)}
@@ -711,6 +718,7 @@ dialog[open]::backdrop{animation:fadeIn .16s ease-out}
 .card:hover,.pcard:hover,button.stat:hover{transform:translateY(-1px);box-shadow:var(--shadow)}
 .btn:active,.card:active{transform:translateY(0) scale(.99)}
 .npanel:not([hidden]){animation:dlgIn .14s ease-out}
+@media (min-width:961px){.npanel{position:fixed;top:64px;max-height:calc(100vh - 84px)}}
 .toast{transition:opacity .2s ease,transform .2s ease}
 .loading{display:flex;align-items:center;justify-content:center;gap:10px}
 .spinner{width:16px;height:16px;border-radius:50%;border:2px solid var(--tint2);border-top-color:var(--p);animation:spin .7s linear infinite}
@@ -1874,7 +1882,7 @@ body.nb-moving,body.nb-moving *{cursor:grabbing!important;user-select:none!impor
 .nb-view .nb-meta{font-size:13px;color:var(--nb-ink3);margin-bottom:28px}
 .nb-view .nb-block{padding:0;margin-top:0;margin-bottom:0;--lh:24px;--mt:0px}
 .nb-view .nb-block.t-text{margin-top:4px;margin-bottom:4px}
-.nb-view .nb-text{font-size:16px;line-height:1.5;min-height:calc(1.5em + 6px);padding:3px 2px;color:inherit}
+.nb-view .nb-text{font-size:16px;line-height:1.5;min-height:calc(1.5em + 6px);padding:3px 2px}
 .nb-view .t-h1 .nb-text,.nb-view .t-th1 .nb-text{font-size:30px;font-weight:700;line-height:1.3;margin-top:28px;letter-spacing:-.01em}
 .nb-view .t-h2 .nb-text,.nb-view .t-th2 .nb-text{font-size:24px;font-weight:700;line-height:1.3;margin-top:22px;letter-spacing:-.005em}
 .nb-view .t-h3 .nb-text,.nb-view .t-th3 .nb-text{font-size:20px;font-weight:600;line-height:1.3;margin-top:16px}
@@ -3114,6 +3122,7 @@ const MOD = {
     allRowsWhen: u => u.quick === "archived",
     quick: [
       ["all", "All"],
+      ["needs", "Needs you", t => taskNeedsMe(t)],
       ["mine", "My tasks", t => t.assignee_id === S.me.id || (t.collaborators || []).includes(S.me.id) || (t.status === "In review" && !!t.qa_state && (t.tester_id === S.me.id || t.reviewer_id === S.me.id))],
       ["tagged", "Tagged me", t => (t.mentions || []).includes(S.me.id)],
       ["review", "I’m reviewing", t => t.reviewer_id === S.me.id && t.status !== "Done"],
@@ -3874,6 +3883,8 @@ async function renderModule(key, el){
   if (S.route !== key) return;
   el.replaceChildren();
   const u = uiFor(key);
+  // the first time Tasks opens, show what needs you (if anything does)
+  if (key === "tasks" && !u.quickSeen) { u.quickSeen = true; if (!u.quick && rows("tasks").some(taskNeedsMe)) u.quick = "needs"; }
 
   // header
   const acts = h("div", { class: "acts" });
@@ -5243,11 +5254,13 @@ function loadGoogle(){
   });
   return G.loading;
 }
-async function callGoogle(action, extra){
+async function callGoogle(action, extra, retried){
   const { data, error } = await sb.functions.invoke("google-sync", { body: Object.assign({ action }, extra || {}) });
   if (error){
     let msg = error.message || "Request failed";
     try { const j = await error.context.json(); if (j && j.error) msg = j.error; } catch (e) {}
+    // after the computer wakes up the sign-in may have lapsed for a moment: renew it and try once more
+    if (!retried && /sign in again|session has expired|jwt/i.test(msg)) { try { await sb.auth.refreshSession(); } catch (e) {} return callGoogle(action, extra, true); }
     if (/Failed to send|not found|404|FunctionsFetchError|Failed to fetch/i.test(msg)) msg = "The “google-sync” function isn’t set up yet.";
     throw new Error(msg);
   }
@@ -5711,6 +5724,11 @@ async function duplicateTask(rec){
 /* ---------------------------------------------------------------------
    Notes
    --------------------------------------------------------------------- */
+// what the sidebar's number on Tasks counts: your tasks due today or overdue, and tasks waiting for your review or test
+function taskNeedsMe(t){
+  const me = S.me.id, mine = t.assignee_id === me || (t.collaborators || []).includes(me);
+  return (mine && t.status !== "Done" && !!t.due_date && t.due_date <= today()) || (t.reviewer_id === me && t.status === "In review");
+}
 const notesHaveEditors = () => rows("notes").some(n => "editors" in n);
 const ticketsHavePortal = () => S.portalReady === true || rows("tickets").some(t => "client_visible" in t);
 const VIS_LABEL = { Private: "Only me", People: "Specific people", Vertical: "My vertical", Company: "Everyone" };
@@ -9442,7 +9460,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11bv";
+const APP_VERSION = "2026-11bw";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -11524,7 +11542,7 @@ function renderShell(){
     const links = visible.map(([r, l]) => {
       const badge = navBadge(r);
       const on = S.route === r || (r === "admin-users" && S.route.startsWith("admin-"));
-      const link = h("a", { href: "#" + r, class: on ? "on" : null, "data-label": l.toLowerCase(), onclick: () => side.classList.remove("open") }, h("span", { class: "nic" }, ic(ROUTE_ICON[r] || "file", 18)), h("span", { class: "nl" }, l), badge);
+      const link = h("a", { href: "#" + r, class: on ? "on" : null, "data-label": l.toLowerCase(), onclick: () => { side.classList.remove("open"); if (r === "tasks" && badgeInfo("tasks").due) { const u = uiFor("tasks"); u.quick = "needs"; u.quickSeen = true; } } }, h("span", { class: "nic" }, ic(ROUTE_ICON[r] || "file", 18)), h("span", { class: "nl" }, l), badge);
       return r === "notes" ? notesTree(link, side) : link;
     });
     if (!group || group === "Admin") { nav.append(h("div", { class: "nav-group" }, h("h4", {}, group || "Workspace"), links)); continue; }
