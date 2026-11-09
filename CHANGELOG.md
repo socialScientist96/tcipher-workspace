@@ -1,5 +1,14 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11ci (9 Nov 2026): select several note blocks like Notion
+Needs: upload `index.html` and `sw.js`.
+- Selecting several blocks was only possible by Shift-clicking the hidden ⋮⋮ handle, so in practice it didn't work. Now, as in Notion:
+  - drag from one block's text into another: the text selection turns into a block selection;
+  - drag from the empty space beside the page: a box selects every block it touches;
+  - Shift-click a block to extend the selection, click anywhere else to clear it;
+  - in a block, **Esc** selects it; **Shift+↑** at the start or **Shift+↓** at the end selects it and the next; **Cmd/Ctrl+A** on a fully selected block selects them all.
+- With blocks selected: Shift+↑/↓ grows or shrinks the selection, Cmd/Ctrl+C copies the text, Enter goes back to typing, Delete removes them, and the bar turns them into another kind, colours, duplicates or deletes them.
+
 ## Database 2026-11cd (9 Nov 2026): owners can be testers (database side)
 Needs: run `upgrade-2026-11cd.sql`. No app change.
 - The database refused "The people working on a task can't also be its tester" (rule C of security-fix-2.sql), so choosing yourself as tester on your own task failed even though the app offered it. Now the people working on a task can be its tester (Pick up, or choosing yourself in Tester (QA)).
