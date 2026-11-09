@@ -5,6 +5,12 @@ Needs: run `upgrade-2026-11cd.sql`. No app change.
 - The database refused "The people working on a task can't also be its tester" (rule C of security-fix-2.sql), so choosing yourself as tester on your own task failed even though the app offered it. Now the people working on a task can be its tester (Pick up, or choosing yourself in Tester (QA)).
 - Still protected: someone working on a task can't mark it Done themselves unless they are its tester.
 
+## Version 2026-11cf (9 Nov 2026): clickable links and embeds in notes
+Needs: upload `index.html` and `sw.js`.
+- **Links work in notes:** web addresses you paste or type become links (when you leave the line), and clicking a link opens it in a new tab.
+- **Embeds, like Notion:** paste a Google Drive file, Drive folder, Google Doc/Sheet/Slides or YouTube link on an empty line and choose **Embed: show it in the note** (or **Keep as a link**). Drive videos play right in the note; Docs, Sheets and folders show inside it. There's also an **Embed** block in the "/" menu and Insert below. Each embed has an "open in a new tab" link and a caption. (Viewers need access to the Drive file, as in Drive.)
+- Exports: embeds become links in PDF, HTML, Word and Markdown.
+
 ## Version 2026-11ce (9 Nov 2026): approve each English change
 Needs: upload `index.html` and `sw.js`.
 - **Convert to English asks what to change:** every suggested change is listed on its own (the title, the details, and in notes each heading and paragraph), each with a tick. Untick anything you'd rather keep; **Replace** applies only the ticked ones ("Replace 1 of 2").
