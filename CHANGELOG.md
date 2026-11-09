@@ -1,5 +1,10 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11cl (9 Nov 2026): PDF name, take two
+Needs: upload `index.html` and `sw.js`.
+- Chrome still suggested "Tcipher Technologies – Workspace": it reads the tab's title a moment after it changes. The note's name is now set just before the print window opens, so Save as PDF suggests it.
+- `sw.js` was empty in 2026-11ck by mistake; restored.
+
 ## Version 2026-11ck (9 Nov 2026): the PDF is named after the note
 Needs: upload `index.html` and `sw.js`.
 - Save as PDF now suggests the note's name (e.g. "9 Nov Dev VONZUU Weekly Meeting With Kevin.pdf") instead of "Tcipher Technologies – Workspace". Characters a file name can't have, like ":" and "/", are left out.

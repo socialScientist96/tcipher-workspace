@@ -6222,10 +6222,13 @@ function nbExport(kind, note, blocks){
     // Chrome names the saved PDF after the page's title, not the frame's: use the note's name while the print window is open
     const was = document.title;
     const back = () => { document.title = was; };
+    // (Chrome reads the tab's title a moment after it changes, so wait before opening the print window)
     const go = () => {
-      document.title = file;
-      try { fr.contentWindow.addEventListener("afterprint", back); fr.contentWindow.focus(); fr.contentWindow.print(); } catch (e) { toast("Couldn’t open the print window."); }
-      back(); setTimeout(() => fr.remove(), 60000);
+      document.title = file; d.title = file;
+      setTimeout(() => {
+        try { fr.contentWindow.addEventListener("afterprint", back); fr.contentWindow.focus(); fr.contentWindow.print(); } catch (e) { toast("Couldn’t open the print window."); }
+        setTimeout(back, 1000); setTimeout(() => fr.remove(), 60000);
+      }, 600);
     };
     const imgs = [...d.images].filter(im => !im.complete);
     if (!imgs.length) setTimeout(go, 150);
@@ -10089,7 +10092,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ck";
+const APP_VERSION = "2026-11cl";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
