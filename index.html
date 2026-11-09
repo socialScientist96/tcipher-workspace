@@ -2113,6 +2113,18 @@ body.nb-moving,body.nb-moving *{cursor:grabbing!important;user-select:none!impor
 
 /* device labels (2026-11cc) */
 .devtag{color:var(--ink3);font-size:.92em;white-space:nowrap}
+
+/* Convert to English: approve each change (2026-11ce) */
+.ai-eng-help{margin:0 0 var(--s2);font-size:var(--fs-sm)}
+.ai-eng-head{grid-template-columns:24px 1fr 1fr}
+.ai-eng-row.pick{display:grid;grid-template-columns:24px 1fr;gap:var(--s2);cursor:pointer}
+.ai-eng-row.pick input{margin-top:4px;width:18px;height:18px;accent-color:var(--p)}
+.ai-eng-cells{display:flex;flex-direction:column;gap:6px;min-width:0}
+.ai-eng-pair{display:grid;grid-template-columns:1fr 1fr;gap:var(--s3)}
+.ai-eng-pair .ai-cell:first-child{color:var(--ink2)}
+.ai-eng-row.pick.off .ai-eng-pair .ai-cell:last-child{text-decoration:line-through;color:var(--ink3)}
+.dv-eng{margin-right:6px}
+@media (max-width:640px){.ai-eng-pair{grid-template-columns:1fr}.ai-eng-head{display:none}.dv-eng span{display:none}}
 </style>
 </head>
 <body>
@@ -6126,7 +6138,7 @@ async function renderNotePage(el, id){
   ], "Page");
   const engBtn = editable ? h("button", { type: "button", class: "btn sm", title: "Rewrite this note in proper English", onclick: async () => {
     if (state.dirty) { clearTimeout(state.saveT); await save(); }
-    const pieces = blocks.filter(b => b.html && !["page", "divider", "code"].includes(b.type)).map(b => ({ id: b.id, html: b.html }));
+    const pieces = blocks.filter(b => b.html && !["page", "divider", "code"].includes(b.type)).map(b => ({ id: b.id, html: b.html, label: /^t?h[1-4]$/.test(b.type) ? "Heading" : "" }));
     englishFlow(title, pieces, async (newTitle, newPieces) => {
       const snap = { title, blocks: JSON.parse(JSON.stringify(blocks)) };
       title = newTitle; titleEl.textContent = title;
@@ -9668,7 +9680,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11cc";
+const APP_VERSION = "2026-11ce";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -10994,6 +11006,7 @@ function drawDevTask(id){
         try { await deleteRow("tasks", t.id); S.devOpen = null; closeDlg(); toast("Deleted."); rerender(); } catch (e) { fail(e, "Couldn’t delete"); } }, { danger: true }] : null
     ].filter(Boolean), taskKey(t)); } }, ic("more", 18));
     dh.insertBefore(mb, dh.lastChild);
+    if (devCanEdit(t, "title")) dh.insertBefore(h("button", { type: "button", class: "btn sm dv-eng", title: "Rewrite the title and details in proper English", onclick: () => taskEnglish(t) }, ic("languages", 15), h("span", {}, "Convert to English")), mb);
   }
   S.dlg = { tbl: "tasks", id: t.id };
   const db = d.querySelector(".db"); if (db && keep) db.scrollTop = keep;
@@ -11167,18 +11180,29 @@ async function englishFlow(title, pieces, apply){
   try { r = await callAI({ action: "english", title, pieces }); }
   catch (e) { box.replaceChildren(h("p", { class: "err" }, String(e.message || e))); return; }
   const byPid = new Map((r.pieces || []).map(p => [String(p.id), p.html]));
+  // every suggested change, each with its own tick: you approve the ones you want (2026-11ce)
   const rowsOut = [];
-  if (title && r.title && r.title.trim() !== title.trim()) rowsOut.push(["Title", nbEsc(title), nbEsc(r.title)]);
-  for (const p of pieces) { const en = byPid.get(String(p.id)); if (en != null && nbText(en).trim() !== nbText(p.html).trim()) rowsOut.push(["", p.html, nbClean(en)]); }
+  if (title && r.title && r.title.trim() !== title.trim()) rowsOut.push({ key: "__title", label: "Title", a: nbEsc(title), b: nbEsc(r.title.trim()) });
+  for (const p of pieces) { const en = byPid.get(String(p.id)); if (en != null && nbText(en).trim() !== nbText(p.html).trim()) rowsOut.push({ key: String(p.id), label: p.label || "", a: p.html, b: nbClean(en) }); }
   if (!rowsOut.length) { box.replaceChildren(h("p", {}, "This is already in English. Nothing to change.")); return; }
   const cell = html => { const d = h("div", { class: "ai-cell" }); d.innerHTML = nbClean(html) || "&nbsp;"; return d; };
-  box.replaceChildren(h("div", { class: "ai-eng-head" }, h("b", {}, "Now"), h("b", {}, "In English")),
-    ...rowsOut.map(([label, a, b]) => h("div", { class: "ai-eng-row" }, label ? h("span", { class: "pill" }, label) : null, cell(a), cell(b))));
-  replaceBtn.disabled = false;
+  const take = new Set(rowsOut.map(x => x.key));
+  const count = () => { replaceBtn.textContent = take.size ? "Replace " + (take.size === rowsOut.length ? (rowsOut.length === 1 ? "it" : "all " + rowsOut.length) : take.size + " of " + rowsOut.length) : "Nothing ticked"; replaceBtn.disabled = !take.size; };
+  box.replaceChildren(
+    h("p", { class: "muted ai-eng-help" }, rowsOut.length === 1 ? "Check the change, then replace." : "Untick anything you'd rather keep as it is. Only the ticked parts are replaced."),
+    h("div", { class: "ai-eng-head" }, h("span", {}), h("b", {}, "Now"), h("b", {}, "In English")),
+    ...rowsOut.map(x => {
+      const cb = h("input", { type: "checkbox", checked: true, "aria-label": "Use the English for " + (x.label || "this part") });
+      const row = h("label", { class: "ai-eng-row pick" }, cb, h("div", { class: "ai-eng-cells" }, x.label ? h("span", { class: "pill" }, x.label) : null, h("div", { class: "ai-eng-pair" }, cell(x.a), cell(x.b))));
+      cb.addEventListener("change", () => { if (cb.checked) take.add(x.key); else take.delete(x.key); row.classList.toggle("off", !cb.checked); count(); });
+      return row;
+    }));
+  count();
   replaceBtn.addEventListener("click", async () => {
     replaceBtn.disabled = true;
-    const newPieces = new Map(); for (const p of pieces) { const en = byPid.get(String(p.id)); if (en != null) newPieces.set(String(p.id), nbClean(en)); }
-    try { await apply(r.title && r.title.trim() ? r.title.trim() : title, newPieces); closeDlg(); }
+    const newPieces = new Map(); for (const p of pieces) { const en = byPid.get(String(p.id)); if (en != null && take.has(String(p.id))) newPieces.set(String(p.id), nbClean(en)); }
+    const newTitle = take.has("__title") && r.title && r.title.trim() ? r.title.trim() : title;
+    try { await apply(newTitle, newPieces); closeDlg(); }
     catch (e) { replaceBtn.disabled = false; fail(e, "Couldn’t save the English version"); }
   });
 }
@@ -11186,9 +11210,9 @@ async function englishFlow(title, pieces, apply){
 const htmlLines = t => nbEsc(String(t || "")).replace(/\n/g, "<br>");
 const linesHtml = h2 => nbText(String(h2 || "").replace(/<br>/g, "\n"));
 function taskEnglish(t){
-  englishFlow(t.title || "", t.description ? [{ id: "description", html: htmlLines(t.description) }] : [], async (title, pieces) => {
+  englishFlow(t.title || "", t.description ? [{ id: "description", label: "Details", html: htmlLines(t.description) }] : [], async (title, pieces) => {
     const before = { title: t.title, description: t.description };
-    const patch = { title };
+    const patch = {}; if (title !== t.title) patch.title = title;
     if (pieces.has("description")) patch.description = linesHtml(pieces.get("description"));
     await updateRow("tasks", t.id, patch);
     toastUndo("Task converted to English.", async () => { await updateRow("tasks", t.id, before); rerender(); });
