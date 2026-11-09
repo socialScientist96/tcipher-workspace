@@ -2093,6 +2093,15 @@ body.nb-moving,body.nb-moving *{cursor:grabbing!important;user-select:none!impor
 .ny-title{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ny-why{font-size:var(--fs-sm);color:var(--bad)}
 @media (max-width:720px){.ny-row{grid-template-columns:auto minmax(0,1fr)}.ny-why{grid-column:1/-1}.ny-row .btn{display:none}}
+
+/* chat: message search results (2026-11bz) */
+.msg-results{display:flex;flex-direction:column;gap:2px}
+.msg-hit{align-items:flex-start}
+.msg-hit .x{display:flex;flex-direction:column;gap:2px;min-width:0;white-space:normal}
+.msg-hit-h{font-size:var(--fs-sm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msg-hit-b{font-size:var(--fs-sm);color:var(--ink2);white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
+.msg-hit mark{background:#FDE9A6;color:inherit;border-radius:3px;padding:0 1px}
+.msg-none{font-size:12.5px;margin:2px 8px 6px}
 </style>
 </head>
 <body>
@@ -8074,8 +8083,9 @@ function drawChatList(){
   const { list } = chatEls;
   const q = (C.q || "").trim().toLowerCase();
   if (!chatEls.search){
-    const search = h("input", { id: "chatSearch", class: "in", type: "search", placeholder: "Find a person or chat", "aria-label": "Find a person or chat", value: C.q || "", autocomplete: "off" });
-    search.addEventListener("input", () => { C.q = search.value; drawChatList(); });
+    const search = h("input", { id: "chatSearch", class: "in", type: "search", placeholder: "Search people, chats and messages", "aria-label": "Search people, chats and messages", value: C.q || "", autocomplete: "off" });
+    search.addEventListener("input", () => { C.q = search.value; drawChatList(); queueMsgSearch(); });
+    search.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); queueMsgSearch(0); } });
     chatEls.search = search; chatEls.items = h("div", { class: "chat-items" });
     list.replaceChildren(search, chatEls.items);
   }
@@ -8099,6 +8109,67 @@ function drawChatList(){
     h("h4", {}, "Direct messages"), ...(people.length ? [] : [h("p", { class: "muted", style: "font-size:12.5px;margin:2px 8px 6px" }, "No one matches “" + C.q.trim() + "”.")]),
     ...people.map(({ p, ch }) => h("button", { type: "button", class: "chat-item" + (ch && C.active === ch.id ? " on" : "") + (ch && C.unread[ch.id] ? " unread" : ""), onclick: open(() => openDM(p.id)) },
       avatar(p.id, "sm"), h("span", { class: "x" }, h("b", {}, p.full_name), h("br"), statusLine(p.id)), ch && C.unread[ch.id] ? h("span", { class: "cnt due" }, String(C.unread[ch.id])) : null))].filter(Boolean));
+  if (q.length >= 2) chatEls.items.append(msgSearchSection(q));
+}
+
+/* ---------- searching messages (2026-11bz) ----------
+   Type two or more letters in the chat search: messages from every chat you're in that contain them (newest first).
+   The database only returns chats you're a member of. Click one to open that chat at that message. */
+const MSG_SEARCH = { q: "", rows: null, busy: false, t: null, err: "", seq: 0 };
+function queueMsgSearch(delay){
+  clearTimeout(MSG_SEARCH.t);
+  const q = (C.q || "").trim();
+  if (q.length < 2) { MSG_SEARCH.q = ""; MSG_SEARCH.rows = null; MSG_SEARCH.busy = false; return; }
+  if (q.toLowerCase() === MSG_SEARCH.q && MSG_SEARCH.rows) return;
+  MSG_SEARCH.t = setTimeout(runMsgSearch, delay ?? 300);
+}
+async function runMsgSearch(){
+  const q = (C.q || "").trim(); if (q.length < 2) return;
+  const seq = ++MSG_SEARCH.seq; MSG_SEARCH.busy = true; MSG_SEARCH.err = ""; drawChatList();
+  try {
+    const pat = "%" + q.replace(/[\\%_]/g, c => "\\" + c) + "%";
+    const rs = ok(await sb.from("chat_messages").select("id,channel_id,author_id,body,created_at,attachments").ilike("body", pat).is("unsent_at", null).order("id", { ascending: false }).limit(50)) || [];
+    if (seq !== MSG_SEARCH.seq) return;
+    const mine = new Set(C.channels.map(c => c.id));
+    MSG_SEARCH.rows = rs.filter(m => mine.has(m.channel_id) && !(C.hidden && C.hidden.has(+m.id)));
+    MSG_SEARCH.q = q.toLowerCase();
+  } catch (e) { if (seq === MSG_SEARCH.seq) { MSG_SEARCH.err = friendly(e); MSG_SEARCH.rows = []; } }
+  if (seq === MSG_SEARCH.seq) { MSG_SEARCH.busy = false; if (S.route === "chat") drawChatList(); }
+}
+// the words around the match, with the match in bold
+function msgSnippet(body, q){
+  const text = String(body || "").replace(/\s+/g, " ").trim(), i = text.toLowerCase().indexOf(q.toLowerCase());
+  if (i < 0) return [text.slice(0, 120)];
+  const from = Math.max(0, i - 16), to = Math.min(text.length, i + q.length + 80);
+  return [(from ? "…" : "") + text.slice(from, i), h("mark", {}, text.slice(i, i + q.length)), text.slice(i + q.length, to) + (to < text.length ? "…" : "")];
+}
+function msgSearchSection(q){
+  const box = h("div", { class: "msg-results" }, h("h4", {}, "Messages"));
+  const rs = MSG_SEARCH.q === q.toLowerCase() ? MSG_SEARCH.rows : null;
+  if (MSG_SEARCH.err) box.append(h("p", { class: "muted msg-none" }, "Couldn’t search: " + MSG_SEARCH.err));
+  else if (!rs) box.append(h("p", { class: "muted msg-none" }, MSG_SEARCH.busy ? "Searching…" : "Press Enter to search messages."));
+  else if (!rs.length) box.append(h("p", { class: "muted msg-none" }, "No messages contain “" + q + "”."));
+  else {
+    for (const m of rs) {
+      const ch = C.channels.find(c => c.id === m.channel_id);
+      const where = !ch ? "" : ch.kind === "dm" ? "with " + (pname(dmOther(ch)) || "someone") : chName(ch);
+      box.append(h("button", { type: "button", class: "chat-item msg-hit", onclick: () => openChatAt(m.channel_id, m.id) },
+        avatar(m.author_id, "sm"),
+        h("span", { class: "x" }, h("span", { class: "msg-hit-h" }, h("b", {}, m.author_id === S.me.id ? "You" : (pname(m.author_id) || "Someone")), h("span", { class: "muted" }, " · " + where + " · " + fmtAgo(m.created_at))),
+          h("span", { class: "msg-hit-b" }, msgSnippet(m.body, q)))));
+    }
+    if (rs.length === 50) box.append(h("p", { class: "muted msg-none" }, "Showing the 50 newest. Type more words to narrow it down."));
+  }
+  return box;
+}
+// open a chat at one message: load older pages until it's there, then scroll to it and flash it
+async function openChatAt(cid, mid){
+  C.mobileView = "conv";
+  await openChannel(cid);
+  for (let i = 0; i < 40 && !(C.msgs[cid] || []).some(m => m.id === mid) && C.more[cid]; i++) await loadEarlier(cid);
+  if (!(C.msgs[cid] || []).some(m => m.id === mid)) { toast("That message couldn’t be found any more."); rerender(); return; }
+  C.pendingJump = mid; C.scrollToUnread = null;
+  rerender();
 }
 function drawChatHead(){
   drawChatHead0();
@@ -8141,6 +8212,7 @@ function drawChatMessages(toBottom){
   if (!chatEls) return;
   const { msgs } = chatEls;
   const atBottom = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 80;
+  const keepTop = msgs.scrollTop, keepFor = C.active;   // redrawing empties the list, which would throw you to the top
   const list = (C.msgs[C.active] || []).filter(m => !(C.hidden && C.hidden.has(+m.id)));   // "delete for me" hides it
   const ch = C.channels.find(c => c.id === C.active) || {};
   const showNames = ch.kind !== "dm";
@@ -8184,12 +8256,31 @@ function drawChatMessages(toBottom){
     });
     msgs.append(row); lastAuthor = m.author_id; lastT = t;
   });
+  // opening a chat at a message found by search: centre it (and keep it there through the redraws right after opening)
+  const jumpTo = C.pendingJump || (C.jumpHold && C.jumpHold.cid === C.active && C.jumpHold.until > Date.now() ? C.jumpHold.mid : null);
+  if (jumpTo && msgs.isConnected) {
+    const pj = msgs.querySelector('[data-mid="' + jumpTo + '"]');
+    if (pj) {
+      const fresh = C.pendingJump === jumpTo;
+      if (fresh) { C.pendingJump = null; C.jumpHold = { cid: C.active, mid: jumpTo, until: Date.now() + 2500 }; }
+      C.scrollToUnread = null; chatEls.pinned = false;
+      const toIt = () => { msgs.scrollTop = Math.max(0, pj.offsetTop - msgs.clientHeight / 2 + pj.offsetHeight / 2); };
+      // already at the newest message: no "Jump to latest" over it
+      const settle = () => { toIt(); chatEls.pinned = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 40; drawJump(); };
+      toIt(); requestAnimationFrame(() => { toIt(); requestAnimationFrame(settle); });
+      pj.classList.add("flash"); setTimeout(() => pj.classList.remove("flash"), fresh ? 2400 : 1200);
+      chatEls.lastDrawn = C.active;
+      drawJump(); return;
+    }
+  }
   const mark = msgs.querySelector("#unreadMark");
   if (C.scrollToUnread === C.active && mark) {
     C.scrollToUnread = null; chatEls.pinned = false;
     const toMark = () => { msgs.scrollTop = Math.max(0, mark.offsetTop - 60); };
     toMark(); requestAnimationFrame(() => { toMark(); requestAnimationFrame(toMark); });
   } else if (toBottom || atBottom) { chatEls.pinned = true; stickBottom(); }
+  else if (chatEls.lastDrawn === keepFor) msgs.scrollTop = keepTop;   // reading further up: stay where you were
+  chatEls.lastDrawn = C.active;
   drawJump();
 }
 // keep the newest message in view: scroll now, after the next paints, and whenever the area changes size
@@ -9495,7 +9586,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11by";
+const APP_VERSION = "2026-11bz";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));

@@ -1,5 +1,11 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11bz (9 Nov 2026): search messages in Chat
+Needs: upload `index.html` and `sw.js`.
+- **Search messages:** the Chat search box ("Search people, chats and messages") now also finds messages. Type two or more letters (or press Enter): matching messages from every chat you're in appear under **Messages**, newest first, with who sent them, which chat, when, and the words around the match highlighted. Only chats you're a member of are searched.
+- **Click a result** to open that chat right at the message: older messages load as needed, and the message is centred and highlighted.
+- Fixed: reading older messages, the chat could jump back to the top when someone's "seen" or a reaction arrived. It now stays where you are.
+
 ## Version 2026-11by (9 Nov 2026): admins can pass or fail a task waiting for a tester
 Needs: upload `index.html` and `sw.js`.
 - A Development task in QA that no tester had picked up showed only "Waiting for a tester", with no buttons for admins, so it couldn't be cleared (the database already allowed admins to decide). Admins now see **✓ Approve** and **Back to development** on it, with a note saying so.
