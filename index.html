@@ -2110,6 +2110,9 @@ body.nb-moving,body.nb-moving *{cursor:grabbing!important;user-select:none!impor
 .tcard-menu:hover{background:var(--tint);color:var(--ink)}
 @media (hover:none){.tcard-menu{opacity:.85}}
 .dv-card .dv-title,.card.tcard .t{padding-right:24px}
+
+/* device labels (2026-11cc) */
+.devtag{color:var(--ink3);font-size:.92em;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -4595,13 +4598,20 @@ function announcementsFeed(el, A){
    Attendance
    --------------------------------------------------------------------- */
 function myToday(){ return rows("attendance").find(r => r.user_id === S.me.id && r.day === today()); }
+// save with the device fields if the database has them (upgrade-2026-11cc.sql), otherwise without
+async function withDevice(save){
+  if (S.devCols === false) return save({});
+  try { return await save({ in: true, out: true }); }
+  catch (e) { if (/device/i.test(String(e && e.message || e))) { S.devCols = false; return save({}); } throw e; }
+}
+const devTag = d => d ? h("span", { class: "devtag", title: "From a " + devWord(d) }, " · " + devWord(d)) : null;
 async function checkIn(mode){
   try {
     // today's row may exist already (another tab, or checked out earlier): never make a second one
     const ex = myToday() || ok(await sb.from("attendance").select("*").eq("user_id", S.me.id).eq("day", today()).maybeSingle());
     if (ex && ex.check_in && !ex.check_out) { upsertCache("attendance", ex); toast("You’re already checked in (since " + fmtTime(ex.check_in) + ")."); }
-    else if (ex && ex.check_out) { await updateRow("attendance", ex.id, { check_out: null }); toast("Checked in again at " + fmtTime(new Date()) + "."); }
-    else { await insertRow("attendance", { user_id: S.me.id, day: today(), check_in: new Date().toISOString(), mode: mode || "Office" }); toast("Checked in at " + fmtTime(new Date()) + "."); }
+    else if (ex && ex.check_out) { await withDevice(d => updateRow("attendance", ex.id, Object.assign({ check_out: null }, d.out ? { check_out_device: "" } : {}))); toast("Checked in again at " + fmtTime(new Date()) + "."); }
+    else { await withDevice(d => insertRow("attendance", Object.assign({ user_id: S.me.id, day: today(), check_in: new Date().toISOString(), mode: mode || "Office" }, d.in ? { check_in_device: MY_DEVICE } : {}))); toast("Checked in at " + fmtTime(new Date()) + "."); }
     if (typeof closeIdleWarning === "function") closeIdleWarning();
   }
   catch (e) { fail(e, "Couldn’t check in"); }
@@ -4613,7 +4623,7 @@ async function loadMyToday(){
 }
 async function checkOut(){
   const r = myToday(); if (!r) return;
-  try { await updateRow("attendance", r.id, { check_out: new Date().toISOString() }); toast("Checked out at " + fmtTime(new Date()) + "."); }
+  try { await withDevice(d => updateRow("attendance", r.id, Object.assign({ check_out: new Date().toISOString() }, d.out ? { check_out_device: MY_DEVICE } : {}))); toast("Checked out at " + fmtTime(new Date()) + "."); }
   catch (e) { fail(e, "Couldn’t check out"); }
   rerender();
 }
@@ -4688,7 +4698,7 @@ async function renderAttendance(el){
         h("td", {}, pill(st, st === "Present" || st === "Checked out" ? "ok" : st === "Absent" ? "bad" : st === "On leave" || st === "Half day" ? "warn" : st === "Work from home" ? "info" : "grey"),
           canMarkAttendance() ? h("button", { type: "button", class: "linkbtn", style: "margin-left:8px", onclick: () => openMarkAttendance(p.id, t0) }, r ? "Edit" : "Mark") : null),
         h("td", {}, scr ? (sj ? h("span", { style: "color:var(--ok);font-weight:600" }, "✓ " + fmtTime(sj.joined_at)) : h("span", { class: "muted" }, "Not joined")) : h("span", { class: "muted" }, "–")),
-        h("td", {}, r ? fmtTime(r.check_in) : "–"), h("td", {}, r && r.check_out ? fmtTime(r.check_out) : "–"), h("td", {}, r ? r.mode : "–"), h("td", { class: "num" }, r && hoursOf(r) != null ? hoursOf(r).toFixed(1) : "–")));
+        h("td", {}, r && r.check_in ? [fmtTime(r.check_in), devTag(r.check_in_device)] : "–"), h("td", {}, r && r.check_out ? [fmtTime(r.check_out), devTag(r.check_out_device)] : "–"), h("td", {}, r ? r.mode : "–"), h("td", { class: "num" }, r && hoursOf(r) != null ? hoursOf(r).toFixed(1) : "–")));
     }
     el.append(h("div", { class: "tablewrap" }, h("table", {}, h("thead", {}, h("tr", {}, ["Person","Status","Morning scrum","In","Out","Where",""].map((x, i) => h("th", { class: i === 6 ? "num" : null }, i === 6 ? "Hours" : x)))), tbody)));
     return;
@@ -4700,7 +4710,7 @@ async function renderAttendance(el){
   const tbody = h("tbody");
   for (const r of rs) tbody.append(h("tr", {}, h("td", {}, fmtDate(r.day)), h("td", {}, personChip(r.user_id)),
     h("td", {}, pill(r.status || "Present", r.status === "Absent" ? "bad" : r.status === "Half day" ? "warn" : "ok"), r.marked_by ? h("span", { class: "muted", style: "font-size:11.5px" }, " by " + (pname(r.marked_by) || "admin").split(" ")[0]) : null),
-    h("td", {}, r.check_in ? fmtTime(r.check_in) : "–"), h("td", {}, r.check_out ? fmtTime(r.check_out) : h("span", { class: "muted" }, "–")), h("td", {}, r.status === "Absent" ? "–" : r.mode),
+    h("td", {}, r.check_in ? [fmtTime(r.check_in), devTag(r.check_in_device)] : "–"), h("td", {}, r.check_out ? [fmtTime(r.check_out), devTag(r.check_out_device)] : h("span", { class: "muted" }, "–")), h("td", {}, r.status === "Absent" ? "–" : r.mode),
     h("td", { class: "num" }, hoursOf(r) != null ? hoursOf(r).toFixed(1) : "–"),
     canMarkAttendance() ? h("td", {}, h("button", { type: "button", class: "linkbtn", onclick: () => openMarkAttendance(r.user_id, r.day) }, "Edit")) : null));
   el.append(h("div", { class: "tablewrap" }, rs.length ? h("table", {}, h("thead", {}, h("tr", {}, ["Date","Person","Status","In","Out","Where","Hours", ...(canMarkAttendance() ? [""] : [])].map((x, i) => h("th", { class: i === 6 ? "num" : null }, x)))), tbody) : h("div", { class: "empty" }, h("b", {}, "No attendance for this month"))));
@@ -7827,15 +7837,36 @@ function playSound(kind, force){
    Online and last-active status
    --------------------------------------------------------------------- */
 let ONLINE = new Set(), presenceCh = null, presenceTimer = null;
+/* ---------- which device (2026-11cc): phone, tablet or laptop ---------- */
+function detectDevice(){
+  const ua = navigator.userAgent || "", touch = navigator.maxTouchPoints > 1, big = Math.max(screen.width || 0, screen.height || 0);
+  if (/iPad|Tablet|PlayBook|Silk/i.test(ua) || (/Android/i.test(ua) && !/Mobile/i.test(ua)) || (/Macintosh/i.test(ua) && touch)) return "tablet";
+  if (/iPhone|iPod|Android.*Mobile|Windows Phone|Mobile/i.test(ua) || (touch && matchMedia("(pointer:coarse)").matches && big < 1000)) return "phone";
+  return "laptop";
+}
+const MY_DEVICE = detectDevice();
+const ONLINE_DEV = new Map();   // person → devices they're online on right now
+const devWord = d => ({ phone: "phone", tablet: "tablet", laptop: "laptop" })[d] || "";
+// " on phone", " on laptop + phone"
+function devSuffix(id, live){
+  const set = live ? ONLINE_DEV.get(id) : null;
+  const list = set && set.size ? [...set] : [(allRows("presence").find(x => x.user_id === id) || {}).device].filter(Boolean);
+  const words = [...new Set(list.map(devWord).filter(Boolean))].sort((a, b) => (a === "laptop" ? -1 : 1));
+  return words.length ? " on " + words.join(" + ") : "";
+}
 function startPresence(){
   stopPresence();
   try {
     presenceCh = sb.channel("online", { config: { private: true, presence: { key: S.me.id } } });
     presenceCh.on("presence", { event: "sync" }, () => {
-      try { ONLINE = new Set(Object.keys(presenceCh.presenceState() || {})); } catch (e) {}
+      try {
+        const st = presenceCh.presenceState() || {};
+        ONLINE = new Set(Object.keys(st)); ONLINE_DEV.clear();
+        for (const [id, metas] of Object.entries(st)) ONLINE_DEV.set(id, new Set((metas || []).map(m => m && m.device).filter(Boolean)));
+      } catch (e) {}
       paintPresence();
     });
-    presenceCh.subscribe(st => { if (st === "SUBSCRIBED") { try { presenceCh.track({ at: Date.now() }); } catch (e) {} } });
+    presenceCh.subscribe(st => { if (st === "SUBSCRIBED") { try { presenceCh.track({ at: Date.now(), device: MY_DEVICE }); } catch (e) {} } });
   } catch (e) { console.warn("presence", e); }
   heartbeat();
   presenceTimer = setInterval(heartbeat, 60000);
@@ -7847,7 +7878,14 @@ function stopPresence(){
 }
 async function heartbeat(){
   if (!S.me || document.visibilityState === "hidden") return;
-  try { await sb.from("presence").upsert({ user_id: S.me.id, last_seen_at: new Date().toISOString() }, { onConflict: "user_id" }); } catch (e) {}
+  try {
+    // the device is saved once upgrade-2026-11cc.sql has added its column; until then, without it
+    const row = { user_id: S.me.id, last_seen_at: new Date().toISOString() };
+    if (S.devCols !== false) row.device = MY_DEVICE;
+    const r = await sb.from("presence").upsert(row, { onConflict: "user_id" });
+    if (r.error && row.device && /device/i.test(r.error.message || "")) { S.devCols = false; delete row.device; await sb.from("presence").upsert(row, { onConflict: "user_id" }); }
+    else if (!r.error && row.device) S.devCols = true;
+  } catch (e) {}
   if (!heartbeat.n || ++heartbeat.n % 2 === 0) { heartbeat.n = heartbeat.n || 1; await load("presence", true); paintPresence(); }
 }
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && S.me) heartbeat(); });
@@ -9339,7 +9377,7 @@ function statusOf(id){
   if (lv) return { label: lv.half_day ? "On half-day leave today" : "On leave today", tone: "leave" };
   const checkedOut = st && st.checked_out_at && localDay(st.checked_out_at) >= addDays(today(), -1) && new Date(st.checked_out_at).toDateString() === new Date().toDateString();
   if (checkedOut || !isWorkDay(today()) || nowMin() >= hm(WH().end)) {
-    if (isOnline(id) && !checkedOut) return { label: "Online", tone: "on" };
+    if (isOnline(id) && !checkedOut) return { label: "Online" + devSuffix(id, true), tone: "on" };
     return { label: "Back " + nextWorkStart(), tone: "off" };
   }
   if (st && st.state === "ooo" && st.until && new Date(st.until) > t) return { label: "Out of office until " + timeOf(st.until) + (st.note ? " · " + st.note : ""), tone: "away" };
@@ -9350,9 +9388,9 @@ function statusOf(id){
   if (st && st.state === "offline") return { label: "Offline · inactive since " + timeOf(st.idle_since || st.last_active_at), tone: "bad" };
   const last = Math.max(st ? +new Date(st.last_active_at) : 0, +new Date((allRows("presence").find(x => x.user_id === id) || {}).last_seen_at || 0));
   const mins = last ? (t - last) / 60000 : Infinity;
-  if (isOnline(id) && mins < 10) return { label: "Online", tone: "on" };
+  if (isOnline(id) && mins < 10) return { label: "Online" + devSuffix(id, true), tone: "on" };
   if (!last) return { label: nowMin() < hm(WH().start) ? "Starts at " + clock(WH().start) : "Not seen yet", tone: "off" };
-  return { label: "Active " + fmtAgo(new Date(last).toISOString()), tone: mins < 30 ? "recent" : "off" };
+  return { label: "Active " + fmtAgo(new Date(last).toISOString()) + devSuffix(id, false), tone: mins < 30 ? "recent" : "off" };
 }
 function paintStatus(){
   document.querySelectorAll("[data-last]").forEach(el => { const s = statusOf(el.dataset.last); el.textContent = s.label; el.className = "lastact st-" + s.tone + (s.tone === "on" ? " is-on" : ""); });
@@ -9630,7 +9668,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11cb";
+const APP_VERSION = "2026-11cc";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -11235,6 +11273,16 @@ async function renderAdminWork(el){
     const statsRow = h("div", { class: "stats" }, stat(s.hours || 0, "Hours logged"), stat(s.tasksDone || 0, "Tasks finished"), stat(s.tasksTouched || 0, "Tasks worked on"),
       stat(s.comments || 0, "Comments"), stat(s.messages || 0, "Messages"), stat(s.emails || 0, "Emails sent"), stat(s.meetings || 0, "Meetings joined"),
       d.period !== "day" ? stat(s.daysPresent || 0, "Days checked in") : null, s.recordsChanged ? stat(s.recordsChanged, "Records updated") : null);
+    // time with the workspace open on each device (upgrade-2026-11cc.sql)
+    const devStats = h("span", { style: "display:contents" });
+    statsRow.append(devStats);
+    const pid = (d.person && d.person.id) || u.user;
+    if (pid) sb.from("device_usage").select("device,minutes").eq("user_id", pid).gte("day", d.start).lte("day", d.end).then(r => {
+      if (r.error || !r.data || !r.data.length) return;
+      const tot = {}; for (const x of r.data) tot[x.device] = (tot[x.device] || 0) + +x.minutes;
+      const hm2 = m => m >= 60 ? Math.floor(m / 60) + "h " + Math.round(m % 60) + "m" : Math.round(m) + "m";
+      devStats.replaceChildren(...["laptop", "phone", "tablet"].filter(k => tot[k]).map(k => stat(hm2(tot[k]), "On " + devWord(k))));
+    }, () => {});
     // every detail, day by day, filterable by kind
     const tl = d.timeline || [];
     const areas = [...new Set(tl.map(l => l.area))];

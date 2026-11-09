@@ -1,5 +1,12 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11cc (9 Nov 2026): phone or laptop
+Needs: upload `index.html` and `sw.js`; run `upgrade-2026-11cc.sql` (until then only the live "Online on …" label works; nothing breaks).
+- **Online status shows the device:** "Online on laptop", "Online on phone" (or "on laptop + phone" when both are open), live, in the sidebar, chat and People. When someone is away: "Active 10 min ago on phone".
+- **Check-ins remember the device:** Attendance shows "· phone" or "· laptop" next to each check-in and check-out time.
+- **Work summary** (admins): time with the workspace open on each device for the day, week or month ("On laptop 6h 10m", "On phone 45m"), counted from the once-a-minute signal the app already sends while it's on screen. Only admins and people who can see attendance can read these times.
+- Phone, tablet or laptop is worked out from the browser and screen (an iPad counts as a tablet; desktop computers count as laptop).
+
 ## Version 2026-11cb (9 Nov 2026): archive and delete tasks from the board
 Needs: upload `index.html` and `sw.js`.
 - **"⋯" on every task card** (Development board and the Tasks board): **Open**, **Archive** (or **Restore** in the Archived view) and **Delete**. It shows when you hover a card (always on phones).
