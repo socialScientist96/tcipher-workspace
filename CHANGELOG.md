@@ -1,5 +1,12 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11co (10 Nov 2026): late check-outs, forgotten check-outs, lunch ends by itself
+Needs: upload `index.html` and `sw.js`; run `upgrade-2026-11ch.sql`; redeploy `work-summary-function.ts`.
+- **Working late:** after midnight, Home shows "Still working since 9 Nov, 8:23 pm" with **Check out**, which closes yesterday's day at the real time. Attendance shows such a check-out as "2:10 am (next day)". (Until today's working hours start.)
+- **Forgot to check out:** the next time you open the workspace it asks "When did you finish?", that day or after midnight the next day, up to a week back. The time must be after the check-in and not in the future. Admins see "entered later" on that day; days an admin marked aren't affected.
+- **Lunch ends by itself** when its time is up (45 minutes, or what Company settings say): you're shown as available again, and inactivity is counted from the end of lunch, so the idle warning and admin alerts work as usual after lunch.
+- Work summary: next-day and entered-later check-outs are shown as such.
+
 ## Version 2026-11cn (10 Nov 2026): time in the workspace, counted right across browsers and devices
 Needs: upload `index.html` and `sw.js`; run `upgrade-2026-11cf.sql`; redeploy `work-summary-function.ts`.
 - Before, each person had one "last seen", so two browsers open at once overwrote each other and the device kept flipping. Now every browser checks in twice a minute while the workspace is on screen, and each minute is kept once per person with every device that had it open. Several browsers or devices at once are all counted, never doubled.

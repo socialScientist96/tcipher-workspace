@@ -105,7 +105,6 @@ Deno.serve(async (req) => {
     const q = async (p: PromiseLike<{ data: unknown; error: unknown }>) => { const r = await p; return ((r as { data: unknown }).data ?? []) as Record<string, any>[]; };
     // which device each thing was done on (upgrade-2026-11ce; check-ins: upgrade-2026-11cc). Before those are run, leave it out.
     const hasDev = !(await db.from("comments").select("device").limit(1)).error;
-    const hasAttDev = !(await db.from("attendance").select("check_in_device").limit(1)).error;
     const D = hasDev ? ",device" : "";
     const [acts, tev, rev, cmts, logs, att, sts, leave, joins, runs, msgs, mails] = await Promise.all([
       q(db.from("activity_log").select("tbl,action,entity_id,summary,at" + D).eq("actor_id", uid).gte("at", from).lt("at", to).order("at").limit(3000)),
@@ -113,7 +112,7 @@ Deno.serve(async (req) => {
       q(db.from("record_events").select("tbl,entity_id,field,old_value,new_value,at" + D).eq("actor_id", uid).gte("at", from).lt("at", to).order("at").limit(3000)),
       q(db.from("comments").select("tbl,entity_id,body,created_at,kind" + D).eq("author_id", uid).gte("created_at", from).lt("created_at", to).order("created_at").limit(2000)),
       q(db.from("work_logs").select("task_id,minutes,note,work_date,created_at" + D).eq("user_id", uid).gte("work_date", start).lte("work_date", end).order("work_date").limit(2000)),
-      q(db.from("attendance").select("day,check_in,check_out,mode,status,note" + (hasAttDev ? ",check_in_device,check_out_device" : "")).eq("user_id", uid).gte("day", start).lte("day", end).order("day")),
+      q(db.from("attendance").select("*").eq("user_id", uid).gte("day", start).lte("day", end).order("day")),
       q(db.from("status_events").select("kind,at,until,note" + D).eq("user_id", uid).gte("at", from).lt("at", to).order("at").limit(1000)),
       q(db.from("leave_requests").select("type,start_date,end_date,half_day,status,reason,created_at" + D).eq("user_id", uid).lte("start_date", end).gte("end_date", start)),
       q(db.from("meeting_joins").select("title,joined_at,left_at,source" + D).eq("user_id", uid).gte("joined_on", start).lte("joined_on", end).order("joined_at")),
@@ -150,7 +149,7 @@ Deno.serve(async (req) => {
     for (const r of att) {
       if (r.check_in) stats.daysPresent++;
       const hrs = r.check_in && r.check_out ? " (" + (Math.round((Date.parse(r.check_out) - Date.parse(r.check_in)) / 360000) / 10) + " h)" : "";
-      add(r.check_in || (r.day + "T09:00:00+05:30"), "Attendance", r.day + ": " + (r.status || "Present") + (r.check_in ? ", in " + ist(r.check_in).slice(11) : "") + (r.check_out ? ", out " + ist(r.check_out).slice(11) : ", no check-out") + hrs + " · " + r.mode + (r.note ? " · " + clip(r.note, 120) : "") + (mob(r.check_in_device) ? " · checked in on " + r.check_in_device : "") + (mob(r.check_out_device) ? " · checked out on " + r.check_out_device : ""), mob(r.check_in_device) || mob(r.check_out_device));
+      add(r.check_in || (r.day + "T09:00:00+05:30"), "Attendance", r.day + ": " + (r.status || "Present") + (r.check_in ? ", in " + ist(r.check_in).slice(11) : "") + (r.check_out ? ", out " + ist(r.check_out).slice(11) + (ist(r.check_out).slice(0, 10) > r.day ? " (next day)" : "") + (r.check_out_late ? " (forgot to check out; entered later)" : "") : ", no check-out") + hrs + " · " + r.mode + (r.note ? " · " + clip(r.note, 120) : "") + (mob(r.check_in_device) ? " · checked in on " + r.check_in_device : "") + (mob(r.check_out_device) ? " · checked out on " + r.check_out_device : ""), mob(r.check_in_device) || mob(r.check_out_device));
     }
     for (const r of sts) add(r.at, "Attendance", "Status: " + r.kind + (r.until ? " until " + ist(r.until).slice(11) : "") + (r.note ? " · " + clip(r.note, 120) : ""), r.device);
     for (const r of leave) add(r.created_at, "Leave", r.type + " " + r.start_date + (r.end_date !== r.start_date ? " to " + r.end_date : "") + (r.half_day ? " (half day)" : "") + " · " + r.status + (r.reason ? " · " + clip(r.reason, 160) : ""), r.device);

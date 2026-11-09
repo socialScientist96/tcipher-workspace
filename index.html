@@ -4657,6 +4657,58 @@ function announcementsFeed(el, A){
    Attendance
    --------------------------------------------------------------------- */
 function myToday(){ return rows("attendance").find(r => r.user_id === S.me.id && r.day === today()); }
+/* working late (2026-11co): yesterday's day is still open after midnight, until today's working hours start.
+   Checking out then closes yesterday (the database allows a check-out on the next day, at the real time). */
+const openDay = r => r && r.user_id === S.me.id && r.check_in && !r.check_out && !r.marked_by && r.status !== "Absent";
+function lateShift(){
+  const t = myToday(); if (t && t.check_in) return null;
+  if (nowMin() >= hm(WH().start)) return null;
+  return rows("attendance").find(r => r.day === addDays(today(), -1) && openDay(r)) || null;
+}
+// a check-out time, with "next day" when it was after midnight
+const outTime = r => r && r.check_out ? fmtTime(r.check_out) + (ymd(new Date(r.check_out)) > r.day ? " (next day)" : "") : "";
+const lateTag = r => r && r.check_out_late ? h("span", { class: "devtag", title: "Forgot to check out; entered the next time they opened the workspace" + (r.check_out_entered_at ? ", " + fmtDate(r.check_out_entered_at.slice(0, 10)) + " " + fmtTime(r.check_out_entered_at) : "") }, " · entered later") : null;
+/* forgot to check out: ask when they finished (that day, or after midnight), up to a week back (upgrade-2026-11ch.sql) */
+let missingAsked = 0;
+async function askMissingCheckout(force){
+  if (!S.me || S.portal || (S.dlg && !force) || (!force && Date.now() - missingAsked < 20 * 60000)) return;
+  let open = [];
+  try { open = ok(await sb.from("attendance").select("*").eq("user_id", S.me.id).gte("day", addDays(today(), -7)).lt("day", today()).is("check_out", null).not("check_in", "is", null).is("marked_by", null).order("day")); } catch (e) { return; }
+  const late = lateShift();
+  open = open.filter(r => openDay(r) && !(late && late.id === r.id));
+  if (!open.length) return;
+  open.forEach(r => upsertCache("attendance", r));
+  missingAsked = Date.now();
+  const r = open[0], next = addDays(r.day, 1);
+  const day = h("select", { class: "in" }, h("option", { value: r.day }, fmtDate(r.day, true) + " (same day)"), h("option", { value: next }, fmtDate(next, true) + " (after midnight)"));
+  const time = h("input", { class: "in", type: "time", value: (WH().end || "18:00").slice(0, 5), required: true });
+  const err = h("p", { class: "err", hidden: true });
+  const save = h("button", { type: "button", class: "btn pri" }, "Save check-out");
+  save.addEventListener("click", async () => {
+    err.hidden = true;
+    const [a, b] = (time.value || "").split(":").map(Number);
+    if (isNaN(a)) { err.textContent = "Choose a time."; err.hidden = false; return; }
+    const at = parseD(day.value); at.setHours(a, b || 0, 0, 0);
+    if (at <= new Date(r.check_in)) { err.textContent = "That’s before you checked in (" + fmtTime(r.check_in) + ")."; err.hidden = false; return; }
+    if (at > new Date()) { err.textContent = "That time hasn’t happened yet."; err.hidden = false; return; }
+    save.disabled = true;
+    try {
+      const { data, error } = await sb.rpc("attendance_set_checkout", { p_id: r.id, p_at: at.toISOString() });
+      if (error) throw error;
+      upsertCache("attendance", data); closeDlg(); toast("Check-out saved: " + fmtDate(day.value) + ", " + fmtTime(at.toISOString()) + ".");
+      rerender(); setTimeout(() => askMissingCheckout(true), 400);
+    } catch (e) {
+      save.disabled = false;
+      err.textContent = /attendance_set_checkout|schema cache|function/i.test(String(e.message || e)) ? "This needs a database update (upgrade-2026-11ch.sql). Ask an admin." : String(e.message || e);
+      err.hidden = false;
+    }
+  });
+  openDialog("You didn’t check out", [
+    h("p", { style: "margin:0 0 10px" }, "On ", h("b", {}, fmtDate(r.day, true)), " you checked in at ", h("b", {}, fmtTime(r.check_in)), r.mode ? " (" + r.mode + ")" : "", " but didn’t check out. When did you finish?"),
+    h("div", { class: "form" }, h("label", { class: "fl" }, "Day", day), h("label", { class: "fl" }, "Time", time)),
+    h("p", { class: "muted", style: "margin:8px 0 0;font-size:12.5px" }, "Your admins see that this check-out was entered later." + (open.length > 1 ? " " + (open.length - 1) + " more day" + (open.length > 2 ? "s" : "") + " to fill after this." : "")), err],
+    [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Later"), save], true);
+}
 // save with the device fields if the database has them (upgrade-2026-11cc.sql), otherwise without
 async function withDevice(save){
   if (S.devCols === false) return save({});
@@ -4680,9 +4732,9 @@ async function checkIn(mode){
 async function loadMyToday(){
   try { const r = ok(await sb.from("attendance").select("*").eq("user_id", S.me.id).eq("day", today()).maybeSingle()); if (r) upsertCache("attendance", r); return r; } catch (e) { return null; }
 }
-async function checkOut(){
-  const r = myToday(); if (!r) return;
-  try { await withDevice(d => updateRow("attendance", r.id, Object.assign({ check_out: new Date().toISOString() }, d.out ? { check_out_device: MY_DEVICE } : {}))); toast("Checked out at " + fmtTime(new Date()) + "."); }
+async function checkOut(row){
+  const t = myToday(), r = (row && row.id ? row : null) || (t && t.check_in && !t.check_out ? t : null) || lateShift() || t; if (!r) return;
+  try { await withDevice(d => updateRow("attendance", r.id, Object.assign({ check_out: new Date().toISOString() }, d.out ? { check_out_device: MY_DEVICE } : {}))); toast("Checked out at " + fmtTime(new Date()) + (r.day !== today() ? " (for " + fmtDate(r.day) + ")" : "") + "."); }
   catch (e) { fail(e, "Couldn’t check out"); }
   rerender();
 }
@@ -4707,6 +4759,13 @@ function attendanceWidget(light){
     wrap.append(h("span", {}, "Marked absent today" + (r.marked_by ? " by " + (pname(r.marked_by) || "an admin") : "")));
     return wrap;
   }
+  const late = lateShift();
+  if (late){
+    // still working from yesterday, after midnight
+    wrap.append(h("span", {}, "Still working since " + fmtDate(late.day) + ", " + fmtTime(late.check_in) + (late.mode ? " (" + late.mode + ")" : "")),
+      h("button", { type: "button", class: "btn", onclick: () => checkOut(late) }, "Check out"));
+    return wrap;
+  }
   if (!r){
     const mode = h("select", { class: "in", style: "width:auto;min-height:36px;" + (light ? "background:#fff;color:var(--ink)" : ""), "aria-label": "Working from" }, WORK_MODES.map(m => h("option", { value: m }, m)));
     wrap.append(h("span", {}, "Not checked in yet"), mode, h("button", { type: "button", class: "btn", onclick: () => checkIn(mode.value) }, "Check in"));
@@ -4717,7 +4776,7 @@ function attendanceWidget(light){
   } else if (!r.check_in){
     wrap.append(h("span", {}, "Checked out at " + fmtTime(r.check_out) + (r.marked_by ? " (marked by " + (pname(r.marked_by) || "an admin") + ")" : "")));
   } else {
-    wrap.append(h("span", {}, "Worked " + hoursOf(r).toFixed(1) + " h today (" + fmtTime(r.check_in) + " – " + fmtTime(r.check_out) + ")"),
+    wrap.append(h("span", {}, "Worked " + hoursOf(r).toFixed(1) + " h today (" + fmtTime(r.check_in) + " – " + outTime(r) + ")"),
       r.marked_by ? null : h("button", { type: "button", class: "btn", id: "checkInAgain", onclick: () => checkIn(r.mode) }, "Check in again"));
   }
   return wrap;
@@ -4757,7 +4816,7 @@ async function renderAttendance(el){
         h("td", {}, pill(st, st === "Present" || st === "Checked out" ? "ok" : st === "Absent" ? "bad" : st === "On leave" || st === "Half day" ? "warn" : st === "Work from home" ? "info" : "grey"),
           canMarkAttendance() ? h("button", { type: "button", class: "linkbtn", style: "margin-left:8px", onclick: () => openMarkAttendance(p.id, t0) }, r ? "Edit" : "Mark") : null),
         h("td", {}, scr ? (sj ? h("span", { style: "color:var(--ok);font-weight:600" }, "✓ " + fmtTime(sj.joined_at)) : h("span", { class: "muted" }, "Not joined")) : h("span", { class: "muted" }, "–")),
-        h("td", {}, r && r.check_in ? [fmtTime(r.check_in), devTag(r.check_in_device)] : "–"), h("td", {}, r && r.check_out ? [fmtTime(r.check_out), devTag(r.check_out_device)] : "–"), h("td", {}, r ? r.mode : "–"), h("td", { class: "num" }, r && hoursOf(r) != null ? hoursOf(r).toFixed(1) : "–")));
+        h("td", {}, r && r.check_in ? [fmtTime(r.check_in), devTag(r.check_in_device)] : "–"), h("td", {}, r && r.check_out ? [outTime(r), devTag(r.check_out_device), lateTag(r)] : "–"), h("td", {}, r ? r.mode : "–"), h("td", { class: "num" }, r && hoursOf(r) != null ? hoursOf(r).toFixed(1) : "–")));
     }
     el.append(h("div", { class: "tablewrap" }, h("table", {}, h("thead", {}, h("tr", {}, ["Person","Status","Morning scrum","In","Out","Where",""].map((x, i) => h("th", { class: i === 6 ? "num" : null }, i === 6 ? "Hours" : x)))), tbody)));
     return;
@@ -4769,7 +4828,7 @@ async function renderAttendance(el){
   const tbody = h("tbody");
   for (const r of rs) tbody.append(h("tr", {}, h("td", {}, fmtDate(r.day)), h("td", {}, personChip(r.user_id)),
     h("td", {}, pill(r.status || "Present", r.status === "Absent" ? "bad" : r.status === "Half day" ? "warn" : "ok"), r.marked_by ? h("span", { class: "muted", style: "font-size:11.5px" }, " by " + (pname(r.marked_by) || "admin").split(" ")[0]) : null),
-    h("td", {}, r.check_in ? [fmtTime(r.check_in), devTag(r.check_in_device)] : "–"), h("td", {}, r.check_out ? [fmtTime(r.check_out), devTag(r.check_out_device)] : h("span", { class: "muted" }, "–")), h("td", {}, r.status === "Absent" ? "–" : r.mode),
+    h("td", {}, r.check_in ? [fmtTime(r.check_in), devTag(r.check_in_device)] : "–"), h("td", {}, r.check_out ? [outTime(r), devTag(r.check_out_device), lateTag(r)] : h("span", { class: "muted" }, "–")), h("td", {}, r.status === "Absent" ? "–" : r.mode),
     h("td", { class: "num" }, hoursOf(r) != null ? hoursOf(r).toFixed(1) : "–"),
     canMarkAttendance() ? h("td", {}, h("button", { type: "button", class: "linkbtn", onclick: () => openMarkAttendance(r.user_id, r.day) }, "Edit")) : null));
   el.append(h("div", { class: "tablewrap" }, rs.length ? h("table", {}, h("thead", {}, h("tr", {}, ["Date","Person","Status","In","Out","Where","Hours", ...(canMarkAttendance() ? [""] : [])].map((x, i) => h("th", { class: i === 6 ? "num" : null }, x)))), tbody) : h("div", { class: "empty" }, h("b", {}, "No attendance for this month"))));
@@ -9828,10 +9887,8 @@ function statusOf(id){
     return { label: "Back " + nextWorkStart(), tone: "off" };
   }
   if (st && st.state === "ooo" && st.until && new Date(st.until) > t) return { label: "Out of office until " + timeOf(st.until) + (st.note ? " · " + st.note : ""), tone: "away" };
-  if (st && st.state === "lunch" && st.until) {
-    const over = Math.round((t - new Date(st.until)) / 60000);
-    return { label: over > 0 ? "At lunch · " + over + " min over" : "At lunch · back by " + timeOf(st.until), tone: "away" };
-  }
+  // lunch ends by itself when its time is up (2026-11co)
+  if (st && st.state === "lunch" && st.until && new Date(st.until) > t) return { label: "At lunch · back by " + timeOf(st.until), tone: "away" };
   if (st && st.state === "offline") return { label: "Offline · inactive since " + timeOf(st.idle_since || st.last_active_at), tone: "bad" };
   const last = Math.max(st ? +new Date(st.last_active_at) : 0, +new Date((allRows("presence").find(x => x.user_id === id) || {}).last_seen_at || 0));
   const mins = last ? (t - last) / 60000 : Infinity;
@@ -9882,7 +9939,15 @@ async function saveMyStatus(patch){
 }
 async function activityTick(){
   if (!S.me) return;
-  const st = ustatus(S.me.id), idleMin = (Date.now() - lastInput) / 60000;
+  let st = ustatus(S.me.id);
+  // lunch is over (45 minutes, or what Company settings say): back to available; inactivity counts from the end of lunch
+  if (st && st.state === "lunch" && st.until && new Date(st.until) <= Date.now()) {
+    const ended = st.until;
+    st = await saveMyStatus({ state: "active", until: null, note: "", idle_since: null, last_active_at: new Date(Math.max(lastInput, +new Date(ended))).toISOString() }) || st;
+    toast("Your lunch break ended at " + timeOf(ended) + ". You’re shown as available again.");
+  }
+  if (Date.now() - missingAsked > 20 * 60000) askMissingCheckout();
+  const idleMin = (Date.now() - lastInput) / 60000;
   // tell the server about real use, at most once a minute
   if (lastInput > lastSent && idleMin < 1.5) {
     lastSent = Date.now();
@@ -9913,7 +9978,9 @@ function needsWarning(){
   if (st.checked_out_at && new Date(st.checked_out_at).toDateString() === new Date().toDateString()) return;
   if (me && me.check_out) return;
   if (["lunch", "ooo"].includes(st.state) && st.until && new Date(st.until) > Date.now()) return;
-  const idleMin = (Date.now() - Math.max(lastInput, st.last_active_at ? +new Date(st.last_active_at) : 0)) / 60000;
+  // after lunch, inactivity counts from when it ended
+  const lunchEnd = st.state === "lunch" && st.until ? +new Date(st.until) : 0;
+  const idleMin = (Date.now() - Math.max(lastInput, lunchEnd, st.last_active_at ? +new Date(st.last_active_at) : 0)) / 60000;
   // checked in today, as recorded on my status (it follows attendance on every device)
   const inToday = st.checked_in_at && new Date(st.checked_in_at).toDateString() === new Date().toDateString() && !st.checked_out_at;
   if ((!me || !me.check_in) && !inToday) return nowMin() >= hm(WH().start) + WH().remind ? "checkin" : null;
@@ -9982,7 +10049,7 @@ function openOutOfOffice(){
 function drawMyStatus(){
   const slot = document.getElementById("myStatus"); if (!slot || !S.me) return;
   const s = statusOf(S.me.id), st = ustatus(S.me.id) || {};
-  const away = ["lunch", "ooo"].includes(st.state) && st.until;
+  const away = ["lunch", "ooo"].includes(st.state) && st.until && new Date(st.until) > Date.now();
   const btn = h("button", { type: "button", class: "mystatus st-" + s.tone, title: "Change your status" }, h("span", { class: "dot" }), h("span", { class: "x" }, s.label));
   btn.addEventListener("click", e => {
     e.stopPropagation();
@@ -10115,7 +10182,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11cn";
+const APP_VERSION = "2026-11co";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -12969,7 +13036,8 @@ async function startSession(session){
     loadNotifications();
     setTimeout(prefetch, 1200);
     if (googleOn()) { loadGoogle().catch(() => {}); autoSyncGoogle(); }
-    await liveAuth(); startPresence(); load("user_status").then(() => { startActivity(); paintStatus(); }); loadChat().then(() => { renderShell(); if (S.route === "dashboard") rerender(); startChatPolling(); startChatLive(); });
+    await liveAuth(); startPresence(); load("user_status").then(() => { startActivity(); paintStatus(); });
+    sb.from("attendance").select("*").eq("user_id", S.me.id).gte("day", addDays(today(), -1)).then(r => { if (!r.error) { (r.data || []).forEach(x => upsertCache("attendance", x)); rerender(); } setTimeout(() => askMissingCheckout(), 2500); }, () => {}); loadChat().then(() => { renderShell(); if (S.route === "dashboard") rerender(); startChatPolling(); startChatLive(); });
     if (typeof loadMyToday === "function") loadMyToday().then(() => renderShell());
     setTimeout(() => { if (typeof loadShotLib === "function") loadShotLib().catch(() => {}); }, 3000);   // so 🐞 can attach a screenshot instantly
     if (isAdmin()) load("problem_reports").then(() => renderShell());   // Google ready before anyone clicks; calendar synced if it's been a while
