@@ -6129,7 +6129,29 @@ function nbToHtml(title, blocks, forPrint){
     if (b.type === "code") return '<pre style="' + st + ';background:#F4F4F5;border-radius:8px;padding:12px 14px;white-space:pre-wrap;font-family:Menlo,Consolas,monospace;font-size:13px">' + nbEsc(nbText(h)) + "</pre>";
     return '<p style="' + st + '">' + (h || "&nbsp;") + "</p>";
   }).join("\n");
-  return '<!doctype html><html><head><meta charset="utf-8"><title>' + nbEsc(title || "Untitled") + '</title><style>body{font-family:Roboto,Arial,sans-serif;max-width:760px;margin:40px auto;padding:0 24px;color:#18181B;line-height:1.6;font-size:15px}h1,h2,h3,h4{font-family:Poppins,Arial,sans-serif;line-height:1.25;margin:1.2em 0 .4em}p{margin:.3em 0}code{background:#F4F4F5;padding:1px 4px;border-radius:4px}' + (forPrint ? "@page{margin:18mm}" : "") + '</style></head><body><h1 style="font-size:32px;margin-top:0">' + nbEsc(title || "Untitled") + "</h1>\n" + body + "</body></html>";
+  if (forPrint) return nbPrintHtml(title, body);
+  return '<!doctype html><html><head><meta charset="utf-8"><title>' + nbEsc(title || "Untitled") + '</title><style>body{font-family:Roboto,Arial,sans-serif;max-width:760px;margin:40px auto;padding:0 24px;color:#18181B;line-height:1.6;font-size:15px}h1,h2,h3,h4{font-family:Poppins,Arial,sans-serif;line-height:1.25;margin:1.2em 0 .4em}p{margin:.3em 0}code{background:#F4F4F5;padding:1px 4px;border-radius:4px}' + '</style></head><body><h1 style="font-size:32px;margin-top:0">' + nbEsc(title || "Untitled") + "</h1>\n" + body + "</body></html>";
+}
+/* the PDF (2026-11cj): no page margins, so the browser prints no "about:blank", date or URL at the edges; instead every
+   page gets the Tcipher logo at the top, a line at the bottom, and a faint logo watermark in the middle. The header and
+   footer repeat on each page (a table's thead/tfoot keep space for them). */
+function nbPrintHtml(title, body){
+  const company = (S.settings && S.settings.company) || "Tcipher Technologies";
+  const when = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  const by = S.me && S.me.full_name ? " · " + nbEsc(S.me.full_name) : "";
+  const css = "@page{size:A4;margin:0}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}html,body{margin:0;padding:0}" +
+    "body{font-family:Roboto,Arial,sans-serif;color:#18181B;line-height:1.6;font-size:14px}h1,h2,h3,h4{font-family:Poppins,Arial,sans-serif;line-height:1.25;margin:1.2em 0 .4em;break-after:avoid}p{margin:.3em 0}code{background:#F4F4F5;padding:1px 4px;border-radius:4px}img{break-inside:avoid}a{color:#4F46E5}" +
+    ".pg{width:100%;border-collapse:collapse}.pg td{padding:0 18mm}.sp-top{height:24mm}.sp-bot{height:16mm}" +
+    ".ph,.pf{position:fixed;left:18mm;right:18mm;display:flex;align-items:center;justify-content:space-between;color:#71717A;font-size:10px}" +
+    ".ph{top:0;height:20mm;border-bottom:1px solid #E4E4E7}.ph img{height:8mm;width:auto}.pf{bottom:0;height:12mm;border-top:1px solid #E4E4E7}" +
+    ".wm{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);opacity:.06;z-index:-1;text-align:center;pointer-events:none}.wm img{width:120mm;display:block;margin:0 auto}.wm div{font-family:Poppins,Arial,sans-serif;font-size:30px;font-weight:700;letter-spacing:.3em;margin-top:6mm;color:#000}" +
+    "@media screen{body{background:#F4F4F5}.pg{max-width:210mm;margin:0 auto;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.08)}.ph,.pf{left:50%;right:auto;width:calc(210mm - 36mm);transform:translateX(-50%);background:#fff}}";
+  return '<!doctype html><html><head><meta charset="utf-8"><title>' + nbEsc(title || "Untitled") + "</title><style>" + css + "</style></head><body>" +
+    '<div class="wm" aria-hidden="true"><img src="' + LOGO_DARK + '" alt=""><div>' + nbEsc(company.toUpperCase()) + "</div></div>" +
+    '<div class="ph"><img src="' + LOGO_DARK + '" alt="' + nbEsc(company) + '"><span>' + nbEsc(company) + " · Internal</span></div>" +
+    '<div class="pf"><span>' + nbEsc(company) + " · Confidential, for internal use</span><span>Exported " + when + by + "</span></div>" +
+    '<table class="pg"><thead><tr><td><div class="sp-top"></div></td></tr></thead><tfoot><tr><td><div class="sp-bot"></div></td></tr></tfoot><tbody><tr><td>' +
+    '<h1 style="font-size:30px;margin-top:4mm">' + nbEsc(title || "Untitled") + "</h1>\n" + body + "</td></tr></tbody></table></body></html>";
 }
 // a .zip without compression, for the Word file and for Markdown + CSV together
 function nbZip(files){
@@ -6192,10 +6214,15 @@ function nbExport(kind, note, blocks){
   else if (kind === "word") nbDownload(file + ".docx", new Blob([nbToDocx(title, blocks)], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
   else if (kind === "pdf"){
     // the browser's own print window: choose "Save as PDF"
-    const w = window.open("about:blank", "_blank");
-    if (!w) { toast("Allow pop-ups for this site to save a PDF."); return; }
-    w.opener = null; w.document.write(nbToHtml(title, blocks, true)); w.document.close();
-    setTimeout(() => { try { w.focus(); w.print(); } catch (e) {} }, 400);
+    // (a hidden frame: no blank tab, and nothing about "about:blank" on the pages)
+    const fr = document.createElement("iframe");
+    fr.setAttribute("aria-hidden", "true"); fr.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
+    document.body.append(fr);
+    const d = fr.contentDocument; d.open(); d.write(nbToHtml(title, blocks, true)); d.close();
+    const go = () => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (e) { toast("Couldn’t open the print window."); } setTimeout(() => fr.remove(), 60000); };
+    const imgs = [...d.images].filter(im => !im.complete);
+    if (!imgs.length) setTimeout(go, 150);
+    else { let left = imgs.length; const one = () => { if (--left === 0) go(); }; imgs.forEach(im => { im.onload = im.onerror = one; }); setTimeout(() => { if (left > 0) { left = -1; go(); } }, 4000); }
   }
 }
 
@@ -10055,7 +10082,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ci";
+const APP_VERSION = "2026-11cj";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));

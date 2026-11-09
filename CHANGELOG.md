@@ -1,5 +1,10 @@
 # Tcipher Workspace – changelog
 
+## Version 2026-11cj (9 Nov 2026): branded PDF export for notes
+Needs: upload `index.html` and `sw.js`.
+- Export → PDF no longer prints "about:blank", the date and the web address at the page edges, and no longer opens a blank tab: the print window opens straight from the note.
+- Every page has the Tcipher logo at the top ("Tcipher Technologies · Internal"), a faint Tcipher logo watermark across the middle, and a footer: "Confidential, for internal use", the export date and who exported it. The file is named after the note.
+
 ## Version 2026-11ci (9 Nov 2026): select several note blocks like Notion
 Needs: upload `index.html` and `sw.js`.
 - Selecting several blocks was only possible by Shift-clicking the hidden ⋮⋮ handle, so in practice it didn't work. Now, as in Notion:
