@@ -2184,6 +2184,17 @@ dialog:has(.ai-imp) {width:min(1100px,calc(100vw - 24px))}
 .dv-chipn{display:inline-block;margin-left:6px;min-width:18px;padding:0 6px;border-radius:999px;background:var(--tint2);font-size:12px;line-height:18px;text-align:center}
 .dv-chipn.warn{background:#FFEDD5;color:#9A3412}
 .dv-chip.on .dv-chipn{background:rgba(255,255,255,.25);color:inherit}
+
+/* notes: a note with pages inside works as a folder (2026-11cv) */
+.note-card.is-folder{background:#FBFAFF;border-color:var(--p-soft2)}
+.note-card.is-folder .nt .ic{color:var(--p)}
+.nfolder-n{font-size:var(--fs-sm);color:var(--p);font-weight:500}
+.nfolder-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-md);background:#fff}
+.nfolder-bar[hidden]{display:none}
+.nfolder-bar .grow{flex:1}
+.nfolder-crumbs{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:var(--fs-ui)}
+.nfolder-crumbs b{display:inline-flex;align-items:center;gap:4px}
+.nfolder-crumbs b .ic{color:var(--p)}
 </style>
 </head>
 <body>
@@ -6045,19 +6056,40 @@ function notesBoard(el, A){
   const u = S.ui.notes;
   const q = h("input", { class: "in search", type: "search", placeholder: "Search notes", value: u.q, id: "q-notes" });
   const grid = h("div", { class: "notes-grid" });
+  const folderBar = h("div", { class: "nfolder-bar" });
+  // (2026-11cv) a note with pages inside works as a folder: click it to see its pages
+  const kidsOf = id => rows("notes").filter(x => x.parent_id === id && !x.archived);
+  function drawFolderBar(){
+    const f = u.folder && byId("notes", u.folder);
+    if (u.folder && !f) u.folder = "";
+    if (!f || u.q.trim()) { folderBar.replaceChildren(); folderBar.hidden = true; return; }
+    const chain = []; for (let p = f, i = 0; p && i < 12; p = p.parent_id && byId("notes", p.parent_id), i++) chain.unshift(p);
+    folderBar.hidden = false;
+    folderBar.replaceChildren(
+      h("nav", { class: "nfolder-crumbs", "aria-label": "Folder" }, h("button", { type: "button", class: "linkbtn", onclick: () => { u.folder = ""; draw(); } }, "Notes"),
+        chain.map((p, i) => [h("span", { class: "nb-sep" }, "/"), i === chain.length - 1 ? h("b", {}, ic("folder", 15), " ", p.title || "Untitled")
+          : h("button", { type: "button", class: "linkbtn", onclick: () => { u.folder = p.id; draw(); } }, p.title || "Untitled")])),
+      h("span", { class: "grow" }),
+      h("button", { type: "button", class: "btn sm", onclick: () => go("note=" + f.id) }, ic("fileText", 15), "Open page"),
+      h("button", { type: "button", class: "btn sm pri", onclick: () => newNotePage(f) }, ic("plus", 15), "New page here"));
+  }
   function draw(){
-    grid.replaceChildren();
+    grid.replaceChildren(); drawFolderBar();
     const s = u.q.trim().toLowerCase();
-    let list = rows("notes").filter(n => (!n.parent_id || !byId("notes", n.parent_id)) && (u.scope === "archived" ? n.archived : !n.archived));
+    let list = rows("notes").filter(n => (s ? true : u.folder ? n.parent_id === u.folder : (!n.parent_id || !byId("notes", n.parent_id))) && (u.scope === "archived" ? n.archived : !n.archived));
     if (u.scope === "mine") list = list.filter(n => n.owner_id === S.me.id);
     if (u.scope === "shared") list = list.filter(n => n.owner_id !== S.me.id);
     if (s) list = list.filter(n => (n.title + " " + n.body).toLowerCase().includes(s));
     list.sort((a, b) => ((b.pinned && b.owner_id === S.me.id) - (a.pinned && a.owner_id === S.me.id)) || String(b.updated_at).localeCompare(String(a.updated_at)));
-    if (!list.length) grid.append(h("div", { class: "panel empty", style: "grid-column:1 / -1" }, h("b", {}, u.scope === "shared" ? "Nothing shared with you yet" : "No notes yet"), "Jot down ideas, meeting prep, specs or to-dos. Notes are private unless you share them."));
+    if (!list.length && u.folder && !s) grid.append(h("div", { class: "panel empty", style: "grid-column:1 / -1" }, h("b", {}, "No pages in this folder yet"), "Press “New page here”, or type /page inside the note."));
+    else if (!list.length) grid.append(h("div", { class: "panel empty", style: "grid-column:1 / -1" }, h("b", {}, u.scope === "shared" ? "Nothing shared with you yet" : "No notes yet"), "Jot down ideas, meeting prep, specs or to-dos. Notes are private unless you share them."));
     for (const n of list){
       const t = byId("tasks", n.task_id), pr = byId("projects", n.project_id), mt = byId("meetings", n.meeting_id);
-      grid.append(h("button", { type: "button", class: "note-card" + (n.pinned && n.owner_id === S.me.id ? " pinned" : ""), "data-id": n.id, onclick: () => openRecord("notes", n.id) },
-        h("div", { class: "nt" }, n.pinned && n.owner_id === S.me.id ? ic("pin", 14) : "", n.title || "Untitled"),
+      const kids = kidsOf(n.id).length;
+      grid.append(h("button", { type: "button", class: "note-card" + (n.pinned && n.owner_id === S.me.id ? " pinned" : "") + (kids ? " is-folder" : ""), "data-id": n.id, title: kids ? "Open the folder" : "",
+          onclick: () => { if (kids && !s) { u.folder = n.id; draw(); window.scrollTo(0, 0); } else openRecord("notes", n.id); } },
+        h("div", { class: "nt" }, kids ? ic("folder", 16) : null, n.pinned && n.owner_id === S.me.id ? ic("pin", 14) : "", n.title || "Untitled"),
+        kids ? h("div", { class: "nfolder-n" }, kids + (kids === 1 ? " page inside" : " pages inside")) : null,
         h("div", { class: "nb" }, renderRich((t => t.slice(0, 260) + (t.length > 260 ? "…" : ""))(String(n.body || "").replace(/^\s*(#{1,4}|[-*•]|\d+[.)]|\[[ x]\])\s+/gim, "")))),
         h("div", { class: "nm" }, pill(VIS_LABEL[n.visibility] || n.visibility, n.visibility === "Private" ? "grey" : "info"),
           t ? h("span", { class: "tkey" }, taskKey(t)) : null, pr ? h("span", {}, pr.name) : null, mt ? h("span", {}, mt.title) : null,
@@ -6069,6 +6101,7 @@ function notesBoard(el, A){
       const n = byId("notes", card.dataset.id); if (!n || n.owner_id !== S.me.id) continue;
       const more = h("button", { type: "button", class: "iconbtn note-more", "aria-label": "More actions for " + (n.title || "Untitled"), onclick: e => { e.stopPropagation(); nbMenu(more, [
         [h("span", {}, ic("expand", 16), "Open Detailed Editor"), () => go("note=" + n.id)],
+        [h("span", {}, ic("plus", 16), "New page inside"), () => newNotePage(n)],
         [h("span", {}, ic("archive2", 16), n.archived ? "Restore" : "Archive"), async () => {
           if (!("archived" in n)) { toast("Archiving needs upgrade-2026-11bf.sql to be run in Supabase first."); return; }
           try { await updateRow("notes", n.id, { archived: !n.archived, archived_at: n.archived ? null : new Date().toISOString() }); draw(); renderShellNotes();
@@ -6086,7 +6119,7 @@ function notesBoard(el, A){
   const renderShellNotes = () => { shellKey = ""; renderShell(); };
   const draw0 = draw; draw = () => { draw0(); cardMenus(); };
   q.addEventListener("input", () => { u.q = q.value; draw(); });
-  el.append(h("div", { class: "tb" }, q, segmented([["all","All I can see"], ["mine","Mine"], ["shared","Shared with me"], ["archived","Archived"]], u.scope, v => { u.scope = v; draw(); })), grid);
+  el.append(h("div", { class: "tb" }, q, segmented([["all","All I can see"], ["mine","Mine"], ["shared","Shared with me"], ["archived","Archived"]], u.scope, v => { u.scope = v; draw(); })), folderBar, grid);
   draw();
 }
 
@@ -10279,7 +10312,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11cu";
+const APP_VERSION = "2026-11cv";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
