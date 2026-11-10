@@ -7605,7 +7605,7 @@ function navBadge(route){
   const b = badgeInfo(route);
   if (b.bang) return h("span", { class: "cnt due", title: b.why.join(" · ") }, "!");
   if (b.due) return h("span", { class: "cnt due", title: b.why.join(" · ") }, String(b.due > 99 ? "99+" : b.due));
-  if (b.fresh) return h("span", { class: "cnt new", title: b.why.join(" · ") }, b.fresh > 99 ? "99+" : b.fresh + " new");
+  if (b.fresh) return h("span", { class: "cnt due", title: b.why.join(" · ") }, String(b.fresh > 99 ? "99+" : b.fresh));   // a red number, like every other count (2026-11cx)
   return null;
 }
 /* ---------------------------------------------------------------------
@@ -10409,7 +10409,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11cw";
+const APP_VERSION = "2026-11cx";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -12565,7 +12565,8 @@ function renderShell(){
     const open = navOpen(group, hasCurrent);
     let due = 0, fresh = 0, bang = false;
     for (const [r] of visible){ if (group !== "Sales" && group !== "Marketing" || !["leads","ig_leads"].includes(r) || !(group === "Marketing" && (isAdmin() || lvl("sales") >= 1))) { const b = badgeInfo(r); due += b.due; fresh += b.fresh; bang = bang || !!b.bang; } }
-    const sum = !open && (due || fresh || bang) ? h("span", { class: "cnt " + (due || bang ? "due" : "new") }, due ? String(due > 99 ? "99+" : due) : bang ? "!" : (fresh > 99 ? "99+" : fresh) + " new") : null;
+    const tot = due + fresh;   // a closed section shows one red number: everything waiting inside it (2026-11cx)
+    const sum = !open && (tot || bang) ? h("span", { class: "cnt due", title: [due && due + " for you", fresh && fresh + " new"].filter(Boolean).join(" · ") || undefined }, tot ? String(tot > 99 ? "99+" : tot) : "!") : null;
     const body = h("div", { class: "nav-items", hidden: !open }, links);
     const head = h("button", { type: "button", class: "nav-head", "aria-expanded": String(open), onclick: () => { const now = body.hidden; body.hidden = !now; head.setAttribute("aria-expanded", String(now)); setNavOpen(group, now); shellKey = ""; renderShell(); } },
       h("span", { class: "gic", "aria-hidden": "true" }, ic(GROUP_ICON[group] || "folder", 18)), h("span", { class: "gl" }, group), sum,
