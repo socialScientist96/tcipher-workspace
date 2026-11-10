@@ -8742,7 +8742,9 @@ async function renderChat(el){
       if (ready.length) { C.uploads[m.channel_id] = ups.filter(u => !ready.includes(u)); drawUploads(); }
       // filed under the conversation it was sent in, even if another chat was opened while it was sending
       const cid = m.channel_id;
-      (C.msgs[cid] = C.msgs[cid] || []).push(m); C.last[cid] = m; C.reads[cid] = m.id;
+      // (2026-11cu) the live update can deliver this message before the save finishes: add it only once
+      { const lst = (C.msgs[cid] = C.msgs[cid] || []); if (!lst.some(x => x.id === m.id)) lst.push(m); }
+      C.last[cid] = m; C.reads[cid] = m.id;
       C.seen = C.seen || new Set(); C.seen.add(m.id); if (m.id > (C.maxId || 0)) C.maxId = m.id;
       // the database sends the live signal for this message to everyone in the conversation
       sb.from("chat_reads").upsert({ user_id: S.me.id, channel_id: cid, last_read_id: m.id }, { onConflict: "user_id,channel_id" }).then(() => {}, () => {});
@@ -8895,7 +8897,7 @@ function drawChatMessages(toBottom){
   const { msgs } = chatEls;
   const atBottom = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 80;
   const keepTop = msgs.scrollTop, keepFor = C.active;   // redrawing empties the list, which would throw you to the top
-  const list = (C.msgs[C.active] || []).filter(m => !(C.hidden && C.hidden.has(+m.id)));   // "delete for me" hides it
+  const list = (C.msgs[C.active] || []).filter((m, i, a) => !(C.hidden && C.hidden.has(+m.id)) && a.findIndex(x => x.id === m.id) === i);   // "delete for me" hides it; never the same message twice
   const ch = C.channels.find(c => c.id === C.active) || {};
   const showNames = ch.kind !== "dm";
   msgs.replaceChildren();
@@ -9814,7 +9816,8 @@ async function startMeetNow(){
     const url = saved && saved.link;
     if (!url || !/^https:\/\/meet\.google\.com\//.test(url)) throw new Error("Google didn’t return a Meet link. Try again, or use Schedule a meeting.");
     const msg = ok(await sb.from("chat_messages").insert({ channel_id: ch.id, author_id: S.me.id, body: "Started a Google Meet: " + url, mentions: [] }).select().single());
-    (C.msgs[ch.id] = C.msgs[ch.id] || []).push(msg); C.last[ch.id] = msg; if (msg.id > (C.maxId || 0)) C.maxId = msg.id;
+    { const lst = (C.msgs[ch.id] = C.msgs[ch.id] || []); if (!lst.some(x => x.id === msg.id)) lst.push(msg); }
+    C.last[ch.id] = msg; if (msg.id > (C.maxId || 0)) C.maxId = msg.id;
     drawChatMessages(true); markChatRead(ch.id);
     if (tab) tab.location.href = url; else window.open(url, "_blank", "noopener");
     toast("Meet started. Everyone here got a calendar invite too.");
@@ -10276,7 +10279,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ct";
+const APP_VERSION = "2026-11cu";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
