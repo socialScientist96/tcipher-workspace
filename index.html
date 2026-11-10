@@ -3224,7 +3224,7 @@ const MOD = {
     quick: [
       ["all", "All"],
       ["needs", "Needs you", t => taskNeedsMe(t)],
-      ["mine", "My tasks", t => t.assignee_id === S.me.id || (t.collaborators || []).includes(S.me.id) || (t.status === "In review" && !!t.qa_state && (t.tester_id === S.me.id || t.reviewer_id === S.me.id))],
+      ["mine", "My tasks", t => t.assignee_id === S.me.id || (t.collaborators || []).includes(S.me.id) || (t.status === "In review" && !!t.qa_state && reviewIsMine(t))],
       ["tagged", "Tagged me", t => (t.mentions || []).includes(S.me.id)],
       ["review", "I’m reviewing", t => t.reviewer_id === S.me.id && t.status !== "Done"],
       ["helping", "Helping", t => (t.collaborators || []).includes(S.me.id)],
@@ -5124,7 +5124,7 @@ async function renderDashboard(el){
     items.push({ d: t.due_date, kind: t.assignee_id === me ? "Task" : "Helping", text: (taskKey(t) ? taskKey(t) + " " : "") + t.title, extra: pill(t.status), open: () => openRecord("tasks", t.id), blocked: t.blocked });
   for (const t of rows("tasks")) if (t.status !== "Done" && (t.mentions || []).includes(me) && t.assignee_id !== me && !(t.collaborators || []).includes(me) && t.reviewer_id !== me)
     items.push({ d: t.due_date, kind: "Tagged", text: taskKey(t) + " " + t.title, extra: pill(t.status), open: () => openRecord("tasks", t.id) });
-  for (const t of rows("tasks")) if (t.status === "In review" && (t.reviewer_id === me || (t.qa_state && t.tester_id === me)) && t.assignee_id !== me) {
+  for (const t of rows("tasks")) if (reviewIsMine(t) && t.assignee_id !== me) {
     const k = t.qa_state ? (t.qa_state === "Retest" ? "Retest" : "Test") : "Review";   // testing work shows as Test / Retest
     items.push({ d: t.due_date || t0, kind: k, text: (taskKey(t) ? taskKey(t) + " " : "") + t.title + " (" + (pname(t.assignee_id) || "unassigned") + ")", extra: pill(k, "warn"), open: () => openRecord(t.type === "Bug" ? "bugs" : "tasks", t.id) });
   }
@@ -5998,7 +5998,7 @@ async function duplicateTask(rec){
 // why a task needs you, in words
 function needReason(t){
   const me = S.me.id, out = [];
-  if (t.reviewer_id === me && t.status === "In review") out.push(t.qa_state === "Retest" ? "fixed: waiting for you to retest it" : t.qa_state === "Failed" ? "failed testing: waiting for you" : t.qa_state ? "waiting for you to test it" : "waiting for your review");
+  if (reviewIsMine(t)) out.push(t.qa_state === "Retest" ? "fixed: waiting for you to retest it" : t.qa_state === "Failed" ? "failed testing: waiting for you" : t.qa_state ? "waiting for you to test it" : "waiting for your review");
   if ((t.assignee_id === me || (t.collaborators || []).includes(me)) && t.status !== "Done" && t.due_date && t.due_date <= today()) {
     const late = Math.round((parseD(today()) - parseD(t.due_date)) / 864e5);
     out.push(late ? "overdue by " + late + (late === 1 ? " day" : " days") : "due today");
@@ -6017,10 +6017,15 @@ function needsYouBox(){
       h("span", { class: "btn sm" }, "Open"))),
     list.length > 8 ? h("p", { class: "muted", style: "margin:6px 0 0;font-size:13px" }, "…and " + (list.length - 8) + " more under “Needs you” below.") : null);
 }
+// (2026-11cr) a task in QA is the tester's to decide once it has one; before that, the reviewer's
+function reviewIsMine(t){
+  if (!t || t.status !== "In review" || !S.me) return false;
+  return t.tester_id ? t.tester_id === S.me.id : t.reviewer_id === S.me.id;
+}
 // what the sidebar's number on Tasks counts: your tasks due today or overdue, and tasks waiting for your review or test
 function taskNeedsMe(t){
   const me = S.me.id, mine = t.assignee_id === me || (t.collaborators || []).includes(me);
-  return (mine && t.status !== "Done" && !!t.due_date && t.due_date <= today()) || (t.reviewer_id === me && t.status === "In review");
+  return (mine && t.status !== "Done" && !!t.due_date && t.due_date <= today()) || reviewIsMine(t);
 }
 const notesHaveEditors = () => rows("notes").some(n => "editors" in n);
 const clientsHaveAccess = () => rows("clients").some(c => "team_access" in c);
@@ -7370,7 +7375,7 @@ function badgeInfo(route){
   const myTask = t => t.assignee_id === me || (t.collaborators || []).includes(me);
   switch (route){
     case "qa": if (L("tasks")) {
-      add(rows("tasks").filter(t => t.status === "In review" && t.qa_state && (t.tester_id === me || t.reviewer_id === me)).length + (L("test_cases") ? rows("test_cases").filter(c => c.status === "Retest" && c.tester_id === me).length : 0), "waiting for you to test", "due");
+      add(rows("tasks").filter(t => t.qa_state && reviewIsMine(t)).length + (L("test_cases") ? rows("test_cases").filter(c => c.status === "Retest" && c.tester_id === me).length : 0), "waiting for you to test", "due");
     } break;
     case "bugs": if (L("tasks")) {
       add(rows("tasks").filter(t => t.type === "Bug" && myTask(t) && t.status !== "Done" && t.status !== "In review").length, "bugs assigned to you", "due");
@@ -7382,7 +7387,7 @@ function badgeInfo(route){
     case "tasks": if (L("tasks")) {
       const ts = rows("tasks");
       add(ts.filter(t => myTask(t) && t.status !== "Done" && t.due_date && t.due_date <= t0).length, "due or overdue", "due");
-      { const rv = ts.filter(t => t.reviewer_id === me && t.status === "In review");
+      { const rv = ts.filter(reviewIsMine);
         add(rv.length, rv.length && rv.length <= 3 ? "waiting for you to review or test (" + rv.map(t => taskKey(t) || t.title).join(", ") + ")" : "waiting for your review", "due"); }
       add(ts.filter(t => t.created_by !== me && (myTask(t) || (t.mentions || []).includes(me) || t.reviewer_id === me) && isNewer(t.created_at, route)).length, "new for you", "new");
     } break;
@@ -10261,7 +10266,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11cq";
+const APP_VERSION = "2026-11cr";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -10877,7 +10882,7 @@ async function renderQA(el){
   const caseRow = c => h("button", { type: "button", class: "row", onclick: () => openRecord("test_cases", c.id) },
     h("span", { class: "tkey" }, tcKey(c)), h("span", { class: "x" }, c.title, h("br"), h("span", { class: "muted", style: "font-size:12.5px" }, (refLabel("features", c.feature_id) || "No feature") + (c.assignee_id ? " · " + pname(c.assignee_id) : ""))), pill(c.status, TC_TONE[c.status]));
   // for testers: what's waiting for them
-  const forMe = rows("tasks").filter(t => inP(t) && t.status === "In review" && t.qa_state && (t.tester_id === S.me.id || t.reviewer_id === S.me.id));
+  const forMe = rows("tasks").filter(t => inP(t) && t.qa_state && reviewIsMine(t));
   const retestMine = cases.filter(c => c.status === "Retest" && (c.tester_id === S.me.id || (isTester() && !c.tester_id)));
   if (isTester() || forMe.length || retestMine.length)
     left.append(h("div", { class: "panel" }, h("h2", {}, "Waiting for you to test", h("span", { class: "muted", style: "font-weight:400;font-size:13px" }, " " + (forMe.length + retestMine.length))),
