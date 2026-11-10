@@ -2176,6 +2176,12 @@ body.nb-moving,body.nb-moving *{cursor:grabbing!important;user-select:none!impor
 .ai-imp-keep{display:flex;align-items:center;gap:6px;font-size:var(--fs-sm);color:var(--ink2);background:var(--tint);border-radius:6px;padding:4px 8px;margin:4px 0}
 dialog:has(.ai-imp) {width:min(1100px,calc(100vw - 24px))}
 @media (max-width:760px){.ai-imp-cols{grid-template-columns:1fr}}
+
+/* development board: Unassigned Dev and Unassigned QA (2026-11cq) */
+.dv-board.with-unassigned{grid-template-columns:repeat(6,minmax(240px,1fr));min-width:1500px}
+.dv-col.dv-unassigned{background:#FFF7ED;box-shadow:inset 0 0 0 1px #FED7AA}
+.dv-col.dv-unassigned .dv-colh{color:#9A3412}
+.dv-empty{font-size:13px;color:var(--ink3);margin:6px 6px 10px}
 </style>
 </head>
 <body>
@@ -10255,7 +10261,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11cp";
+const APP_VERSION = "2026-11cq";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -11393,8 +11399,20 @@ function devBoard(u){
     && (!u.needqa || (t.status === "In review" && !t.tester_id)))
     .sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")));
   const board = h("div", { class: "dv-board" });
+  // (2026-11cq) two sections first: work nobody is building yet, and work in QA nobody is testing yet.
+  // A task shows there until someone is assigned, then in its own column.
+  const unDev = u.archived ? [] : list.filter(t => t.status !== "Done" && t.status !== "In review" && !ownersOf(t).length);
+  const unQA = u.archived ? [] : list.filter(t => t.status === "In review" && !t.tester_id);
+  const parked = new Set([...unDev, ...unQA].map(t => t.id));
+  if (!u.archived) {
+    board.classList.add("with-unassigned");
+    for (const [label, items, empty, hint] of [["Unassigned Dev", unDev, "Every task has someone building it.", "No owner yet: open one and add an owner"], ["Unassigned QA", unQA, "Everything in QA has a tester.", "In QA, no tester yet: pick it up or choose a tester"]])
+      board.append(h("section", { class: "dv-col dv-unassigned", "aria-label": label },
+        h("div", { class: "dv-colh", title: hint }, h("span", {}, label), h("span", { class: "dv-n" }, String(items.length))),
+        h("div", { class: "dv-cards" }, items.length ? items.slice(0, 200).map(devCard) : h("p", { class: "dv-empty" }, empty))));
+  }
   for (const [st, label] of FLOW){
-    const items = list.filter(t => t.status === st);
+    const items = list.filter(t => t.status === st && !parked.has(t.id));
     const col = h("section", { class: "dv-col", "aria-label": label, "data-status": st },
       h("div", { class: "dv-colh" }, h("span", {}, label), h("span", { class: "dv-n" }, String(items.length)), st === "Done" ? h("span", { class: "muted", style: "font-weight:400" }, "last 2 weeks") : null),
       h("div", { class: "dv-cards" }, items.slice(0, 200).map(devCard)));
