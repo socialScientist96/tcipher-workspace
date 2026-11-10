@@ -5511,7 +5511,13 @@ async function callGoogle(action, extra, retried){
     try { const j = await error.context.json(); if (j && j.error) msg = j.error; } catch (e) {}
     // after the computer wakes up the sign-in may have lapsed for a moment: renew it and try once more
     if (!retried && /sign in again|session has expired|jwt/i.test(msg)) { try { await sb.auth.refreshSession(); } catch (e) {} return callGoogle(action, extra, true); }
-    if (/Failed to send|not found|404|FunctionsFetchError|Failed to fetch/i.test(msg)) msg = "The “google-sync” function isn’t set up yet.";
+    // (2026-11ct) only a real 404 means the function is missing; a dropped connection is retried once, then said plainly
+    const status = error.context && error.context.status;
+    if (status === 404 || /requested function was not found/i.test(msg)) msg = "The “google-sync” function isn’t set up yet.";
+    else if (!status && /Failed to send|FunctionsFetchError|Failed to fetch|NetworkError|Load failed|network/i.test(msg)) {
+      if (!retried) { await new Promise(r => setTimeout(r, 2000)); return callGoogle(action, extra, true); }
+      const e2 = new Error("Couldn’t reach Google sync (connection problem). It will try again by itself."); e2.transient = true; throw e2;
+    }
     throw new Error(msg);
   }
   if (data && data.error) throw new Error(data.error);
@@ -5547,7 +5553,7 @@ async function syncGoogleNow(quiet){
   if (!googleConnected() || G.syncing) return;
   G.syncing = true;
   try { const r = await callGoogle("sync"); await refreshGoogleData(); if (!quiet) toast("Google Calendar synced: " + ((r && r.events) || 0) + " events from the last 7 days and next 45 days."); rerender(); }
-  catch (e) { await refreshGoogleData().catch(() => {}); if (!quiet) fail(e, "Sync failed"); else console.warn("google sync", e); renderShell(); }
+  catch (e) { await refreshGoogleData().catch(() => {}); if (!quiet) fail(e, "Sync failed"); else if (!e.transient) console.warn("google sync", e); renderShell(); }   // a passing connection blip in the background isn't a problem to report
   finally { G.syncing = false; }
 }
 // sync when the workspace opens (if it's been a while) and every 15 minutes while it's open
@@ -10270,7 +10276,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11cs";
+const APP_VERSION = "2026-11ct";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
