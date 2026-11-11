@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.tcipher.workspace",
+    "sha256_cert_fingerprints": ["EA:8C:3F:7F:4D:D9:53:50:5A:CA:4A:DA:9C:6C:AA:38:21:EF:F7:47:04:74:7E:E6:BE:B8:23:FF:15:6B:AD:87"]
+  }
+}]

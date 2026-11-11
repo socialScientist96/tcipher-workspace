@@ -1,5 +1,7 @@
--- upgrade-2026-11cz: phone and desktop notifications (web push), also used by the Tcipher Android app.
+-- upgrade-2026-11cz: phone and desktop notifications (web push), also used by the Tcipher Android app, and Apple
+-- notifications (APNs) for the Tcipher iPhone app.
 -- - push_subscriptions: one row per device where someone switched notifications on (only they can see or remove it).
+--   kind: 'web' (browsers, Android app), 'apns' (iPhone app from TestFlight/App Store), 'apns-sandbox' (built in Xcode).
 -- - Every new notification (and every new message in a chat that already had an unread one) asks the "push" Edge
 --   Function to send it to that person's devices, at once. The function skips read ones, muted chats and accounts
 --   that are off. If anything here fails, the notification itself is still saved as usual.
@@ -19,11 +21,13 @@ create table if not exists public.push_subscriptions (
   p256dh text not null,
   auth text not null,
   device text not null default '',
+  kind text not null default 'web',
   user_agent text not null default '',
   created_at timestamptz not null default now(),
   last_ok_at timestamptz,
   last_error text not null default ''
 );
+alter table public.push_subscriptions add column if not exists kind text not null default 'web';
 create index if not exists push_subscriptions_user on public.push_subscriptions (user_id);
 alter table public.push_subscriptions enable row level security;
 drop policy if exists own_select on public.push_subscriptions;
@@ -50,6 +54,23 @@ begin
 end $$;
 revoke all on function public.claim_push_subscription(text, text, text, text, text) from public, anon;
 grant execute on function public.claim_push_subscription(text, text, text, text, text) to authenticated;
+
+-- the iPhone app: its Apple device token (kept as endpoint 'apns:<token>')
+create or replace function public.claim_native_push(p_token text, p_kind text, p_device text)
+returns text language plpgsql security definer set search_path = public as $$
+declare ep text;
+begin
+  if auth.uid() is null then raise exception 'Sign in again.' using errcode = '42501'; end if;
+  if coalesce(p_token, '') !~ '^[0-9a-fA-F]{32,200}$' then raise exception 'That isn’t an Apple device token.'; end if;
+  if p_kind not in ('apns', 'apns-sandbox') then raise exception 'Unknown kind.'; end if;
+  ep := 'apns:' || lower(p_token);
+  insert into public.push_subscriptions (user_id, endpoint, p256dh, auth, device, kind, user_agent)
+  values (auth.uid(), ep, '', '', left(coalesce(p_device, 'phone'), 20), p_kind, 'Tcipher iPhone app')
+  on conflict (endpoint) do update set user_id = excluded.user_id, kind = excluded.kind, device = excluded.device, last_error = '';
+  return ep;
+end $$;
+revoke all on function public.claim_native_push(text, text, text) from public, anon;
+grant execute on function public.claim_native_push(text, text, text) to authenticated;
 
 create or replace function public.push_notification()
 returns trigger language plpgsql security definer set search_path = public as $$

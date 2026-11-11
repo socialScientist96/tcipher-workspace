@@ -6,6 +6,8 @@
 // Paste this into Supabase > Edge Functions > Deploy a new function > Via Editor, name it exactly: push
 // and switch OFF "Enforce JWT verification" (the database calls it with CRON_SECRET; people are checked here).
 // Secrets (Edge Functions > Secrets): VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT, and CRON_SECRET (already there).
+// For the iPhone app (Apple's push service): APNS_KEY (the whole text of the .p8 key file), APNS_KEY_ID, APNS_TEAM_ID,
+// and APNS_BUNDLE_ID (com.tcipher.workspace). Without them, iPhones are simply skipped.
 //
 // Calls:
 //   from the database (upgrade-2026-11cz.sql), header x-cron-secret:  { id: "<notification id>" }
@@ -32,6 +34,37 @@ const SUBJECT = Deno.env.get("VAPID_SUBJECT") ?? "mailto:notifications@tcipher.c
 // deno-lint-ignore no-explicit-any
 type Any = any;
 
+const APNS_KEY = (Deno.env.get("APNS_KEY") ?? "").replace(/\\n/g, "\n"), APNS_KEY_ID = Deno.env.get("APNS_KEY_ID") ?? "";
+const APNS_TEAM_ID = Deno.env.get("APNS_TEAM_ID") ?? "", APNS_BUNDLE_ID = Deno.env.get("APNS_BUNDLE_ID") ?? "com.tcipher.workspace";
+const b64url = (b: ArrayBuffer | Uint8Array) => btoa(String.fromCharCode(...new Uint8Array(b as ArrayBuffer))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+let apnsJwt = { token: "", at: 0 };
+// Apple's sign-in for push: a short token signed with the .p8 key, reused for 50 minutes
+async function apnsToken(): Promise<string> {
+  if (apnsJwt.token && Date.now() - apnsJwt.at < 50 * 60000) return apnsJwt.token;
+  const pem = APNS_KEY.replace(/-----[^-]+-----/g, "").replace(/\s+/g, "");
+  const key = await crypto.subtle.importKey("pkcs8", Uint8Array.from(atob(pem), (c) => c.charCodeAt(0)), { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+  const enc = (o: unknown) => b64url(new TextEncoder().encode(JSON.stringify(o)));
+  const head = enc({ alg: "ES256", kid: APNS_KEY_ID }), body = enc({ iss: APNS_TEAM_ID, iat: Math.floor(Date.now() / 1000) });
+  const sig = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, new TextEncoder().encode(head + "." + body));
+  apnsJwt = { token: head + "." + body + "." + b64url(sig), at: Date.now() };
+  return apnsJwt.token;
+}
+// one message to one iPhone; returns "gone" when Apple says the app was removed from that phone
+async function sendApns(s: Any, payload: Any): Promise<"ok" | "gone" | string> {
+  if (!APNS_KEY || !APNS_KEY_ID || !APNS_TEAM_ID) return "iPhone push isn’t set up (APNS_* secrets)";
+  const host = s.kind === "apns-sandbox" ? "https://api.sandbox.push.apple.com" : "https://api.push.apple.com";
+  const res = await fetch(host + "/3/device/" + String(s.endpoint).slice(5), {
+    method: "POST",
+    headers: { authorization: "bearer " + await apnsToken(), "apns-topic": APNS_BUNDLE_ID, "apns-push-type": "alert", "apns-priority": payload.urgent ? "10" : "5",
+      "apns-expiration": String(Math.floor(Date.now() / 1000) + 6 * 3600), ...(payload.tag ? { "apns-collapse-id": String(payload.tag).slice(0, 64) } : {}) },
+    body: JSON.stringify({ aps: { alert: { title: payload.title, body: payload.body }, sound: "default", "thread-id": payload.tag || "tcipher" }, url: payload.url }),
+  });
+  if (res.ok) return "ok";
+  const why = await res.text().catch(() => "");
+  if (res.status === 410 || /BadDeviceToken|Unregistered|DeviceTokenNotForTopic/.test(why)) return "gone";
+  return res.status + " " + why.slice(0, 200);
+}
+
 const db = createClient(Deno.env.get("SUPABASE_URL")!, secretKey(), { auth: { persistSession: false, autoRefreshToken: false } });
 
 // send one message to every device of one person; devices that are gone (uninstalled, notifications blocked) are removed
@@ -39,6 +72,15 @@ async function sendTo(userId: string, payload: Any) {
   const { data: subs } = await db.from("push_subscriptions").select("*").eq("user_id", userId);
   let sent = 0;
   for (const s of subs ?? []) {
+    if (String(s.kind || "web").startsWith("apns")) {
+      try {
+        const r = await sendApns(s, payload);
+        if (r === "ok") { sent++; await db.from("push_subscriptions").update({ last_ok_at: new Date().toISOString(), last_error: "" }).eq("id", s.id); }
+        else if (r === "gone") await db.from("push_subscriptions").delete().eq("id", s.id);
+        else await db.from("push_subscriptions").update({ last_error: r.slice(0, 300) }).eq("id", s.id);
+      } catch (e) { await db.from("push_subscriptions").update({ last_error: String(e).slice(0, 300) }).eq("id", s.id); }
+      continue;
+    }
     try {
       await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(payload),
         { TTL: 6 * 3600, urgency: payload.urgent ? "high" : "normal", topic: String(payload.tag || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 32) || undefined });

@@ -5261,7 +5261,7 @@ async function renderDashboard(el){
   right.append(holidaysPanel(4));
   // (2026-11cz) offer notifications on this device once, until switched on or dismissed
   const pushKey = "tc_push_ask_" + S.me.id;
-  if (pushSupported() && Notification.permission === "default" && (() => { try { return !localStorage.getItem(pushKey); } catch (e) { return false; } })()) {
+  if (pushSupported() && notifPerm() === "default" && (() => { try { return !localStorage.getItem(pushKey); } catch (e) { return false; } })()) {
     const card = h("div", { class: "panel", style: "background:var(--tint);border-color:transparent;display:flex;align-items:center;gap:10px;flex-wrap:wrap" },
       h("span", { style: "flex:1;min-width:180px" }, h("b", {}, "Get notifications on this " + (MY_DEVICE === "laptop" ? "computer" : MY_DEVICE)), h("br"), h("span", { class: "muted", style: "font-size:13px" }, "Messages and updates pop up even when the workspace is closed.")),
       h("button", { type: "button", class: "btn ghost sm", onclick: () => { try { localStorage.setItem(pushKey, "no"); } catch (e) {} card.remove(); } }, "Not now"),
@@ -8612,16 +8612,39 @@ function openMarkAttendance(userId, day){
    (upgrade-2026-11cz.sql). This public key pairs with VAPID_PRIVATE_KEY in Supabase's secrets.
    --------------------------------------------------------------------- */
 const VAPID_PUBLIC = "BIgk0iuDP7BtHBEQgZYZOm2V6T1f1y-bFgD97zTRsxPv7bV0y1uYTHvQdM9afMKNX1dPkcYyOZx_hfKiUpC7bgM";
-const pushSupported = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window && window.isSecureContext;
+// the Tcipher iPhone app shows the workspace in its own window and gets notifications from Apple instead (2026-11cz)
+const IN_IOS_APP = () => !!(window.TcipherApp && window.TcipherApp.platform === "ios" && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.tcApp);
+const NATIVE_KEY = () => "tc_native_push_" + (S.me ? S.me.id : "");
+const nativeEp = () => { try { return localStorage.getItem(NATIVE_KEY()) || ""; } catch (e) { return ""; } };
+const pushSupported = () => IN_IOS_APP() || ("serviceWorker" in navigator && "PushManager" in window && "Notification" in window && window.isSecureContext);
+const notifPerm = () => IN_IOS_APP() ? (nativeEp() ? "granted" : "default") : (window.Notification ? Notification.permission : "denied");
+// asks the iPhone app for its Apple device token (it asks the person first, the first time)
+function nativeToken(){
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error("The app didn’t answer. Close and reopen it, then try again.")), 30000);
+    window.tcNativePushToken = (token, kind, err) => { clearTimeout(t); err ? reject(new Error(err)) : resolve({ token, kind }); };
+    try { window.webkit.messageHandlers.tcApp.postMessage({ type: "registerPush" }); } catch (e) { clearTimeout(t); reject(e); }
+  });
+}
+async function nativeRegister(){
+  const { token, kind } = await nativeToken();
+  const ep = ok(await sb.rpc("claim_native_push", { p_token: token, p_kind: kind, p_device: MY_DEVICE }));
+  try { localStorage.setItem(NATIVE_KEY(), ep); } catch (e) {}
+}
 const b64u = s => { const p = (s + "===".slice((s.length + 3) % 4)).replace(/-/g, "+").replace(/_/g, "/"); return Uint8Array.from(atob(p), c => c.charCodeAt(0)); };
 async function swReady(){ return await Promise.race([navigator.serviceWorker.ready, new Promise((_, rej) => setTimeout(() => rej(new Error("The app’s background helper didn’t start. Reload the page and try again.")), 8000))]); }
-async function pushSub(){ if (!pushSupported()) return null; try { const reg = await swReady(); return await reg.pushManager.getSubscription(); } catch (e) { return null; } }
+async function pushSub(){ if (IN_IOS_APP()) return nativeEp() ? { endpoint: nativeEp(), unsubscribe: async () => true } : null; if (!pushSupported()) return null; try { const reg = await swReady(); return await reg.pushManager.getSubscription(); } catch (e) { return null; } }
 async function saveSub(sub){
   const j = sub.toJSON(); const k = j.keys || {};
   ok(await sb.rpc("claim_push_subscription", { p_endpoint: j.endpoint, p_p256dh: k.p256dh, p_auth: k.auth, p_device: MY_DEVICE, p_ua: navigator.userAgent.slice(0, 300) }));
 }
 // called from a click: asks the browser, then registers this device
 async function enablePush(quietTest){
+  if (IN_IOS_APP()) {
+    await nativeRegister();
+    if (!quietTest) { try { await sb.functions.invoke("push", { body: { action: "test" } }); } catch (e) {} }
+    return true;
+  }
   if (!pushSupported()) throw new Error(/iPhone|iPad/.test(navigator.userAgent) ? "On iPhone, add the workspace to your Home Screen first (Share › Add to Home Screen), then turn notifications on from there." : "This browser can’t show notifications from websites.");
   const perm = await Notification.requestPermission();
   if (perm !== "granted") throw new Error(perm === "denied" ? "Notifications are blocked for this site. Allow them in the browser’s site settings (the icon left of the address), then try again." : "Notifications weren’t allowed.");
@@ -8639,18 +8662,21 @@ async function enablePush(quietTest){
 async function disablePush(){
   const sub = await pushSub(); if (!sub) return;
   try { await sb.from("push_subscriptions").delete().eq("endpoint", sub.endpoint); } catch (e) {}
+  if (IN_IOS_APP()) { try { localStorage.removeItem(NATIVE_KEY()); } catch (e) {} return; }
   try { await sub.unsubscribe(); } catch (e) {}
 }
 // on every start: a device that already allowed notifications keeps its registration current (and belongs to whoever is signed in)
 async function pushOnStart(){
+  if (IN_IOS_APP()) { if (S.me && nativeEp()) nativeRegister().catch(e => console.warn("push start", e)); return; }   // already allowed: no question asked again
   if (!pushSupported() || Notification.permission !== "granted" || !S.me) return;
   try { const reg = await swReady(); let sub = await reg.pushManager.getSubscription();
     if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(VAPID_PUBLIC) });
     await saveSub(sub); } catch (e) { console.warn("push start", e); }
 }
 // signing out stops this device getting that person's notifications
-async function signOutHere(){ try { const sub = await pushSub(); if (sub) await sb.from("push_subscriptions").delete().eq("endpoint", sub.endpoint); } catch (e) {} return sb.auth.signOut(); }
+async function signOutHere(){ try { const sub = await pushSub(); if (sub) await sb.from("push_subscriptions").delete().eq("endpoint", sub.endpoint); if (IN_IOS_APP()) localStorage.removeItem(NATIVE_KEY()); } catch (e) {} return sb.auth.signOut(); }
 // tapping a notification while the workspace is open: go to that item here
+window.tcOpenUrl = url => { try { const u = new URL(url, location.href); if (u.origin === location.origin && u.hash) location.hash = u.hash; } catch (e) {} };   // called by the iPhone app
 if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", e => {
   const d = e.data || {}; if (d.type !== "open" || !d.url) return;
   try { const u = new URL(d.url, location.href); if (u.origin === location.origin) { if (u.hash && u.hash !== location.hash) location.hash = u.hash; window.focus(); } } catch (err) {}
@@ -8659,8 +8685,8 @@ function pushCard(){
   const box = h("div", { style: "display:flex;flex-direction:column;gap:8px" });
   const draw = async () => {
     if (!pushSupported()) { box.replaceChildren(h("p", { class: "muted", style: "margin:0" }, /iPhone|iPad/.test(navigator.userAgent) ? "On iPhone: add the workspace to your Home Screen first (Share › Add to Home Screen), then open it from there to turn these on." : "This browser can’t show notifications from websites.")); return; }
-    const sub = Notification.permission === "granted" ? await pushSub() : null;
-    const on = !!sub, blocked = Notification.permission === "denied";
+    const sub = notifPerm() === "granted" ? await pushSub() : null;
+    const on = !!sub, blocked = notifPerm() === "denied";
     const btn = h("button", { type: "button", class: "btn sm " + (on ? "ghost" : "pri") }, on ? "Turn off on this device" : "Turn on");
     btn.addEventListener("click", async () => { btn.disabled = true;
       try { if (on) { await disablePush(); toast("Notifications off on this device."); } else { await enablePush(); toast("Notifications on. A test one is on its way."); } }
