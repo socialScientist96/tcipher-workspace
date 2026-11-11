@@ -7,7 +7,7 @@
 // 4 seconds or fails (the fresh copy still replaces it in the background, and the app shows its
 // "new version available" bar when that happens).
 // To switch this off for everyone: delete this file from the site. Browsers drop the cache on their next visit.
-const CACHE = "tc-shell-v65";
+const CACHE = "tc-shell-v66";
 const PAGE_WAIT_MS = 4000;
 
 self.addEventListener("install", () => self.skipWaiting());
@@ -61,3 +61,33 @@ async function staleWhileRevalidate(e, req) {
   e.waitUntil(net.catch(() => {}));
   return saved || net;
 }
+
+// ---------- phone and desktop notifications (2026-11cz) ----------
+// The "push" Edge Function sends each notification here; it shows even when the workspace isn't open
+// (on Android, also in the Tcipher app). Nothing shows if you're looking at the workspace right now:
+// the page shows it itself.
+self.addEventListener("push", (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (_) { d = { title: "Tcipher workspace", body: e.data ? e.data.text() : "" }; }
+  e.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    if (d.tag !== "test" && wins.some((c) => c.visibilityState === "visible" && c.focused)) return;
+    await self.registration.showNotification(d.title || "Tcipher workspace", {
+      body: d.body || "", tag: d.tag || undefined, renotify: !!d.tag, data: { url: d.url || "/" },
+      icon: "/icons/icon-192.png", badge: "/icons/badge-96.png", timestamp: Date.now(),
+    });
+  })());
+});
+// tapping a notification opens the workspace at that item (in the window that's already open, if there is one)
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const url = new URL((e.notification.data && e.notification.data.url) || "/", self.location.origin).href;
+  e.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    const same = wins.find((c) => new URL(c.url).origin === self.location.origin);
+    if (same) { try { await same.focus(); } catch (_) {} try { same.postMessage({ type: "open", url }); } catch (_) {} return; }
+    await self.clients.openWindow(url);
+  })());
+});
+// the browser renewed the push address: tell the page to save the new one next time it opens
+self.addEventListener("pushsubscriptionchange", () => {});
