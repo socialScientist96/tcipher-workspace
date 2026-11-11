@@ -8,6 +8,8 @@
 // Secrets (Edge Functions > Secrets): VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT, PUSH_SECRET.
 // For the iPhone app (Apple's push service): APNS_KEY (the whole text of the .p8 key file), APNS_KEY_ID, APNS_TEAM_ID,
 // and APNS_BUNDLE_ID (com.tcipher.workspace). Without them, iPhones are simply skipped.
+// For the Android app (Firebase Cloud Messaging): FCM_SERVICE_ACCOUNT (the whole text of the Firebase service-account
+// .json key). Without it, Android phones are simply skipped.
 //
 // Calls:
 //   from the database (upgrade-2026-11cz.sql), header x-push-secret:  { id: "<notification id>" }
@@ -65,6 +67,42 @@ async function sendApns(s: Any, payload: Any): Promise<"ok" | "gone" | string> {
   return res.status + " " + why.slice(0, 200);
 }
 
+// ---- Android app: Firebase Cloud Messaging (HTTP v1) ----
+let fcmAuth = { token: "", at: 0, project: "" };
+async function fcmAccess(): Promise<{ token: string; project: string }> {
+  if (fcmAuth.token && Date.now() - fcmAuth.at < 50 * 60000) return fcmAuth;
+  const sa = JSON.parse(Deno.env.get("FCM_SERVICE_ACCOUNT") ?? "{}");
+  if (!sa.private_key || !sa.client_email || !sa.project_id) throw new Error("Android push isn’t set up (FCM_SERVICE_ACCOUNT)");
+  const pem = String(sa.private_key).replace(/-----[^-]+-----/g, "").replace(/\s+/g, "");
+  const key = await crypto.subtle.importKey("pkcs8", Uint8Array.from(atob(pem), (c) => c.charCodeAt(0)), { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
+  const enc = (o: unknown) => b64url(new TextEncoder().encode(JSON.stringify(o)));
+  const now = Math.floor(Date.now() / 1000);
+  const unsigned = enc({ alg: "RS256", typ: "JWT" }) + "." + enc({ iss: sa.client_email, scope: "https://www.googleapis.com/auth/firebase.messaging",
+    aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600 });
+  const jwt = unsigned + "." + b64url(await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(unsigned)));
+  const r = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: "grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=" + jwt });
+  const j = await r.json();
+  if (!j.access_token) throw new Error("Firebase sign-in failed: " + JSON.stringify(j).slice(0, 200));
+  fcmAuth = { token: j.access_token, at: Date.now(), project: sa.project_id };
+  return fcmAuth;
+}
+// a data message, so the app shows it the same way whether it's open, in the background or closed
+async function sendFcm(s: Any, payload: Any): Promise<"ok" | "gone" | string> {
+  if (!Deno.env.get("FCM_SERVICE_ACCOUNT")) return "Android push isn’t set up (FCM_SERVICE_ACCOUNT)";
+  const a = await fcmAccess();
+  const res = await fetch("https://fcm.googleapis.com/v1/projects/" + a.project + "/messages:send", {
+    method: "POST", headers: { Authorization: "Bearer " + a.token, "Content-Type": "application/json" },
+    body: JSON.stringify({ message: { token: String(s.endpoint).slice(4),
+      data: { title: String(payload.title || ""), body: String(payload.body || ""), url: String(payload.url || APP_URL), tag: String(payload.tag || "") },
+      android: { priority: "HIGH", ttl: "21600s", ...(payload.tag ? { collapse_key: String(payload.tag).slice(0, 60) } : {}) } } }),
+  });
+  if (res.ok) return "ok";
+  const why = await res.text().catch(() => "");
+  if (res.status === 404 || /UNREGISTERED|registration-token-not-registered|INVALID_ARGUMENT.*token/i.test(why)) return "gone";
+  return res.status + " " + why.slice(0, 200);
+}
+
 const db = createClient(Deno.env.get("SUPABASE_URL")!, secretKey(), { auth: { persistSession: false, autoRefreshToken: false } });
 
 // send one message to every device of one person; devices that are gone (uninstalled, notifications blocked) are removed
@@ -72,9 +110,9 @@ async function sendTo(userId: string, payload: Any) {
   const { data: subs } = await db.from("push_subscriptions").select("*").eq("user_id", userId);
   let sent = 0;
   for (const s of subs ?? []) {
-    if (String(s.kind || "web").startsWith("apns")) {
+    if (String(s.kind || "web").startsWith("apns") || s.kind === "fcm") {
       try {
-        const r = await sendApns(s, payload);
+        const r = s.kind === "fcm" ? await sendFcm(s, payload) : await sendApns(s, payload);
         if (r === "ok") { sent++; await db.from("push_subscriptions").update({ last_ok_at: new Date().toISOString(), last_error: "" }).eq("id", s.id); }
         else if (r === "gone") await db.from("push_subscriptions").delete().eq("id", s.id);
         else await db.from("push_subscriptions").update({ last_error: r.slice(0, 300) }).eq("id", s.id);

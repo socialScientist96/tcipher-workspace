@@ -2224,6 +2224,53 @@ dialog:has(.ai-imp) {width:min(1100px,calc(100vw - 24px))}
 .dv-colh{position:sticky;top:-8px;z-index:2;background:inherit;margin:-8px -8px 0;padding:14px 14px 10px;border-radius:10px 10px 0 0}
 .dv-col{background:var(--tint)}
 @media (max-width:760px){.dv-boardwrap{max-height:none;overflow-y:visible}.dv-colh{position:static;margin:0;padding:6px 6px 10px}}
+
+/* chat on phones (2026-11da): one row like a messaging app, the conversation edge to edge, no menu bar underneath */
+.chat-send .ic + .bl{margin-left:6px}
+.seen{margin-left:3px}
+@media (min-width:761px){ .chat-send .ic{display:none} .chat-send .bl{margin-left:0} }
+@media (max-width:760px){
+  .chat-foot{flex-wrap:nowrap;align-items:flex-end;gap:6px;padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px))}
+  .chat-foot textarea{order:0;flex:1 1 auto;min-width:0;min-height:42px;max-height:132px;padding:10px 14px;border-radius:21px;font-size:16px;line-height:1.35;overflow-y:auto}
+  .chat-foot .chat-attach{flex:none;width:42px;height:42px;min-height:42px;padding:0;justify-content:center;border-radius:50%}
+  .chat-foot .chat-attach[title="Emoji"]{display:none}     /* the phone keyboard has emoji */
+  .chat-foot > .chat-attach:not(.chat-mic){order:0} .chat-foot textarea{order:1} .chat-foot .chat-mic{order:2} .chat-foot .chat-send{order:3}
+  .chat-foot textarea.in{width:auto;box-sizing:border-box}
+  .chat-foot .chat-send{flex:none;width:42px;height:42px;min-height:42px;padding:0;border-radius:50%;justify-content:center;margin-left:0}
+  .chat-foot .chat-send .bl{display:none}
+  .chat-foot:not(.has-text) .chat-send{display:none}
+  .chat-foot.has-text .chat-mic{display:none}
+  #content .chat.m-conv{margin:-16px -16px 0;border:0;border-radius:0;box-shadow:none}
+  body:has(#content .chat.m-conv) .topbar{display:none}
+  body:has(#content .chat.m-conv) .content{padding-bottom:0}
+}
+
+/* sign-in on phones (2026-11da): a slim logo strip on top, so the form is right there without scrolling */
+@media (max-width:820px){
+  .auth{min-height:100dvh;grid-template-rows:auto 1fr}
+  .auth-side{padding:calc(18px + env(safe-area-inset-top,0px)) 24px 18px;flex-direction:row;align-items:center}
+  .auth-side > div:not(.auth-note){display:none}
+  .auth-side .auth-note{display:none}
+  .auth-side::after{display:none}
+  .auth-side .logo{height:30px}
+  .auth-main{place-items:start center;padding:32px 24px calc(24px + env(safe-area-inset-bottom,0px))}
+}
+
+/* the Development board on phones (2026-11da): one column per screen, swipe sideways between To Do, In Progress,
+   In QA and Done; the filters fit in three tidy rows */
+@media (max-width:760px){
+  .dv-toolbar{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .dv-toolbar .dv-search{grid-column:1 / -1;max-width:none;width:100%}
+  .dv-toolbar .dv-who{min-width:0;max-width:none;width:100%}
+  .dv-toolbar .dv-chip{white-space:nowrap}
+  .dv-toolbar > .dv-chip:first-of-type{grid-column:1}
+  .dv-boardwrap{max-height:none;overflow-x:auto;overflow-y:visible;scroll-snap-type:x mandatory;margin:0 -16px;padding:0 16px 8px;scroll-padding:0 16px}
+  .dv-board{display:grid;grid-auto-flow:column;grid-template-columns:none;grid-auto-columns:calc(100vw - 48px);min-width:0;gap:12px}
+  .dv-col{scroll-snap-align:start;min-width:0}
+  .dv-card{min-width:0;max-width:100%}
+  .dv-title{overflow-wrap:anywhere}
+  .dv-top{flex-wrap:wrap;gap:10px}
+}
 </style>
 </head>
 <body>
@@ -8613,7 +8660,9 @@ function openMarkAttendance(userId, day){
    --------------------------------------------------------------------- */
 const VAPID_PUBLIC = "BIgk0iuDP7BtHBEQgZYZOm2V6T1f1y-bFgD97zTRsxPv7bV0y1uYTHvQdM9afMKNX1dPkcYyOZx_hfKiUpC7bgM";
 // the Tcipher iPhone app shows the workspace in its own window and gets notifications from Apple instead (2026-11cz)
-const IN_IOS_APP = () => !!(window.TcipherApp && window.TcipherApp.platform === "ios" && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.tcApp);
+// (2026-11da) …and the Tcipher Workspace Android app, with notifications from Firebase. Both are "the app" below.
+const IN_IOS_APP = () => !!(window.TcipherApp && window.TcipherApp.platform === "ios" && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.tcApp)
+  || !!(window.TcipherApp && window.TcipherApp.platform === "android" && window.TcipherAndroid);
 const NATIVE_KEY = () => "tc_native_push_" + (S.me ? S.me.id : "");
 const nativeEp = () => { try { return localStorage.getItem(NATIVE_KEY()) || ""; } catch (e) { return ""; } };
 const pushSupported = () => IN_IOS_APP() || ("serviceWorker" in navigator && "PushManager" in window && "Notification" in window && window.isSecureContext);
@@ -8623,7 +8672,7 @@ function nativeToken(){
   return new Promise((resolve, reject) => {
     const t = setTimeout(() => reject(new Error("The app didn’t answer. Close and reopen it, then try again.")), 30000);
     window.tcNativePushToken = (token, kind, err) => { clearTimeout(t); err ? reject(new Error(err)) : resolve({ token, kind }); };
-    try { window.webkit.messageHandlers.tcApp.postMessage({ type: "registerPush" }); } catch (e) { clearTimeout(t); reject(e); }
+    try { if (window.TcipherAndroid) window.TcipherAndroid.registerPush(); else window.webkit.messageHandlers.tcApp.postMessage({ type: "registerPush" }); } catch (e) { clearTimeout(t); reject(e); }
   });
 }
 async function nativeRegister(){
@@ -9012,14 +9061,14 @@ function chatOnChange0(payload){
 }
 
 /* ---------- the Chat page ---------- */
-let chatEls = null;
+let chatEls = null, chatEls_markText = () => {};
 async function renderChat(el){
   if (!C.ready) { el.append(h("div", { class: "loading" }, "Loading chat…")); await loadChat(); if (S.route !== "chat") return; el.replaceChildren(); }
   if (!C.active){ const g = C.channels.find(c => c.kind === "channel" && c.name === "general") || C.channels[0]; if (g) await openChannel(g.id); }
   const list = h("div", { class: "chat-list" }), head = h("div", { class: "chat-head" }), msgs = h("div", { class: "chat-msgs", role: "log", "aria-live": "polite" });
   const ta = h("textarea", { class: "in", rows: 2, maxlength: "4000", placeholder: "Write a message… type @ to tag someone. Enter to send, Shift + Enter for a new line." });
   attachMentions(ta, { allLabel: () => { const c = C.channels.find(x => x.id === C.active); return !c ? "Everyone here" : c.kind === "channel" ? (c.vertical ? "Everyone in the " + c.vertical + " team" : "Everyone in the company") : "Everyone in this conversation"; } });
-  const sendBtn = h("button", { type: "button", class: "btn pri" }, "Send");
+  const sendBtn = h("button", { type: "button", class: "btn pri chat-send", "aria-label": "Send" }, ic("send", 18), h("span", { class: "bl" }, "Send"));
   const fileIn = h("input", { type: "file", multiple: true, hidden: true });
   const attachBtn = h("button", { type: "button", class: "btn ghost chat-attach", title: "Attach files (up to 100 MB each)", "aria-label": "Attach files" }, ic("paperclip", 18));
   attachBtn.addEventListener("click", () => { if (chatFilesReady()) fileIn.click(); });
@@ -9030,6 +9079,14 @@ async function renderChat(el){
   const replyBar = h("div", { class: "chat-reply", hidden: true });
   const micBtn = voiceNoteButton(() => sendBtn);
   const foot = h("div", { class: "chat-foot" }, attachBtn, emojiBtn, micBtn, fileIn, ta, sendBtn);
+  // (2026-11da) phones: one row like a messaging app — attach, the box (grows as you type), then the mic when it's
+  // empty or Send when there's something to send. A short hint, and Enter makes a new line (the Send button sends).
+  const PHONE = () => window.matchMedia("(max-width:760px)").matches;
+  const fitBox = () => { if (!PHONE()) { ta.style.height = ""; return; } ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight + 2, 132) + "px"; };
+  const markText = () => { const ups = (C.uploads && C.uploads[C.active]) || []; foot.classList.toggle("has-text", !!ta.value.trim() || ups.some(u => u.state === "ready")); };
+  if (PHONE()) { ta.rows = 1; ta.placeholder = "Message"; }
+  ta.addEventListener("input", () => { fitBox(); markText(); });
+  chatEls_markText = () => { fitBox(); markText(); };
   const typing = h("div", { class: "chat-typing", "aria-live": "polite" });
   const live = h("span", { class: "live-dot" });
   const jump = h("button", { type: "button", class: "chat-jump", hidden: true, onclick: () => { chatEls.pinned = true; msgs.scrollTop = msgs.scrollHeight; chatEls.jumpNew = false; drawJump(); } }, "↓ Jump to latest");
@@ -9040,7 +9097,7 @@ async function renderChat(el){
   el._chatEls = chatEls;           // so the chat can always find the copy that's actually on screen
   el.append(h("div", { class: "chat" + (C.mobileView === "conv" ? " m-conv" : "") }, list, h("div", { class: "chat-main" }, head, h("div", { class: "chat-msgwrap" }, msgs, jump), typing, replyBar, upl, foot,
     h("p", { class: "muted", style: "font-size:12px;margin:4px 14px 10px" }, "Text, links and files up to 100 MB each: attach them, drag them here or paste a screenshot. Files are kept in the company’s Google Drive; only this conversation’s members can open them. Messages are kept permanently."))));
-  ta.value = C.drafts[C.active] || "";
+  ta.value = C.drafts[C.active] || ""; chatEls_markText();
   // drop files anywhere on the conversation, or paste a screenshot into the box
   const main = el.querySelector(".chat-main");
   if (main) {
@@ -9054,7 +9111,7 @@ async function renderChat(el){
   });
   drawUploads(); drawReplyBar(); attachEmojiShortcodes(ta);
   ta.addEventListener("input", () => { C.drafts[C.active] = ta.value; if (ta.value.trim() && Date.now() - typingSentAt > 2000) { typingSentAt = Date.now(); liveSend("typing", { cid: C.active, uid: S.me.id }); } });
-  ta.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing && !(ta.parentNode.querySelector(".mention-pop:not([hidden])") || document.querySelector(".mention-pop:not([hidden])"))) { e.preventDefault(); send(); } });
+  ta.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing && !PHONE() && !(ta.parentNode.querySelector(".mention-pop:not([hidden])") || document.querySelector(".mention-pop:not([hidden])"))) { e.preventDefault(); send(); } });
   sendBtn.addEventListener("click", send);
   // one message on its way at a time: Enter pressed again while it's still sending does nothing
   let sending = false;
@@ -9090,7 +9147,7 @@ async function renderChat(el){
       fail(e, "Not sent");
       if (C.active === cidAtSend && !ta.value.trim()) { ta.value = body; C.drafts[cidAtSend] = body; }
     }
-    sending = false; sendBtn.disabled = false; ta.focus();
+    sending = false; sendBtn.disabled = false; chatEls_markText(); ta.focus();
   }
   drawChatList(); drawChatHead(); drawChatMessages(true);
   fitChat(); requestAnimationFrame(fitChat);
@@ -9634,7 +9691,8 @@ function fitChat(){
   // on phones the menu bar sits at the bottom of the screen: stop above it
   const bar = document.querySelector(".topbar"), barH = bar && getComputedStyle(bar).position === "fixed" ? bar.getBoundingClientRect().height : 0;
   const small = window.innerHeight < 560;
-  if (top > 0) el.style.height = Math.max(small ? 240 : 420, Math.floor(window.innerHeight - top - 16 - barH)) + "px";
+  const edge = el.classList.contains("m-conv") && window.innerWidth <= 760 ? 0 : 16;   // a phone conversation reaches the bottom edge
+  if (top > 0) el.style.height = Math.max(small ? 240 : 420, Math.floor(window.innerHeight - top - edge - barH)) + "px";
 }
 window.addEventListener("resize", () => { if (S.route === "chat") fitChat(); });
 // the on-screen keyboard opening, closing or the page shifting under it
@@ -9714,7 +9772,8 @@ function drawUploads(progressOnly){
       u.state === "error" ? h("span", { class: "err", style: "display:block;font-size:12px" }, u.error) : null),
     u.state === "uploading" ? h("span", { class: "uppc muted" }, Math.round(u.progress * 100) + "%") : u.state === "ready" ? h("span", { class: "pill ok" }, "Ready") : null,
     h("button", { type: "button", class: "upclose", title: u.state === "uploading" ? "Cancel" : "Remove", "aria-label": "Remove " + u.name, onclick: () => cancelUpload(u) }, ic("x", 14)))));
-  if (chatEls.ta) chatEls.ta.placeholder = list.some(u => u.state === "ready") ? "Add a message (optional), then press Enter to send" : "Write a message… type @ to tag someone. Enter to send, Shift + Enter for a new line.";
+  try { chatEls_markText(); } catch (e) {}
+  if (chatEls.ta) chatEls.ta.placeholder = window.matchMedia("(max-width:760px)").matches ? (list.some(u => u.state === "ready") ? "Add a message (optional)" : "Message") : list.some(u => u.state === "ready") ? "Add a message (optional), then press Enter to send" : "Write a message… type @ to tag someone. Enter to send, Shift + Enter for a new line.";
 }
 function cancelUpload(u){
   const wasReady = u.state === "ready";
@@ -10644,7 +10703,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11cz";
+const APP_VERSION = "2026-11da";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
