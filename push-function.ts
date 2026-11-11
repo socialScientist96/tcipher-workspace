@@ -4,13 +4,13 @@
 // Android, and in the Tcipher Android app (which runs the workspace in Chrome).
 //
 // Paste this into Supabase > Edge Functions > Deploy a new function > Via Editor, name it exactly: push
-// and switch OFF "Enforce JWT verification" (the database calls it with CRON_SECRET; people are checked here).
-// Secrets (Edge Functions > Secrets): VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT, and CRON_SECRET (already there).
+// and switch OFF "Enforce JWT verification" (the database calls it with PUSH_SECRET; people are checked here).
+// Secrets (Edge Functions > Secrets): VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT, PUSH_SECRET.
 // For the iPhone app (Apple's push service): APNS_KEY (the whole text of the .p8 key file), APNS_KEY_ID, APNS_TEAM_ID,
 // and APNS_BUNDLE_ID (com.tcipher.workspace). Without them, iPhones are simply skipped.
 //
 // Calls:
-//   from the database (upgrade-2026-11cz.sql), header x-cron-secret:  { id: "<notification id>" }
+//   from the database (upgrade-2026-11cz.sql), header x-push-secret:  { id: "<notification id>" }
 //   from the app, signed in:                                         { action: "test" }  (a test to your own devices)
 // What is NOT sent: notifications already read, chats you muted (unless you're tagged), people whose account is off,
 // and anything when "Phone and desktop notifications" are off on that device (the device has no subscription then).
@@ -19,7 +19,7 @@ import webpush from "npm:web-push@3.6.7";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-push-secret",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
@@ -28,7 +28,7 @@ function secretKey(): string {
   return Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 }
 const APP_URL = Deno.env.get("APP_URL") ?? "https://internal.tcipher.com/";
-const CRON = Deno.env.get("CRON_SECRET") ?? "";
+const PUSH_SECRET = Deno.env.get("PUSH_SECRET") ?? "";
 const PUB = Deno.env.get("VAPID_PUBLIC_KEY") ?? "", PRIV = Deno.env.get("VAPID_PRIVATE_KEY") ?? "";
 const SUBJECT = Deno.env.get("VAPID_SUBJECT") ?? "mailto:notifications@tcipher.com";
 // deno-lint-ignore no-explicit-any
@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
     return json({ sent: n });
   }
 
-  if (!CRON || req.headers.get("x-cron-secret") !== CRON) return json({ error: "Not allowed." }, 403);
+  if (!PUSH_SECRET || req.headers.get("x-push-secret") !== PUSH_SECRET) return json({ error: "Not allowed." }, 403);
   const id = String(body.id ?? "");
   if (!id) return json({ error: "Missing notification id." }, 400);
   const { data: n } = await db.from("notifications").select("*").eq("id", id).maybeSingle();

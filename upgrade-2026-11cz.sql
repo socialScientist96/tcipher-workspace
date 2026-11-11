@@ -8,10 +8,8 @@
 --
 -- Before running:
 --   1. Database › Extensions: "pg_net" is on (it already is for Google sync).
---   2. Run this once, with your real CRON_SECRET between the quotes (the same one as in Edge Functions › Secrets),
---      so the database can prove to the push function that it's really the database calling:
---        select vault.create_secret('<CRON_SECRET>', 'cron_secret');
---      (If it says the name already exists, it's already done.)
+--   2. Run push-secret-PRIVATE.sql once (it stores PUSH_SECRET in the vault, so the database can prove to the push
+--      function that it's really the database calling). The same PUSH_SECRET goes in Edge Functions › Secrets.
 -- Then run this file in Supabase › SQL Editor. Safe to run more than once. Changes no existing data.
 
 create table if not exists public.push_subscriptions (
@@ -79,11 +77,11 @@ begin
   if new.is_read then return null; end if;
   if tg_op = 'UPDATE' and new.created_at is not distinct from old.created_at then return null; end if;
   begin
-    select decrypted_secret into secret from vault.decrypted_secrets where name = 'cron_secret' limit 1;
+    select decrypted_secret into secret from vault.decrypted_secrets where name = 'push_secret' limit 1;
     if coalesce(secret, '') = '' then return null; end if;
     perform net.http_post(
       url := 'https://pfdnziybqaumnofjknsj.supabase.co/functions/v1/push',
-      headers := jsonb_build_object('Content-Type', 'application/json', 'x-cron-secret', secret),
+      headers := jsonb_build_object('Content-Type', 'application/json', 'x-push-secret', secret),
       body := jsonb_build_object('id', new.id));
   exception when others then
     null;   -- push is a nice-to-have: never lose the notification because of it
@@ -98,4 +96,4 @@ create trigger push_notification after insert or update of created_at on public.
 select (select count(*) from pg_class where relname = 'push_subscriptions') as push_table,
        (select count(*) from pg_trigger where tgname = 'push_notification') as push_trigger,
        (select count(*) from pg_extension where extname = 'pg_net') as pg_net_on,
-       (select count(*) from vault.secrets where name = 'cron_secret') as secret_in_vault;
+       (select count(*) from vault.secrets where name = 'push_secret') as secret_in_vault;
