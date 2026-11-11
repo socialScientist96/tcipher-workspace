@@ -2210,6 +2210,17 @@ dialog:has(.ai-imp) {width:min(1100px,calc(100vw - 24px))}
 .h-nw{left:-8px;top:-8px;cursor:nwse-resize}.h-ne{right:-8px;top:-8px;cursor:nesw-resize}.h-sw{left:-8px;bottom:-8px;cursor:nesw-resize}.h-se{right:-8px;bottom:-8px;cursor:nwse-resize}
 .h-n{left:calc(50% - 8px);top:-8px;cursor:ns-resize}.h-s{left:calc(50% - 8px);bottom:-8px;cursor:ns-resize}.h-e{right:-8px;top:calc(50% - 8px);cursor:ew-resize}.h-w{left:-8px;top:calc(50% - 8px);cursor:ew-resize}
 .crop-size{font-size:var(--fs-sm);line-height:1.4}
+
+/* projects on the Development board (2026-11cy) */
+.dv-proj{align-self:flex-start;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px;font-weight:600;color:var(--p-deep);background:var(--brand-light);border-radius:4px;padding:1px 6px;margin-top:2px}
+.dv-projbox{display:flex;flex-direction:column;gap:6px;margin-top:12px}
+.dv-projbox .dv-lab{font-size:var(--fs-sm);font-weight:600;color:var(--ink2)}
+
+/* (2026-11cy) the board scrolls on its own and the column names (To Do, In Progress…) stay at the top */
+.dv-boardwrap{overflow:auto;max-height:calc(100dvh - var(--dv-top, 220px));min-height:360px;overscroll-behavior:contain}
+.dv-colh{position:sticky;top:-8px;z-index:2;background:inherit;margin:-8px -8px 0;padding:14px 14px 10px;border-radius:10px 10px 0 0}
+.dv-col{background:var(--tint)}
+@media (max-width:760px){.dv-boardwrap{max-height:none;overflow-y:visible}.dv-colh{position:static;margin:0;padding:6px 6px 10px}}
 </style>
 </head>
 <body>
@@ -5042,7 +5053,8 @@ function openMyProfile(){
     h("div", { class: "form" },
       h("div", { class: "fl full" }, "Photo", photoPicker()),
       h("label", { class: "fl full" }, "Full name", name), h("label", { class: "fl" }, "Job title", title), h("label", { class: "fl" }, "Phone", phone),
-      h("div", { class: "fl full" }, "Email", h("div", { class: "ro" }, p.email)),
+      h("div", { class: "fl full" }, "Work email", h("div", { class: "ro", style: "display:flex;align-items:center;gap:10px;flex-wrap:wrap" }, h("span", { style: "flex:1;min-width:0;overflow-wrap:anywhere" }, p.email),
+        h("button", { type: "button", class: "btn sm soft", onclick: () => changeMyEmail() }, "Change")), h("span", { class: "hint" }, "You sign in with it. " + (p.is_admin ? "" : "An admin makes the change."))),
       h("div", { class: "full section", style: "margin-top:4px" }, h("h3", {}, "Change password")),
       h("label", { class: "fl" }, "New password", pw1, h("span", { class: "hint" }, "At least 8 characters")), h("label", { class: "fl" }, "Repeat new password", pw2),
       h("div", { class: "full section", style: "margin-top:4px" }, h("h3", {}, "Two-step sign-in"), mfaCard()),
@@ -5059,6 +5071,37 @@ function openMyProfile(){
   ], [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), save], true);
 }
 
+/* (2026-11cy) changing your work email: admins change their own at once; everyone else asks, and admins get a notification
+   that opens the person's details with the new address ready to save */
+function changeMyEmail(){
+  const p = S.me, inp = h("input", { class: "in", type: "email", maxlength: "200", placeholder: "name@tcipher.com", autocomplete: "off" });
+  const why = h("input", { class: "in", maxlength: "200", placeholder: "Optional, e.g. spelling mistake in my name" });
+  const err = h("p", { class: "err", hidden: true });
+  const go2 = h("button", { type: "button", class: "btn pri" }, p.is_admin ? "Change email" : "Send to admins");
+  go2.addEventListener("click", async () => {
+    const v = inp.value.trim().toLowerCase(); err.hidden = true;
+    if (!validEmail(v)) { err.textContent = "Enter a valid email address."; err.hidden = false; return; }
+    if (v === String(p.email).toLowerCase()) { err.textContent = "That’s already your work email."; err.hidden = false; return; }
+    go2.disabled = true;
+    try {
+      if (p.is_admin) {
+        const r = await callAdmin({ action: "set_email", id: p.id, email: v }); if (r && r.warning) toast(r.warning);
+        S.me = Object.assign({}, S.me, { email: v }); await load("profiles", true).catch(() => {});
+        closeDlg(); toast("Done. Sign in with " + v + " from now on.");
+      } else {
+        const admins = rows("profiles").filter(x => x.is_admin && x.is_active && x.id !== p.id).map(x => x.id);
+        if (!admins.length) throw new Error("No admin found to send it to.");
+        notify(admins, p.full_name + " asked to change their work email", "From " + p.email + " to " + v + (why.value.trim() ? ". Reason: " + why.value.trim() : "") + ". Open Admin panel › Users to change it.", "profiles", p.id);
+        closeDlg(); toast("Sent. An admin will change it and you’ll get a notification.");
+      }
+    } catch (e) { err.textContent = friendly(e); err.hidden = false; go2.disabled = false; }
+  });
+  openDialog("Change your work email", [h("div", { class: "form" },
+    h("p", { class: "muted full", style: "margin:0" }, "Now: " + p.email + ". " + (p.is_admin ? "You’ll sign in with the new address straight away." : "Admins change work emails, since it’s how you sign in. They’ll get your request now.")),
+    h("label", { class: "fl full" }, "New work email", inp), p.is_admin ? null : h("label", { class: "fl full" }, "Why (optional)", why)), err],
+    [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), go2], true);
+  setTimeout(() => inp.focus(), 50);
+}
 // "9:30 am Title" -> minutes since midnight, for ordering a day's meetings
 function timeKey(t){ const m = String(t).match(/^(\d{1,2}):(\d{2})\s*([ap]m)?/i); if (!m) return 9999; let hh = +m[1] % 12; if (/p/i.test(m[3] || "")) hh += 12; return hh * 60 + +m[2]; }
 /* ---------------------------------------------------------------------
@@ -5516,7 +5559,13 @@ const G = { loading: null, ready: false, syncing: false };
 const G_SCOPES = "openid email https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/meetings.space.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly";
 const googleOn = () => /\.apps\.googleusercontent\.com$/.test(GOOGLE_CLIENT_ID || "");
 const myGoogle = () => rows("google_links").find(l => l.user_id === S.me.id) || null;
-const googleConnected = () => !!myGoogle();
+// (2026-11cy) Google said the sign-in expired or was taken back: treat it as not connected, so "Connect Google" shows again,
+// and stop the automatic syncs (they'd only fail again) until the person reconnects
+const gExpiredKey = () => "tc_g_expired_" + (S.me ? S.me.id : "");
+const googleExpired = () => { try { return localStorage.getItem(gExpiredKey()) === "1"; } catch (e) { return false; } };
+function setGoogleExpired(on){ try { on ? localStorage.setItem(gExpiredKey(), "1") : localStorage.removeItem(gExpiredKey()); } catch (e) {} }
+const isGoogleExpiry = e => /expired or revoked|invalid_grant|reconnect google|token has been revoked/i.test(String(e && e.message || e));
+const googleConnected = () => !!myGoogle() && !googleExpired();
 
 function loadGoogle(){
   if (!G.ready && window.google && window.google.accounts && window.google.accounts.oauth2) G.ready = true;
@@ -5561,7 +5610,7 @@ function connectGoogle(extraScopes){
       client_id: GOOGLE_CLIENT_ID, scope: G_SCOPES + (extraScopes ? " " + extraScopes : ""), include_granted_scopes: true, ux_mode: "popup", prompt: "consent", hint: S.me.email,
       callback: async r => {
         if (r.error) { fail(new Error(r.error_description || r.error), "Google not connected"); resolve(false); return; }
-        try { const res = await callGoogle("connect", { code: r.code }); await refreshGoogleData();
+        try { const res = await callGoogle("connect", { code: r.code }); setGoogleExpired(false); await refreshGoogleData();
           if (res.warning) toast("Google connected" + (res.email ? " as " + res.email : "") + ", but the first sync failed: " + res.warning);
           else toast("Google connected" + (res.email ? " as " + res.email : "") + ". " + (res.events || 0) + " events synced; it now updates automatically.");
           rerender(); resolve(true); }
@@ -5580,14 +5629,17 @@ async function syncGoogleNow(quiet){
   if (!googleConnected() || G.syncing) return;
   G.syncing = true;
   try { const r = await callGoogle("sync"); await refreshGoogleData(); if (!quiet) toast("Google Calendar synced: " + ((r && r.events) || 0) + " events from the last 7 days and next 45 days."); rerender(); }
-  catch (e) { await refreshGoogleData().catch(() => {}); if (!quiet) fail(e, "Sync failed"); else if (!e.transient) console.warn("google sync", e); renderShell(); }   // a passing connection blip in the background isn't a problem to report
+  catch (e) {
+    await refreshGoogleData().catch(() => {});
+    if (isGoogleExpiry(e)) { setGoogleExpired(true); toast("Your Google connection has expired. Click “Connect Google” on your dashboard to switch it back on."); rerender(); return; }   // not a fault to report: the person just needs to reconnect
+    if (!quiet) fail(e, "Sync failed"); else if (!e.transient) console.warn("google sync", e); renderShell(); }   // a passing connection blip in the background isn't a problem to report
   finally { G.syncing = false; }
 }
 // sync when the workspace opens (if it's been a while) and every 15 minutes while it's open
 async function autoSyncGoogle(){
   if (!googleOn()) return;
   await ensure(["google_links"]);
-  const l = myGoogle(); if (!l) return;
+  const l = myGoogle(); if (!l || googleExpired()) return;
   if (!l.last_sync_at || Date.now() - new Date(l.last_sync_at) > 10 * 60000) syncGoogleNow(true);
 }
 setInterval(() => { if (S.me && googleConnected()) syncGoogleNow(true); }, 15 * 60000);
@@ -5979,14 +6031,36 @@ async function deleteTask(t){
   catch (e) { fail(e, "Couldn’t delete"); }
 }
 // the "⋯" on a task's card on a board: open, archive or restore, delete
+/* ---------- the order of cards in a column (2026-11cy) ----------
+   board_rank: smaller is higher up. A card moved between two others gets the number halfway between theirs. */
+const rankOf = t => t.board_rank == null ? -(+new Date(t.updated_at || t.created_at || 0) / 1000) : +t.board_rank;
+const boardOrder = (a, b) => rankOf(a) - rankOf(b) || String(b.updated_at || "").localeCompare(String(a.updated_at || ""));
+// the cards around t, in the order the board shows them (with the board's filters)
+function boardNeighbours(t){
+  const u = S.ui.dev || {};
+  const list = devTasks().filter(x => x.status === t.status && (!u.who || ownersOf(x).includes(u.who) || x.tester_id === u.who) && (!u.mine || isOwner(x) || x.tester_id === S.me.id)
+    && (!u.project || (u.project === "none" ? !x.project_id : x.project_id === u.project))).sort(boardOrder);
+  return { list, i: list.findIndex(x => x.id === t.id) };
+}
+async function placeTask(t, above, below){
+  if (above && above.id === t.id) above = null; if (below && below.id === t.id) below = null;
+  const r = above && below ? (rankOf(above) + rankOf(below)) / 2 : above ? rankOf(above) + 1 : below ? rankOf(below) - 1 : rankOf(t);
+  const was = t.board_rank; t.board_rank = r; rerender();
+  try { ok(await sb.rpc("move_task_rank", { p_task: t.id, p_rank: r })); }
+  catch (e) { t.board_rank = was; rerender(); fail(/move_task_rank|function .* does not exist|schema cache/i.test(String(e && e.message)) ? new Error("Reordering needs a database update first (upgrade-2026-11cy.sql).") : e, "Couldn’t move it"); }
+}
 function taskCardMenu(t, open){
   const canArchive = typeof devCanEdit === "function" ? devCanEdit(t, "archived") : access(MOD.tasks, t).canEdit;
   const canDel = access(MOD.tasks, t).canDelete;
   if (!canArchive && !canDel) return null;
   const b = h("span", { class: "tcard-menu", role: "button", tabindex: "0", "aria-label": "More actions for " + (taskKey(t) || t.title), title: "Archive, delete…", draggable: "false" }, ic("more", 16));
   const show = e => { e.preventDefault(); e.stopPropagation();
+    const nb = S.route === "dev-board" && !t.archived ? boardNeighbours(t) : null;
     nbMenu(b, [
       [h("span", {}, ic("expand", 16), "Open"), () => open()],
+      nb && nb.i > 0 ? [h("span", {}, ic("arrowUp", 16), "Move to top"), () => placeTask(t, null, nb.list[0])] : null,
+      nb && nb.i > 0 ? [h("span", {}, ic("arrowUp", 16), "Move up"), () => placeTask(t, nb.list[nb.i - 2], nb.list[nb.i - 1])] : null,
+      nb && nb.i < nb.list.length - 1 ? [h("span", {}, ic("arrowDown", 16), "Move down"), () => placeTask(t, nb.list[nb.i + 1], nb.list[nb.i + 2])] : null,
       canArchive ? [h("span", {}, ic("archive2", 16), t.archived ? "Restore" : "Archive"), () => archiveTask(t, !t.archived)] : null,
       canDel ? [h("span", {}, ic("trash", 16), "Delete"), () => deleteTask(t), { danger: true }] : null
     ].filter(Boolean), taskKey(t) || "Task"); };
@@ -6191,6 +6265,7 @@ const nbMedia = t => t === "image" || t === "video";
 // short-lived links to uploaded pictures and videos, kept while the page is open
 const nbLinks = new Map();
 const nbFileRows = new Map();
+const nbMediaEls = new Map();   // block id + file → the <img>/<video> already made for it (2026-11cy: no reload on redraw)
 async function nbMediaLink(fid, long){
   let f = nbFileRows.get(fid);
   if (!f) { f = ok(await sb.from("files").select("*").eq("id", fid).maybeSingle()); if (!f) throw new Error("This file isn’t available any more."); nbFileRows.set(fid, f); }
@@ -6673,16 +6748,23 @@ async function renderNotePage(el, id){
       const media = h("div", { class: "nb-media" });
       if (b._uploading) media.append(h("div", { class: "nb-media-wait" }, h("span", { class: "spinner" }), "Uploading " + (b.name || "file") + "…"));
       else if (!b.file) media.append(h("button", { type: "button", class: "nb-media-pick", disabled: !editable, onclick: () => pickMedia(i, b.type) }, ic(b.type === "video" ? "video" : "image", 20), b.type === "video" ? "Add a video" : "Add a picture"));
+      else if (nbMediaEls.has(b.id + ":" + b.file)) {
+        // (2026-11cy) already on the page: the same picture or video element is moved into place, so a redraw (a save,
+        // or someone else's edit) doesn't reload it, show a spinner, or stop a video that's playing
+        const el0 = nbMediaEls.get(b.id + ":" + b.file);
+        media.append(el0);
+        if (b.type === "image") requestAnimationFrame(() => { if (!b.width && el0.naturalHeight > el0.naturalWidth * 1.2) box.style.width = Math.round(560 * el0.naturalWidth / el0.naturalHeight) + "px"; });
+      }
       else {
         media.append(h("div", { class: "nb-media-wait" }, h("span", { class: "spinner" }), "Loading…"));
         nbMediaLink(b.file, b.type === "video").then(url => {
           const el = b.type === "video" ? h("video", { class: "nb-video", src: url, controls: true, preload: "metadata", playsinline: true, draggable: "false" }) : h("img", { class: "nb-img", src: url, alt: nbText(b.html) || b.name || "Picture", draggable: "false" });
           if (b.type === "image") {
-            el.addEventListener("click", () => { if (!box.classList.contains("nb-resizing")) window.open(url, "_blank", "noopener"); });
+            el.addEventListener("click", () => { const bx = el.closest(".nb-mbox"); if (!bx || !bx.classList.contains("nb-resizing")) window.open(url, "_blank", "noopener"); });
             // a tall phone photo starts at a comfortable height instead of filling the whole column
             el.addEventListener("load", () => { if (!b.width && el.naturalHeight > el.naturalWidth * 1.2) box.style.width = Math.round(560 * el.naturalWidth / el.naturalHeight) + "px"; }, { once: true });
           }
-          media.replaceChildren(el);
+          media.replaceChildren(el); nbMediaEls.set(b.id + ":" + b.file, el); if (nbMediaEls.size > 200) nbMediaEls.delete(nbMediaEls.keys().next().value);
         }, e => media.replaceChildren(h("div", { class: "nb-media-wait err" }, String(e.message || e))));
       }
       const cap = h("div", { class: "nb-text nb-caption", contenteditable: editable && !b._uploading ? "true" : "false", "data-placeholder": editable ? "Add a caption" : "" });
@@ -8524,10 +8606,25 @@ function unlockAudio(){
   try { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return; if (!audioCtx) audioCtx = new AC(); if (audioCtx.state === "suspended") audioCtx.resume(); } catch (e) {}
 }
 ["pointerdown", "keydown", "touchstart"].forEach(ev => document.addEventListener(ev, unlockAudio, { passive: true }));
+/* ---------- several tabs open (2026-11cy) ----------
+   Only one tab rings for a message (the one you're looking at first), and reading a chat or muting it in one tab
+   updates the others at once. */
+const TABS = (() => { try { return new BroadcastChannel("tc-tabs"); } catch (e) { return null; } })();
+function tabsSend(msg){ try { if (TABS && S.me) TABS.postMessage(Object.assign({ me: S.me.id }, msg)); } catch (e) {} }
+function claimRing(){
+  try { const last = +localStorage.getItem("tc_ring") || 0; if (Date.now() - last < 2500) return false; localStorage.setItem("tc_ring", String(Date.now())); } catch (e) {}
+  return true;
+}
+// a tab you're not looking at waits a moment, so the one you are looking at rings instead
+function ringOnce(play){ if (document.visibilityState === "visible") { if (claimRing()) play(); } else setTimeout(() => { if (claimRing()) play(); }, 450); }
 function playSound(kind, force){
   if (!force && (!S.me || !soundOn())) return;
   const now = Date.now(); if (!force && now - lastSoundAt < 2500) return;   // a burst plays one sound, not five
   lastSoundAt = now;
+  if (!force) { ringOnce(() => playSound0(kind)); return; }
+  playSound0(kind);
+}
+function playSound0(kind){
   try {
     unlockAudio(); if (!audioCtx || audioCtx.state !== "running") return;
     const t0 = audioCtx.currentTime + 0.01;
@@ -8743,6 +8840,7 @@ async function markChatRead(id){
   C.reads[id] = maxId; C.unread[id] = 0; C.mentions[id] = 0;
   try { await sb.from("chat_reads").upsert({ user_id: S.me.id, channel_id: id, last_read_id: maxId }, { onConflict: "user_id,channel_id" }); } catch (e) {}
   liveSend("read", { cid: id, uid: S.me.id, last: maxId });
+  tabsSend({ t: "read", cid: id, last: maxId });
   updateTabTitle();
   renderShell();
 }
@@ -9287,8 +9385,34 @@ function onLiveTyping(p){
   typingAt[p.cid + "|" + p.uid] = Date.now(); drawTyping();
   setTimeout(drawTyping, 4200);
 }
+// I read a chat somewhere else (another tab or device): it's read here too
+function applyMyRead(cid, last){
+  if (!cid || !last || (C.reads[cid] || 0) >= last) return;
+  C.reads[cid] = last;
+  const after = (C.msgs[cid] || []).filter(m => m.id > last && m.author_id !== S.me.id);
+  C.unread[cid] = after.length; C.mentions[cid] = after.filter(m => (m.mentions || []).includes(S.me.id)).length;
+  updateTabTitle(); renderShell(); if (S.route === "chat") drawChatList();
+}
+if (TABS) TABS.onmessage = e => {
+  const d = e.data || {}; if (!S.me || d.me !== S.me.id || typeof C === "undefined") return;
+  if (d.t === "read") applyMyRead(d.cid, +d.last);
+  if (d.t === "mute") { C.muted = C.muted || new Set(); d.on ? C.muted.add(d.cid) : C.muted.delete(d.cid); renderShell(); if (S.route === "chat") { drawChatList(); if (typeof drawChatHead === "function" && C.active === d.cid) drawChatHead(); } }
+};
+// back on a tab: pick up what was read or muted on other devices meanwhile
+let mineSyncAt = 0;
+async function syncMyChatState(){
+  if (!S.me || !C.ready || Date.now() - mineSyncAt < 15000) return; mineSyncAt = Date.now();
+  try {
+    const [reads, mutes] = await Promise.all([sb.from("chat_reads").select("channel_id,last_read_id").eq("user_id", S.me.id), sb.from("chat_mutes").select("channel_id")]);
+    if (!mutes.error) { const was = [...(C.muted || [])].sort().join(); C.muted = new Set((mutes.data || []).map(x => x.channel_id)); if (was !== [...C.muted].sort().join()) renderShell(); }
+    if (!reads.error) for (const r of reads.data || []) applyMyRead(r.channel_id, +r.last_read_id || 0);
+  } catch (e) {}
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") syncMyChatState(); });
+window.addEventListener("focus", () => syncMyChatState());
 function onLiveRead(p){
   if (!p || !p.cid || !p.uid) return;
+  if (S.me && p.uid === S.me.id) { applyMyRead(p.cid, +p.last); return; }
   C.othersRead[p.cid] = C.othersRead[p.cid] || {};
   if ((C.othersRead[p.cid][p.uid] || 0) < p.last) { C.othersRead[p.cid][p.uid] = p.last; if (S.route === "chat" && C.active === p.cid) drawChatMessages(); }
 }
@@ -9885,6 +10009,9 @@ function playMarimba(){
   if (!S.me || !soundOn()) return;
   const now = Date.now(); if (now - lastMarimba < 4000) return;   // a burst of messages plays it once
   lastMarimba = now;
+  ringOnce(playMarimba0);
+}
+function playMarimba0(){
   try {
     unlockAudio(); if (!audioCtx || audioCtx.state !== "running") return;
     const ctx = audioCtx, t0 = ctx.currentTime + 0.02;
@@ -10019,6 +10146,7 @@ async function toggleChatMute(ch){
   try {
     if (was) { ok(await sb.from("chat_mutes").delete().eq("channel_id", ch.id).eq("user_id", S.me.id)); C.muted.delete(ch.id); toast("Unmuted. You’ll hear new messages again."); }
     else { ok(await sb.from("chat_mutes").insert({ user_id: S.me.id, channel_id: ch.id })); C.muted.add(ch.id); toast("Muted. No sound or pop-ups, except when someone tags you."); }
+    tabsSend({ t: "mute", cid: ch.id, on: !was });
   } catch (e) { fail(e, was ? "Couldn’t unmute" : "Couldn’t mute"); }
   if (typeof drawChatHead === "function") drawChatHead(); drawChatList();
 }
@@ -10409,7 +10537,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11cx";
+const APP_VERSION = "2026-11cy";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -11518,7 +11646,7 @@ function devRefresh(){
 
 /* ---------- the board ---------- */
 async function renderDevBoard(el){
-  await ensure(["tasks", "profiles", "roles"]);
+  await ensure(["tasks", "profiles", "roles", "projects"]);
   if (S.route !== "dev-board") return;
   const u = S.ui.dev = S.ui.dev || {};
   el.append(h("div", { class: "dv-top" },
@@ -11540,7 +11668,12 @@ async function renderDevBoard(el){
   const nQA = live.filter(t => t.status === "In review" && !t.tester_id).length;
   const unChip = (k, label, n) => h("button", { type: "button", class: "dv-chip" + (u[k] ? " on" : ""), "aria-pressed": String(!!u[k]), title: k === "undev" ? "Unfinished tasks with no owner" : "Tasks in QA with no tester",
     onclick: () => { const was = !!u[k]; u.undev = false; u.unqa = false; u[k] = !was; if (u[k]) u.archived = false; rerender(); } }, label, h("span", { class: "dv-chipn" + (n ? " warn" : "") }, String(n)));
-  el.append(h("div", { class: "dv-toolbar" }, q, whoSel,
+  // (2026-11cy) one project's work
+  const projs = rows("projects").filter(p => !["Completed", "Cancelled"].includes(p.status) || p.id === u.project).sort((a, b) => a.name.localeCompare(b.name));
+  if (u.project && u.project !== "none" && !byId("projects", u.project)) u.project = "";
+  const projSel = h("select", { class: "in dv-who", "aria-label": "Show one project’s work", onchange: e => { u.project = e.target.value; rerender(); } },
+    h("option", { value: "" }, "All projects"), projs.map(p => h("option", { value: p.id, selected: u.project === p.id }, p.name)), h("option", { value: "none", selected: u.project === "none" }, "No project"));
+  el.append(h("div", { class: "dv-toolbar" }, q, whoSel, projSel,
     chip("mine", "Only my work"), unChip("undev", "Unassigned Dev", nDev), unChip("unqa", "Unassigned QA", nQA), chip("archived", "Archived")), body);
   draw();
 }
@@ -11554,8 +11687,9 @@ function devBoard(u){
     && (!u.mine || isOwner(t) || t.tester_id === S.me.id)
     && (!u.needqa || (t.status === "In review" && !t.tester_id))
     && (!u.undev || (t.status !== "Done" && t.status !== "In review" && !ownersOf(t).length))
-    && (!u.unqa || (t.status === "In review" && !t.tester_id)))
-    .sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")));
+    && (!u.unqa || (t.status === "In review" && !t.tester_id))
+    && (!u.project || (u.project === "none" ? !t.project_id : t.project_id === u.project)))
+    .sort(boardOrder);
   const board = h("div", { class: "dv-board" });
   for (const [st, label] of FLOW){
     const items = list.filter(t => t.status === st);
@@ -11565,10 +11699,17 @@ function devBoard(u){
     if (st === "To do" && access(MOD.tasks).canCreate) col.append(inlineCreate());
     col.addEventListener("dragover", e => { if (!devDrag) return; e.preventDefault(); col.classList.add("drop"); });
     col.addEventListener("dragleave", e => { if (!col.contains(e.relatedTarget)) col.classList.remove("drop"); });
-    col.addEventListener("drop", e => { e.preventDefault(); col.classList.remove("drop"); const t = devDrag && byId("tasks", devDrag); devDrag = null; if (t && t.status !== st) dropTo(t, st); });
+    col.addEventListener("drop", e => { e.preventDefault(); col.classList.remove("drop"); const t = devDrag && byId("tasks", devDrag); devDrag = null; if (!t) return;
+      if (t.status !== st) { dropTo(t, st); return; }
+      // the same column: it goes where it was dropped (2026-11cy)
+      const others = items.filter(x => x.id !== t.id), cards = [...col.querySelectorAll(".dv-card")].filter(c => c.dataset.id !== t.id);
+      let at = cards.findIndex(c => { const r = c.getBoundingClientRect(); return e.clientY < r.top + r.height / 2; }); if (at < 0) at = others.length;
+      placeTask(t, others[at - 1], others[at]); });
     board.append(col);
   }
-  return h("div", { class: "dv-boardwrap" }, board);
+  const wrap = h("div", { class: "dv-boardwrap" }, board);
+  requestAnimationFrame(() => { const top = wrap.getBoundingClientRect().top + (window.scrollY || 0); if (top > 0) wrap.style.setProperty("--dv-top", Math.round(top + 16) + "px"); });
+  return wrap;
 }
 // dragging follows the same steps as the buttons
 function dropTo(t, st){
@@ -11587,6 +11728,7 @@ function devCard(t){
     back ? h("span", { class: "dv-flag" }, "↩ Sent back by QA") : null,
     t.blocked ? h("span", { class: "dv-flag" }, ic("flag", 12), "Blocked") : null,
     h("span", { class: "dv-title" }, t.title),
+    t.project_id && byId("projects", t.project_id) ? h("span", { class: "dv-proj", title: "Project" }, byId("projects", t.project_id).name) : null,
     h("span", { class: "dv-foot" }, h("span", { class: "dv-key" }, taskKey(t)), h("span", { class: "grow" }),
       t.status === "In review" ? (t.tester_id ? h("span", { class: "dv-qa", title: "Tester: " + pname(t.tester_id) }, "QA ", avatar(t.tester_id, "sm")) : h("span", { class: "dv-needqa" }, "Needs a tester")) : null,
       ownersOf(t).length ? faces(ownersOf(t)) : noone()));
@@ -11603,7 +11745,8 @@ function inlineCreate(){
       if (e.key === "Escape") { done(); return; }
       if (e.key !== "Enter" || !inp.value.trim()) return;
       inp.disabled = true;
-      try { const t = await devInsert({ title: inp.value.trim() }); toast(taskKey(t) + " created."); rerender(); }
+      const bp = (S.ui.dev || {}).project;
+      try { const t = await devInsert(Object.assign({ title: inp.value.trim() }, bp && bp !== "none" ? { project_id: bp } : {})); toast(taskKey(t) + " created."); rerender(); }
       catch (err) { fail(err, "Not created"); inp.disabled = false; }
     });
     inp.addEventListener("blur", () => { if (!inp.value.trim()) done(); });
@@ -11625,11 +11768,27 @@ function taskCreate(preset){
   const notes = h("textarea", { class: "in", id: "devNewNotes", rows: 4, placeholder: "Notes: what “done” looks like, links, steps…" }, preset.description || "");
   const owners = ownersPicker([preset.assignee_id || S.me.id, ...(preset.collaborators || [])].filter((x, i, a) => x && a.indexOf(x) === i));
   const due = h("input", { class: "in", id: "taskNewDue", type: "date", value: preset.due_date || "", min: today() });
+  // (2026-11cy) Development work can belong to a project; it starts on the board's project filter, else the last one used
+  const lastProjKey = "tc_last_project_" + S.me.id;
+  const proj = h("select", { class: "in", id: "taskNewProject" }, h("option", { value: "" }, "No project"));
+  const fillProj = pick => { const cur = pick !== undefined ? pick : proj.value;
+    proj.replaceChildren(h("option", { value: "" }, "No project"), ...rows("projects").filter(p => !["Completed", "Cancelled"].includes(p.status)).sort((a, b) => a.name.localeCompare(b.name)).map(p => h("option", { value: p.id }, p.name)),
+      lvl("projects") >= 2 || isAdmin() ? h("option", { value: "__new" }, "+ New project…") : null);
+    proj.value = cur && byId("projects", cur) ? cur : ""; };
+  const startProj = preset.project_id || ((S.ui.dev || {}).project && S.ui.dev.project !== "none" ? S.ui.dev.project : "") || (() => { try { return localStorage.getItem(lastProjKey) || ""; } catch (e) { return ""; } })();
+  ensure(["projects"]).then(() => fillProj(startProj)).catch(() => {});
+  proj.addEventListener("change", () => { if (proj.value !== "__new") return; proj.value = "";
+    const back = { title: title.value, notes: notes.value };
+    openRecord("projects", null, {}, { onSaved: row => { taskCreate(Object.assign({}, preset, { title: back.title, description: back.notes, project_id: row && row.id })); } }); });
+  const projRow = h("label", { class: "fl", id: "taskNewProjectRow" }, h("span", {}, "Project ", h("span", { class: "muted", style: "font-weight:400" }, "(optional)")), proj);
+  const showProj = () => { projRow.hidden = (vertical ? vertical.value : startV) !== "Development"; };
+  if (vertical) vertical.addEventListener("change", showProj); showProj();
   const err = h("p", { class: "err", hidden: true });
   const go2 = h("button", { type: "button", class: "btn pri", id: "devNewGo" }, "Create");
   const values = () => { const ids = owners.value(), vv = vertical ? vertical.value : startV;
     return Object.assign({}, preset, { vertical: vv, type: preset.type || ({ Sales: "Follow-up", Marketing: "Content" })[vv] || "Feature", title: title.value.trim(), description: notes.value.trim(),
-    assignee_id: ids[0] || null, collaborators: ids.slice(1), due_date: due.value || null }); };
+    assignee_id: ids[0] || null, collaborators: ids.slice(1), due_date: due.value || null,
+    project_id: vv === "Development" && proj.value && proj.value !== "__new" ? proj.value : null }); };
   const submit = async () => {
     if (go2.disabled) return;
     err.hidden = true;
@@ -11637,6 +11796,7 @@ function taskCreate(preset){
     go2.disabled = true;
     try {
       const t = await devInsert(values());
+      try { if (t.project_id) localStorage.setItem(lastProjKey, t.project_id); } catch (e) {}
       closeDlg(); rerender();
       if (t.vertical === "Development") { toast(taskKey(t) + " created. Add a screenshot or file if you have one."); openDevTask(t.id); }
       else toast((taskKey(t) ? taskKey(t) + " " : "Task ") + "created.");
@@ -11650,7 +11810,7 @@ function taskCreate(preset){
       vertical ? h("label", { class: "fl" }, "Vertical", vertical) : null,
       h("label", { class: "fl full" }, "Title", title), h("label", { class: "fl full" }, "Notes", notes),
       h("div", { class: "fl full" }, h("span", {}, "Owners"), owners.el),
-      h("label", { class: "fl" }, h("span", {}, "Due date ", h("span", { class: "muted", style: "font-weight:400" }, "(optional)")), due)), err],
+      h("label", { class: "fl" }, h("span", {}, "Due date ", h("span", { class: "muted", style: "font-weight:400" }, "(optional)")), due), projRow), err],
     [more, h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), go2], true);
   setTimeout(() => title.focus(), 30);
 }
@@ -11718,7 +11878,12 @@ function drawDevTask(id){
   const left = h("div", { class: "dv-left" }, devNotes(t),
     h("div", { class: "dv-sec dv-files" }, filesSection("tasks", t.id, A.canEdit || A.L >= 1 || isOwner(t) || t.tester_id === S.me.id)),
     devActivity(t));
-  const right = h("div", { class: "dv-right" }, aiTaskButtons(t, devCanEdit(t, "title")), flowBox(t), devPeople(t),
+  // (2026-11cy) which project it belongs to
+  const projBox = h("div", { class: "dv-sec dv-projbox" }, h("div", { class: "dv-lab" }, "Project"),
+    devCanEdit(t, "project_id") ? (() => { const sel = h("select", { class: "in", "aria-label": "Project", onchange: () => devSave(t, { project_id: sel.value || null }, sel.value ? "Moved to " + refLabel("projects", sel.value) + "." : "Project removed.") },
+        h("option", { value: "" }, "No project"), rows("projects").filter(p => !["Completed", "Cancelled"].includes(p.status) || p.id === t.project_id).sort((a, b) => a.name.localeCompare(b.name)).map(p => h("option", { value: p.id, selected: p.id === t.project_id }, p.name)));
+      return sel; })() : h("span", {}, refLabel("projects", t.project_id) || "No project"));
+  const right = h("div", { class: "dv-right" }, aiTaskButtons(t, devCanEdit(t, "title")), flowBox(t), devPeople(t), projBox,
     h("div", { class: "dv-stamp" }, h("span", {}, "Created " + fmtAgo(t.created_at) + (t.created_by ? " by " + pname(t.created_by) : "")), t.updated_at ? h("span", {}, "Updated " + fmtAgo(t.updated_at)) : null,
       devCanEdit(t, "title") ? h("button", { type: "button", class: "linkbtn", id: "devMore", onclick: () => openRecord("tasks", t.id, null, { form: true }) }, "Edit all fields") : null));
   openDialog("", [devTitle(t), h("div", { class: "dv-view" }, left, right)], null);
@@ -12007,10 +12172,18 @@ async function renderAdminWork(el){
     h("button", { type: "button", class: "btn", title: "Ask Claude again with the latest activity", onclick: () => load(true) }, "Refresh summary")));
   const out = h("div", { class: "ws-out" });
   el.append(out);
-  let seq = 0;
-  async function load(refresh){
+  let seq = 0, shown = null;
+  // (2026-11cy) the summary keeps itself up to date: a period that includes today is rewritten when it's over 30 minutes
+  // old, on opening and every 30 minutes while the page is open (quietly: the old one stays on screen meanwhile)
+  const STALE = 30 * 60000;
+  const needsNew = d => d && d.end >= today() && (!d.generated_at || Date.now() - new Date(d.generated_at) > STALE);
+  const timer = setInterval(() => {
+    if (S.route !== "admin-work" || !out.isConnected) { clearInterval(timer); return; }
+    if (document.visibilityState === "visible" && needsNew(shown)) load(true, true);
+  }, 60000);
+  async function load(refresh, quiet){
     const my = ++seq;
-    out.replaceChildren(h("div", { class: "loading" }, h("span", { class: "spinner" }), "Reading " + (u.period === "day" ? "the day" : "the " + u.period) + " and writing the summary…"));
+    if (!quiet) out.replaceChildren(h("div", { class: "loading" }, h("span", { class: "spinner" }), "Reading " + (u.period === "day" ? "the day" : "the " + u.period) + " and writing the summary…"));
     try {
       const { data, error } = await sb.functions.invoke("work-summary", { body: { user_id: u.user, period: u.period, date: u.date, refresh: !!refresh } });
       if (error){
@@ -12020,8 +12193,9 @@ async function renderAdminWork(el){
         throw new Error(msg);
       }
       if (data && data.error) throw new Error(data.error);
-      if (my === seq) draw(data);
+      if (my === seq) { const keep = quiet ? (document.scrollingElement || {}).scrollTop : 0; shown = data; draw(data); if (quiet && keep) document.scrollingElement.scrollTop = keep; if (!refresh && needsNew(data)) load(true, true); }
     } catch (e) {
+      if (quiet) return;   // a background update that failed leaves the summary on screen as it was
       if (my === seq) out.replaceChildren(h("div", { class: "panel empty" }, h("b", {}, "Couldn’t load the work summary"), String(e.message || e)));
     }
   }
@@ -12031,7 +12205,7 @@ async function renderAdminWork(el){
     const stat = (v, l) => h("div", { class: "stat" }, h("div", { class: "v" }, String(v)), h("div", { class: "l" }, l));
     const sum = h("section", { class: "panel ws-summary" },
       h("div", { class: "ws-head" }, h("h2", {}, d.person.name + " · " + range),
-        d.generated_at ? h("span", { class: "muted ws-meta" }, "Summary by Claude, " + fmtAgo(d.generated_at)) : null),
+        d.generated_at ? h("span", { class: "muted ws-meta" }, "Summary by Claude, " + fmtAgo(d.generated_at) + (d.end >= today() ? " · updates by itself every 30 minutes" : "")) : null),
       d.summary ? h("div", { class: "ws-body" }, workMd(d.summary)) : null,
       d.note ? h("p", { class: "muted ws-note" }, d.note) : null);
     const statsRow = h("div", { class: "stats" }, s.onPhone ? h("div", { class: "stat ws-phone", title: "Things done from a phone or tablet (the team is expected to work on a laptop)" }, h("div", { class: "v" }, String(s.onPhone)), h("div", { class: "l" }, "Done on phone")) : null, stat(s.hours || 0, "Hours logged"), stat(s.tasksDone || 0, "Tasks finished"), stat(s.tasksTouched || 0, "Tasks worked on"),
@@ -12141,7 +12315,7 @@ function openUserEditor(id){
   const p = id ? person(id) : null;
   const f = {
     full_name: h("input", { class: "in", value: p ? p.full_name : "", maxlength: "80" }),
-    email: h("input", { class: "in", type: "email", value: p ? p.email : "", disabled: !!p, autocomplete: "off" }),
+    email: h("input", { class: "in", type: "email", value: p ? p.email : "", autocomplete: "off" }),   // (2026-11cy) admins can change it
     password: h("input", { class: "in", type: "text", autocomplete: "new-password", placeholder: p ? "Leave empty to keep the current password" : "At least 8 characters" }),
     title: h("input", { class: "in", value: p ? p.title : "", maxlength: "80", placeholder: "e.g. App Developer" }),
     phone: h("input", { class: "in", type: "tel", value: p ? p.phone : "", maxlength: "30" }),
@@ -12191,6 +12365,12 @@ function openUserEditor(id){
         closeDlg();
         showCredentials(name, f.email.value.trim(), pw);
       } else {
+        const newEmail = f.email.value.trim().toLowerCase();
+        if (newEmail !== String(p.email || "").toLowerCase()) {
+          if (!validEmail(newEmail)) { err.textContent = "Enter a valid work email."; err.hidden = false; save.disabled = false; return; }
+          const r = await callAdmin({ action: "set_email", id: p.id, email: newEmail }); if (r && r.warning) toast(r.warning);
+          notify([p.id], "Your work email is now " + newEmail, "Changed by " + S.me.full_name + ". Sign in with " + newEmail + " from now on.", "profiles", p.id);
+        }
         await updateRow("profiles", p.id, prof);
         if (personalWas !== null && pe !== personalWas) await savePersonalEmail(p.id, pe);
         if (pw) await callAdmin({ action: "set_password", id: p.id, password: pw });
@@ -12412,7 +12592,7 @@ async function renderAdminActivity(el){
 const NAV = [
   ["", [["dashboard","Home"], ["overview","Company overview"], ["tasks","Tasks"], ["notes","Notes"], ["calendar","Calendar"], ["team-calendar","Team calendar"]]],
   // Development and QA work on one simple board (2026-11ad); the older pages are hidden, their data is kept
-  ["Development & QA", [["dev-board","Board"]]],
+  ["Development & QA", [["dev-board","Board"], ["projects","Projects"]]],   // projects: added 2026-11cy
   ["Communication", [["chat","Chat"], ["emails","Emails"], ["announcements","Announcements"]]],
   ["Sales", [["sales","Sales dashboard"], ["deals","Pipeline"], ["leads","Leads"], ["ig_leads","Instagram leads"], ["activities","Activities"], ["proposals","Proposals"], ["targets","Targets"], ["crm-analytics","Analytics"]]],
   // clients and everything they send through the client portal (2026-11bu)
@@ -12695,6 +12875,7 @@ function drawNotifications(){
       if (!n.is_read) { try { await sb.from("notifications").update({ is_read: true }).eq("id", n.id); n.is_read = true; renderShell(); } catch (e) {} }
       if (n.tbl === "connect-google") { if (googleConnected()) toast("Google is already connected."); else connectGoogle(); return; }
       if (n.tbl === "team-day") { S.ui.day = { day: localDay(n.created_at || new Date()), user: n.entity_id || "" }; go("admin-day"); return; }
+      if (n.tbl === "profiles") { if (n.entity_id === S.me.id) openMyProfile(); else if (isAdmin()) { await ensure(["profiles", "roles"]); openUserEditor(n.entity_id); } else openPerson(n.entity_id); return; }   // (2026-11cy) email change requests
       openTarget(n.tbl, n.entity_id);
     } }, h("b", {}, n.title), n.body ? h("span", {}, n.body) : null, h("span", {}, fmtAgo(n.created_at))));
   }
@@ -13347,6 +13528,9 @@ function liveWake(){
   if (typeof startChatLive === "function") startChatLive();
 }
 window.addEventListener("online", liveWake);
+// (2026-11cy) a computer that slept with the page on screen gives no "visible again" signal (Safari): notice the gap in time instead
+let wakeTick = Date.now();
+setInterval(() => { const now = Date.now(); if (now - wakeTick > 60000) liveWake(); wakeTick = now; }, 15000);
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") liveWake(); });
 
 // Quietly load every section this person can open, so switching pages is instant.

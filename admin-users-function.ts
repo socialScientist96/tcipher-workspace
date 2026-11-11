@@ -155,6 +155,19 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     }
 
+    // (2026-11cy) change someone's work email: their sign-in email and the address shown everywhere
+    if (action === "set_email") {
+      const email = String(body.email ?? "").trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "Enter a valid email address." }, 400);
+      const { data: taken } = await admin.from("profiles").select("id").ilike("email", email).neq("id", id).limit(1);
+      if (taken && taken.length) return json({ error: "Someone else already uses that email." }, 400);
+      const { error } = await admin.auth.admin.updateUserById(id, { email, email_confirm: true });
+      if (error) return json({ error: error.message }, 400);
+      const { error: pErr } = await admin.from("profiles").update({ email }).eq("id", id);
+      if (pErr) return json({ ok: true, warning: "Sign-in email changed, but the profile wasn’t updated: " + pErr.message });
+      return json({ ok: true });
+    }
+
     if (action === "reset_mfa") {
       // for someone who lost the phone with their authenticator app: they sign in with the password until they set it up again
       const { data, error } = await admin.auth.admin.mfa.listFactors({ userId: id });
