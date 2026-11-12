@@ -1143,6 +1143,32 @@ a.tkey:hover{background:var(--tint);color:var(--ink)}
 .chat-list h4{text-transform:none;letter-spacing:0;font-size:12px;font-weight:500;margin:16px 8px 4px}
 .chat-item.unread b{font-weight:600}
 .gicon{background:var(--tint);color:var(--ink2)}
+/* chat list rows (batch 5): icon · name + time · last message + unread */
+.chat-item{gap:10px;padding:8px;min-height:56px;align-items:center}
+.chat-item .x{display:flex;flex-direction:column;gap:2px;white-space:normal;overflow:visible}
+.ci-top{display:flex;align-items:baseline;gap:8px;min-width:0}
+.ci-top b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.ci-when{flex:none;font-size:11.5px;color:var(--ink3);font-variant-numeric:tabular-nums}
+.chat-item.unread .ci-when{color:var(--p-ink);font-weight:600}
+.ci-sub{display:flex;align-items:center;gap:8px;min-width:0;font-size:13px;color:var(--ink3);line-height:1.35}
+.ci-prev{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ci-prev .status-line,.ci-prev > *{white-space:nowrap}
+.chat-item.unread .ci-prev{color:var(--ink);font-weight:500}
+.ci-sub .cnt{flex:none}
+.cicon{width:36px;height:36px;border-radius:10px;background:var(--tint);color:var(--ink2);display:grid;place-items:center;font-weight:600;font-size:16px;flex:none}
+.chat-item > .av{width:36px;height:36px;flex:none}
+/* (2026-11dj) a narrow conversation (small laptop with the menu open, tablets) squeezed the name to one letter per line:
+   the header measures itself; under 560 px the buttons show icons only (labels stay for screen readers) */
+.chat-foot > textarea{flex:1 1 160px;min-width:0}   /* the message box takes the free width (it was squeezed to ~150 px on small laptops) */
+.chat-head{container-type:inline-size;container-name:chathead}
+.chat-head .x{min-width:0}
+.chat-head .x b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-head .x .lastact{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@container chathead (max-width:560px){
+  .chat-head .btn{flex:none;gap:0;padding:0 10px;min-width:40px;justify-content:center}
+  .chat-head .btn .bl{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
+  .chat-head .x{min-width:96px}
+}
 .chat-msgs .bname{font-weight:500}
 .chat-msgs .bub{background:#F1F1F3;border-radius:16px}
 .chat-msgs .bub.tagged{box-shadow:0 0 0 1px #E9B949 inset;background:#FFFBF0}
@@ -2560,6 +2586,9 @@ html:has(#content .chat),html:has(#content .chat) body{overscroll-behavior-y:non
   dialog.dv-wide .dv-flow{order:2;position:sticky;bottom:-12px;z-index:3;margin:0 -16px -12px;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));border:0;border-top:1px solid var(--line);border-radius:0;background:var(--white);box-shadow:0 -6px 16px rgba(0,0,0,.06)}
   dialog.dv-wide .dv-flow .dv-steps{display:none}   /* the status is in the window's header already */
   dialog.dv-wide .dv-flowbtns > .btn{flex:1 1 auto;justify-content:center;min-height:44px}
+  /* ===== Redesign batch 5 — notes on phones: the ⋮⋮ handles stay quiet until you're working on that block ===== */
+  .nb-gutter{opacity:.32;transition:opacity .15s var(--ease)}
+  .nb-block:focus-within > .nb-gutter,.nb-block:active > .nb-gutter,.nb-gutter:focus-within{opacity:1}
   .ph .acts .m-hide{display:none !important}
   .tablewrap > table:not(.tcal) > tbody > tr.m-titled{display:flex;flex-direction:column}
   .tablewrap > table:not(.tcal) > tbody > tr.m-titled > td.m-title{order:-2;justify-content:flex-start;text-align:left;font-size:var(--fs-lg);font-weight:600;padding:0 0 2px}
@@ -2950,6 +2979,16 @@ function fmtDate(s, withYear){
 }
 function fmtMonth(s){ return s ? parseD(String(s).slice(0, 7) + "-01").toLocaleDateString("en-IN", { month: "short", year: "numeric" }) : ""; }
 const monthStart = (s) => (s || today()).slice(0, 7) + "-01";
+// chat list: 10:42 am today, Yesterday, Mon (this week), 3 Nov (older)
+function chatWhen(ts){
+  if (!ts) return "";
+  const d = new Date(ts), now = new Date(), day = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.round((day(now) - day(d)) / 864e5);
+  if (diff <= 0) return fmtTime(ts);
+  if (diff === 1) return "Yesterday";
+  if (diff < 7) return d.toLocaleDateString("en-IN", { weekday: "short" });
+  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
 function fmtTime(ts){ return ts ? new Date(ts).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }) : ""; }
 function fmtAgo(ts){
   const s = (Date.now() - new Date(ts)) / 1000;
@@ -9723,9 +9762,20 @@ function drawChatList(){
     chatEls.search = search; chatEls.items = h("div", { class: "chat-items" });
     list.replaceChildren(search, chatEls.items);
   }
+  // (batch 5) every row: icon · name and time of the last message · what was said last, with the unread count
+  const lastOf = (cid, kind) => {
+    const m = cid && C.last[cid]; if (!m) return null;
+    const who = m.author_id === S.me.id ? "You: " : kind === "dm" ? "" : ((pname(m.author_id) || "").split(" ")[0] || "Someone") + ": ";
+    const txt = String(m.body || "").replace(/\s+/g, " ").trim() || "Attachment";
+    return { text: who + txt, when: chatWhen(m.created_at) };
+  };
+  const row = (cid, kind, name, fallback, unread, cnt) => { const l = lastOf(cid, kind); return h("span", { class: "x" },
+    h("span", { class: "ci-top" }, name, l ? h("span", { class: "ci-when" }, l.when) : null),
+    h("span", { class: "ci-sub" }, h("span", { class: "ci-prev" }, l ? l.text : fallback), cnt || null)); };
   const item = (id, label, sub, unread, mention, extra) => h("button", { type: "button", class: "chat-item" + (C.active === id ? " on" : "") + (unread ? " unread" : ""), onclick: async () => { C.mobileView = "conv"; await openChannel(id); rerender(); } },
-    extra || null, h("span", { class: "x" }, h("b", {}, label, chatMuted(id) ? h("span", { class: "mutedmark", title: "Muted", "aria-label": "Muted" }, ic("bellOff", 13)) : null), sub ? h("br") : null, sub || null),
-    unread ? h("span", { class: "cnt " + (chatMuted(id) && !C.mentions[id] ? "muted" : mention ? "due" : "new") }, String(unread > 99 ? "99+" : unread)) : null);
+    extra || null,
+    row(id, (C.channels.find(c => c.id === id) || {}).kind, h("b", {}, label, chatMuted(id) ? h("span", { class: "mutedmark", title: "Muted", "aria-label": "Muted" }, ic("bellOff", 13)) : null), sub, unread,
+      unread ? h("span", { class: "cnt " + (chatMuted(id) && !C.mentions[id] ? "muted" : mention ? "due" : "new") }, String(unread > 99 ? "99+" : unread)) : null));
   const match = t => !q || String(t || "").toLowerCase().includes(q);
   const channels = C.channels.filter(c => c.kind === "channel" && match(c.name));
   const groups = C.channels.filter(c => c.kind === "group" && match(chName(c))).sort((a, b) => String((C.last[b.id] || {}).created_at || b.created_at).localeCompare(String((C.last[a.id] || {}).created_at || a.created_at)));
@@ -9736,13 +9786,14 @@ function drawChatList(){
   // on a phone, opening a chat switches to the conversation
   const open = fn => async (...a) => { C.mobileView = "conv"; await fn(...a); };
   chatEls.items.replaceChildren(...[
-    channels.length ? h("h4", {}, "Channels") : null, ...channels.map(c => item(c.id, "# " + c.name, c.vertical ? c.vertical + " team" : "Everyone", C.unread[c.id], C.mentions[c.id])),
+    channels.length ? h("h4", {}, "Channels") : null, ...channels.map(c => item(c.id, c.name, c.vertical ? c.vertical + " team" : "Everyone", C.unread[c.id], C.mentions[c.id], h("span", { class: "cicon", "aria-hidden": "true" }, "#"))),
     h("h4", { style: "display:flex;align-items:center" }, "Groups", h("button", { type: "button", class: "linkbtn", style: "margin-left:auto;text-transform:none;letter-spacing:0", onclick: () => groupDialog(null) }, "+ New group")),
-    ...(groups.length ? groups.map(c => item(c.id, chName(c), (c.members || []).length + " people", C.unread[c.id], true, h("span", { class: "gicon", "aria-hidden": "true" }, ic("users", 15))))
+    ...(groups.length ? groups.map(c => item(c.id, chName(c), (c.members || []).length + " people", C.unread[c.id], true, h("span", { class: "cicon", "aria-hidden": "true" }, ic("users", 17))))
       : [h("p", { class: "muted", style: "font-size:12.5px;margin:2px 8px 6px" }, q ? "No groups match." : "Private chats with a few people.")]),
     h("h4", {}, "Direct messages"), ...(people.length ? [] : [h("p", { class: "muted", style: "font-size:12.5px;margin:2px 8px 6px" }, "No one matches “" + C.q.trim() + "”.")]),
     ...people.map(({ p, ch }) => h("button", { type: "button", class: "chat-item" + (ch && C.active === ch.id ? " on" : "") + (ch && C.unread[ch.id] ? " unread" : ""), onclick: open(() => openDM(p.id)) },
-      avatar(p.id, "sm"), h("span", { class: "x" }, h("b", {}, p.full_name), h("br"), statusLine(p.id)), ch && C.unread[ch.id] ? h("span", { class: "cnt due" }, String(C.unread[ch.id])) : null))].filter(Boolean));
+      avatar(p.id), row(ch && ch.id, "dm", h("b", {}, p.full_name, ch && chatMuted(ch.id) ? h("span", { class: "mutedmark", title: "Muted", "aria-label": "Muted" }, ic("bellOff", 13)) : null), statusLine(p.id), ch && C.unread[ch.id],
+        ch && C.unread[ch.id] ? h("span", { class: "cnt due" }, String(C.unread[ch.id] > 99 ? "99+" : C.unread[ch.id])) : null)))].filter(Boolean));
   if (q.length >= 2) chatEls.items.append(msgSearchSection(q));
 }
 
