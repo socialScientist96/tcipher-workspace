@@ -4702,6 +4702,7 @@ async function openRecord(key, id, preset, opts){
   const A = access(M, rec);
   const editable = rec ? A.canEdit : A.canCreate;
   const values = rec ? clone(rec) : {};
+  const opened = rec ? clone(rec) : null;   // (2026-11dk) what the record looked like when this form opened
   if (!rec){
     for (const f of M.fields){ if (f.def !== undefined) values[f.k] = typeof f.def === "function" ? f.def() : f.def; }
     Object.assign(values, preset || {});
@@ -4800,6 +4801,13 @@ async function openRecord(key, id, preset, opts){
             h("button", { type: "button", class: "linkbtn", onclick: () => { save.confirmedDup = true; save(thenFiles); } }, "create anyway"), ".");
           err.hidden = false; return;
         }
+      }
+      // (2026-11dk) editing: send only the fields this person changed. Sending the whole form silently put back
+      // anything someone else had changed meanwhile (their new title, status, owner…) with this form's old values.
+      if (rec && opened){
+        const same = (a, b) => { const n = v => v === "" || v === undefined || v === null ? null : typeof v === "object" ? JSON.stringify(v) : String(v); return n(a) === n(b); };
+        for (const k of Object.keys(data)) if (same(data[k], opened[k])) delete data[k];
+        if (!Object.keys(data).length) { closeDlg(); toast("No changes to save."); return; }
       }
       saveBtns.forEach(b => { b.disabled = true; b.dataset.label = b.textContent; b.textContent = "Saving…"; });
       try {
@@ -14295,7 +14303,11 @@ function portalPanel(rec){
 /* ---------------------------------------------------------------------
    Sign-in and startup
    --------------------------------------------------------------------- */
-function showScreen(which){ for (const id of ["boot","setup","login","inactive","mfa","app","portal"]) $(id).hidden = id !== which; if (which === "login") showCaptcha(); }
+function showScreen(which){ for (const id of ["boot","setup","login","inactive","mfa","app","portal"]) $(id).hidden = id !== which; if (which === "login") showCaptcha();
+  // (2026-11dk) the sign-in screen never keeps the last person's password or code: after "Sign out" on a shared
+  // laptop or phone, pressing Enter used to sign the previous person straight back in
+  if (which === "login") { for (const id of ["loginPass", "mfaCode"]) { const f = document.getElementById(id); if (f) f.value = ""; } }
+}
 
 async function startSession(session){
   try {
