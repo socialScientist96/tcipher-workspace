@@ -11156,7 +11156,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11df-dev";
+const APP_VERSION = "2026-11dg-dev";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -13498,7 +13498,19 @@ function takeDeepLink(){
   const tbl = decodeURIComponent(m[1]), id = decodeURIComponent(m[2]);
   history.replaceState(null, "", location.pathname + location.search + (tbl === "chat" ? "#chat" : "#dashboard"));
   setTimeout(() => openTarget(tbl, id), 0);
+  markNotifsReadFor(tbl, id);   // opened from a push notification on the phone: it's read now (2026-11df)
   return true;
+}
+// mark my unread notifications about one item as read (the push tapped on a phone, or its link)
+async function markNotifsReadFor(tbl, id){
+  if (!S.me || !tbl || !id) return;
+  try {
+    const { error } = await sb.from("notifications").update({ is_read: true }).eq("user_id", S.me.id).eq("tbl", tbl).eq("entity_id", id).eq("is_read", false);
+    if (error) return;
+    (S.notifications || []).forEach(n => { if (n.tbl === tbl && String(n.entity_id) === String(id)) n.is_read = true; });
+    renderShell();
+    const np = document.getElementById("npanel"); if (np && !np.hidden && typeof drawNotifications === "function") drawNotifications();
+  } catch (e) {}
 }
 function drawNotifications(){
   const p = $("npanel");
