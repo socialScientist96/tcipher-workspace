@@ -2319,6 +2319,28 @@ html:has(#content .chat),html:has(#content .chat) body{overscroll-behavior-y:non
 .shot-wait{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:rgba(15,12,45,.25)}
 .shot-box{display:flex;align-items:center;gap:12px;background:var(--white);color:var(--ink);border-radius:14px;padding:16px 20px;box-shadow:0 10px 40px rgba(0,0,0,.2);font-weight:600}
 .btn .spinner{width:14px;height:14px;margin-right:6px;vertical-align:-2px}
+
+/* Broken UI repairs — chat on phones (BU-016 bubbles off the left edge, BU-017 header wrapping with large text) */
+@media (max-width:760px){
+  /* a bubble never grows past its column; what's inside shrinks to fit */
+  .chat-msgs .bub{max-width:100%;min-width:0;box-sizing:border-box}
+  .chat-msgs .bub > *{max-width:100%;min-width:0}
+  .catts{min-width:0;max-width:100%}
+  .cfile{min-width:0;max-width:100%;flex-wrap:wrap;row-gap:2px;box-sizing:border-box}
+  .cfile .cfx{flex:1 1 calc(100% - 40px)}
+  .cfile .btn{flex:1 1 auto;min-height:40px;justify-content:center}
+  .vp{min-width:0;max-width:100%;box-sizing:border-box}
+  .vp-bar{min-width:40px}
+  .vp-time{min-width:0}
+  .chat-msgs .cimgbtn,.chat-msgs .cimg{max-width:100%;height:auto}
+  /* header: one line for the name, one for the status, buttons in one row (also with large system text) */
+  .chat-head{flex-wrap:nowrap;align-items:center}
+  .chat-head .x{min-width:0;flex:1 1 auto}
+  .chat-head .x b,.chat-head .x > span:first-child{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chat-head .x .muted,.chat-head .x .lastact{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chat-head .x br{display:none}
+  .chat-head .chat-acts{flex-wrap:nowrap;flex:none}
+  .chat-head .chat-acts .btn{width:40px;min-height:40px}
 </style>
 </head>
 <body>
