@@ -6475,7 +6475,13 @@ async function autoSyncGoogle(){
   const l = myGoogle(); if (!l || googleExpired()) return;
   if (!l.last_sync_at || Date.now() - new Date(l.last_sync_at) > 10 * 60000) syncGoogleNow(true);
 }
-setInterval(() => { if (S.me && googleConnected()) syncGoogleNow(true); }, 15 * 60000);
+// (2026-11ea) skip if your calendar was synced in the last 14 minutes (by the server's own sync, or another tab or device)
+setInterval(async () => {
+  if (!S.me || !googleConnected() || document.visibilityState === "hidden") return;
+  try { await load("google_links", true); } catch (e) {}
+  const l = myGoogle(); if (!l || (l.last_sync_at && Date.now() - new Date(l.last_sync_at) < 14 * 60000)) return;
+  syncGoogleNow(true);
+}, 15 * 60000);
 
 async function syncMeetingToGoogle(m){ const r = await callGoogle("save_event", { meeting_id: m.id }); if (r && r.meeting) upsertCache("meetings", r.meeting); return r && r.meeting; }
 async function deleteGoogleEvent(m){ if (googleOn() && m.google_event_id) await callGoogle("delete_event", { meeting_id: m.id }); }
@@ -10123,7 +10129,8 @@ async function heartbeat(){
     if (r.error && row.device && /device/i.test(r.error.message || "")) { S.devCols = false; delete row.device; await sb.from("presence").upsert(row, { onConflict: "user_id" }); }
     else if (!r.error && row.device) S.devCols = true;
   } catch (e) {}
-  if (!heartbeat.n || ++heartbeat.n % 2 === 0) { heartbeat.n = heartbeat.n || 1; await load("presence", true); paintPresence(); }
+  // (2026-11ea) who's online comes live (presence channel); the "last seen" times only need a refresh every 5 minutes
+  if (!heartbeat.n || ++heartbeat.n % 5 === 0) { heartbeat.n = heartbeat.n || 1; await load("presence", true); paintPresence(); }
 }
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && S.me) { heartbeat(); usagePing(); } });
 const isOnline = id => ONLINE.has(id);
@@ -10716,7 +10723,8 @@ async function chatPoll(){
   if (!S.me || !C.ready || document.visibilityState === "hidden") return;
   // a backup for when live updates are down: while they work, a slow safety check is enough (saves the database)
   const live = S.live === "SUBSCRIBED" && !window.__mock;   // the preview's stand-in live connection doesn't deliver others' messages
-  const now = Date.now(), every = live ? 60000 : window.__mock ? (S.route === "chat" ? 2000 : 10000) : (S.route === "chat" ? 10000 : 30000);
+  // (2026-11ea) live: every 3 minutes (was 1); messages come over the live connection, this only catches a missed one
+  const now = Date.now(), every = live ? (liveConnected() ? 180000 : 60000) : window.__mock ? (S.route === "chat" ? 2000 : 10000) : (S.route === "chat" ? 10000 : 30000);
   if (now - lastChatPoll < every - 200) return;
   lastChatPoll = now;
   // (2026-11dy) the backup check keeps its own bookmark: only what it has itself fetched moves it on. A message that
@@ -10737,7 +10745,8 @@ function startChatPolling(){
   notifPollT = setInterval(async () => {
     if (!S.me || document.visibilityState === "hidden") return;
     // live updates bring new notifications at once; this is only a backup (every 2 minutes, or 30 s while live is down)
-    if (Date.now() - lastNotifPoll < (S.live === "SUBSCRIBED" && !window.__mock ? 120000 : 20000) - 500) return;
+    // (2026-11ea) every 5 minutes while your own live channel is connected (it delivers each new notification)
+    if (Date.now() - lastNotifPoll < (S.live === "SUBSCRIBED" && !window.__mock ? (S.userLive === "SUBSCRIBED" ? 300000 : 120000) : 20000) - 500) return;
     lastNotifPoll = Date.now();
     const before = new Set(S.notifications.map(n => n.id + "|" + n.created_at));
     try { await loadNotifications(); } catch (e) { return; }
@@ -12122,7 +12131,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11dz";
+const APP_VERSION = "2026-11ea";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -14562,7 +14571,7 @@ function onChange(payload){
     let changed = false;
     for (const x of list){
       const before = JSON.stringify(x === "settings" ? S.settings : (S.cache[x] || null));
-      if (x === "settings") await loadSettings(); else await load(x, true);
+      if (x === "settings") await loadSettings(); else await liveRefresh(x);
       if (JSON.stringify(x === "settings" ? S.settings : (S.cache[x] || null)) !== before) changed = true;
     }
     if (!changed) return;   // our own save already updated the screen
@@ -14577,6 +14586,59 @@ function onChange(payload){
     if (deps && !list.some(t => deps.has(t) || t === "roles" || t === "settings")) { renderShell(); return; }
     liveRedraw();
   }, 400);
+}
+// (2026-11ea) after a live signal, fetch only what changed instead of the whole table again (much less data on the
+// free plan). These tables stamp updated_at on every save; a 2-minute overlap covers saves that commit late.
+// Deleted rows: a list of ids only (tiny) shows what's gone. Anything unusual falls back to the full reload.
+const DELTA_TABLES = new Set(["activities","announcements","attendance","campaigns","clients","contacts","content","deals","documents","features","leads","leave_requests","meetings","notes","projects","proposals","releases","seo_keywords","social_stats","sprints","targets","tasks","tickets"]);
+async function liveRefresh(t){
+  const cache = S.cache[t];
+  if (!DELTA_TABLES.has(t) || !S.loaded.has(t) || !cache || !cache.length || !("updated_at" in cache[0])) return load(t, true);
+  try {
+    let max = 0; for (const r of cache) { const v = Date.parse(r.updated_at); if (v > max) max = v; }
+    if (!max) return load(t, true);
+    const since = new Date(max - 120000).toISOString();
+    const changed = ok(await sb.from(t).select("*").gte("updated_at", since).limit(1000)) || [];
+    if (changed.length >= 1000) return load(t, true);
+    let next = cache.slice();
+    const at = new Map(next.map((r, i) => [r.id, i]));
+    const o = ORDER[t] || ["created_at", false];
+    let moved = false;
+    for (const r of changed) {
+      if (at.has(r.id)) { const i = at.get(r.id); if (next[i][o[0]] !== r[o[0]]) moved = true; next[i] = r; }
+      else { at.set(r.id, next.length); next.push(r); moved = true; }
+    }
+    if (next.length < 1000) {   // deletions (and rows you can no longer see)
+      const ids = ok(await sb.from(t).select("id").limit(1000)) || [];
+      if (ids.length < 1000) { const keep = new Set(ids.map(x => x.id)); next = next.filter(r => keep.has(r.id)); }
+    }
+    const val = r => r[o[0]], cmp = (a, b) => {
+      const x = val(a), y = val(b);
+      if (x == null && y == null) return String(a.id).localeCompare(String(b.id)); if (x == null) return 1; if (y == null) return -1;
+      const c = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y));
+      return (o[1] ? c : -c) || String(a.id).localeCompare(String(b.id));
+    };
+    if (moved) next.sort(cmp);   // only when a row is new or its sort field changed: otherwise the order stays as loaded
+    S.cache[t] = next;
+    return rows(t);
+  } catch (e) { return load(t, true); }
+}
+// (2026-11ea) a broadcast signal from the database: which table changed (and, for comments, files and profiles, which item).
+// The data itself is then loaded through the normal access rules, exactly as before.
+function onSignal(p){
+  if (!p || !p.t || !S.me) return;
+  const t = p.t;
+  if (t === "chat_channels") { if (typeof C !== "undefined" && C.ready) loadChat(true).then(() => { syncChatSubs(); renderShell(); if (S.route === "chat") rerender(); }, () => {}); return; }
+  // everyone's "last active" is saved once a minute, so these come often: one reload at most every 20 seconds
+  if (t === "user_status") {
+    if (!S.loaded.has("user_status") || onSignal.statusT) return;
+    const wait = Math.max(0, 20000 - (Date.now() - (onSignal.statusAt || 0)));
+    onSignal.statusT = setTimeout(() => { onSignal.statusT = null; onSignal.statusAt = Date.now(); load("user_status", true).then(() => { if (typeof paintStatus === "function") paintStatus(); }, () => {}); }, wait);
+    return;
+  }
+  if (t === "comments" || t === "files") { onChange({ table: t, new: p.tbl ? { tbl: p.tbl, entity_id: p.eid } : null }); return; }
+  if (t === "profiles" && p.pid) { const id = p.pid; setTimeout(() => { if (typeof refreshAvatars === "function") refreshAvatars(id); }, 1500); }   // after the reload below
+  onChange({ table: t, eventType: "SIGNAL" });
 }
 async function loadSettings(){ try { const r = ok(await sb.from("settings").select("data").eq("id", 1).maybeSingle()); S.settings = (r && r.data) || {}; } catch (e) { S.settings = S.settings || {}; } }
 
@@ -15166,7 +15228,9 @@ document.addEventListener("visibilitychange", () => {
 function startLive(){
   if (!S.me) return;
   if (channel) { try { sb.removeChannel(channel); } catch (e) {} channel = null; }
-  const mine = channel = sb.channel("ws-live", { config: { private: true } }).on("postgres_changes", { event: "*", schema: "public" }, onChange).subscribe((status, err) => {
+  // (2026-11ea) signals the database broadcasts ("tasks changed"), not "postgres_changes" on 39 tables: watching
+  // tables made the database record and remove a subscription per table on every connect, and check each change for each person
+  const mine = channel = sb.channel("ws-live", { config: { private: true } }).on("broadcast", { event: "chg" }, ({ payload }) => onSignal(payload)).subscribe((status, err) => {
     if (channel !== mine) return;
     S.live = status;
     if (status === "SUBSCRIBED") {
