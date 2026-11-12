@@ -2272,6 +2272,30 @@ dialog:has(.ai-imp) {width:min(1100px,calc(100vw - 24px))}
   .dv-title{overflow-wrap:anywhere}
   .dv-top{flex-wrap:wrap;gap:10px}
 }
+
+/* pages inside a note, under its title (2026-11dc) */
+.nb-inside{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:4px 0 18px}
+.nb-inside > .muted{font-size:var(--fs-sm);margin-right:2px}
+.nb-inside-item{display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--white);color:var(--ink);text-decoration:none;font-size:var(--fs-sm);min-height:36px}
+.nb-inside-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nb-inside-item:hover{background:var(--tint)}
+
+/* phones: a back button in the bottom bar and a close button in the menu (2026-11dc) */
+.topbar .back{display:none}
+.side-close{display:none}
+@media (max-width:960px){
+  .topbar .back:not([hidden]){display:grid}
+  .side-close{display:inline-grid}
+}
+
+/* touch screens (2026-11dc): Crop sits under the picture, not on it (it covered small pictures), and the resize bars
+   are shorter so the picture stays visible */
+@media (hover:none){
+  .nb-mbox .nb-cropbtn{position:static;display:inline-flex;opacity:1;margin:6px 0 0;background:var(--tint);color:var(--ink2);padding:4px 10px;font-size:var(--fs-sm)}
+  .nb-mbox{display:flex;flex-direction:column;align-items:center}
+  .nb-mbox > .nb-media,.nb-mbox > .nb-caption{align-self:stretch}
+  .nb-resize{top:20%;bottom:auto;height:50%;width:22px;opacity:.7}
+}
 </style>
 </head>
 <body>
@@ -2334,6 +2358,7 @@ dialog:has(.ai-imp) {width:min(1100px,calc(100vw - 24px))}
   <div class="main">
     <div class="topbar">
       <button class="iconbtn menu" id="menuBtn" type="button" aria-label="Menu"><svg class="ic" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg></button>
+      <button class="iconbtn back" id="backBtn" type="button" aria-label="Back" title="Back" hidden><svg class="ic" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
       <div class="crumb" id="crumb"></div>
       <button class="iconbtn" id="bell" type="button" aria-label="Notifications">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
@@ -6747,6 +6772,10 @@ async function renderNotePage(el, id){
   el.append(article); article.append(titleEl,
     h("div", { class: "nb-meta muted" }, "By " + (pname(note.owner_id) || "someone") + " · edited " + fmtAgo(note.updated_at) + " · " + (VIS_LABEL[note.visibility] || note.visibility) +
       ((note.editors || []).length ? " · " + note.editors.length + " can edit" : "") + (!isOwnerNote && editable ? " · you can edit" : !editable ? " · view only" : "")), wrap);
+  // (2026-11dc) a page with pages inside lists them right under its title, so they're one tap away however it was opened
+  { const inside = rows("notes").filter(n => n.parent_id === note.id && !n.archived).sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
+    if (inside.length) wrap.before(h("div", { class: "nb-inside" }, h("span", { class: "muted" }, "Pages inside"),
+      ...inside.slice(0, 30).map(c => h("a", { href: "#note=" + c.id, class: "nb-inside-item" }, ic("fileText", 15), h("span", {}, c.title || "Untitled"))))); }
 
   const crumbHere = el.querySelector(".nb-crumbs > span:last-child");
   titleEl.addEventListener("input", () => { title = titleEl.textContent.replace(/\n/g, " ").trim(); if (crumbHere) crumbHere.textContent = title || "Untitled"; $("crumb").textContent = title || "Note"; queueSave(); });
@@ -8726,6 +8755,14 @@ async function pushOnStart(){
 // signing out stops this device getting that person's notifications
 async function signOutHere(){ try { const sub = await pushSub(); if (sub) await sb.from("push_subscriptions").delete().eq("endpoint", sub.endpoint); if (IN_IOS_APP()) localStorage.removeItem(NATIVE_KEY()); } catch (e) {} return sb.auth.signOut(); }
 // tapping a notification while the workspace is open: go to that item here
+// the back button in the bar (phones and the apps): close an open window first, then the previous page in the
+// workspace, or Home when there's nothing before it (2026-11dc)
+let navDepth = 0, navBacking = false;
+window.addEventListener("hashchange", () => { if (navBacking) { navBacking = false; navDepth = Math.max(0, navDepth - 1); } else navDepth++; });
+function navBack(){
+  try { if (dlg().open) { closeDlg(); return; } } catch (e) {}
+  if (navDepth > 0) { navBacking = true; history.back(); } else go("dashboard");
+}
 // called by the iPhone and Android apps when a notification (or a workspace link) is tapped: close whatever window or
 // menu is open, then go to that item (2026-11db: it used to open behind an open window, or not at all for the same link)
 // (2026-11db) the iPhone app switches its pull-to-refresh off on the chat screen (the Android app asks the page itself)
@@ -10718,7 +10755,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11db";
+const APP_VERSION = "2026-11dc";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -10814,7 +10851,8 @@ async function openReportDialog(){
   // take the screenshot first, so it shows the page the person was looking at
   let auto = null;
   // only when the screenshot tool is already loaded (it loads quietly after sign-in): never make people wait for the dialog
-  if (window.html2canvas && !(dlg && dlg().open && dlg().querySelector(".bugdlg"))) { try { auto = await capturePage(); } catch (e) { console.info("screenshot", e && e.message); } }
+  // (2026-11dc) it can take a few seconds on a phone: say so at once
+  if (window.html2canvas && !(dlg && dlg().open && dlg().querySelector(".bugdlg"))) { toast("Taking a screenshot of this page…"); try { auto = await capturePage(); } catch (e) { console.info("screenshot", e && e.message); } }
   else loadShotLib().catch(() => {});
   const note = h("textarea", { class: "in", rows: 5, maxlength: "4000", placeholder: "What went wrong? What were you trying to do, and what did you expect to happen?" });
   let shot = null;
@@ -10823,10 +10861,10 @@ async function openReportDialog(){
   const takeShot = async () => { try { const f = await capturePage(); if (f) showShot(f); else toast("Couldn’t take a screenshot. Choose an image instead."); } catch (e) { toast(e.message + " Choose an image instead."); } };
   const showShot = f => { shot = f;
     prev.replaceChildren(f ? h("img", { src: URL.createObjectURL(f), alt: "Screenshot of the page" }) : "");
-    shotBtns.replaceChildren(
+    shotBtns.replaceChildren(...[   // (2026-11dc) an empty slot used to print the word "null"
       h("button", { type: "button", class: "btn sm " + (f ? "ghost" : "soft"), id: "bugShotTake", onclick: takeShot }, ic("camera"), f ? "Retake" : "Take a screenshot"),
       f ? h("button", { type: "button", class: "btn sm ghost", id: "bugShotRemove", onclick: () => showShot(null) }, "Remove") : null,
-      h("button", { type: "button", class: "linkbtn", onclick: () => fileIn.click() }, f ? "Use another image" : "or choose an image")); };
+      h("button", { type: "button", class: "linkbtn", onclick: () => fileIn.click() }, f ? "Use another image" : "or choose an image")].filter(Boolean)); };
   const fileIn = h("input", { type: "file", accept: "image/*", hidden: true, onchange: () => { const f = fileIn.files[0]; if (f && f.size > 8 * 1048576) { toast("That image is over 8 MB."); return; } showShot(f || null); } });
   const err = h("p", { class: "err", hidden: true });
   const send = h("button", { type: "button", class: "btn pri" }, "Send report");
@@ -12869,6 +12907,7 @@ function renderShell(){
   const side = $("side");
   const label0 = S.route.startsWith("note=") ? ((byId("notes", S.route.slice(5)) || {}).title || "Note") : (NAV.flatMap(([, i]) => i).find(([r]) => r === S.route) || [null, S.route.startsWith("admin-") ? "Admin panel" : ""])[1];
   $("crumb").textContent = label0 || "";
+  { const bb = $("backBtn"); if (bb) bb.hidden = S.route === "dashboard"; }   // (2026-11dc) a back button on every page but Home
   const unread0 = S.notifications.filter(n => !n.is_read).length;
   const dot0 = $("bell").querySelector(".dot");
   dot0.hidden = !unread0; dot0.textContent = unread0 > 9 ? "9+" : String(unread0);
@@ -12891,7 +12930,8 @@ function renderShell(){
       h("a", { class: "brand", href: "#dashboard", "aria-label": (S.settings.company || "Tcipher") + " workspace home" }, h("img", { src: LOGO_DARK, alt: "Tcipher", class: "brand-logo" })),
       h("span", { class: "grow" }),
       canNewTask ? h("button", { type: "button", class: "side-ic", title: "New task", "aria-label": "New task", onclick: () => { closeSide(); openRecord("tasks", null); } }, ic("squarePen", 18)) : null,
-      h("button", { type: "button", class: "side-ic side-hide", title: "Hide sidebar (Ctrl+\\)", "aria-label": "Hide sidebar", onclick: () => setSideHidden(true) }, ic("panelLeft", 18))));
+      h("button", { type: "button", class: "side-ic side-hide", title: "Hide sidebar (Ctrl+\\)", "aria-label": "Hide sidebar", onclick: () => setSideHidden(true) }, ic("panelLeft", 18)),
+      h("button", { type: "button", class: "side-ic side-close", title: "Close menu", "aria-label": "Close menu", onclick: closeSide }, ic("x", 20))));   // phones (2026-11dc)
   // search: narrows the menu as you type (Ctrl+K or ⌘K jumps here)
   const search = h("input", { class: "side-search-in", id: "sideSearch", type: "search", placeholder: "Search", "aria-label": "Search the menu", autocomplete: "off", enterkeyhint: "go",
     oninput: () => { sideQuery = search.value; filterSide(); },
@@ -13891,6 +13931,7 @@ function wire(){
   $("loginPass").addEventListener("keydown", e => { if (e.key === "Enter") signIn(); });
   $("forgotBtn").addEventListener("click", forgot);
   $("inactiveOut").addEventListener("click", () => sb.auth.signOut());
+  $("backBtn").addEventListener("click", navBack);
   $("menuBtn").addEventListener("click", () => { if (window.innerWidth > 960) setSideHidden(!document.body.classList.contains("side-off")); else $("side").classList.toggle("open"); });
   try { if (localStorage.getItem("tc_side_off") === "1") document.body.classList.add("side-off"); } catch (e) {}
   document.addEventListener("keydown", e => {
