@@ -862,6 +862,13 @@ Deno.serve(async (req) => {
       try { mail = await mailRun(); } catch (e) { mail = { error: String((e as Error)?.message || e).slice(0, 200) }; }
       return json({ ok: true, replies, failed, ...mail });
     }
+    // (2026-11dr) the demo-booking function asks for the Google invite of a demo a lead just booked
+    if (action === "invite_booking") {
+      if (!CRON || req.headers.get("x-cron-secret") !== CRON) return json({ error: "Not allowed." }, 403);
+      const m = must(await db.from("meetings").select("id,created_by,kind,google_event_id").eq("id", String(body.meeting_id || "")).single());
+      if (m.kind !== "Sales demo" || m.google_event_id) return json({ error: "Nothing to send." }, 400);
+      return json({ ok: true, meeting: await saveEvent(m.created_by, m.id) });
+    }
     if (action === "sync_all") {
       if (!CRON || req.headers.get("x-cron-secret") !== CRON) return json({ error: "Not allowed." }, 403);
       const links = must(await db.from("google_links").select("user_id"));

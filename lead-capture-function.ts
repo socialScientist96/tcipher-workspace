@@ -14,6 +14,7 @@
 //   "lead_type": "Vendor",              // optional
 //   "page_url": "https://tcipher.com/ai-design-guide",
 //   "utm": { "source": "instagram", "medium": "paid", "campaign": "ai_guide" },
+//   "whatsapp_consent": true,           // (2026-11dr) the person ticked "You can message me on WhatsApp"
 //   "form": { "name": "ai_design_guide", "title": "AI Design Skills guide",
 //             "fields": [ { "key": "ai_website", "label": "Is your website AI-generated?", "value": "Partly" } ] }
 // }
@@ -71,6 +72,8 @@ Deno.serve(async (req) => {
     if (!name && !email && !phone) return json({ error: "Send at least a name, email or phone." }, 422);
     if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "That email address doesn’t look right." }, 422);
     const pipeline = b.pipeline === "Instagram" ? "Instagram" : "General";
+    // (2026-11dr) WhatsApp Business needs the person's agreement before we message them: keep when and where
+    const consent = b.whatsapp_consent === true && phone ? { whatsapp_consent_at: new Date().toISOString(), whatsapp_consent_source: "Website form" + (b?.form?.title ? ": " + String(clean(b.form.title, 80)) : "") } : null;
 
     // the form's own answers, kept exactly as asked (any number of fields)
     const fields = Array.isArray(b?.form?.fields) ? b.form.fields.slice(0, 50).map((f: Any) => ({
@@ -93,6 +96,7 @@ Deno.serve(async (req) => {
       const subs = [...(existing.form_submissions || []), submission].slice(-20);
       const { error } = await db.from("leads").update({ form_submissions: subs }).eq("id", existing.id);
       if (error) throw error;
+      if (consent) await db.from("leads").update(consent).eq("id", existing.id).is("whatsapp_consent_at", null);   // fails quietly if the column isn't there yet
       return json({ ok: true, reused: true, lead_id: existing.id });
     }
     const row = {
@@ -102,8 +106,10 @@ Deno.serve(async (req) => {
       lead_type: String(clean(b.lead_type, 60) || ""), form_submissions: [submission],
       notes: String(clean(b.message, 2000) || ""),
     };
-    const { data, error } = await db.from("leads").insert(row).select("id,lead_number").single();
-    if (error) throw error;
+    let ins = await db.from("leads").insert(consent ? { ...row, ...consent } : row).select("id,lead_number").single();
+    if (ins.error && consent && /whatsapp_consent/.test(ins.error.message || "")) ins = await db.from("leads").insert(row).select("id,lead_number").single();   // upgrade-2026-11dr.sql not run yet
+    if (ins.error || !ins.data) throw ins.error || new Error("Lead not saved.");
+    const data: Any = ins.data;
     // tell Marketing and Sales, unless a flood of leads is arriving (then they're saved but not announced one by one)
     const since = new Date(Date.now() - WINDOW_MS).toISOString();
     const { count } = await db.from("leads").select("id", { count: "exact", head: true }).gte("created_at", since);

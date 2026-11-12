@@ -29,6 +29,8 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 form{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
 label{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--ink2);font-weight:500}
 label.full{grid-column:1/-1}
+label.check{flex-direction:row;align-items:flex-start;gap:10px;font-weight:400;color:var(--ink2)}
+label.check input{width:18px;height:18px;margin:2px 0 0;flex:none;accent-color:var(--pri)}
 input,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
 textarea{resize:vertical;min-height:72px}
 .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
@@ -58,7 +60,7 @@ textarea{resize:vertical;min-height:72px}
 <script>
 (() => {
   // the workspace's Supabase project; the publishable key is public by design
-  const API = "https://pfdnziybqaumnofjknsj.supabase.co/functions/v1/google-sync";
+  const API = "https://pfdnziybqaumnofjknsj.supabase.co/functions/v1/demo-booking";
   const KEY = "sb_publishable_pqodY5Y9HWb0dsYTJy4CnA_c6nzCJ1q";
   const app = document.getElementById("app");
   const lead = (new URLSearchParams(location.search).get("lead") || "").trim();
@@ -84,7 +86,7 @@ textarea{resize:vertical;min-height:72px}
   const endLabel = (t, mins) => { const [h, m] = t.split(":").map(Number); const n = h * 60 + m + mins; return timeLabel(String(Math.floor(n / 60)).padStart(2, "0") + ":" + String(n % 60).padStart(2, "0")); };
 
   async function load(keep){
-    try { st.data = await call({ action: "public_slots", lead }); }
+    try { st.data = await call({ action: "slots", lead }); }
     catch (e) { app.replaceChildren(el("h1", { text: "Book a demo" }), el("p", { class: "err", text: "Couldn’t load free times. Please refresh the page." })); return; }
     if (!keep || !st.data.days.some(d => d.day === st.day && d.times.includes(st.time))) { st.time = null; }
     if (!st.day || !st.data.days.some(d => d.day === st.day && d.times.length)) st.day = (st.data.days.find(d => d.times.length) || {}).day || null;
@@ -123,7 +125,7 @@ textarea{resize:vertical;min-height:72px}
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v("f-email").trim())) return show("Please enter a valid email address. The invite goes there.", "f-email");
       st.sending = true; btn.disabled = true; btn.textContent = "Booking…"; err.hidden = true;
       try {
-        const r = await call({ action: "public_book", lead, day: st.day, time: st.time, name: v("f-name"), email: v("f-email"), phone: v("f-phone"), company: v("f-company"), note: v("f-note"), website: v("f-website") });
+        const r = await call({ action: "book", lead, day: st.day, time: st.time, name: v("f-name"), email: v("f-email"), phone: v("f-phone"), company: v("f-company"), note: v("f-note"), website: v("f-website"), whatsapp: !!(form.querySelector("#f-wa") || {}).checked });
         done(r, v("f-email").trim());
       } catch (ex) {
         st.sending = false;
@@ -139,6 +141,7 @@ textarea{resize:vertical;min-height:72px}
       f("f-phone", "Phone / WhatsApp (optional)", "tel", L.phone, { ac: "tel" }),
       f("f-company", "Company (optional)", "text", L.company, { ac: "organization" }),
       f("f-note", "What would you like to see? (optional)", "textarea", "", { full: true, ph: "e.g. an ordering app for our 3 restaurants" }),
+      el("label", { class: "full check", for: "f-wa" }, el("input", { id: "f-wa", type: "checkbox" }), "You can message me on WhatsApp about this demo (at the phone number above)."),
       el("div", { class: "hp", "aria-hidden": "true" }, el("label", { for: "f-website" }, "Website", el("input", { id: "f-website", name: "website", type: "text", tabindex: "-1", autocomplete: "off" }))),
       el("div", { class: "actions" }, btn), err);
     return form;

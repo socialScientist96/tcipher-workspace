@@ -3405,7 +3405,23 @@ const REF_LABEL = {
   roles: r => r.name, contacts: r => r.name, deals: r => r.title,
   leads: r => r.name + (r.company ? " (" + r.company + ")" : "")
 };
-function refLabel(table, id){ const r = byId(table, id); return r ? REF_LABEL[table](r) : ""; }
+function refLabel(table, id){ const r = byId(table, id); if (r) return REF_LABEL[table](r); return table === "campaigns" && id ? campaignName(id) : ""; }
+// (2026-11dr) people who can't open Marketing's campaigns (Sales) still see a campaign's name: loaded once
+const CAMPAIGN_NAMES = { map: null, p: null };
+function loadCampaignNames(){
+  if (CAMPAIGN_NAMES.map) return Promise.resolve(false);
+  if (!CAMPAIGN_NAMES.p) CAMPAIGN_NAMES.p = sb.rpc("campaign_names").then(({ data, error }) => {
+    CAMPAIGN_NAMES.map = {};
+    if (!error) for (const c of data || []) CAMPAIGN_NAMES.map[c.id] = c.name;
+    return !error && (data || []).length > 0;
+  }, () => { CAMPAIGN_NAMES.map = {}; return false; });
+  return CAMPAIGN_NAMES.p;
+}
+function campaignName(id){
+  if (CAMPAIGN_NAMES.map) return CAMPAIGN_NAMES.map[id] || "";
+  if (typeof sb !== "undefined" && sb && S.me && !CAMPAIGN_NAMES.p) loadCampaignNames().then(any => { if (any) rerender(); });
+  return "";
+}
 
 function fieldInput(f, val, rec){
   const common = { class: "in", "data-k": f.k };
@@ -4817,6 +4833,8 @@ function openDialog(title, bodyNodes, footNodes, narrow){
 async function openRecord(key, id, preset, opts){
   const M = MOD[key];
   await ensure([M.table, ...(M.needs || [])]);
+  // (2026-11dr) someone who can't open campaigns still sees the campaign's name in the form
+  if (M.fields.some(f => f.ref === "campaigns") && !rows("campaigns").length) await loadCampaignNames();
   let rec = id ? byId(M.table, id) : null;
   if (id && !rec){
     try { rec = ok(await sb.from(M.table).select("*").eq("id", id).maybeSingle()); if (rec) upsertCache(M.table, rec); } catch (e) {}
@@ -8850,7 +8868,7 @@ async function setDealOutcome(rec, what){
 /* ---------- sections inside a lead or deal ---------- */
 function crmDetail(table, rec, box){
   box.append(h("div", { class: "section" }, h("h3", {}, "Contact"), contactBar(table, rec),
-    h("p", { class: "muted", style: "font-size:12.5px;margin:6px 0 0" }, "Opens your phone, WhatsApp or email, and logs it here." + (rec.last_contacted_at ? " Last contacted " + fmtAgo(rec.last_contacted_at) + "." : " Not contacted yet."))));
+    h("p", { class: "muted", style: "font-size:12.5px;margin:6px 0 0" }, "Opens your phone, WhatsApp or email, and logs it here." + (rec.last_contacted_at ? " Last contacted " + fmtAgo(rec.last_contacted_at) + "." : " Not contacted yet.")), waConsentLine(table, rec)));
   if (table === "leads"){
     if ((rec.form_submissions || []).length) box.append(formAnswersSection(rec));
     if (rec.deal_id){
@@ -8863,6 +8881,19 @@ function crmDetail(table, rec, box){
     if (ld && (ld.form_submissions || []).length) box.append(formAnswersSection(ld));
   }
   box.append(...[demosSection(table, rec), linkedTasksSection(table, rec), linkedActivitiesSection(table, rec), recordHistorySection(table, rec)].filter(Boolean));
+}
+// (2026-11dr) WhatsApp Business needs the lead's agreement before messaging them
+function waConsentLine(table, rec){
+  if (table !== "leads" || !("whatsapp_consent_at" in rec)) return null;
+  const style = "font-size:12.5px;margin:4px 0 0";
+  if (rec.whatsapp_consent_at) return h("p", { class: "muted", style }, "✓ Agreed to WhatsApp messages on " + fmtDate(localDay(rec.whatsapp_consent_at), true) + (rec.whatsapp_consent_source ? " (" + rec.whatsapp_consent_source + ")" : "") + ".");
+  if (!rec.phone) return null;
+  return h("p", { class: "muted", style }, "No WhatsApp agreement recorded yet. ",
+    h("button", { type: "button", class: "linkbtn", onclick: async () => {
+      if (!confirm("Record that " + rec.name + " agreed to be messaged on WhatsApp (for example, on a call)?")) return;
+      try { await updateRow("leads", rec.id, { whatsapp_consent_at: new Date().toISOString(), whatsapp_consent_source: "Recorded by " + S.me.full_name }); toast("Recorded."); closeDlg(); openRecord(leadRoute(rec), rec.id); }
+      catch (e) { fail(e, "Not saved"); }
+    } }, "They agreed"));
 }
 function formAnswersSection(rec){
   const subs = (rec.form_submissions || []).slice().reverse();
@@ -11909,7 +11940,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11dq";
+const APP_VERSION = "2026-11dr";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));

@@ -21,6 +21,7 @@ The internal workspace for Tcipher's three verticals, **Development**, **Sales**
 | `upgrade-2026-11k.sql` | Chat notifications, live updates for chat, “Seen” | Supabase › SQL Editor |
 | `upgrade-2026-11m.sql` | Instant updates on private live channels (signed in) | Supabase › SQL Editor |
 | `lead-capture-function.ts` | Optional: website forms post leads straight into the workspace | Supabase › Edge Functions, named `lead-capture` |
+| `demo-booking-function.ts` | The public demo booking page (`book.html`): free times and booking | Supabase › Edge Functions, named `demo-booking`, **Verify JWT off** |
 | `CHANGELOG.md` | What’s in each version, and what still needs doing to go live | Keep with the files |
 
 All data, logins and files live in Supabase. GitHub only hosts the page.
@@ -167,11 +168,14 @@ fetch("https://pfdnziybqaumnofjknsj.supabase.co/functions/v1/lead-capture", {
     page_url: location.href,
     hp: form.website.value,                      // a hidden, empty "website" field: bots fill it in and are ignored
     utm: { source: "instagram", medium: "paid", campaign: "ai_guide" },
+    whatsapp_consent: form.whatsapp_ok.checked,  // a checkbox: "You can message me on WhatsApp"
     form: { name: "ai_design_guide", title: "AI Design Skills guide",
             fields: [ { key: "ai_website", label: "Is your website AI-generated?", value: "Partly" } ] }
   })
 });
 ```
+
+Add a checkbox to the form such as `<label><input type="checkbox" name="whatsapp_ok"> You can message me on WhatsApp</label>` and send it as `whatsapp_consent`. When it's ticked and a phone is given, the lead shows “Agreed to WhatsApp messages” with the date and form, which WhatsApp Business requires before you message someone.
 
 If the same email or phone submits again in the same pipeline, the new answers are added to the existing lead instead of creating a duplicate. Marketing (and Sales, for Instagram) are notified of every new website lead, unless more than 15 arrive within 10 minutes (then they're saved without a notification each). One address can send at most 5 submissions in 10 minutes. Only http(s) page addresses are kept.
 
