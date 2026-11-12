@@ -9689,6 +9689,7 @@ function syncChatSubs(){
       ch.on("broadcast", { event: "msg" }, ({ payload }) => onLiveMsg(payload));
       ch.on("broadcast", { event: "typing" }, ({ payload }) => onLiveTyping(payload));
       ch.on("broadcast", { event: "read" }, ({ payload }) => onLiveRead(payload));
+      ch.on("broadcast", { event: "mute" }, ({ payload }) => { if (payload && S.me && payload.uid === S.me.id) applyMute(payload.cid, !!payload.on); });   // (2026-11de) muted on another device
       liveSubs[id] = { ch, st: "" };
       ch.subscribe((st, err) => {
         if (liveSubs[id]) liveSubs[id].st = st;
@@ -9772,10 +9773,16 @@ function applyMyRead(cid, last){
   C.unread[cid] = after.length; C.mentions[cid] = after.filter(m => (m.mentions || []).includes(S.me.id)).length;
   updateTabTitle(); renderShell(); if (S.route === "chat") drawChatList();
 }
+// a chat was muted or unmuted in another tab or on another device: no sound for it here either
+function applyMute(cid, on){
+  if (!cid || typeof C === "undefined") return;
+  C.muted = C.muted || new Set(); on ? C.muted.add(cid) : C.muted.delete(cid);
+  renderShell(); if (S.route === "chat") { drawChatList(); if (typeof drawChatHead === "function" && C.active === cid) drawChatHead(); }
+}
 if (TABS) TABS.onmessage = e => {
   const d = e.data || {}; if (!S.me || d.me !== S.me.id || typeof C === "undefined") return;
   if (d.t === "read") applyMyRead(d.cid, +d.last);
-  if (d.t === "mute") { C.muted = C.muted || new Set(); d.on ? C.muted.add(d.cid) : C.muted.delete(d.cid); renderShell(); if (S.route === "chat") { drawChatList(); if (typeof drawChatHead === "function" && C.active === d.cid) drawChatHead(); } }
+  if (d.t === "mute") applyMute(d.cid, d.on);
 };
 // back on a tab: pick up what was read or muted on other devices meanwhile
 let mineSyncAt = 0;
@@ -10528,6 +10535,9 @@ async function toggleChatMute(ch){
     if (was) { ok(await sb.from("chat_mutes").delete().eq("channel_id", ch.id).eq("user_id", S.me.id)); C.muted.delete(ch.id); toast("Unmuted. You’ll hear new messages again."); }
     else { ok(await sb.from("chat_mutes").insert({ user_id: S.me.id, channel_id: ch.id })); C.muted.add(ch.id); toast("Muted. No sound or pop-ups, except when someone tags you."); }
     tabsSend({ t: "mute", cid: ch.id, on: !was });
+    // (2026-11de) and your other devices (phone app, another computer) at once, over the conversation's live channel
+    // (the same one that carries "typing" and "read"); only your own devices act on it
+    liveSend("mute", { cid: ch.id, uid: S.me.id, on: !was });
   } catch (e) { fail(e, was ? "Couldn’t unmute" : "Couldn’t mute"); }
   if (typeof drawChatHead === "function") drawChatHead(); drawChatList();
 }
