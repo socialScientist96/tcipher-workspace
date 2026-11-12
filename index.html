@@ -2335,19 +2335,19 @@ html:has(#content .chat),html:has(#content .chat) body{overscroll-behavior-y:non
   .topbar .back{display:none !important}
 
   /* tables → stacked cards (labels from the header row) */
-  .tablewrap:has(> table.m-cards){overflow:visible;background:none;border:0;border-radius:0}
-  table.m-cards,table.m-cards > tbody{display:block;width:100%}
-  table.m-cards > thead{display:none}
-  table.m-cards > tbody > tr{display:block;background:var(--white);border:1px solid var(--line);border-radius:var(--r-lg);padding:12px 14px;margin:0 0 10px}
-  table.m-cards > tbody > tr > td{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:4px 0;border:0;min-width:0;text-align:right;white-space:normal;overflow-wrap:anywhere;font-size:var(--fs-ui)}
-  table.m-cards > tbody > tr > td::before{content:attr(data-label);flex:none;max-width:45%;color:var(--ink3);font-size:var(--fs-sm);text-align:left}
-  table.m-cards > tbody > tr > td:first-child{justify-content:flex-start;text-align:left;font-size:var(--fs-lg);font-weight:600;padding:0 0 6px}
-  table.m-cards > tbody > tr > td:first-child::before{display:none}
-  table.m-cards > tbody > tr > td:not([data-label])::before{display:none}
-  table.m-cards > tbody > tr > td.m-empty{display:none}
-  table.m-cards > tbody > tr > td > *{max-width:100%}
-  table.m-cards > tbody > tr.click{cursor:pointer}
-  table.m-cards > tbody > tr:active{background:var(--tint)}
+  .tablewrap:has(> table:not(.tcal)){overflow:visible;background:none;border:0;border-radius:0}
+  .tablewrap > table:not(.tcal),.tablewrap > table:not(.tcal) > tbody{display:block;width:100%}
+  .tablewrap > table:not(.tcal) > thead{display:none}
+  .tablewrap > table:not(.tcal) > tbody > tr{display:block;background:var(--white);border:1px solid var(--line);border-radius:var(--r-lg);padding:12px 14px;margin:0 0 10px}
+  .tablewrap > table:not(.tcal) > tbody > tr > td{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:4px 0;border:0;min-width:0;text-align:right;white-space:normal;overflow-wrap:anywhere;font-size:var(--fs-ui)}
+  .tablewrap > table:not(.tcal) > tbody > tr > td::before{content:attr(data-label);flex:none;max-width:45%;color:var(--ink3);font-size:var(--fs-sm);text-align:left}
+  .tablewrap > table:not(.tcal) > tbody > tr > td:first-child{justify-content:flex-start;text-align:left;font-size:var(--fs-lg);font-weight:600;padding:0 0 6px}
+  .tablewrap > table:not(.tcal) > tbody > tr > td:first-child::before{display:none}
+  .tablewrap > table:not(.tcal) > tbody > tr > td:not([data-label])::before{display:none}
+  .tablewrap > table:not(.tcal) > tbody > tr > td.m-empty{display:none}
+  .tablewrap > table:not(.tcal) > tbody > tr > td > *{max-width:100%}
+  .tablewrap > table:not(.tcal) > tbody > tr.click{cursor:pointer}
+  .tablewrap > table:not(.tcal) > tbody > tr:active{background:var(--tint)}
 
   /* filter bars: search + Filters (n); the dropdowns and chips open under it */
   .m-fbtn{display:inline-flex;align-items:center;gap:6px;min-height:44px;justify-content:center}
@@ -2388,6 +2388,39 @@ html:has(#content .chat),html:has(#content .chat) body{overscroll-behavior-y:non
   .tcard-menu::after{content:"";position:absolute;inset:-9px}   /* the 26 px ⋯ gets a 44 px tap area (looks the same) */
   .nb-handle{min-width:32px;min-height:44px}
   .av.sm{font-size:11px}
+}
+
+/* Broken UI repairs (phase 3) */
+@media (max-width:760px){
+  /* tasks "Load…" rows: one column on phones, nothing runs off the screen (BU-004) */
+  .load-row{grid-template-columns:minmax(0,1fr);gap:2px;width:100%;margin:0}
+  .load-row > *,.load-row span{min-width:0;white-space:normal;overflow-wrap:anywhere}
+  /* team calendar: a real grid, scrolls inside its own box with the names pinned (BU-006) */
+  .tcal{min-width:640px}
+  .tcal th.who,.tcal td.who{width:112px}
+}
+
+/* Broken UI repairs — chat on phones (BU-016 bubbles off the left edge, BU-017 header wrapping with large text) */
+@media (max-width:760px){
+  /* a bubble never grows past its column; what's inside shrinks to fit */
+  .chat-msgs .bub{max-width:100%;min-width:0;box-sizing:border-box}
+  .chat-msgs .bub > *{max-width:100%;min-width:0}
+  .catts{min-width:0;max-width:100%}
+  .cfile{min-width:0;max-width:100%;flex-wrap:wrap;row-gap:2px;box-sizing:border-box}
+  .cfile .cfx{flex:1 1 calc(100% - 40px)}
+  .cfile .btn{flex:1 1 auto;min-height:40px;justify-content:center}
+  .vp{min-width:0;max-width:100%;box-sizing:border-box}
+  .vp-bar{min-width:40px}
+  .vp-time{min-width:0}
+  .chat-msgs .cimgbtn,.chat-msgs .cimg{max-width:100%;height:auto}
+  /* header: one line for the name, one for the status, buttons in one row (also with large system text) */
+  .chat-head{flex-wrap:nowrap;align-items:center}
+  .chat-head .x{min-width:0;flex:1 1 auto}
+  .chat-head .x b,.chat-head .x > span:first-child{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chat-head .x .muted,.chat-head .x .lastact{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chat-head .x br{display:none}
+  .chat-head .chat-acts{flex-wrap:nowrap;flex:none}
+  .chat-head .chat-acts .btn{width:40px;min-height:40px}
 }
 </style>
 </head>
@@ -8868,7 +8901,7 @@ async function signOutHere(){ try { const sub = await pushSub(); if (sub) await 
 const PHONE_MQ = window.matchMedia("(max-width:760px)");
 const filterOpen = {};   // which pages have their filters open (until the page is left)
 function phoneTables(root){
-  for (const t of root.querySelectorAll(".tablewrap table")) {
+  for (const t of root.querySelectorAll(".tablewrap > table:not(.tcal)")) {   // (.tcal = the team calendar grid: stays a grid)
     const heads = [...t.querySelectorAll(":scope > thead th")].map(th => th.textContent.trim());
     t.classList.add("m-cards");
     for (const tr of t.querySelectorAll(":scope > tbody > tr")) {
