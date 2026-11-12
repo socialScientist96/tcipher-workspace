@@ -1,4 +1,4 @@
-// Supabase Edge Function: demo-booking (2026-11dr)
+// Supabase Edge Function: demo-booking (2026-11dr; one database call since 2026-11ds)
 // The public demo booking page (internal.tcipher.com/book.html) asks this small function for free times and books
 // one. It is kept separate from google-sync so the page opens quickly: no client library, a few database reads.
 // Only times are shown, never names or events. When booking, the time is checked again, the demo goes to whoever on
@@ -63,10 +63,7 @@ function occursOn(m: Any, d: string, wd: number[], hol: string[]) {
 }
 
 /* ---------------- free times ---------------- */
-async function config() {
-  const st = ((await rest("settings?select=data&id=eq.1"))[0] || { data: {} }).data || {};
-  const ids: string[] = (Array.isArray(st.demo_team) ? st.demo_team : []).filter(isUuid);
-  const people: Any[] = ids.length ? await rest("profiles?select=id,full_name,is_active&id=in." + q(inList(ids))) : [];
+function configFrom(st: Any, people: Any[]) {
   return {
     on: st.demo_public === true, team: people.filter((p) => p.is_active).map((p) => p.id) as string[], people,
     len: Math.max(15, +st.demo_minutes || 45), buffer: st.demo_buffer_min != null && st.demo_buffer_min !== "" ? Math.max(0, +st.demo_buffer_min) : 15,
@@ -75,33 +72,49 @@ async function config() {
     hol: ((st.holidays || []) as Any[]).map((h) => h.date) as string[], company: String(st.company || "Tcipher Technologies"),
   };
 }
-async function freeTimes(C: Any) {
+// (2026-11ds) everything in one database call (demo_booking_data); the older way, five reads, if that SQL isn't run yet
+async function gather(lead?: string) {
+  const t0 = today(), to = addDays(t0, 30), leadId = isUuid(lead) ? String(lead) : null;
+  const r = await fetch(BASE + "/rest/v1/rpc/demo_booking_data", { method: "POST", headers: headers(), body: JSON.stringify({ p_from: t0, p_to: to, p_lead: leadId }) });
+  if (r.ok) {
+    const d: Any = await r.json();
+    return { C: configFrom(d.settings || {}, d.people || []), ms: d.meetings || [], evs: d.events || [], lv: d.leave || [], linked: new Set<string>(d.linked || []), lead: d.lead || null };
+  }
+  if (r.status !== 404) throw new Error("Database error " + r.status);
+  const st = ((await rest("settings?select=data&id=eq.1"))[0] || { data: {} }).data || {};
+  const ids: string[] = (Array.isArray(st.demo_team) ? st.demo_team : []).filter(isUuid);
+  const people: Any[] = ids.length ? await rest("profiles?select=id,full_name,is_active&id=in." + q(inList(ids))) : [];
+  const C = configFrom(st, people);
+  const team = C.team.length ? q(inList(C.team)) : "";
+  const [ms, evs, lv, links, leads] = await Promise.all([
+    rest("meetings?select=meeting_date,start_time,duration_min,repeat,repeat_days,attendees&start_time=not.is.null&meeting_date=lte." + to),
+    team ? rest("calendar_events?select=user_id,starts_at,ends_at&all_day=eq.false&start_date=lte." + to + "&end_date=gte." + t0 + "&user_id=in." + team) : Promise.resolve([]),
+    team ? rest("leave_requests?select=user_id,start_date,end_date,type&status=eq.Approved&start_date=lte." + to + "&end_date=gte." + t0 + "&user_id=in." + team) : Promise.resolve([]),
+    team ? rest("google_links?select=user_id&user_id=in." + team) : Promise.resolve([]),
+    leadId ? rest("leads?select=name,email,phone,company&id=eq." + leadId) : Promise.resolve([]),
+  ]);
+  return { C, ms, evs, lv, linked: new Set<string>((links as Any[]).map((l) => l.user_id)), lead: (leads as Any[])[0] || null };
+}
+function freeTimes(C: Any, ms: Any[], evs: Any[], lv: Any[]) {
   const t0 = today(), to = addDays(t0, C.ahead), team: string[] = C.team;
   const busy: Record<string, Record<string, number[][]>> = {};
   const add = (u: string, d: string, a: number, b: number) => { const x = busy[u] = busy[u] || {}; (x[d] = x[d] || []).push([a, b]); };
-  if (team.length) {
-    const [ms, evs, lv] = await Promise.all([
-      rest("meetings?select=meeting_date,start_time,duration_min,repeat,repeat_days,attendees&start_time=not.is.null&meeting_date=lte." + to),
-      rest("calendar_events?select=user_id,starts_at,ends_at&all_day=eq.false&start_date=lte." + to + "&end_date=gte." + t0 + "&user_id=in." + q(inList(team))),
-      rest("leave_requests?select=user_id,start_date,end_date,type&status=eq.Approved&start_date=lte." + to + "&end_date=gte." + t0 + "&user_id=in." + q(inList(team))),
-    ]);
-    for (const m of ms as Any[]) {
-      const rep = m.repeat && m.repeat !== "Does not repeat";
-      if (!rep && m.meeting_date < t0) continue;
-      const who = (m.attendees || []).length ? (m.attendees as string[]).filter((a) => team.includes(a)) : team;
-      if (!who.length) continue;
-      for (let d = rep ? t0 : m.meeting_date; d <= to; d = addDays(d, 1)) {
-        if (occursOn(m, d, C.wd, C.hol)) { const a = hmMin(m.start_time); for (const u of who) add(u, d, a, a + (+m.duration_min || 30)); }
-        if (!rep) break;
-      }
+  for (const m of ms) {
+    const rep = m.repeat && m.repeat !== "Does not repeat";
+    if (!rep && (m.meeting_date < t0 || m.meeting_date > to)) continue;
+    const who = (m.attendees || []).length ? (m.attendees as string[]).filter((a) => team.includes(a)) : team;
+    if (!who.length) continue;
+    for (let d = rep ? t0 : m.meeting_date; d <= to; d = addDays(d, 1)) {
+      if (occursOn(m, d, C.wd, C.hol)) { const a = hmMin(m.start_time); for (const u of who) add(u, d, a, a + (+m.duration_min || 30)); }
+      if (!rep) break;
     }
-    for (const e of evs as Any[]) {
-      if (!e.starts_at) continue;
-      const a = new Date(e.starts_at), b = new Date(e.ends_at || e.starts_at), first = dayIn(a), last = dayIn(b);
-      for (let d = first, i = 0; d <= last && i < 40; d = addDays(d, 1), i++) add(e.user_id, d, d === first ? minIn(a) : 0, d === last ? minIn(b) : 1440);
-    }
-    for (const l of lv as Any[]) if (l.type !== "Work from home") for (let d = l.start_date, i = 0; d <= l.end_date && i < 60; d = addDays(d, 1), i++) add(l.user_id, d, 0, 1440);
   }
+  for (const e of evs) {
+    if (!e.starts_at || !team.includes(e.user_id)) continue;
+    const a = new Date(e.starts_at), b = new Date(e.ends_at || e.starts_at), first = dayIn(a), last = dayIn(b);
+    for (let d = first, i = 0; d <= last && i < 40; d = addDays(d, 1), i++) add(e.user_id, d, d === first ? minIn(a) : 0, d === last ? minIn(b) : 1440);
+  }
+  for (const l of lv) if (l.type !== "Work from home" && team.includes(l.user_id)) for (let d = l.start_date, i = 0; d <= l.end_date && i < 60; d = addDays(d, 1), i++) add(l.user_id, d, 0, 1440);
   const nowAbs = minIn(new Date()) + C.notice * 60;
   const days: Any[] = [];
   for (let d = t0, i = 0; d <= to; d = addDays(d, 1), i++) {
@@ -119,11 +132,11 @@ async function freeTimes(C: Any) {
 
 /* ---------------- actions ---------------- */
 async function slots(body: Any) {
-  const C = await config();
-  if (!C.on || !C.team.length) return { open: false, company: C.company };
-  const [{ days }, leadRows] = await Promise.all([freeTimes(C), isUuid(body.lead) ? rest("leads?select=name,email,phone,company&id=eq." + body.lead) : Promise.resolve([])]);
-  const l = (leadRows as Any[])[0];
-  return { open: true, company: C.company, minutes: C.len, timezone: "India (IST)",
+  const G = await gather(body.lead);
+  if (!G.C.on || !G.C.team.length) return { open: false, company: G.C.company };
+  const { days } = freeTimes(G.C, G.ms, G.evs, G.lv);
+  const l = G.lead;
+  return { open: true, company: G.C.company, minutes: G.C.len, timezone: "India (IST)",
     lead: l ? { name: l.name || "", email: l.email || "", phone: l.phone || "", company: l.company || "" } : null,
     days: days.map((x: Any) => ({ day: x.day, times: x.slots.map((s: Any) => minHM(s.start)) })) };
 }
@@ -139,12 +152,12 @@ async function book(body: Any, ip: string) {
   if (await count("booking_log?select=id&ip=eq." + q(ip) + "&at=gte." + q(hourAgo)) >= 5) throw new Error("Too many tries from this connection. Please try again in an hour, or reply to our email.");
   await rest("booking_log", { method: "POST", body: JSON.stringify({ ip, email, ok: false }), headers: { Prefer: "return=minimal" } });
   if (await count("booking_log?select=id&ok=eq.true&email=eq." + q(email) + "&at=gte." + q(weekAgo)) >= 2) throw new Error("You already have a demo booked with us. Check your email for the invite, or reply to it to change the time.");
-  const C = await config();
+  const G = await gather(), C = G.C;
   if (!C.on || !C.team.length) throw new Error("Online booking is closed right now. Please reply to our email and we’ll find a time.");
-  const { days, busy } = await freeTimes(C);
+  const { days, busy } = freeTimes(C, G.ms, G.evs, G.lv);
   const slot = (days.find((x: Any) => x.day === day)?.slots || []).find((x: Any) => x.start === hmMin(time));
   if (!slot) { const e = new Error("That time was just taken. Please pick another one."); (e as Any).status = 409; throw e; }
-  const linked = new Set(((await rest("google_links?select=user_id&user_id=in." + q(inList(slot.free)))) as Any[]).map((l) => l.user_id));
+  const linked = G.linked;
   const who = (slot.free as string[]).slice().sort((a, b) => (+linked.has(b) - +linked.has(a)) || (((busy[a] || {})[day] || []).length - ((busy[b] || {})[day] || []).length))[0];
   // the lead: the one the personal link was for, else the newest lead with this email, else a new one
   let lead: Any = isUuid(body.lead) ? (await rest("leads?select=*&id=eq." + body.lead))[0] : null;
