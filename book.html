@@ -1,61 +1,130 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Book a demo – Tcipher Technologies</title>
-<meta name="description" content="Pick a time for a free demo call with Tcipher Technologies.">
+<meta name="description" content="Pick a time for a 45-minute demo call with Tcipher Technologies.">
 <meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://pfdnziybqaumnofjknsj.supabase.co" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#F7F7FC;--card:#fff;--ink:#1D1B2E;--ink2:#55526B;--ink3:#7F7C96;--line:#E4E4F2;--pri:#6450F5;--pri-ink:#fff;--soft:#EFEDFF;--bad:#C2362B;--ok:#1F8A4C}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121120;--card:#1B1A2B;--ink:#F1F0FA;--ink2:#C3C0D8;--ink3:#8F8BA8;--line:#2E2C44;--pri:#8B7BFF;--pri-ink:#120F2E;--soft:#26224A;--bad:#FF8A7E;--ok:#5FD08F}}
-:root[data-theme="dark"]{--bg:#121120;--card:#1B1A2B;--ink:#F1F0FA;--ink2:#C3C0D8;--ink3:#8F8BA8;--line:#2E2C44;--pri:#8B7BFF;--pri-ink:#120F2E;--soft:#26224A;--bad:#FF8A7E;--ok:#5FD08F}
+/* unslop pass (2026-11dt): ink neutrals, one brand accent, the real logo, line icons, a calendar leaf for the chosen day.
+   unslop by @heydamir (CC BY 4.0) */
+:root{
+  --bg:#f5f7fa;--card:#fff;--raised:#eceff4;--ink:#111827;--ink2:#4b5565;--ink3:#6b7487;--line:rgba(17,24,39,.08);--line2:rgba(17,24,39,.14);
+  --acc:#6450F5;--acc-hover:#5641E0;--on-acc:#fff;--acc-soft:#efedfe;--bad:#dc2626;--ok:#16a34a;
+  --shadow:0 1px 2px rgba(17,24,39,.05);--float:0 8px 24px rgba(17,24,39,.06);
+  --ease:cubic-bezier(.2,.7,.2,1);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0b0d14;--card:#11141c;--raised:#1a1e28;--ink:#eef0f5;--ink2:#a3a9b8;--ink3:#7a8296;--line:rgba(238,240,245,.08);--line2:rgba(238,240,245,.14);
+  --acc:#8B7BFF;--acc-hover:#9d8fff;--on-acc:#0b0d14;--acc-soft:#1d1a3a;--bad:#e5484d;--ok:#4cc38a;--shadow:none;--float:0 8px 24px rgba(0,0,0,.35)}}
+:root[data-theme="dark"]{
+  --bg:#0b0d14;--card:#11141c;--raised:#1a1e28;--ink:#eef0f5;--ink2:#a3a9b8;--ink3:#7a8296;--line:rgba(238,240,245,.08);--line2:rgba(238,240,245,.14);
+  --acc:#8B7BFF;--acc-hover:#9d8fff;--on-acc:#0b0d14;--acc-soft:#1d1a3a;--bad:#e5484d;--ok:#4cc38a;--shadow:none;--float:0 8px 24px rgba(0,0,0,.35)}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;-webkit-font-smoothing:antialiased}
-main{max-width:720px;margin:0 auto;padding:32px 16px 56px}
-.brand{font-weight:700;letter-spacing:-.01em;font-size:18px;color:var(--ink)}
-.brand span{color:var(--pri)}
-.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px clamp(16px,4vw,32px);margin-top:16px}
-h1{font-size:clamp(24px,5vw,30px);line-height:1.2;margin:0 0 6px;letter-spacing:-.015em}
-.sub{color:var(--ink2);margin:0}
-.meta{display:flex;flex-wrap:wrap;gap:6px 16px;color:var(--ink3);font-size:14px;margin-top:10px}
-h2{font-size:13px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink3);margin:22px 0 8px}
-.days{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 6px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
-.day{flex:none;scroll-snap-align:start;min-width:76px;padding:8px 10px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);text-align:left;cursor:pointer;font:inherit}
-.day b{display:block;font-size:15px}.day small{color:var(--ink3);font-size:12.5px}
-.day[aria-pressed="true"]{background:var(--pri);border-color:var(--pri);color:var(--pri-ink)}.day[aria-pressed="true"] small{color:inherit;opacity:.85}
-.day:disabled{opacity:.45;cursor:default}
-.times{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
-.time{padding:10px 8px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-weight:600;cursor:pointer;font-variant-numeric:tabular-nums}
-.time:hover{border-color:var(--pri)}.time[aria-pressed="true"]{background:var(--pri);border-color:var(--pri);color:var(--pri-ink)}
-button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--pri);outline-offset:2px}
-form{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
-label{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--ink2);font-weight:500}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Roboto,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+.page{max-width:1080px;margin:0 auto;padding:40px 24px 64px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,560px);gap:64px;align-items:start}
+.intro{position:sticky;top:40px;padding-top:8px}
+.logo{display:block;height:32px;width:auto}
+h1{font:500 36px/1.15 Poppins,Roboto,sans-serif;margin:48px 0 12px;letter-spacing:-.01em;max-width:14em}
+.lede{color:var(--ink2);font-size:17px;line-height:28px;margin:0;max-width:30em}
+.facts{list-style:none;margin:32px 0 0;padding:0;display:grid;gap:12px}
+.facts li{display:flex;align-items:center;gap:10px;color:var(--ink2);font-size:15px}
+.ic{width:18px;height:18px;flex:none;stroke:var(--ink3);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.privacy{margin:40px 0 0;color:var(--ink3);font-size:13px;line-height:20px;max-width:30em}
+.privacy a{color:inherit;text-decoration:underline;text-underline-offset:2px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px;box-shadow:var(--shadow)}
+.sec{font-size:14px;font-weight:500;color:var(--ink2);margin:0 0 12px}
+.sec + .days, .sec + .times{margin-top:0}
+.block + .block{margin-top:24px}
+.days{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px}
+.day{padding:8px 0;border-radius:10px;border:1px solid var(--line2);background:var(--card);color:var(--ink);cursor:pointer;font:inherit;text-align:center;line-height:1.2}
+.day .wd{display:block;font-size:12px;color:var(--ink3)}
+.day .dn{display:block;font:500 20px/28px Poppins,Roboto,sans-serif}
+.day .mo{display:block;font-size:12px;color:var(--ink3)}
+.day:hover:not(:disabled){border-color:var(--acc)}
+.day[aria-pressed="true"]{background:var(--acc);border-color:var(--acc);color:var(--on-acc)}
+.day[aria-pressed="true"] .wd,.day[aria-pressed="true"] .mo{color:inherit;opacity:.85}
+.day:disabled{cursor:default;opacity:.45}
+.times{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}
+.time{height:44px;border-radius:10px;border:1px solid var(--line2);background:var(--card);color:var(--ink);font:500 15px Roboto,sans-serif;cursor:pointer}
+.time:hover{border-color:var(--acc);color:var(--acc)}
+.time[aria-pressed="true"]{background:var(--acc);border-color:var(--acc);color:var(--on-acc)}
+.empty{color:var(--ink2);margin:0}
+.note{color:var(--ink3);font-size:13px;margin:8px 0 0}
+/* the chosen day, as a calendar leaf */
+.picked{display:flex;align-items:center;gap:16px;background:var(--raised);border-radius:12px;padding:12px}
+.leaf{width:56px;flex:none;border-radius:8px;background:var(--card);box-shadow:var(--float);overflow:hidden;text-align:center;border:1px solid var(--line)}
+.leaf .lt{background:var(--acc);color:var(--on-acc);font-size:12px;line-height:20px;font-weight:500;position:relative}
+.leaf .lt::before,.leaf .lt::after{content:"";position:absolute;top:-3px;width:4px;height:8px;border-radius:2px;background:var(--ink3)}
+.leaf .lt::before{left:14px}.leaf .lt::after{right:14px}
+.leaf .ln{font:500 24px/32px Poppins,Roboto,sans-serif;color:var(--ink)}
+.leaf .lm{font-size:12px;line-height:16px;color:var(--ink3);padding-bottom:4px}
+.picked .when{flex:1;min-width:0}
+.picked .when b{display:block;font-weight:500;font-size:16px}
+.picked .when span{color:var(--ink2);font-size:14px}
+form{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+label{display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--ink2)}
 label.full{grid-column:1/-1}
-label.check{flex-direction:row;align-items:flex-start;gap:10px;font-weight:400;color:var(--ink2)}
-label.check input{width:18px;height:18px;margin:2px 0 0;flex:none;accent-color:var(--pri)}
-input,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
-textarea{resize:vertical;min-height:72px}
+input,textarea{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line2);border-radius:10px;padding:10px 12px;width:100%;min-height:44px}
+textarea{resize:vertical;min-height:88px}
+input:hover,textarea:hover{border-color:var(--ink3)}
+label.check{flex-direction:row;align-items:flex-start;gap:10px;color:var(--ink2)}
+label.check input{width:18px;height:18px;min-height:0;margin:2px 0 0;flex:none;accent-color:var(--acc)}
 .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
-.picked{grid-column:1/-1;background:var(--soft);border-radius:12px;padding:12px 14px;display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center}
-.picked b{font-size:16px}.picked button{margin-left:auto}
-.btn{font:inherit;font-weight:600;border-radius:10px;padding:12px 18px;border:1px solid var(--pri);background:var(--pri);color:var(--pri-ink);cursor:pointer}
-.btn.ghost{background:transparent;color:var(--pri);padding:6px 10px;border-color:transparent}
+.btn{font:500 15px Roboto,sans-serif;border-radius:10px;height:44px;padding:0 20px;border:1px solid var(--acc);background:var(--acc);color:var(--on-acc);cursor:pointer}
+.btn:hover:not(:disabled){background:var(--acc-hover);border-color:var(--acc-hover)}
 .btn:disabled{opacity:.6;cursor:default}
-.actions{grid-column:1/-1;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.err{color:var(--bad);margin:0;font-size:14.5px}
-.muted{color:var(--ink3);font-size:14px}
-.empty{color:var(--ink2);padding:8px 0}
-.done{text-align:left}
-.done .tick{width:44px;height:44px;border-radius:50%;background:var(--ok);color:#fff;display:grid;place-items:center;font-size:24px;margin-bottom:12px}
-.skeleton{height:44px;border-radius:10px;background:var(--line);opacity:.5}
-@media (max-width:520px){form{grid-template-columns:1fr}}
-@media (prefers-reduced-motion:no-preference){.time,.day{transition:background-color .12s,border-color .12s,color .12s}}
+.link{font:inherit;font-size:14px;background:none;border:0;padding:4px;color:var(--acc);cursor:pointer;border-radius:6px}
+.actions{grid-column:1/-1;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.err{color:var(--bad);margin:0;font-size:14px}
+.skel{height:44px;border-radius:10px;background:var(--raised)}
+.skel-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}
+.done h2{font:500 24px/32px Poppins,Roboto,sans-serif;margin:16px 0 4px}
+.done p{color:var(--ink2);margin:8px 0 0}
+.done .ok{display:inline-flex;align-items:center;gap:8px;color:var(--ok);font-size:14px;font-weight:500}
+.done .ok .ic{stroke:currentColor}
+.done a{color:var(--acc);font-weight:500}
+button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+@media (prefers-reduced-motion:no-preference){
+  .day,.time,.btn,input,textarea{transition:background-color .15s var(--ease),border-color .15s var(--ease),color .15s var(--ease)}
+}
+@media (max-width:880px){
+  .page{grid-template-columns:1fr;gap:24px;padding:24px 16px 48px}
+  .intro{position:static;padding:0}
+  h1{font-size:28px;line-height:36px;margin:32px 0 8px}
+  .lede{font-size:16px;line-height:24px}
+  .facts{margin-top:20px;gap:8px}
+  .privacy{display:none}
+  .privacy.bottom{display:block;margin:0}
+  .card{padding:20px}
+}
+@media (min-width:881px){.privacy.bottom{display:none}}
+@media (max-width:520px){form{grid-template-columns:1fr}.times{grid-template-columns:repeat(3,1fr)}}
 </style></head>
-<body><main>
-<div class="brand">t<span>cipher</span></div>
-<div class="card" id="app" aria-live="polite">
-  <h1>Book a demo</h1>
-  <p class="sub">Loading free times…</p>
-</div>
-<p class="muted" style="margin-top:14px">Times are in India time (IST). Your details are used only to arrange this call. <a href="privacy.html" style="color:var(--pri)">Privacy</a></p>
+<body>
+<main class="page">
+  <section class="intro">
+    <picture>
+      <source srcset="icons/logo-white.png" media="(prefers-color-scheme: dark)">
+      <img class="logo" src="icons/logo.png" alt="Tcipher" width="92" height="32">
+    </picture>
+    <h1 id="title">Book a demo with Tcipher</h1>
+    <p class="lede">A video call where we show what we can build for you and answer your questions</p>
+    <ul class="facts">
+      <li><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg><span id="f-len">45 minutes</span></li>
+      <li><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>Google Meet, link sent by email</li>
+      <li><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>Times in India time (IST)</li>
+    </ul>
+    <p class="privacy">Your details are used only to arrange this call. <a href="privacy.html">Privacy policy</a></p>
+  </section>
+  <section class="card" id="app" aria-live="polite" aria-labelledby="title">
+    <p class="sec">Pick a day</p>
+    <div class="skel-row"><div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
+  </section>
+  <p class="privacy bottom">Your details are used only to arrange this call. <a href="privacy.html">Privacy policy</a></p>
 </main>
 <script>
 (() => {
@@ -65,6 +134,7 @@ textarea{resize:vertical;min-height:72px}
   const app = document.getElementById("app");
   const lead = (new URLSearchParams(location.search).get("lead") || "").trim();
   const st = { data: null, day: null, time: null, sending: false };
+  const SVG = "http://www.w3.org/2000/svg";
 
   const el = (tag, attrs, ...kids) => {
     const n = document.createElement(tag);
@@ -75,53 +145,60 @@ textarea{resize:vertical;min-height:72px}
     for (const c of kids.flat()) if (c != null && c !== false) n.append(c.nodeType ? c : document.createTextNode(String(c)));
     return n;
   };
+  const icon = (paths) => { const s = document.createElementNS(SVG, "svg"); s.setAttribute("viewBox", "0 0 24 24"); s.setAttribute("class", "ic"); s.setAttribute("aria-hidden", "true"); s.innerHTML = paths; return s; };
   const call = async (body) => {
     const res = await fetch(API, { method: "POST", headers: { "Content-Type": "application/json", apikey: KEY }, body: JSON.stringify(body) });
     const j = await res.json().catch(() => ({}));
     if (!res.ok || j.error) { const e = new Error(j.error || "Something went wrong. Please try again."); e.status = res.status; throw e; }
     return j;
   };
-  const dayLabel = (d, long) => new Date(d + "T12:00:00").toLocaleDateString("en-IN", long ? { weekday: "long", day: "numeric", month: "long" } : { weekday: "short", day: "numeric", month: "short" });
-  const timeLabel = t => { const [h, m] = t.split(":").map(Number); return ((h % 12) || 12) + ":" + String(m).padStart(2, "0") + (h < 12 ? " am" : " pm"); };
-  const endLabel = (t, mins) => { const [h, m] = t.split(":").map(Number); const n = h * 60 + m + mins; return timeLabel(String(Math.floor(n / 60)).padStart(2, "0") + ":" + String(n % 60).padStart(2, "0")); };
+  const D = d => new Date(d + "T12:00:00");
+  const fmt = (d, o) => D(d).toLocaleDateString("en-IN", o);
+  const t12 = t => { const [h, m] = t.split(":").map(Number); return ((h % 12) || 12) + ":" + String(m).padStart(2, "0") + (h < 12 ? " am" : " pm"); };
+  const plus = (t, mins) => { const [h, m] = t.split(":").map(Number); const n = h * 60 + m + mins; return String(Math.floor(n / 60)).padStart(2, "0") + ":" + String(n % 60).padStart(2, "0"); };
+  // diary-style range: "1:00 – 1:45 pm", or "11:30 am – 12:15 pm" across noon
+  const range = (t, mins) => { const a = t12(t), b = t12(plus(t, mins)); return a.slice(-2) === b.slice(-2) ? a.slice(0, -3) + " – " + b : a + " – " + b; };
+  const leaf = d => el("div", { class: "leaf", "aria-hidden": "true" }, el("div", { class: "lt", text: fmt(d, { weekday: "short" }) }), el("div", { class: "ln", text: String(D(d).getDate()) }), el("div", { class: "lm", text: fmt(d, { month: "short" }) }));
 
-  async function load(keep){
+  async function load(){
     try { st.data = await call({ action: "slots", lead }); }
-    catch (e) { app.replaceChildren(el("h1", { text: "Book a demo" }), el("p", { class: "err", text: "Couldn’t load free times. Please refresh the page." })); return; }
-    if (!keep || !st.data.days.some(d => d.day === st.day && d.times.includes(st.time))) { st.time = null; }
-    if (!st.day || !st.data.days.some(d => d.day === st.day && d.times.length)) st.day = (st.data.days.find(d => d.times.length) || {}).day || null;
+    catch (e) { app.replaceChildren(el("p", { class: "err", text: "Couldn’t load free times. Please refresh the page." })); return; }
+    const D0 = st.data;
+    if (D0.minutes) document.getElementById("f-len").textContent = D0.minutes + " minutes";
+    if (D0.company) document.getElementById("title").textContent = "Book a demo with " + D0.company.replace(/ Technologies$/, "");
+    if (!st.day || !D0.days.some(d => d.day === st.day && d.times.length)) st.day = (D0.days.find(d => d.times.length) || {}).day || null;
+    if (st.time && !D0.days.some(d => d.day === st.day && d.times.includes(st.time))) st.time = null;
     draw();
   }
-  function head(){
-    const D = st.data;
-    return [el("h1", { text: "Book a demo with " + (D.company || "us") }),
-      el("p", { class: "sub", text: "Pick a time that suits you. We’ll show you what we can build for you and answer your questions." }),
-      el("div", { class: "meta" }, el("span", { text: "🕒 " + D.minutes + " minutes" }), el("span", { text: "📹 Google Meet" }), el("span", { text: "🌏 " + D.timezone }))];
-  }
   function draw(){
-    const D = st.data;
-    if (!D.open) { app.replaceChildren(el("h1", { text: "Book a demo" }), el("p", { class: "sub", text: "Online booking is closed right now. Please reply to our email or message us on WhatsApp, and we’ll find a time." })); return; }
-    const withTimes = D.days.filter(d => d.times.length);
-    if (!withTimes.length) { app.replaceChildren(...head(), el("p", { class: "empty", text: "No free times in the coming days. Please reply to our email and we’ll find a time." })); return; }
-    const days = el("div", { class: "days", role: "group", "aria-label": "Day" }, D.days.map(d => el("button", { type: "button", class: "day", disabled: !d.times.length, "aria-pressed": String(st.day === d.day),
-      onclick: () => { st.day = d.day; st.time = null; draw(); } }, el("b", { text: dayLabel(d.day).split(" ").slice(0, 1).join(" ").replace(",", "") }), el("small", { text: dayLabel(d.day).split(" ").slice(1).join(" ") + (d.times.length ? "" : " · full") }))));
-    const cur = D.days.find(d => d.day === st.day);
-    const times = el("div", { class: "times", role: "group", "aria-label": "Time" }, (cur ? cur.times : []).map(t => el("button", { type: "button", class: "time", "aria-pressed": String(st.time === t),
-      onclick: () => { st.time = t; draw(); setTimeout(() => { const f = document.getElementById("f-name"); if (f) { f.scrollIntoView({ behavior: "smooth", block: "center" }); f.focus({ preventScroll: true }); } }, 50); } }, timeLabel(t))));
-    const parts = [...head(), el("h2", { text: "Day" }), days, el("h2", { text: cur ? dayLabel(cur.day, true) : "Time" }), times];
-    if (st.time) parts.push(el("h2", { text: "Your details" }), detailsForm());
+    const D0 = st.data;
+    if (!D0.open) { app.replaceChildren(el("p", { class: "empty", text: "Online booking is closed right now. Reply to our email or message us on WhatsApp, and we’ll find a time." })); return; }
+    if (!D0.days.some(d => d.times.length)) { app.replaceChildren(el("p", { class: "empty", text: "No free times in the coming days. Reply to our email and we’ll find a time." })); return; }
+    const days = el("div", { class: "days", role: "group", "aria-label": "Day" }, D0.days.map(d => el("button", {
+        type: "button", class: "day", disabled: !d.times.length, "aria-pressed": String(st.day === d.day),
+        "aria-label": fmt(d.day, { weekday: "long", day: "numeric", month: "long" }) + (d.times.length ? ", " + d.times.length + " free times" : ", full"),
+        onclick: () => { st.day = d.day; st.time = null; draw(); } },
+      el("span", { class: "wd", text: fmt(d.day, { weekday: "short" }) }), el("span", { class: "dn", text: String(D(d.day).getDate()) }), el("span", { class: "mo", text: d.times.length ? fmt(d.day, { month: "short" }) : "Full" }))));
+    const cur = D0.days.find(d => d.day === st.day);
+    const times = el("div", { class: "times", role: "group", "aria-label": "Time" }, (cur ? cur.times : []).map(t => el("button", {
+      type: "button", class: "time", "aria-pressed": String(st.time === t),
+      onclick: () => { st.time = t; draw(); setTimeout(() => { const f = document.getElementById("f-name"); if (f) { f.scrollIntoView({ behavior: "smooth", block: "center" }); f.focus({ preventScroll: true }); } }, 50); } }, t12(t))));
+    const parts = [el("div", { class: "block" }, el("p", { class: "sec", text: "Pick a day" }), days),
+      el("div", { class: "block" }, el("p", { class: "sec", text: cur ? fmt(cur.day, { weekday: "long", day: "numeric", month: "long" }) : "Pick a time" }), times)];
+    if (st.time) parts.push(el("div", { class: "block" }, el("p", { class: "sec", text: "Your details" }), detailsForm()));
     app.replaceChildren(...parts);
   }
   function detailsForm(){
     const L = st.data.lead || {};
     const f = (id, label, type, val, opts) => el("label", { class: (opts && opts.full) ? "full" : null, for: id }, label,
-      type === "textarea" ? el("textarea", { id, name: id, rows: "3", placeholder: (opts && opts.ph) || null }) : el("input", { id, name: id, type, value: val || "", required: opts && opts.req, autocomplete: (opts && opts.ac) || null, placeholder: (opts && opts.ph) || null }));
+      type === "textarea" ? el("textarea", { id, name: id, rows: "3", placeholder: (opts && opts.ph) || null }) : el("input", { id, name: id, type, value: val || "", required: opts && opts.req, autocomplete: (opts && opts.ac) || null }));
     const err = el("p", { class: "err", hidden: true, role: "alert" });
-    const btn = el("button", { type: "submit", class: "btn" }, "Book " + timeLabel(st.time));
+    const btn = el("button", { type: "submit", class: "btn" }, "Book " + t12(st.time));
     const form = el("form", { novalidate: true, onsubmit: async e => {
       e.preventDefault(); if (st.sending) return;
       const v = id => (form.querySelector("#" + id) || {}).value || "";
-      if (v("f-name").trim().length < 2) return show("Please enter your name.", "f-name");
+      const show = (msg, focusId) => { err.textContent = msg; err.hidden = false; if (focusId) form.querySelector("#" + focusId).focus(); };
+      if (v("f-name").trim().length < 2) return show("Please enter your name", "f-name");
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v("f-email").trim())) return show("Please enter a valid email address. The invite goes there.", "f-email");
       st.sending = true; btn.disabled = true; btn.textContent = "Booking…"; err.hidden = true;
       try {
@@ -129,33 +206,33 @@ textarea{resize:vertical;min-height:72px}
         done(r, v("f-email").trim());
       } catch (ex) {
         st.sending = false;
-        if (ex.status === 409) { await load(false); const e2 = app.querySelector("h2"); show(ex.message); if (e2) app.insertBefore(err, e2); return; }
-        btn.disabled = false; btn.textContent = "Book " + timeLabel(st.time); show(ex.message);
+        if (ex.status === 409) { st.time = null; await load(); app.prepend(el("p", { class: "err", role: "alert", style: "margin:0 0 16px", text: ex.message })); return; }
+        btn.disabled = false; btn.textContent = "Book " + t12(st.time); show(ex.message);
       }
-      function show(msg, focusId){ err.textContent = msg; err.hidden = false; if (focusId) form.querySelector("#" + focusId).focus(); }
     } },
-      el("div", { class: "picked" }, el("b", { text: dayLabel(st.day) + ", " + timeLabel(st.time) + " – " + endLabel(st.time, st.data.minutes) }), el("span", { class: "muted", text: "IST" }),
-        el("button", { type: "button", class: "btn ghost", onclick: () => { st.time = null; draw(); } }, "Change")),
+      el("div", { class: "picked full", style: "grid-column:1/-1" }, leaf(st.day),
+        el("div", { class: "when" }, el("b", { text: range(st.time, st.data.minutes) }), el("span", { text: fmt(st.day, { weekday: "long", day: "numeric", month: "long" }) + " · IST" })),
+        el("button", { type: "button", class: "link", onclick: () => { st.time = null; draw(); } }, "Change")),
       f("f-name", "Your name", "text", L.name, { req: true, ac: "name" }),
-      f("f-email", "Email (for the invite)", "email", L.email, { req: true, ac: "email" }),
-      f("f-phone", "Phone / WhatsApp (optional)", "tel", L.phone, { ac: "tel" }),
+      f("f-email", "Email for the invite", "email", L.email, { req: true, ac: "email" }),
+      f("f-phone", "Phone or WhatsApp (optional)", "tel", L.phone, { ac: "tel" }),
       f("f-company", "Company (optional)", "text", L.company, { ac: "organization" }),
-      f("f-note", "What would you like to see? (optional)", "textarea", "", { full: true, ph: "e.g. an ordering app for our 3 restaurants" }),
-      el("label", { class: "full check", for: "f-wa" }, el("input", { id: "f-wa", type: "checkbox" }), "You can message me on WhatsApp about this demo (at the phone number above)."),
+      f("f-note", "What would you like to see? (optional)", "textarea", "", { full: true, ph: "For example, an ordering app for our 3 restaurants" }),
+      el("label", { class: "full check", for: "f-wa" }, el("input", { id: "f-wa", type: "checkbox" }), "You can message me on WhatsApp about this demo, at the number above"),
       el("div", { class: "hp", "aria-hidden": "true" }, el("label", { for: "f-website" }, "Website", el("input", { id: "f-website", name: "website", type: "text", tabindex: "-1", autocomplete: "off" }))),
       el("div", { class: "actions" }, btn), err);
     return form;
   }
   function done(r, email){
-    app.replaceChildren(el("div", { class: "done" }, el("div", { class: "tick", "aria-hidden": "true", text: "✓" }),
-      el("h1", { text: "You’re booked" }),
-      el("p", { class: "sub" }, el("b", { text: dayLabel(r.day, true) + ", " + timeLabel(r.time) + " – " + endLabel(r.time, r.minutes) + " IST" }), r.with ? " with " + r.with + "." : "."),
-      el("p", { class: "sub", text: r.invited ? "A Google Calendar invite with the Meet link is on its way to " + email + "." : "We’ll email the meeting link to " + email + " shortly." }),
-      r.link ? el("p", {}, el("a", { href: r.link, target: "_blank", rel: "noopener", style: "color:var(--pri);font-weight:600" }, "Meeting link")) : null,
-      el("p", { class: "muted", text: "Need to change the time? Reply to the invite and we’ll sort it out." })));
-    app.focus && app.scrollIntoView({ behavior: "smooth", block: "start" });
+    app.replaceChildren(el("div", { class: "done" },
+      el("div", { class: "picked" }, leaf(r.day), el("div", { class: "when" }, el("b", { text: range(r.time, r.minutes) + " IST" }), el("span", { text: fmt(r.day, { weekday: "long", day: "numeric", month: "long" }) + (r.with ? " · with " + r.with : "") }))),
+      el("h2", { text: "You’re booked" }),
+      el("p", { class: "ok" }, icon('<path d="M20 6 9 17l-5-5"/>'), r.invited ? "Google Calendar invite sent to " + email : "Booked. We’ll email the meeting link to " + email),
+      r.link ? el("p", {}, el("a", { href: r.link, target: "_blank", rel: "noopener" }, "Open the meeting link")) : null,
+      el("p", { text: "Need another time? Reply to the invite and we’ll move it." })));
+    app.scrollIntoView({ behavior: "smooth", block: "start" });
   }
-  load(false);
+  load();
 })();
 </script>
 </body></html>
