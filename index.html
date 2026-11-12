@@ -3694,6 +3694,8 @@ const DAY_NAMES = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const dayList = ds => [1,2,3,4,5,6,0].filter(d => (ds || []).includes(d)).map(d => DAY_NAMES[d]).join(", ");
 const repeatText = m => m.repeat === "Selected days" ? dayList(m.repeat_days) : m.repeat === "Every weekday" ? "Every working day" : m.repeat;
 const TASK_WORK_FIELDS = ["status","blocked","blocked_reason","branch","pr_url"];
+// (2026-11dm) whoever created a task can edit it, and delete it while nobody has started it (still "To do", not in QA)
+const taskNotStarted = r => !!r && /^to do$/i.test(String(r.status || "")) && !r.qa_state;
 const isTaskHandler = v => isAdmin() || ((S.settings.task_handlers || {})[v] || []).includes(S.me.id);
 const workerOnTask = r => !!r && ([r.assignee_id, r.reviewer_id].includes(S.me.id) || (r.collaborators || []).includes(S.me.id));
 const workersCanUpdate = () => S.settings.owners_can_update_status !== false;
@@ -3808,9 +3810,9 @@ const MOD = {
     needs: ["projects","sprints","releases","notes","leads","deals"], comments: true, files: true, personalCreate: true,
     keyOf: r => taskKey(r),
     searchExtra: r => taskKey(r) + " " + (r.labels || []).join(" ") + " " + (r.branch || ""),
-    canEdit: (rec) => !rec || isTaskHandler(rec.vertical) || (workersCanUpdate() && workerOnTask(rec)),
-    canDelete: (rec) => !!rec && isTaskHandler(rec.vertical),   // (2026-11cb) the database keeps a copy of every deleted task
-    fieldEditable: (f, rec) => !rec || isTaskHandler(rec.vertical) || TASK_WORK_FIELDS.includes(f.k),
+    canEdit: (rec) => !rec || isTaskHandler(rec.vertical) || rec.created_by === S.me.id || (workersCanUpdate() && workerOnTask(rec)),
+    canDelete: (rec) => !!rec && (isTaskHandler(rec.vertical) || (rec.created_by === S.me.id && taskNotStarted(rec))),   // (2026-11cb) the database keeps a copy of every deleted task
+    fieldEditable: (f, rec) => !rec || isTaskHandler(rec.vertical) || rec.created_by === S.me.id || TASK_WORK_FIELDS.includes(f.k),
     allRowsWhen: u => u.quick === "archived",
     quick: [
       ["all", "All"],
@@ -11536,7 +11538,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11dl";
+const APP_VERSION = "2026-11dm";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
