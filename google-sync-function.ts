@@ -489,6 +489,9 @@ async function sendPendingEmails(row: Any, token: string) {
   const people = new Map<string, Any>((must(await db.from("profiles").select("id,email,full_name,is_active,email_notifications,client_id,portal_active").in("id", ids)) || []).map((p: Any) => [p.id, p]));
   const personal = new Map<string, string>((must(await db.from("profile_private").select("user_id,personal_email").in("user_id", ids)) || []).map((p: Any) => [p.user_id, p.personal_email]));
   const seen = new Map<string, string>((must(await db.from("presence").select("user_id,last_seen_at").in("user_id", ids)) || []).map((p: Any) => [p.user_id, p.last_seen_at]));
+  // muted conversations: no emails either (same rule as push — only @mentions still come through) (2026-11dh)
+  const chatIds = [...new Set(list.filter((n: Any) => n.tbl === "chat" && n.entity_id).map((n: Any) => n.entity_id))];
+  const muted = new Set<string>(chatIds.length ? (must(await db.from("chat_mutes").select("user_id,channel_id").in("user_id", ids).in("channel_id", chatIds)) || []).map((m: Any) => m.user_id + "|" + m.channel_id) : []);
   const canReply = String(row.scopes || "").includes("gmail.readonly");
   let sent = 0;
   for (const n of list) {
@@ -500,6 +503,7 @@ async function sendPendingEmails(row: Any, token: string) {
     const pref = p.email_notifications || "all";
     if (pref === "off") { await skip("skipped: off"); continue; }
     if (pref === "direct" && !isDirect(n)) { await skip("skipped: not direct"); continue; }
+    if (n.tbl === "chat" && muted.has(n.user_id + "|" + n.entity_id) && !/mentioned you|tagged you/i.test(String(n.title || ""))) { await skip("skipped: muted"); continue; }
     const last = seen.get(n.user_id);
     if (last && last > cutoff) continue;                                   // they're in the app: they'll see it there
     const to = [...new Set([p.email, personal.get(n.user_id)].map((x) => String(x || "").trim().toLowerCase()).filter((x) => /^[^@\s<>"]+@[^@\s<>"]+\.[^@\s<>"]+$/.test(x)))];

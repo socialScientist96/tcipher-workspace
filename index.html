@@ -1797,8 +1797,9 @@ dialog{border-radius:var(--r-xl)}
 .hero-n[hidden]{display:none}
 /* desktop: the check-in card and Summarize sit in the banner's right column (instead of a picture) */
 .hello.has-hero > .att{grid-column:2;grid-row:1;align-self:end;justify-self:stretch;margin:0 24px 24px 20px;z-index:1;flex-wrap:wrap;padding:12px 14px}
-.hello.has-hero > .ai-dash{grid-column:2;grid-row:1;align-self:start;justify-self:end;margin:22px 24px 0 0;z-index:1;background:transparent!important;color:var(--h-mute,#B8B2D8)!important;border-color:rgba(255,255,255,.16)!important}
-.hello.has-hero > .ai-dash:hover{color:#fff!important;border-color:rgba(255,255,255,.3)!important}
+.hello.has-hero > .ai-dash{grid-column:2;grid-row:1;align-self:start;justify-self:end;margin:22px 24px 0 0;z-index:1;background:transparent!important;color:#fff!important;border-color:rgba(255,255,255,.4)!important}
+.hello.has-hero > .ai-dash .ic{color:#fff}
+.hello.has-hero > .ai-dash:hover{background:rgba(255,255,255,.08)!important;border-color:rgba(255,255,255,.6)!important}
 @media (max-width:1100px) and (min-width:761px){
   .hello.has-hero{grid-template-columns:1fr}
   .hero{padding-right:32px}
@@ -2492,12 +2493,17 @@ html:has(#content .chat),html:has(#content .chat) body{overscroll-behavior-y:non
   .home .hello{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:4px 12px;margin-bottom:12px}
   /* banner on phones: greeting, one line about today, five shortcuts — under 25 % of the screen */
   .home .hello.has-hero{grid-template-columns:minmax(0,1fr);gap:0}
-  .hero{padding:14px 14px 12px;min-height:0;border-radius:16px}
-  .hero-brand{display:none}
+  .hero{padding:11px 14px 10px;min-height:0;border-radius:16px}
+  .hero-brand{margin-bottom:5px;font-size:12.5px;gap:8px;line-height:20px}
+  .hero-brand b{font-size:13px}
+  .hero-logo{width:20px;height:20px;border-radius:6px}
+  .hero-sep,.hero-tag{display:none}
+  .hero-brand::after{content:"Home";margin-left:auto;color:var(--h-mute);font-size:12.5px}
+  @media (max-height:640px){ .hero-brand{display:none} }
   .hero-h{line-height:1.2}
-  .hero-p{font-size:12.5px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .hero-tiles{display:grid;grid-template-columns:repeat(var(--n,5),minmax(0,1fr));gap:6px;margin-top:12px;flex-wrap:nowrap}
-  .hero-t{width:auto;min-height:56px;padding:8px 2px 6px;gap:4px;font-size:11.5px;border-radius:10px}
+  .hero-p{font-size:12.5px;margin-top:3px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .hero-tiles{display:grid;grid-template-columns:repeat(var(--n,5),minmax(0,1fr));gap:6px;margin-top:10px;flex-wrap:nowrap}
+  .hero-t{width:auto;min-height:52px;padding:7px 2px 5px;gap:3px;font-size:11.5px;border-radius:10px}
   .hero-l{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
   .hero-l[data-s]{font-size:0} .hero-l[data-s]::after{content:attr(data-s);font-size:11.5px}   /* "Dev Board" → "Board" on phones */
   .home .hello.has-hero .hero .hero-h{font-size:clamp(18px,5.6vw,21px)}
@@ -2509,7 +2515,9 @@ html:has(#content .chat),html:has(#content .chat) body{overscroll-behavior-y:non
   /* Summarize leaves the banner on phones: a small button in the check-in card's corner */
   .home .hello.has-hero > .ai-dash{grid-column:1;grid-row:2;align-self:start;justify-self:end;margin:16px 10px 0 0;width:44px;height:44px;min-height:44px;padding:0;font-size:0;gap:0;justify-content:center;border-radius:12px;
     background:var(--white)!important;color:var(--p-ink)!important;border:1px solid var(--line)!important}
-  .home .hello.has-hero:has(> .ai-dash) > .att .att-st{padding-right:52px}
+  .home .hello.has-hero:has(> .ai-dash) > .att .att-st{padding-right:52px;min-height:44px;display:flex;align-items:center}   /* Summarize sits beside the status line, clear of Check out */
+  .home .hello.has-hero > .ai-dash{margin-top:12px!important}
+  .home .hello.has-hero > .ai-dash .ic{color:var(--p-ink)}   /* phones: violet icon on the white button (desktop: white on the dark banner) */
   .home .hello.has-hero > .ai-dash .ic{width:18px;height:18px}
   .home .hello h1{font-size:22px}
   .home .hello .ai-dash{grid-column:2;grid-row:1;min-height:44px;padding:0 12px}
@@ -6119,7 +6127,8 @@ async function syncGoogleNow(quiet){
   catch (e) {
     await refreshGoogleData().catch(() => {});
     if (isGoogleExpiry(e)) { setGoogleExpired(true); toast("Your Google connection has expired. Click “Connect Google” on your dashboard to switch it back on."); rerender(); return; }   // not a fault to report: the person just needs to reconnect
-    if (!quiet) fail(e, "Sync failed"); else if (!e.transient) console.warn("google sync", e); renderShell(); }   // a passing connection blip in the background isn't a problem to report
+    const googleBlip = /internal_failure|backendError|backend error|rateLimitExceeded|userRateLimit|quotaExceeded|\b50[0234]\b/i.test(String(e && e.message || e));   // Google's own passing errors (2026-11dh)
+    if (!quiet) fail(e, "Sync failed"); else if (!e.transient && !googleBlip) console.warn("google sync", e); renderShell(); }   // a passing connection blip in the background isn't a problem to report
   finally { G.syncing = false; }
 }
 // sync when the workspace opens (if it's been a while) and every 15 minutes while it's open
@@ -7877,13 +7886,15 @@ function openNbSub(btn, items, heading){
   closeNbSub();
   btn.classList.add("open");
   const sub = h("div", { class: "nb-menu nb-sub", role: "menu" }, heading ? h("div", { class: "nb-menu-h" }, heading) : null, nbMenuItems(items, closeNbMenu));
-  sub._from = btn; document.body.append(sub); nbSubEl = sub;
+  sub._from = btn; popHost().append(sub); nbSubEl = sub;
   placeMenu(sub, btn.getBoundingClientRect(), true);
 }
+// where a menu or pop-up goes: inside the open window if there is one (a modal window covers everything else), else the page
+const popHost = () => [...document.querySelectorAll("dialog[open]")].pop() || document.body;
 function nbMenu(anchor, items, heading, keepFocus){
   closeNbMenu();
   const menu = h("div", { class: "nb-menu", role: "menu" }, heading ? h("div", { class: "nb-menu-h" }, heading) : null, nbMenuItems(items, closeNbMenu));
-  document.body.append(menu); nbMenuEl = menu; nbMenuSel = 0;
+  popHost().append(menu); nbMenuEl = menu; nbMenuSel = 0;
   placeMenu(menu, anchor.getBoundingClientRect(), false);
   if (!keepFocus) { const first = menu.querySelector("button"); if (first) first.focus(); }
   setTimeout(() => document.addEventListener("click", function off(e){ if (!menu.contains(e.target) && !(nbSubEl && nbSubEl.contains(e.target))) { closeNbMenu(); document.removeEventListener("click", off); } }), 0);
@@ -9696,7 +9707,9 @@ async function renderChat(el){
   drawChatList(); drawChatHead(); drawChatMessages(true);
   keepChatView();
   fitChat(); requestAnimationFrame(fitChat);
-  setTimeout(() => ta.focus(), 50);
+  // (2026-11dh) phones and tablets: opening a chat doesn't pop the keyboard up; it opens when you tap the message box.
+  // Computers with a real keyboard still start with the cursor in the box.
+  if (!window.matchMedia("(hover: none), (pointer: coarse)").matches) setTimeout(() => ta.focus(), 50);
 }
 function drawChatList(){
   if (!visibleChat()) return;
@@ -10560,7 +10573,7 @@ function openEmojiPicker(anchor, onPick){
   search.addEventListener("input", draw);
   search.addEventListener("keydown", e => { if (e.key === "Escape") closeEmojiPicker(); if (e.key === "Enter") { const b = grid.querySelector(".epbtn"); if (b) { e.preventDefault(); b.click(); } } });
   emojiPop = h("div", { class: "emoji-pop", role: "dialog", "aria-label": "Emoji" }, search, grid);
-  document.body.append(emojiPop); draw();
+  popHost().append(emojiPop); draw();
   const r = anchor.getBoundingClientRect(), W = 320, H = 340;
   emojiPop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - W - 8)) + "px";
   emojiPop.style.top = (r.top > H + 12 ? r.top - H - 6 : Math.min(r.bottom + 6, window.innerHeight - H - 8)) + "px";
@@ -10587,7 +10600,7 @@ function attachEmojiShortcodes(ta){
     if (!m) { close(); return; }
     items = findEmoji(m[2]); if (!items.length) { close(); return; }
     start = ta.selectionStart - m[2].length - 1; idx = 0;
-    if (box.parentNode !== document.body) document.body.append(box);
+    { const hst = popHost(); if (box.parentNode !== hst) hst.append(box); }
     draw(); box.hidden = false;
     const r = ta.getBoundingClientRect(); box.style.left = r.left + "px"; box.style.width = "240px"; box.style.top = Math.max(6, r.top - box.offsetHeight - 4) + "px";
   });
@@ -10714,7 +10727,7 @@ function openQuickReact(anchor, m){
   closeEmojiPicker();
   const more = h("button", { type: "button", class: "epbtn more", title: "More emoji", "aria-label": "More emoji", onclick: () => openEmojiPicker(anchor, e => toggleReaction(m, e)) }, "＋");
   emojiPop = h("div", { class: "emoji-pop quick", role: "dialog", "aria-label": "React" }, h("div", { class: "eprow" }, QUICK_REACT.map(e => h("button", { type: "button", class: "epbtn", title: QUICK_MEANING[e], "aria-label": QUICK_MEANING[e], onclick: () => { toggleReaction(m, e); closeEmojiPicker(); } }, e)), more));
-  document.body.append(emojiPop);
+  popHost().append(emojiPop);
   const r = anchor.getBoundingClientRect();
   const wPop = emojiPop.offsetWidth || 480;
   emojiPop.style.left = Math.max(8, Math.min(r.left - wPop / 2, window.innerWidth - wPop - 8)) + "px";
@@ -14525,7 +14538,8 @@ function wire(){
    --------------------------------------------------------------------- */
 const NET = { slow: 0, bar: null, hideT: null };
 function netPaint(){
-  const off = navigator.onLine === false, slow = NET.slow > 0;
+  const busyBtn = !!document.querySelector("button[disabled] .spinner");   // a button already says "Sending…": don't add a second loader
+  const off = navigator.onLine === false, slow = NET.slow > 0 && !busyBtn;
   clearTimeout(NET.hideT);
   // stays up 3 s after the last slow request, so it doesn't blink on and off between requests
   if (!off && !slow) { if (NET.bar) NET.hideT = setTimeout(() => { if (NET.slow === 0 && navigator.onLine !== false && NET.bar) { NET.bar.remove(); NET.bar = null; } }, 3000); return; }
