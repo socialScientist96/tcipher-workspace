@@ -2088,6 +2088,7 @@ body.nb-moving,body.nb-moving *{cursor:grabbing!important;user-select:none!impor
 }
 
 /* Tasks: what needs you (2026-11bx) */
+@media (min-width:761px){.m-only{display:none !important}}
 .needs-you{border-color:var(--bad-t);background:#FFF8F8;margin-bottom:var(--s3);padding:var(--s3) var(--s4)}
 .ny-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--bad);margin-bottom:6px}
 .ny-h .muted{color:var(--ink2);font-size:var(--fs-sm)}
@@ -2437,7 +2438,53 @@ html:has(#content .chat),html:has(#content .chat) body{overscroll-behavior-y:non
   .cvoice-ic{display:none}
   .vp .vp-dl{min-width:32px;width:32px;padding:0;position:relative;flex:none}
   .vp .vp-dl::after{content:"";position:absolute;inset:-6px}
-  .vp .vp-time{white-space:nowrap;flex:none;overflow-wrap:normal}   /* "0:04" never splits across lines at large text (BU-034) */
+  .vp .vp-time{white-space:nowrap;flex:none;overflow-wrap:normal}
+  /* ===== Redesign batch 2 — Home and Attendance (phones) =====
+     Home answers "what do I do now?": date → check-in → needs you → my work → meetings → messages → setup prompts
+     → compact stats → the rest. Desktop keeps its two columns. */
+  .home{display:flex;flex-direction:column}
+  .home > .g-dash,.home > .g-dash > .grid{display:contents}
+  .home > *{order:20;margin-bottom:12px}
+  .home [data-sec]{margin:0 0 12px}
+  .home .hello{order:0} .home [data-sec=needs]{order:2} .home [data-sec=work]{order:3} .home [data-sec=meet]{order:4}
+  .home [data-sec=msgs]{order:5} .home [data-sec=setup]{order:6} .home [data-sec=stats]{order:7} .home [data-sec=verticals]{order:8}
+  .home [data-sec=ann]{order:9} .home [data-sec=pins]{order:10} .home [data-sec=hol]{order:11} .home [data-sec=away]{order:12}
+  /* greeting: date + name, Summarize top-right, the check-in card under it */
+  .home .hello{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:4px 12px;margin-bottom:12px}
+  .home .hello h1{font-size:22px}
+  .home .hello .ai-dash{grid-column:2;grid-row:1;min-height:44px;padding:0 12px}
+  .home .hello .att{grid-column:1 / -1;margin-top:8px}
+  /* check-in card (Home and Attendance): status line, one main action, scrum/meeting as quieter links */
+  .att{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;background:var(--white);border:1px solid var(--line);border-radius:var(--r-lg);padding:12px 14px}
+  .panel .att{border:0;padding:0;background:none}
+  .att .att-st{order:0;flex:1 1 100%;font-size:var(--fs-ui);color:var(--ink);font-weight:500}
+  .att select.in{order:1;flex:1 1 auto;min-height:44px}
+  .att .att-main{order:2;flex:1 1 auto;min-height:44px;background:var(--p);color:#fff;border-color:var(--p);font-weight:600}
+  .att .att-or{display:none}
+  .att .att-scrum,.att .att-next{order:3;flex:1 1 100%;justify-content:flex-start;min-height:44px;background:none;border:0;padding:0;color:var(--p-ink);font-weight:600;text-align:left}
+  .att span.att-scrum{color:var(--ok);font-weight:500;font-size:var(--fs-sm);min-height:0}
+  /* My work: kind · status · due on the first line, the full title underneath at full width */
+  .mw .row{display:grid;grid-template-columns:auto auto minmax(0,1fr);grid-template-areas:"k s d" "t t t";gap:6px 8px;align-items:center;padding:10px 0}
+  .mw .row > .pill:first-child{grid-area:k;min-width:0 !important}
+  .mw .row > .x{grid-area:t;font-weight:500;line-height:1.4}
+  .mw .row > .pill:not(:first-child){grid-area:s}
+  .mw .row > .y{grid-area:d;justify-self:end;min-width:0 !important;text-align:right}
+  /* stats: one compact row of small figures, after the work */
+  .home .stats{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .home .stats .stat{padding:10px;border-top-width:1px}
+  .home .stats .stat .v{font-size:18px;line-height:1.25}
+  .home .stats .stat .l{font-size:12px;line-height:1.3}
+  .m-only{display:block}
+  .home .needs-you .ny-h .muted,.home .needs-you .ny-more{display:none}
+  .home .needs-you > .ny-row:nth-child(n+5){display:none}   /* header is child 1, so this keeps rows 1–3 */
+  .home .needs-you .ny-all{min-height:44px;margin-top:4px;padding:0;background:none;border:0;color:var(--p-ink);font:inherit;font-weight:600;cursor:pointer}
+  .att .att-scrum,.att .att-next{box-shadow:none}
+  .att-today > b{flex:1 1 100%}
+  .att-today .att{flex:1 1 100%}
+  .tb .att-mark{width:100%;min-height:44px;justify-content:center;gap:6px}
+  /* table cards: a cell's values sit together on the right ("10:00 am · laptop"), not spread across the row (BU-035) */
+  .tablewrap > table:not(.tcal) > tbody > tr > td:not(:first-child){justify-content:flex-end;flex-wrap:wrap;column-gap:6px}
+  .tablewrap > table:not(.tcal) > tbody > tr > td:not(:first-child)::before{margin-right:auto}   /* "0:04" never splits across lines at large text (BU-034) */
   /* chat header: the Meet button keeps its size too; back arrow 40 px + tap ring; button labels stay readable by
      screen readers (they were display:none, so "Email" had no name at all) (BU-027) */
   /* long words / URLs / file names (BU-030): break-word only wraps after the layout is sized, so one long word still
@@ -5127,38 +5174,38 @@ function attendanceWidget(light){
   const nm = nextMeeting();
   if (nm && !nm.scrum){
     const mins = Math.round((new Date(nm.start) - Date.now()) / 60000);
-    wrap.append(h("button", { type: "button", class: "btn", style: "font-weight:700", onclick: () => joinAgendaItem(nm) }, "Join " + (nm.title.length > 28 ? nm.title.slice(0, 28) + "…" : nm.title) + (mins > 0 ? " · in " + mins + " min" : " · now")));
+    wrap.append(h("button", { type: "button", class: "btn att-next", style: "font-weight:700", onclick: () => joinAgendaItem(nm) }, "Join " + (nm.title.length > 28 ? nm.title.slice(0, 28) + "…" : nm.title) + (mins > 0 ? " · in " + mins + " min" : " · now")));
   }
   const scrum = todaysScrum();
   if (scrum && meetUrl(scrum)){
     const j = myJoin(scrum.id, today());
-    wrap.append(j ? h("span", {}, "✓ Joined morning scrum at " + fmtTime(j.joined_at))
-      : h("button", { type: "button", class: "btn", style: "font-weight:700", onclick: () => joinMeeting(scrum, today()) }, "Join morning scrum" + (scrum.start_time ? " · " + fmtTimeOfDay(scrum.start_time) : "")));
-    if (!r && !j) wrap.append(h("span", {}, "or"));
+    wrap.append(j ? h("span", { class: "att-scrum" }, "✓ Joined morning scrum at " + fmtTime(j.joined_at))
+      : h("button", { type: "button", class: "btn att-scrum", style: "font-weight:700", onclick: () => joinMeeting(scrum, today()) }, "Join morning scrum" + (scrum.start_time ? " · " + fmtTimeOfDay(scrum.start_time) : "")));
+    if (!r && !j) wrap.append(h("span", { class: "att-or" }, "or"));
   }
   if (r && r.status === "Absent"){
-    wrap.append(h("span", {}, "Marked absent today" + (r.marked_by ? " by " + (pname(r.marked_by) || "an admin") : "")));
+    wrap.append(h("span", { class: "att-st" }, "Marked absent today" + (r.marked_by ? " by " + (pname(r.marked_by) || "an admin") : "")));
     return wrap;
   }
   const late = lateShift();
   if (late){
     // still working from yesterday, after midnight
-    wrap.append(h("span", {}, "Still working since " + fmtDate(late.day) + ", " + fmtTime(late.check_in) + (late.mode ? " (" + late.mode + ")" : "")),
-      h("button", { type: "button", class: "btn", onclick: () => checkOut(late) }, "Check out"));
+    wrap.append(h("span", { class: "att-st" }, "Still working since " + fmtDate(late.day) + ", " + fmtTime(late.check_in) + (late.mode ? " (" + late.mode + ")" : "")),
+      h("button", { type: "button", class: "btn att-main", onclick: () => checkOut(late) }, "Check out"));
     return wrap;
   }
   if (!r){
     const mode = h("select", { class: "in", style: "width:auto;min-height:36px;" + (light ? "background:#fff;color:var(--ink)" : ""), "aria-label": "Working from" }, WORK_MODES.map(m => h("option", { value: m }, m)));
-    wrap.append(h("span", {}, "Not checked in yet"), mode, h("button", { type: "button", class: "btn", onclick: () => checkIn(mode.value) }, "Check in"));
+    wrap.append(h("span", { class: "att-st" }, "Not checked in yet"), mode, h("button", { type: "button", class: "btn att-main", onclick: () => checkIn(mode.value) }, "Check in"));
   } else if (!r.check_out){
     // a day an admin marked can't be checked out of here (the database refuses it)
-    wrap.append(h("span", {}, r.check_in ? "Checked in at " + fmtTime(r.check_in) + (r.mode ? " (" + r.mode + ")" : "") : "Marked " + (r.status || "present") + " today" + (r.marked_by ? " by " + (pname(r.marked_by) || "an admin") : "")),
-      r.marked_by || !r.check_in ? null : h("button", { type: "button", class: "btn", onclick: checkOut }, "Check out"));
+    wrap.append(h("span", { class: "att-st" }, r.check_in ? "Checked in at " + fmtTime(r.check_in) + (r.mode ? " (" + r.mode + ")" : "") : "Marked " + (r.status || "present") + " today" + (r.marked_by ? " by " + (pname(r.marked_by) || "an admin") : "")),
+      r.marked_by || !r.check_in ? null : h("button", { type: "button", class: "btn att-main", onclick: checkOut }, "Check out"));
   } else if (!r.check_in){
-    wrap.append(h("span", {}, "Checked out at " + fmtTime(r.check_out) + (r.marked_by ? " (marked by " + (pname(r.marked_by) || "an admin") + ")" : "")));
+    wrap.append(h("span", { class: "att-st" }, "Checked out at " + fmtTime(r.check_out) + (r.marked_by ? " (marked by " + (pname(r.marked_by) || "an admin") + ")" : "")));
   } else {
-    wrap.append(h("span", {}, "Worked " + hoursOf(r).toFixed(1) + " h today (" + fmtTime(r.check_in) + " – " + outTime(r) + ")"),
-      r.marked_by ? null : h("button", { type: "button", class: "btn", id: "checkInAgain", onclick: () => checkIn(r.mode) }, "Check in again"));
+    wrap.append(h("span", { class: "att-st" }, "Worked " + hoursOf(r).toFixed(1) + " h today (" + fmtTime(r.check_in) + " – " + outTime(r) + ")"),
+      r.marked_by ? null : h("button", { type: "button", class: "btn att-main", id: "checkInAgain", onclick: () => checkIn(r.mode) }, "Check in again"));
   }
   return wrap;
 }
@@ -5171,9 +5218,11 @@ async function renderAttendance(el){
   const L = lvl("attendance");
   if (!S.ui.attendance) S.ui.attendance = { month: today().slice(0, 7), scope: L >= 1 ? "today" : "mine", person: "" };
   const u = S.ui.attendance;
+  // phones: my own check-in is the page's main action; marking others is an admin tool beside the team list (batch 2)
+  const markHere = canMarkAttendance() && PHONE_MQ.matches;
   el.append(h("div", { class: "ph" }, h("div", {}, h("h1", {}, "Attendance"), h("p", {}, "Daily check-in and check-out, with hours worked.")),
-    canMarkAttendance() ? h("div", { class: "acts" }, h("button", { type: "button", class: "btn pri", onclick: () => openMarkAttendance() }, "Mark attendance")) : null));
-  el.append(h("div", { class: "panel", style: "margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap" }, h("b", {}, "Today"), attendanceWidget()));
+    canMarkAttendance() && !markHere ? h("div", { class: "acts" }, h("button", { type: "button", class: "btn pri", onclick: () => openMarkAttendance() }, "Mark attendance")) : null));
+  el.append(h("div", { class: "panel att-today", style: "margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap" }, h("b", {}, "Today"), attendanceWidget()));
   if (MY_DEVICE !== "phone" && !S.portal) el.append(trackerCard());
 
   const tb = h("div", { class: "tb" });
@@ -5183,6 +5232,7 @@ async function renderAttendance(el){
     m.addEventListener("change", () => { u.month = m.value || today().slice(0, 7); rerender(); });
     tb.append(m);
   }
+  if (markHere) tb.append(h("button", { type: "button", class: "btn att-mark", onclick: () => openMarkAttendance() }, ic("plus", 16), "Mark attendance"));
   el.append(tb);
 
   if (u.scope === "today"){
@@ -5448,6 +5498,7 @@ async function renderDashboard(el){
   await ensure(want);
   if (S.route !== "dashboard") return;
   const t0 = today(), me = S.me.id;
+  el.classList.add("home");
 
   // the page is titled by the day; check-in sits in a quiet card beside it
   const scope = S.me.vertical || (isAdmin() ? "All verticals" : "");
@@ -5462,7 +5513,7 @@ async function renderDashboard(el){
     items.push({ d: t.due_date, kind: "Tagged", text: taskKey(t) + " " + t.title, extra: pill(t.status), open: () => openRecord("tasks", t.id) });
   for (const t of rows("tasks")) if (reviewIsMine(t) && t.assignee_id !== me) {
     const k = t.qa_state ? (t.qa_state === "Retest" ? "Retest" : "Test") : "Review";   // testing work shows as Test / Retest
-    items.push({ d: t.due_date || t0, kind: k, text: (taskKey(t) ? taskKey(t) + " " : "") + t.title + " (" + (pname(t.assignee_id) || "unassigned") + ")", extra: pill(k, "warn"), open: () => openRecord(t.type === "Bug" ? "bugs" : "tasks", t.id) });
+    items.push({ d: t.due_date || t0, kind: k, text: (taskKey(t) ? taskKey(t) + " " : "") + t.title + " (" + (pname(t.assignee_id) || "unassigned") + ")", extra: null, warn: true, open: () => openRecord(t.type === "Bug" ? "bugs" : "tasks", t.id) });
   }
   for (const dl of rows("deals")) if (dl.owner_id === me && !["Won","Lost"].includes(dl.stage) && dl.next_followup && dl.next_followup <= addDays(t0, 3))
     items.push({ d: dl.next_followup, kind: "Follow-up", text: dl.title, extra: pill(dl.stage), open: () => openRecord("deals", dl.id) });
@@ -5483,20 +5534,28 @@ async function renderDashboard(el){
   const nh = upcomingHolidays(1)[0];
   if (nh) stats.push(["Next holiday", nh.name + " · " + (dayDiff(t0, nh.date) === 0 ? "today" : dayDiff(t0, nh.date) === 1 ? "tomorrow" : "in " + dayDiff(t0, nh.date) + " days"), "var(--ok)", () => go("holidays")]);
   if (lvl("leave") >= 2) stats.push(["Leave to approve", rows("leave_requests").filter(r => r.status === "Pending").length, "var(--warn)", () => go("leave_requests")]);
-  el.append(statStrip(stats));
+  const st = statStrip(stats); st.dataset.sec = "stats"; el.append(st);
+  // phones: the tasks that need me, right under check-in (same list as the number next to Tasks)
+  const ny = needsYouBox();
+  if (ny) {
+    ny.classList.add("m-only"); ny.dataset.sec = "needs";
+    const n = rows("tasks").filter(taskNeedsMe).length;
+    if (n > 3) ny.append(h("button", { type: "button", class: "link ny-all", onclick: () => go("tasks") }, "See all " + n + " in Tasks"));
+    el.append(ny);
+  }
 
   const left = h("div", { class: "grid" }), right = h("div", { class: "grid" });
   el.append(h("div", { class: "grid g-dash" }, left, right));
 
-  const mw = h("div", { class: "panel" }, h("h2", {}, "My work", h("button", { type: "button", class: "link", onclick: () => openRecord("tasks", null) }, "+ Add task")));
+  const mw = h("div", { class: "panel mw", "data-sec": "work" }, h("h2", {}, "My work", h("button", { type: "button", class: "link", onclick: () => openRecord("tasks", null) }, "+ Add task")));
   if (!items.length) mw.append(h("p", { class: "nothing" }, "Nothing on your plate. Add a task or check your vertical’s board."));
   for (const i of items.slice(0, 12)) mw.append(h("button", { type: "button", class: "row", onclick: i.open },
-    h("span", { class: "pill grey", style: "min-width:76px;justify-content:center" }, i.kind), h("span", { class: "x" }, i.blocked ? h("span", { class: "blocked-ic", title: "Blocked" }, ic("ban", 14)) : "", i.text), i.extra, h("span", { class: "y", style: "min-width:70px;text-align:right" }, i.d ? dueTag(i.d) : "")));
+    h("span", { class: "pill " + (i.warn ? "warn" : "grey"), style: "min-width:76px;justify-content:center" }, i.kind), h("span", { class: "x" }, i.blocked ? h("span", { class: "blocked-ic", title: "Blocked" }, ic("ban", 14)) : "", i.text), i.extra, h("span", { class: "y", style: "min-width:70px;text-align:right" }, i.d ? dueTag(i.d) : "")));
   if (items.length > 12) mw.append(h("p", { class: "nothing" }, "and " + (items.length - 12) + " more"));
   left.append(mw);
 
   if (isAdmin()){
-    left.append(h("div", { class: "panel" }, h("h2", {}, "Your three verticals", h("button", { type: "button", class: "link", onclick: () => go("overview") }, "Company overview")),
+    left.append(h("div", { class: "panel", "data-sec": "verticals" }, h("h2", {}, "Your three verticals", h("button", { type: "button", class: "link", onclick: () => go("overview") }, "Company overview")),
       h("div", { class: "grid g3" }, VERTICALS.map(v => {
         const open = rows("tasks").filter(t => t.vertical === v && t.status !== "Done");
         const od = open.filter(t => t.due_date && t.due_date < t0).length;
@@ -5535,6 +5594,9 @@ async function renderDashboard(el){
 
   const away = rows("leave_requests").filter(r => r.status === "Approved" && r.start_date <= t0 && r.end_date >= t0);
   if (away.length) right.append(listPanel("Away today", away.map(r => h("div", { class: "row", style: "cursor:default" }, avatar(r.user_id, "sm"), h("span", { class: "x" }, pname(r.user_id)), h("span", { class: "y" }, r.type + " until " + fmtDate(r.end_date)))), ""));
+  // phones order the page by these tags (CSS); unknown cards are setup prompts (notifications, Google)
+  const SEC = { "Meetings this week": "meet", "Messages": "msgs", "Announcements": "ann", "Pinned notes": "pins", "Upcoming holidays": "hol", "Away today": "away" };
+  for (const p of right.children) if (!p.dataset.sec) { const h2 = p.querySelector(":scope > h2"); p.dataset.sec = (h2 && SEC[(h2.firstChild || {}).textContent]) || "setup"; }
 }
 
 /* ---------------------------------------------------------------------
@@ -6398,7 +6460,7 @@ function needsYouBox(){
       h("span", { class: "ny-key" }, taskKey(t)), h("span", { class: "ny-title" }, t.title),
       h("span", { class: "ny-why" }, needReason(t) + (t.assignee_id && t.assignee_id !== S.me.id ? " · from " + (pname(t.assignee_id) || "someone") : "")),
       h("span", { class: "btn sm" }, "Open"))),
-    list.length > 8 ? h("p", { class: "muted", style: "margin:6px 0 0;font-size:13px" }, "…and " + (list.length - 8) + " more under “Needs you” below.") : null);
+    list.length > 8 ? h("p", { class: "muted ny-more", style: "margin:6px 0 0;font-size:13px" }, "…and " + (list.length - 8) + " more under “Needs you” below.") : null);
 }
 // (2026-11cr) a task in QA is the tester's to decide once it has one; before that, the reviewer's
 function reviewIsMine(t){
