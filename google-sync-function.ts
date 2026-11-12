@@ -119,8 +119,19 @@ async function syncUserInner(userId: string) {
       attendee_emails: [...emails], updated_at: new Date().toISOString(),
     };
   });
-  must(await db.from("calendar_events").delete().eq("user_id", userId).gte("start_date", fromDay));
-  for (let i = 0; i < rows.length; i += 200) must(await db.from("calendar_events").upsert(rows.slice(i, i + 200), { onConflict: "user_id,google_event_id" }));
+  // (2026-11dz) write only what changed: every sync used to delete and re-insert all of a person's events, which was
+  // one of the biggest uses of the database's disk. Now: new or changed events are upserted, removed ones deleted.
+  const have = (must(await db.from("calendar_events").select("google_event_id,ical_uid,title,starts_at,ends_at,all_day,start_date,end_date,meet_link,html_link,location,organizer_email,attendee_emails")
+    .eq("user_id", userId).gte("start_date", fromDay)) || []) as Any[];
+  const t = (v: unknown) => v ? Date.parse(String(v)) : 0;
+  const key = (e: Any) => JSON.stringify([e.ical_uid || "", e.title || "", t(e.starts_at), t(e.ends_at), !!e.all_day, e.start_date, e.end_date, e.meet_link || "", e.html_link || "",
+    e.location || "", e.organizer_email || "", [...(e.attendee_emails || [])].sort()]);
+  const old = new Map(have.map((e) => [e.google_event_id, key(e)]));
+  const changed = rows.filter((r: Any) => old.get(r.google_event_id) !== key(r));
+  const keep = new Set(rows.map((r: Any) => r.google_event_id));
+  const gone = have.map((e) => e.google_event_id).filter((id: string) => !keep.has(id));
+  for (let i = 0; i < gone.length; i += 200) must(await db.from("calendar_events").delete().eq("user_id", userId).in("google_event_id", gone.slice(i, i + 200)));
+  for (let i = 0; i < changed.length; i += 200) must(await db.from("calendar_events").upsert(changed.slice(i, i + 200), { onConflict: "user_id,google_event_id" }));
   await db.from("google_links").update({ last_sync_at: new Date().toISOString(), last_error: "" }).eq("user_id", userId);
   try { await syncReplies(userId); } catch (e) { await db.from("google_links").update({ last_error: "Reply check failed: " + String((e as Error)?.message || e).slice(0, 200) }).eq("user_id", userId); }
   return rows.length;
@@ -619,7 +630,7 @@ async function quickReplies(userId: string): Promise<number> {
     // Gmail no longer has that bookmark (e.g. after a long break): start again, the 10-minute check covers the gap
     await resetBookmark(); return 0;
   }
-  await db.from("google_links").update({ history_id: latest }).eq("user_id", userId);
+  if (latest !== String(link.history_id)) await db.from("google_links").update({ history_id: latest }).eq("user_id", userId);   // (2026-11dz) only when Gmail's bookmark moved
   if (!threadIds.size) return 0;
   // conversations already on a record: started from the workspace, or (2026-11dp) started by a lead
   const ours = must(await db.from("emails").select("gmail_thread_id,tbl,entity_id,subject").eq("user_id", userId).in("gmail_thread_id", [...threadIds].slice(0, 300))) || [];

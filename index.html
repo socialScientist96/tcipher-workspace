@@ -10800,11 +10800,11 @@ function syncChatSubs(){
 // one conversation's connection failed: rebuild just that one, not all of them
 const subRetry = {};
 function retryChatSub(id){
-  if (!S.me || liveStopping) return;
+  if (!S.me || liveStopping || liveHiddenOrOffline()) return;   // (2026-11dz) not while nobody's looking
   const r = subRetry[id] = subRetry[id] || { n: 0, t: null };
   if (r.t) return;
-  const wait = Math.min(30000, 3000 * Math.pow(2, r.n++));
-  r.t = setTimeout(() => { r.t = null; const s = liveSubs[id]; if (s) { try { sb.removeChannel(s.ch); } catch (e) {} delete liveSubs[id]; } syncChatSubs(); }, wait);
+  const wait = Math.min(r.n >= 6 ? 300000 : 30000, 3000 * Math.pow(2, r.n++));
+  r.t = setTimeout(() => { r.t = null; if (liveHiddenOrOffline()) return; const s = liveSubs[id]; if (s) { try { sb.removeChannel(s.ch); } catch (e) {} delete liveSubs[id]; } syncChatSubs(); }, wait);
 }
 function liveTrouble(st, err, id){
   if (st !== "CHANNEL_ERROR" && st !== "TIMED_OUT") return;
@@ -10816,7 +10816,7 @@ function liveTrouble(st, err, id){
   if (!liveReported && now - chatDownSince >= 10 * 60000) { liveReported = true; captureError("Instant chat has been down for several minutes: " + st + (err && err.message ? " (" + err.message + ")" : ""), "", { realtime: st }); }
   if (id) { retryChatSub(id); return; }
   // try again with growing pauses; the 2-second backup check keeps messages coming meanwhile
-  if (S.me && !liveRetryT) { const wait = Math.min(30000, 3000 * Math.pow(2, liveRetry++)); liveRetryT = setTimeout(() => { liveRetryT = null; if (S.me && !liveConnected()) startChatLive(); }, wait); }
+  if (S.me && !liveRetryT && !liveHiddenOrOffline()) { const wait = Math.min(liveRetry >= 6 ? 300000 : 30000, 3000 * Math.pow(2, liveRetry++)); liveRetryT = setTimeout(() => { liveRetryT = null; if (S.me && !liveConnected() && !liveHiddenOrOffline()) startChatLive(); }, wait); }
 }
 function stopChatLive(){
   liveStopping = true; clearTimeout(liveRetryT); liveRetryT = null;
@@ -12122,7 +12122,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11dy";
+const APP_VERSION = "2026-11dz";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -15147,6 +15147,22 @@ async function startSession(session){
 // Live updates. Connections drop all the time (laptop sleep, Wi-Fi changes); the app reconnects on its own,
 // at once when the computer wakes or the network returns, and only reports a problem if it stays down.
 let wsRetry = 0, wsRetryT = null, liveDownSince = 0, liveReportedDown = false;
+// (2026-11dz) a page nobody is looking at closes its live connections after a minute, and opens them again once
+// when it's shown; meanwhile nothing reconnects. This saves the database a lot of work (see liveTrouble/startLive).
+const liveHiddenOrOffline = () => document.visibilityState === "hidden" || navigator.onLine === false;
+let liveParked = false, liveParkT = null;
+function parkLive(){
+  if (!S.me || document.visibilityState !== "hidden") return;
+  liveParked = true;
+  clearTimeout(wsRetryT); wsRetryT = null;
+  if (channel) { const c = channel; channel = null; try { sb.removeChannel(c); } catch (e) {} }
+  S.live = "PARKED";
+  if (typeof stopChatLive === "function") stopChatLive();
+}
+document.addEventListener("visibilitychange", () => {
+  clearTimeout(liveParkT); liveParkT = null;
+  if (document.visibilityState === "hidden") liveParkT = setTimeout(parkLive, 60000);
+});
 function startLive(){
   if (!S.me) return;
   if (channel) { try { sb.removeChannel(channel); } catch (e) {} channel = null; }
@@ -15164,7 +15180,10 @@ function startLive(){
         liveReportedDown = true;
         captureError("Live updates have been down for 3 minutes: " + status + (err && err.message ? " (" + err.message + ")" : ""), "", { realtime: status });
       }
-      if (!wsRetryT) { const wait = Math.min(30000, 2000 * Math.pow(2, wsRetry++)); wsRetryT = setTimeout(() => { wsRetryT = null; startLive(); }, wait); }
+      // (2026-11dz) every reconnect makes the database record a subscription for each table (and remove it again):
+      // phones and hidden tabs retrying all day were most of the project's disk use. No retries while hidden or
+      // offline (coming back to the page reconnects once), and after repeated failures wait up to 5 minutes.
+      if (!wsRetryT && !liveHiddenOrOffline()) { const wait = Math.min(wsRetry >= 6 ? 300000 : 30000, 2000 * Math.pow(2, wsRetry++)); wsRetryT = setTimeout(() => { wsRetryT = null; if (!liveHiddenOrOffline()) startLive(); }, wait); }
     }
   });
 }
@@ -15185,6 +15204,8 @@ function catchUpAfterDrop(){
 }
 function liveWake(){
   if (!S.me) return;
+  if (liveHiddenOrOffline()) return;   // (2026-11dz) reconnect only for someone looking, with a network
+  if (liveParked) { liveParked = false; wsRetry = 0; liveRetry = 0; startLive(); if (typeof startChatLive === "function") startChatLive(); if (typeof catchUpAfterDrop === "function") { lastCatchUp = 0; catchUpAfterDrop(); } return; }
   if (liveDownSince) liveDownSince = Date.now();   // time spent hidden or asleep doesn't count as an outage
   if (chatDownSince) chatDownSince = Date.now(); liveRetry = 0;
   if (S.live !== "SUBSCRIBED") { clearTimeout(wsRetryT); wsRetryT = null; wsRetry = 0; startLive(); }
