@@ -988,6 +988,15 @@ button.is-busy{opacity:.6;cursor:progress;pointer-events:none}
   .tablewrap.t-cards > table > tbody > tr.m-titled > td.m-meta{order:-1;font-size:var(--fs-sm);font-weight:400;color:var(--ink3)}
   .tablewrap.t-cards > table > tbody > tr.m-titled > td.m-meta::before{display:none}
 }
+/* Demo booking (2026-11do) */
+.demo-days{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 6px}
+.demo-days .btn{flex-direction:column;align-items:flex-start;gap:0;line-height:1.25;min-width:84px}
+.demo-days .btn small{font-size:11.5px;opacity:.75;font-weight:500}
+.demo-slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:6px;margin-top:4px}
+.demo-slots .btn{flex-direction:column;align-items:flex-start;gap:0;line-height:1.25}
+.demo-slots .btn small{font-size:11.5px;opacity:.7;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.demo-team{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px 14px;margin:6px 0 12px}
+.meet-files{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 /* Today in sales (2026-11dn) */
 .sec-h{font-size:16px;font-weight:600;margin:4px 0 10px}
 .crm-today h2 .seg{margin-left:auto}
@@ -3989,7 +3998,7 @@ const MOD = {
 
   meetings: {
     label: "Meetings", one: "meeting", table: "meetings", area: "meetings", title: "title",
-    desc: "Morning scrum, client calls and reviews, with Google Meet links, agenda, notes and a log of who joined.", needs: ["projects","clients","meeting_joins"], comments: true, files: true,
+    desc: "Morning scrum, client calls and reviews, with Google Meet links, agenda, notes and a log of who joined.", needs: ["projects","clients","meeting_joins","leads"], comments: true, files: true,
     personalCreate: true,
     canEdit: (rec, L) => L >= 2 || !rec || rec.created_by === S.me.id,
     canDelete: (rec, L) => L >= 3 || (rec && rec.created_by === S.me.id),
@@ -4003,6 +4012,9 @@ const MOD = {
       { k: "duration_min", l: "Duration (minutes)", t: "int", def: 30, min: 5 },
       { k: "project_id", l: "Project", t: "ref", ref: "projects" },
       { k: "client_id", l: "Client", t: "ref", ref: "clients" },
+      // (2026-11do) a demo belongs to a lead; people outside the company (the lead) get the Google invite too
+      { k: "lead_id", l: "Lead", t: "ref", ref: "leads", none: "No lead", col: () => rows("meetings").some(m => "lead_id" in m), show: r => r.kind === "Sales demo" || !!r.lead_id },
+      { k: "guest_emails", l: "Guests from outside the company (emails)", t: "tags", ph: "e.g. priya@client.com, separated by commas", full: true, col: () => rows("meetings").some(m => "guest_emails" in m), show: r => ["Sales demo","Client call","Interview"].includes(r.kind) || (r.guest_emails || []).length > 0 },
       { k: "link", l: "Google Meet link", t: "url", ph: "Leave empty to create one in Google Calendar" },
       { k: "_google", l: "Google Calendar", t: "bool", virtual: true, when: v => googleOn() && googleConnected() && !v.google_event_id, cb: "Add to Google Calendar, send invites and create a Google Meet link", def: () => googleOn() && googleConnected() },
       { k: "attendees", l: "Attendees", t: "users", full: true, def: () => [S.me.id] },
@@ -4015,13 +4027,14 @@ const MOD = {
       { k: "joined", l: "Joined today", get: r => occursOn(r, today()) ? String(new Set(joinsFor(r.id, today()).map(j => j.user_id || j.display_name)).size) : "–" },
       { k: "join", l: "", render: (v, r) => (occursOn(r, today()) || r.meeting_date >= today()) ? (joinButton(r, today(), true) || h("span", { class: "muted" }, "No link")) : h("span", { class: "muted" }, "") }],
     sort: (a, b) => (a.meeting_date + (a.start_time || "")).localeCompare(b.meeting_date + (b.start_time || "")),
-    views: [["upcoming","Upcoming"], ["past","Past"]],
-    viewFilter: (r, v) => { const rep = r.repeat && r.repeat !== "Does not repeat"; return v === "past" ? (!rep && r.meeting_date < today()) : (rep || r.meeting_date >= today()); },
+    views: [["upcoming","Upcoming"], ["past","Past"], ["demos","Demos"]],
+    viewFilter: (r, v) => { if (v === "demos") return r.kind === "Sales demo"; const rep = r.repeat && r.repeat !== "Does not repeat"; return v === "past" ? (!rep && r.meeting_date < today()) : (rep || r.meeting_date >= today()); },
     actions: (rec) => {
       const out = [];
       const day = occursOn(rec, today()) ? today() : null;
       if (meetUrl(rec)) out.push(h("b", { style: "flex:1" }, day ? (isScrum(rec) ? "Morning scrum is on today" : "This meeting is on today") : "Meeting link ready"), joinButton(rec, day || rec.meeting_date));
       if (rec.google_html_link) out.push(h("a", { class: "btn", href: rec.google_html_link, target: "_blank", rel: "noopener" }, "Open in Google Calendar"));
+      out.push(...meetingNotesActions(rec));
       if (googleOn() && meetCode(rec) && (isAdmin() || rec.created_by === S.me.id || rec.google_owner === S.me.id))
         out.push(h("button", { type: "button", class: "btn", onclick: async e => {
           const b = e.currentTarget; b.disabled = true; b.textContent = "Importing…";
@@ -4053,7 +4066,7 @@ const MOD = {
   /* ---------------- Sales ---------------- */
   deals: {
     label: "Sales pipeline", one: "deal", table: "deals", area: "sales", title: "title",
-    desc: "Deals from first conversation to signed contract: Lead › Qualified › Meeting › Proposal › Negotiation › Won or Lost.", needs: ["clients","contacts","leads","activities","tasks"], comments: true, files: true, csv: true, commentKinds: true,
+    desc: "Deals from first conversation to signed contract: Lead › Qualified › Meeting › Proposal › Negotiation › Won or Lost.", needs: ["clients","contacts","leads","activities","tasks","meetings"], comments: true, files: true, csv: true, commentKinds: true,
     canEdit: (rec, L) => L >= 2 || (rec && rec.owner_id === S.me.id),
     dupCheck: d => findDuplicate("deals", d),
     fields: [
@@ -4283,7 +4296,7 @@ const MOD = {
     fields: [
       { k: "name", l: "Campaign name", t: "text", req: true, full: true },
       // (2026-11dn) leads from website forms are matched to the campaign by this code (or by the campaign's name)
-      { k: "utm_code", l: "Tracking code (utm_campaign)", t: "text", ph: "e.g. ai_guide_nov — the same text as in the ad’s link", full: true, show: () => rows("campaigns").some(c => "utm_code" in c) },
+      { k: "utm_code", l: "Tracking code (utm_campaign)", t: "text", ph: "e.g. ai_guide_nov — the same text as in the ad’s link", full: true, col: () => rows("campaigns").some(c => "utm_code" in c) },
       { k: "channel", l: "Channel", t: "select", o: ["Google Ads","Meta Ads","LinkedIn","Instagram","YouTube","Email","SEO","Content","Events","Cold outreach","Referral program","Other"], filter: true },
       { k: "objective", l: "Objective", t: "select", o: ["Lead generation","Brand awareness","App installs","Website traffic","Hiring","Event sign-ups"] },
       { k: "status", l: "Status", t: "select", o: ["Planned","Live","Paused","Completed"], req: true, def: "Planned" },
@@ -4828,6 +4841,7 @@ async function openRecord(key, id, preset, opts){
   const wraps = {};
   for (const f of M.fields){
     if (f.auto && !rec) continue;
+    if (f.col && !f.col()) continue;   // (2026-11do) its database column isn't there yet (upgrade SQL not run): leave it out, so saving still works
     if (f.t === "heading"){ const w = h("div", { class: "full fhead" }, f.l); wraps[f.k] = w; form.append(w); continue; }
     let node;
     const approverField = f.approverOnly;
@@ -8453,7 +8467,7 @@ function leadModule(pipeline){
     label: ig ? "Instagram leads" : "Leads", one: ig ? "Instagram lead" : "lead", table: "leads", area: "leads", title: "name",
     desc: ig ? "People from Instagram campaigns and website forms, worked by phone: Lead › Called › Picked up › Qualified › Demo booked › Demo done › Follow up › Closed."
              : "Marketing captures leads and hands them to Sales. Sales turns good ones into deals.",
-    needs: ["campaigns","deals","activities","tasks"], comments: true, files: true, csv: true, commentKinds: true,
+    needs: ["campaigns","deals","activities","tasks","meetings"], comments: true, files: true, csv: true, commentKinds: true,
     pipeline,
     rowFilter: r => (r.pipeline || "General") === pipeline,
     keyOf: r => r.lead_number || "",
@@ -8560,6 +8574,213 @@ function openWhatsApp(table, rec, anchor){
 
 /* ---------- contact buttons: open your own app, and log it ---------- */
 function waNumber(p){ let d = String(p || "").replace(/\D/g, ""); if (d.length === 10) d = "91" + d; return d; }
+/* ---------- Demo booking (2026-11do) ----------
+   The demo team (Admin › Company settings › Demo team) takes demos. "Book demo" on a lead or deal shows the free
+   times of the coming days: the working hours, minus each person's workspace meetings, synced Google Calendar events
+   and approved leave, with a buffer kept free around each. A time is open when anyone on the team is free; the booker
+   can pick the person, or leave it to whoever has the lighter day. Booking creates a "Sales demo" meeting linked to
+   the lead, sends the Google invite and Meet link to the lead, and tells the person taking it. */
+const DEMO = () => {
+  const s = S.settings || {};
+  return { team: Array.isArray(s.demo_team) ? s.demo_team : null, len: Math.max(15, +s.demo_minutes || 45),
+    buffer: s.demo_buffer_min != null && s.demo_buffer_min !== "" ? Math.max(0, +s.demo_buffer_min) : 15,
+    ahead: Math.min(30, Math.max(3, +s.demo_days_ahead || 10)) };
+};
+const hhmm = n => String(Math.floor(n / 60)).padStart(2, "0") + ":" + String(n % 60).padStart(2, "0");
+const minsOfDay = d => d.getHours() * 60 + d.getMinutes();
+async function demoSlots(){
+  const D = DEMO(), W = WH(), t0 = today(), to = addDays(t0, D.ahead);
+  const av = ok(await sb.rpc("demo_availability", { p_from: t0, p_to: to })) || {};
+  const team = (av.team || []).filter(id => { const p = person(id); return p && p.is_active; });
+  const busy = {};
+  const add = (u, d, a, b) => { const x = busy[u] = busy[u] || {}; (x[d] = x[d] || []).push([a, b]); };
+  for (const m of av.meetings || []) for (let d = t0; d <= to; d = addDays(d, 1)) {
+    if (!occursOn(m, d)) continue;
+    const a = hm(m.start_time);
+    for (const u of m.attendees || []) add(u, d, a, a + (+m.duration_min || 30));
+  }
+  for (const e of av.events || []) {
+    if (!e.starts_at) continue;
+    const a = new Date(e.starts_at), b = new Date(e.ends_at || e.starts_at), first = localDay(e.starts_at), last = localDay(e.ends_at || e.starts_at);
+    for (let d = first, i = 0; d <= last && i < 40; d = addDays(d, 1), i++) add(e.user_id, d, d === first ? minsOfDay(a) : 0, d === last ? minsOfDay(b) : 1440);
+  }
+  for (const l of av.leave || []) for (let d = l.start_date, i = 0; d <= l.end_date && i < 60; d = addDays(d, 1), i++) add(l.user_id, d, 0, 1440);
+  const hol = new Set((S.settings.holidays || []).map(x => x.date));
+  const start = hm(W.start), end = hm(W.end), soon = nowMin() + 30;
+  const days = [];
+  for (let d = t0; d <= to; d = addDays(d, 1)) {
+    if (!W.days.includes(parseD(d).getDay()) || hol.has(d)) continue;
+    const slots = [];
+    for (let s = Math.ceil(start / 30) * 30; s + D.len <= end; s += 30) {
+      if (d === t0 && s < soon) continue;
+      const free = team.filter(u => !((busy[u] || {})[d] || []).some(([a, b]) => a < s + D.len + D.buffer && b > s - D.buffer));
+      if (free.length) slots.push({ start: s, free });
+    }
+    days.push({ day: d, slots });
+  }
+  return { team, days, busy, D };
+}
+async function bookDemo(table, rec){
+  const D0 = DEMO();
+  if (!(D0.team || []).length) {
+    if (isAdmin()) { toast("Pick who takes demos first."); closeDlg(); go("admin-settings"); }
+    else toast("Nobody is set to take demos yet. Ask an admin to pick the demo team in Company settings.");
+    return;
+  }
+  const leadId = table === "leads" ? rec.id : (rec.lead_id || null);
+  const lead = leadId ? byId("leads", leadId) : null;
+  const who0 = rec.name || rec.contact_name || (lead && lead.name) || rec.title || "";
+  const company = rec.company || (lead && lead.company) || "";
+  const body = h("div", {}, h("p", { class: "muted" }, "Finding free times…"));
+  closeDlg();
+  openDialog("Book a demo" + (who0 ? ": " + who0 : ""), [body], [h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel")]);
+  let data;
+  try { data = await demoSlots(); }
+  catch (e) { body.replaceChildren(h("p", { class: "err" }, /demo_availability|function/i.test(String(e && e.message)) ? "Demo booking needs a database update first (upgrade-2026-11do.sql). Ask your admin." : friendly(e))); return; }
+  const { team, days, busy, D } = data;
+  if (!team.length) { body.replaceChildren(h("p", { class: "err" }, "Nobody on the demo team is active. Ask an admin to update it in Company settings.")); return; }
+  const st = { who: "", day: null };
+  const fits = s => !st.who || s.free.includes(st.who);
+  const lighter = (ids, d) => ids.slice().sort((a, b) => ((busy[a] || {})[d] || []).length - ((busy[b] || {})[d] || []).length)[0];
+  const first = n => (pname(n) || "").split(" ")[0];
+  function drawPick(){
+    if (!st.day || !days.find(x => x.day === st.day && x.slots.some(fits))) st.day = (days.find(x => x.slots.some(fits)) || {}).day || null;
+    const pickWho = h("select", { class: "in" }, h("option", { value: "" }, "Anyone free (" + team.map(first).join(", ") + ")"), team.map(id => h("option", { value: id }, pname(id))));
+    pickWho.value = st.who; pickWho.onchange = () => { st.who = pickWho.value; drawPick(); };
+    const dayBtns = h("div", { class: "demo-days" }, days.map(x => {
+      const n = x.slots.filter(fits).length;
+      return h("button", { type: "button", class: "btn sm" + (st.day === x.day ? " pri" : ""), disabled: !n, "aria-pressed": String(st.day === x.day), onclick: () => { st.day = x.day; drawPick(); } },
+        x.day === today() ? "Today" : x.day === addDays(today(), 1) ? "Tomorrow" : parseD(x.day).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }),
+        h("small", {}, n ? n + " free" : "Full"));
+    }));
+    const cur = days.find(x => x.day === st.day);
+    const slots = cur ? cur.slots.filter(fits) : [];
+    body.replaceChildren(
+      h("p", { class: "muted", style: "margin:0 0 10px;font-size:13px" }, D.len + "-minute demo with " + D.buffer + " minutes kept free around it, from the demo team’s working hours, meetings, Google Calendar and leave."),
+      h("label", { class: "fl", style: "max-width:420px" }, "Who takes it", pickWho),
+      h("h3", { class: "ct-h" }, "Day"), dayBtns,
+      h("h3", { class: "ct-h" }, cur ? fmtDate(cur.day) : "Time"),
+      slots.length ? h("div", { class: "demo-slots" }, slots.map(s => h("button", { type: "button", class: "btn", onclick: () => drawConfirm(cur.day, s) },
+          fmtTimeOfDay(hhmm(s.start)), h("small", {}, st.who ? "" : s.free.map(first).join(", ")))))
+        : h("p", { class: "nothing" }, days.some(x => x.slots.some(fits)) ? "No free time on this day." : "No free time in the next " + D.ahead + " days" + (st.who ? " for " + first(st.who) : "") + "."));
+  }
+  function drawConfirm(day, s){
+    const who = st.who || lighter(s.free, day);
+    const guest = h("input", { class: "in", type: "email", value: rec.email || (lead && lead.email) || "", placeholder: "Lead’s email, for the invite" });
+    const agenda = h("textarea", { class: "in", rows: 3, placeholder: "What they want to see (optional)" });
+    const err = h("p", { class: "err", hidden: true });
+    const go2 = h("button", { type: "button", class: "btn pri" }, "Book demo");
+    go2.onclick = async () => {
+      const email = guest.value.trim().toLowerCase();
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err.textContent = "That email doesn’t look right."; err.hidden = false; return; }
+      go2.disabled = true; go2.textContent = "Booking…";
+      const m = { title: "Demo: " + (who0 || "lead") + (company ? " (" + company + ")" : ""), kind: "Sales demo", repeat: "Does not repeat",
+        meeting_date: day, start_time: hhmm(s.start), duration_min: D.len, attendees: [...new Set([who, S.me.id])],
+        lead_id: leadId, guest_emails: email ? [email] : [], agenda: agenda.value.trim() };
+      let saved;
+      try { saved = await insertRow("meetings", m); }
+      catch (e) { go2.disabled = false; go2.textContent = "Book demo"; err.textContent = /lead_id|guest_emails/.test(String(e && e.message)) ? "Demo booking needs a database update first (upgrade-2026-11do.sql). Ask your admin." : friendly(e); err.hidden = false; return; }
+      let invited = false, inviteErr = "";
+      if (googleOn() && googleConnected()) { try { await syncMeetingToGoogle(saved); invited = true; } catch (e) { inviteErr = friendly(e); } }
+      const when = fmtDate(day) + ", " + fmtTimeOfDay(m.start_time);
+      notify([who], "Demo booked with you", m.title + " · " + when + (who !== S.me.id ? " · booked by " + first(S.me.id) : ""), "meetings", saved.id);
+      if (lead && lead.pipeline === "Instagram" && IG_STAGES.indexOf(lead.status) < IG_STAGES.indexOf("Demo booked")) { try { await updateRow("leads", lead.id, { status: "Demo booked" }); } catch (e) { /* their role may not edit leads */ } }
+      if (lvl(MOD.activities.area) >= 2) {
+        const a = { kind: "Demo", direction: "Outbound", activity_date: today(), owner_id: S.me.id, subject: "Demo booked for " + when + " with " + (pname(who) || "the team") };
+        if (table === "leads") a.lead_id = rec.id; else { a.deal_id = rec.id; if (rec.client_id) a.client_id = rec.client_id; if (rec.contact_id) a.contact_id = rec.contact_id; if (leadId) a.lead_id = leadId; }
+        try { await insertRow("activities", a); } catch (e) { /* not critical */ }
+      }
+      closeDlg(); rerender();
+      toast(invited ? "Demo booked for " + when + ". Google invite with a Meet link sent" + (email ? " to " + email : "") + "."
+        : inviteErr ? "Demo booked, but the Google invite failed: " + inviteErr
+        : "Demo booked for " + when + ". Connect Google to send the invite and Meet link.");
+      openRecord("meetings", saved.id);
+    };
+    body.replaceChildren(
+      h("div", { class: "panel", style: "margin:0 0 12px" }, h("b", {}, fmtDate(day) + ", " + fmtTimeOfDay(hhmm(s.start)) + "–" + fmtTimeOfDay(hhmm(s.start + D.len))),
+        h("div", { class: "muted", style: "font-size:13px;margin-top:2px" }, "Taken by " + (pname(who) || "") + (st.who ? "" : s.free.length > 1 ? " (lighter day; " + s.free.filter(x => x !== who).map(first).join(", ") + " also free)" : ""))),
+      h("div", { class: "form" }, h("label", { class: "fl full" }, "Send the invite to", guest), h("label", { class: "fl full" }, "Agenda", agenda)),
+      googleOn() && googleConnected() ? h("p", { class: "muted", style: "font-size:12.5px" }, "A Google Calendar invite with a Meet link goes to the lead and to " + first(who) + " from your Google account.")
+        : h("p", { class: "muted", style: "font-size:12.5px" }, "Your Google isn’t connected, so no invite or Meet link will be sent. ", h("button", { type: "button", class: "linkbtn", onclick: () => connectGoogle() }, "Connect Google"), " first to send it."),
+      err,
+      h("div", { style: "display:flex;gap:8px;margin-top:6px" }, h("button", { type: "button", class: "btn ghost", onclick: drawPick }, "Back"), go2));
+  }
+  drawPick();
+}
+function demosSection(table, rec){
+  const leadId = table === "leads" ? rec.id : rec.lead_id;
+  const ms = rows("meetings").filter(m => m.kind === "Sales demo" && ((leadId && m.lead_id === leadId) || (table === "deals" && m.lead_id && m.lead_id === rec.lead_id)))
+    .sort((a, b) => (b.meeting_date + (b.start_time || "")).localeCompare(a.meeting_date + (a.start_time || "")));
+  if (!ms.length && !leadId) return null;
+  const t0 = today();
+  return h("div", { class: "section" },
+    h("h3", {}, "Demos", h("button", { type: "button", class: "link", style: "margin-left:auto;font-weight:500", onclick: () => bookDemo(table, rec) }, "+ Book demo")),
+    ms.length ? ms.map(m => rowBtn(pill(m.meeting_date < t0 ? "Done" : m.meeting_date === t0 ? "Today" : "Booked", m.meeting_date < t0 ? "grey" : "info"),
+        [fmtDate(m.meeting_date) + (m.start_time ? ", " + fmtTimeOfDay(m.start_time) : ""), h("span", { class: "muted" }, " · " + (m.attendees || []).filter(x => x !== S.me.id).map(x => (pname(x) || "").split(" ")[0]).join(", "))],
+        m.notes_doc_url || (m.notes || "").trim() ? h("span", { class: "pill ok" }, "Notes") : m.recording_url ? h("span", { class: "pill grey" }, "Recording") : null,
+        () => { closeDlg(); openRecord("meetings", m.id); }))
+      : h("p", { class: "nothing" }, "No demo booked yet."));
+}
+
+/* ---------- Gemini notes, transcript and recording on a meeting (2026-11do) ----------
+   When Google Meet records a call or Gemini takes notes, Google saves them in the organiser's Drive. The google-sync
+   function finds them (Meet API and the calendar event's attachments) and keeps the links on the meeting; with the
+   extra "Meet files" permission it also copies Gemini's notes into the meeting's notes and onto the lead. */
+const MEET_FILES_SCOPE = "https://www.googleapis.com/auth/drive.meet.readonly";
+function meetingNotesActions(rec){
+  const out = [];
+  if (!("notes_checked_at" in rec)) return out;
+  const files = [[rec.notes_doc_url, "Gemini notes"], [rec.transcript_url, "Transcript"], [rec.recording_url, "Recording"]].filter(x => x[0]);
+  if (files.length) out.push(h("span", { class: "meet-files" }, files.map(([u, l]) => h("a", { class: "btn", href: u, target: "_blank", rel: "noopener" }, l))));
+  const started = rec.meeting_date < today() || (rec.meeting_date === today() && rec.start_time && hm(rec.start_time) <= nowMin());
+  const mine = isAdmin() || rec.created_by === S.me.id || rec.google_owner === S.me.id;
+  if (googleOn() && meetCode(rec) && started && mine && (rec.repeat || "Does not repeat") === "Does not repeat")
+    out.push(h("button", { type: "button", class: "btn", onclick: async e => {
+      const b = e.currentTarget; b.disabled = true; b.textContent = "Looking in Google…";
+      try {
+        const r = await callGoogle("fetch_notes", { meeting_id: rec.id });
+        if (r.meeting) upsertCache("meetings", r.meeting);
+        if (r.activity) upsertCache("activities", r.activity);
+        const got = [r.found && r.found.notes ? "Gemini notes" : null, r.found && r.found.transcript ? "transcript" : null, r.found && r.found.recording ? "recording" : null].filter(Boolean);
+        toast(got.length ? "Found " + got.join(", ") + (r.copied ? ". Notes copied into the meeting" + (rec.lead_id ? " and the lead" : "") + "." : ".")
+          : "Nothing yet. Google can take up to an hour after the call; this is also checked automatically.");
+        if (r.needScope && !String((myGoogle() || {}).scopes || "").includes("drive.meet")) {
+          if (confirm("Found Gemini notes. To copy their text into the workspace, allow “See files Google Meet created” once. Allow now?")) await connectGoogle(MEET_FILES_SCOPE);
+        }
+        closeDlg(); openRecord("meetings", rec.id);
+      } catch (err) { fail(err, "Couldn’t get the notes"); b.disabled = false; b.textContent = "Get notes and recording"; }
+    } }, files.length ? "Check again" : "Get notes and recording"));
+  return out;
+}
+
+/* ---------- Company settings: demo team (2026-11do) ---------- */
+function demoTeamPanel(){
+  const D = DEMO();
+  const staff = rows("profiles").filter(p => p.is_active && !p.client_id).sort((a, b) => String(a.full_name).localeCompare(String(b.full_name)));
+  const start = D.team || staff.filter(p => /^(saurabh|geethika)\b/i.test(p.full_name || "")).map(p => p.id);   // the owner's starting list
+  const chosen = new Set(start);
+  const boxes = h("div", { class: "demo-team" }, staff.map(p => {
+    const c = h("input", { type: "checkbox", checked: chosen.has(p.id) });
+    c.onchange = () => { if (c.checked) chosen.add(p.id); else chosen.delete(p.id); };
+    return h("label", { class: "chk" }, c, p.full_name + (p.vertical ? " · " + p.vertical : ""));
+  }));
+  const num = (v, min, max) => h("input", { class: "in", type: "number", min: String(min), max: String(max), value: String(v) });
+  const len = num(D.len, 15, 180), buf = num(D.buffer, 0, 60), ahead = num(D.ahead, 3, 30);
+  const err = h("p", { class: "err", hidden: true });
+  const save = h("button", { type: "button", class: "btn pri" }, "Save demo team");
+  save.onclick = async () => {
+    err.hidden = true;
+    if (!chosen.size) { err.textContent = "Pick at least one person."; err.hidden = false; return; }
+    const data = { ...(await latestSettings()), demo_team: [...chosen], demo_minutes: +len.value || 45, demo_buffer_min: Math.max(0, +buf.value || 0), demo_days_ahead: +ahead.value || 10 };
+    try { ok(await sb.from("settings").upsert({ id: 1, data, updated_at: new Date().toISOString() })); S.settings = data; toast("Demo team saved."); rerender(); } catch (e) { fail(e, "Not saved"); }
+  };
+  return h("div", { class: "panel", style: "margin-bottom:14px" }, h("h2", {}, "Demo team"),
+    h("p", { class: "muted", style: "margin:0 0 6px;font-size:13px" }, D.team ? "These people take demo calls. “Book demo” on a lead shows the times when any of them is free." : "Not saved yet. Tick who takes demo calls and save; “Book demo” on a lead then shows the times when any of them is free."),
+    boxes,
+    h("div", { class: "form" }, h("label", { class: "fl" }, "Demo length (minutes)", len), h("label", { class: "fl" }, "Keep free before and after (minutes)", buf), h("label", { class: "fl" }, "Show free times for the next (days)", ahead)),
+    err, h("div", { style: "margin-top:8px" }, save));
+}
+
 function contactBar(table, rec){
   const phone = rec.phone, email = rec.email, first = String(rec.contact_name || rec.name || "").split(" ")[0];
   const log = kind => logActivity(table, rec, kind);
@@ -8587,10 +8808,13 @@ function crmActions(table, rec){
       out.push(h("b", { style: "flex:1" }, "Ready for Sales?"), h("button", { type: "button", class: "btn pri", onclick: () => sendLeadToSales(rec) }, "Send to Sales"));
     if (!rec.deal_id && lvl("sales") >= 2 && !["Not a fit","Unqualified","Ghosted","Converted"].includes(rec.status))
       out.push(...(out.length ? [] : [h("b", { style: "flex:1" }, ig ? "Demo going well?" : "Worth pursuing?")]), h("button", { type: "button", class: "btn ok", onclick: () => convertLead(rec) }, "Convert to deal"));
+    if (!["Not a fit","Unqualified","Ghosted","Converted","Closed"].includes(rec.status))
+      out.push(h("button", { type: "button", class: "btn", onclick: () => bookDemo(table, rec) }, "Book demo"));
     if (rec.lead_number) out.push(h("span", { class: "tkey", style: "margin-left:auto" }, rec.lead_number));
   } else {
     if (!["Won","Lost"].includes(rec.stage)){
       out.push(h("b", { style: "flex:1" }, pill(rec.stage), " ", money(rec.value)),
+        h("button", { type: "button", class: "btn", onclick: () => bookDemo(table, rec) }, "Book demo"),
         h("button", { type: "button", class: "btn ok", onclick: () => setDealOutcome(rec, "Won") }, "Mark won"),
         h("button", { type: "button", class: "btn danger", onclick: () => setDealOutcome(rec, "Lost") }, "Mark lost"));
     } else {
@@ -8624,7 +8848,7 @@ function crmDetail(table, rec, box){
     if (ld) box.append(h("div", { class: "section" }, h("h3", {}, "Came from lead"), h("button", { type: "button", class: "row", onclick: () => { closeDlg(); openRecord(ld.pipeline === "Instagram" ? "ig_leads" : "leads", ld.id); } }, h("span", { class: "tkey" }, ld.lead_number || ""), h("span", { class: "x" }, ld.name), pill(ld.source, "grey"))));
     if (ld && (ld.form_submissions || []).length) box.append(formAnswersSection(ld));
   }
-  box.append(linkedTasksSection(table, rec), linkedActivitiesSection(table, rec), recordHistorySection(table, rec));
+  box.append(...[demosSection(table, rec), linkedTasksSection(table, rec), linkedActivitiesSection(table, rec), recordHistorySection(table, rec)].filter(Boolean));
 }
 function formAnswersSection(rec){
   const subs = (rec.form_submissions || []).slice().reverse();
@@ -11668,7 +11892,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11dn";
+const APP_VERSION = "2026-11do";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -13659,6 +13883,7 @@ function renderAdminSettings(el){
   adminHeader(el, "Company settings", "Name, currency, working days, leave rules, holidays and notification emails.");
   el.append(mailSenderPanel());
   el.append(activitySettingsPanel());
+  el.append(demoTeamPanel());
   const s = clone(S.settings);
   const company = h("input", { class: "in", value: s.company || "", maxlength: "80" });
   const currency = h("select", { class: "in" }, ["INR","USD","EUR","GBP","AED","AUD","CAD","SGD"].map(c => h("option", { value: c }, c)));

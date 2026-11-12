@@ -141,7 +141,8 @@ async function eventBody(m: Any, withMeet: boolean) {
     description: [m.agenda, "Created from the Tcipher workspace."].filter(Boolean).join("\n\n"),
     start: { dateTime: localDateTime(m.meeting_date, m.start_time), timeZone: TZ },
     end: { dateTime: localDateTime(m.meeting_date, m.start_time, m.duration_min || 30), timeZone: TZ },
-    attendees: [...new Set(people.map((p: Any) => p.email).filter(Boolean))].map((email) => ({ email })),
+    // (2026-11do) people outside the company (a lead booked for a demo) are invited too
+    attendees: [...new Set([...people.map((p: Any) => String(p.email || "").toLowerCase()), ...(m.guest_emails || []).map((e: string) => String(e || "").trim().toLowerCase())].filter(Boolean))].map((email) => ({ email })),
     recurrence: rrule,
   };
   if (withMeet) body.conferenceData = { createRequest: { requestId: crypto.randomUUID(), conferenceSolutionKey: { type: "hangoutsMeet" } } };
@@ -170,6 +171,58 @@ async function deleteEvent(meetingId: string) {
   const token = await accessFor(m.google_owner);
   try { await g(token, CAL + "/" + encodeURIComponent(m.google_event_id) + "?sendUpdates=all", { method: "DELETE" }); }
   catch (e) { if (!/not found|deleted|Google error (404|410)/i.test(String((e as Error)?.message || e))) throw e; }   // already gone in Google: fine
+}
+
+/* ---------------- Gemini notes, transcript and recording (2026-11do) ----------------
+   Google saves them in the organiser's Drive after the call (it can take a while). Found through the Meet API
+   (recordings, transcripts, smart notes) and the calendar event's attachments ("Notes by Gemini"). With the
+   drive.meet.readonly permission the notes' text is copied into the meeting, and onto the lead as an activity. */
+const docId = (u: string) => { const x = String(u || "").match(/\/d\/([a-zA-Z0-9_-]{20,})/); return x ? x[1] : ""; };
+async function docText(token: string, id: string): Promise<{ text: string; needScope: boolean }> {
+  const res = await fetch("https://www.googleapis.com/drive/v3/files/" + encodeURIComponent(id) + "/export?mimeType=text/plain", { headers: { Authorization: "Bearer " + token } });
+  if (res.ok) return { text: (await res.text()).replace(/\r/g, "").replace(/\n{3,}/g, "\n\n").trim().slice(0, 20000), needScope: false };
+  return { text: "", needScope: res.status === 401 || res.status === 403 };
+}
+async function fetchNotes(meetingId: string) {
+  const m = must(await db.from("meetings").select("*").eq("id", meetingId).single());
+  const owner = m.google_owner || m.created_by;
+  const token = await accessFor(owner);
+  const found: Any = { notes: m.notes_doc_url || "", transcript: m.transcript_url || "", recording: m.recording_url || "" };
+  let notesId = docId(found.notes);
+  const code = meetCode(m.link);
+  if (code) {
+    const since = new Date(new Date(m.meeting_date + "T00:00:00+05:30").getTime() - 864e5).toISOString();
+    let records: Any[] = [];
+    try { records = await listAll(token, "conferenceRecords?filter=" + encodeURIComponent('space.meeting_code = "' + code + '" AND start_time >= "' + since + '"'), "conferenceRecords"); } catch (_) { /* no access to this call */ }
+    for (const rec of records.slice(-3)) {
+      try { for (const r of await listAll(token, rec.name + "/recordings", "recordings")) if (r.driveDestination && r.driveDestination.exportUri) found.recording = r.driveDestination.exportUri; } catch (_) { /* none */ }
+      try { for (const t of await listAll(token, rec.name + "/transcripts", "transcripts")) if (t.docsDestination && t.docsDestination.exportUri) found.transcript = t.docsDestination.exportUri; } catch (_) { /* none */ }
+      try { for (const n of await listAll(token, rec.name + "/smartNotes", "smartNotes")) if (n.docsDestination) { found.notes = n.docsDestination.exportUri || found.notes; notesId = n.docsDestination.document || docId(found.notes) || notesId; } } catch (_) { /* not offered by Google for this account */ }
+    }
+  }
+  if (m.google_event_id) {
+    try {
+      const ev = await g(token, CAL + "/" + encodeURIComponent(m.google_event_id));
+      for (const a of (ev && ev.attachments) || []) {
+        const title = String(a.title || "");
+        if (/gemini|notes/i.test(title) && /document/.test(String(a.mimeType || "document"))) { found.notes = found.notes || a.fileUrl; notesId = notesId || a.fileId || docId(a.fileUrl); }
+        else if (/transcript/i.test(title)) found.transcript = found.transcript || a.fileUrl;
+        else if (/video|recording/i.test(String(a.mimeType || "") + " " + title)) found.recording = found.recording || a.fileUrl;
+      }
+    } catch (_) { /* event gone or no access */ }
+  }
+  let text = "", needScope = false;
+  if (notesId && !String(m.notes || "").trim()) { const r = await docText(token, notesId); text = r.text; needScope = r.needScope; }
+  const patch: Any = { notes_doc_url: found.notes || "", transcript_url: found.transcript || "", recording_url: found.recording || "", notes_checked_at: new Date().toISOString() };
+  if (text) patch.notes = text;
+  const meeting = must(await db.from("meetings").update(patch).eq("id", meetingId).select().single());
+  let activity = null;
+  if (text && m.lead_id) {
+    const r = await db.from("activities").insert({ kind: "Demo", direction: "Outbound", activity_date: m.meeting_date, owner_id: owner, lead_id: m.lead_id,
+      subject: "Demo notes: " + m.title, outcome: text.slice(0, 4000) + (found.recording ? "\n\nRecording: " + found.recording : "") }).select().single();
+    if (!r.error) activity = r.data;
+  }
+  return { meeting, activity, found: { notes: !!found.notes, transcript: !!found.transcript, recording: !!found.recording }, copied: !!text, needScope };
 }
 
 /* ---------------- Google Meet joins ---------------- */
@@ -635,6 +688,19 @@ Deno.serve(async (req) => {
         if (!occursOn(m, today(), wd, hol) && !occursOn(m, addDays(today(), -1), wd, hol)) continue;
         try { const r = await importJoins(m.id, 2); result.joins += r.joins; result.checkedIn += r.checkedIn; } catch (_) { /* keep going */ }
       }
+      // (2026-11do) Gemini notes and recordings of demos and other one-off calls from the last two days
+      result.notes = 0;
+      const fifteenAgo = new Date(Date.now() - 15 * 60000).toISOString();
+      for (const m of meetings) {
+        if (m.repeat && m.repeat !== "Does not repeat") continue;
+        if (m.meeting_date < addDays(today(), -2) || m.meeting_date > today()) continue;
+        if (!connected.has(m.google_owner || m.created_by) || !("notes_checked_at" in m)) continue;
+        if (m.notes_doc_url && m.recording_url) continue;
+        if (!m.start_time || new Date(localDateTime(m.meeting_date, m.start_time, m.duration_min || 30) + "+05:30") > new Date()) continue;   // not over yet
+        if (m.notes_checked_at && m.notes_checked_at > fifteenAgo) continue;
+        try { const r = await fetchNotes(m.id); if (r.found.notes || r.found.recording) result.notes++; } catch (_) { /* keep going */ }
+        if (result.notes >= 20) break;
+      }
       return json(result);
     }
 
@@ -699,6 +765,7 @@ Deno.serve(async (req) => {
     if (action === "save_event") return json({ ok: true, meeting: await saveEvent(me.id, meetingId) });
     if (action === "delete_event") { await deleteEvent(meetingId); return json({ ok: true }); }
     if (action === "import_joins") return json({ ok: true, ...(await importJoins(meetingId, 30)) });
+    if (action === "fetch_notes") return json({ ok: true, ...(await fetchNotes(meetingId)) });
     return json({ error: "Unknown action." }, 400);
   } catch (e) {
     return json({ error: (e as Error)?.message ?? String(e) }, 500);
