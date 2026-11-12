@@ -1760,6 +1760,7 @@ table{font-size:var(--fs-ui)} th{font-size:var(--fs-sm);font-weight:500} td{font
 .panel h2{margin:0 0 var(--s3)}
 .grid,.stats{gap:var(--s4)}
 .stats{grid-template-columns:repeat(auto-fit,minmax(130px,1fr));margin-bottom:var(--s6)}
+.stat .v.txt{font-size:var(--fs-lg,17px);line-height:1.3;overflow-wrap:normal;word-break:normal}   /* (2026-11dk) "Christmas · in 43 days" broke mid-word in 130 px tiles */
 .stat{padding:var(--s4);border-radius:var(--r-lg)}
 .tb{gap:var(--s2);margin-bottom:var(--s4)}
 .btn,.in{border-radius:var(--r-md)}
@@ -4547,7 +4548,8 @@ async function renderModule(key, el){
 
 function statStrip(items){
   return h("div", { class: "stats" }, items.map(([l, v, c, onclick]) =>
-    h(onclick ? "button" : "div", { class: "stat", style: c ? "--tone:" + c : null, type: onclick ? "button" : null, onclick }, h("div", { class: "v" }, String(v)), h("div", { class: "l" }, l))));
+    h(onclick ? "button" : "div", { class: "stat", style: c ? "--tone:" + c : null, type: onclick ? "button" : null, onclick },
+      h("div", { class: "v" + (/^[\s\d.,%₹$+\-–—/:x×]+$|^\d+ of \d+$/i.test(String(v)) ? "" : " txt") }, String(v)), h("div", { class: "l" }, l))));   // words (a holiday's name, "Not set") use a smaller size than figures
 }
 function segmented(items, current, onPick){
   const seg = h("div", { class: "seg", role: "group" });
