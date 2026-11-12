@@ -9477,7 +9477,7 @@ async function renderEmails(el){
   if (S.route !== "emails") return;
   if (!S.ui.emails) S.ui.emails = { view: "replies", q: "" };
   const u = S.ui.emails;
-  el.append(h("div", { class: "ph" }, h("div", {}, h("h1", {}, "Emails"), h("p", {}, "Emails you’ve sent from the workspace, and the replies to them. Only these conversations are read; the rest of your inbox stays private.")),
+  el.append(h("div", { class: "ph" }, h("div", {}, h("h1", {}, "Emails"), h("p", {}, "Emails you’ve sent from the workspace, the replies to them, and new emails from leads and deal contacts (matched by their email address). Only those conversations are saved here; the rest of your inbox stays private.")),
     h("div", { class: "acts" }, h("button", { type: "button", class: "btn pri", onclick: () => newEmailToAnyone() }, ic("mail"), "New email"))));
   if (!canEmail()) el.append(h("div", { class: "panel", style: "background:var(--tint);border-color:transparent;display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px" },
     h("span", { style: "flex:1;min-width:200px" }, h("b", {}, "Send from your own email. "), "Connect Google once and tick the Gmail boxes. Emails go from your address, and replies show up here."),
@@ -9500,7 +9500,7 @@ async function renderEmails(el){
       h("tbody", {}, rs.slice(0, 300).map(e => h("tr", { class: "click" + (e.direction === "in" && !e.read_at && e.user_id === S.me.id ? " unread-row" : ""), onclick: () => openEmail(e) },
         h("td", {}, (u.view === "replies" ? e.from_email : e.to_email).replace(/<.*>/, "").trim().slice(0, 40)), h("td", {}, h("b", {}, e.subject || "(no subject)"), h("br"), h("span", { class: "muted", style: "font-size:12.5px" }, e.snippet.slice(0, 90))),
         h("td", {}, linkOf(e) || h("span", { class: "muted" }, "–")), h("td", { style: "white-space:nowrap" }, fmtAgo(e.sent_at))))))
-      : h("div", { class: "empty" }, h("b", {}, u.view === "replies" ? "No replies yet" : "Nothing sent yet"), u.view === "replies" ? "Replies to emails you send from the workspace appear here within about 10 minutes." : "Send from a lead, deal, client, contact or proposal, or use New email."));
+      : h("div", { class: "empty" }, h("b", {}, u.view === "replies" ? "No replies yet" : "Nothing sent yet"), u.view === "replies" ? "Replies, and new emails from your leads, appear here within a few minutes." : "Send from a lead, deal, client, contact or proposal, or use New email."));
   }
   q.addEventListener("input", () => { u.q = q.value; draw(); });
   const unread = mine.filter(e => e.direction === "in" && !e.read_at && e.user_id === S.me.id).length;
@@ -11892,7 +11892,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11do";
+const APP_VERSION = "2026-11dp";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));

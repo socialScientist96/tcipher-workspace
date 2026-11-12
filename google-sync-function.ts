@@ -395,9 +395,14 @@ async function readThread(userId: string, token: string, tid: string, origin: An
   let found = 0;
   const ids = (th.messages || []).map((m: Any) => m.id);
   const known = new Set(((must(await db.from("emails").select("gmail_message_id").in("gmail_message_id", ids)) || []) as Any[]).map((r) => r.gmail_message_id));
+  // (2026-11dp) the same email can reach two people's mailboxes (the lead wrote to both): keep one copy on the record
+  const hdrOf = (m: Any, n: string) => ((m.payload && m.payload.headers) || []).find((x: Any) => x.name.toLowerCase() === n)?.value || "";
+  const rfcs = (th.messages || []).map((m: Any) => hdrOf(m, "message-id")).filter(Boolean);
+  const knownRfc = new Set(rfcs.length && origin.entity_id ? ((must(await db.from("emails").select("rfc_message_id").eq("tbl", origin.tbl).eq("entity_id", origin.entity_id).in("rfc_message_id", rfcs)) || []) as Any[]).map((r) => r.rfc_message_id) : []);
   for (const m of th.messages || []) {
     if (known.has(m.id) || (m.labelIds || []).includes("DRAFT")) continue;
-    const hd = (n: string) => ((m.payload && m.payload.headers) || []).find((x: Any) => x.name.toLowerCase() === n)?.value || "";
+    if (hdrOf(m, "message-id") && knownRfc.has(hdrOf(m, "message-id"))) continue;
+    const hd = (n: string) => hdrOf(m, n);
     const mine = (m.labelIds || []).includes("SENT");
     const text = plainBody(m.payload).slice(0, 100000);
     const row = { user_id: userId, direction: mine ? "out" : "in", tbl: origin.tbl, entity_id: origin.entity_id, from_email: hd("from"), to_email: hd("to"), cc: hd("cc"),
@@ -409,13 +414,66 @@ async function readThread(userId: string, token: string, tid: string, origin: An
       found++;
       await logEmailActivity(userId, origin.tbl, origin.entity_id, "Inbound", row.subject, text);
       // the notification opens the conversation
-      await db.from("notifications").insert({ user_id: userId, title: "Email reply from " + (row.from_email.replace(/<.*>/, "").trim() || row.from_email), body: (row.subject + " · " + String(m.snippet || "")).slice(0, 200), tbl: "emails", entity_id: ins.data.id });
+      await db.from("notifications").insert({ user_id: userId, title: (origin.fresh ? "Email from " : "Email reply from ") + (row.from_email.replace(/<.*>/, "").trim() || row.from_email), body: (row.subject + " · " + String(m.snippet || "")).slice(0, 200), tbl: "emails", entity_id: ins.data.id });
     }
   }
   return { found, checked: true, problem: "", stop: false };
 }
+/* ---------------- emails a lead or client sends first (2026-11dp) ----------------
+   A new email in someone's inbox is matched by its sender's address against the email saved on leads and deals.
+   Only the "From" line of new inbox mail is read to do that; a conversation is imported onto the record only when
+   the sender is a lead or deal contact, and from then on it is followed like one started from the workspace. */
+let leadMailCache: { at: number; map: Map<string, Any>; recent: string[] } | null = null;
+const addrOf = (v: string) => { const x = String(v || "").match(/<([^>]+)>/); return (x ? x[1] : String(v || "")).trim().toLowerCase(); };
+async function leadMailMap() {
+  if (leadMailCache && Date.now() - leadMailCache.at < 60000) return leadMailCache;
+  const map = new Map<string, Any>(), seen: Record<string, string> = {};
+  const staff = new Set(((must(await db.from("profiles").select("email")) || []) as Any[]).map((p) => String(p.email || "").toLowerCase()));
+  const put = (email: string, tbl: string, id: string, at: string) => {
+    const e = String(email || "").trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) || staff.has(e)) return;
+    map.set(e, { tbl, entity_id: id, subject: "", fresh: true }); seen[e] = at > (seen[e] || "") ? at : seen[e];
+  };
+  // later rows win: the most recently updated lead, and an open deal over its lead
+  for (const l of (must(await db.from("leads").select("id,email,updated_at").not("email", "is", null).neq("email", "").order("updated_at", { ascending: true }).limit(10000)) || []) as Any[]) put(l.email, "leads", l.id, l.updated_at || "");
+  for (const d of (must(await db.from("deals").select("id,email,stage,updated_at").not("email", "is", null).neq("email", "").neq("stage", "Lost").order("updated_at", { ascending: true }).limit(10000)) || []) as Any[]) put(d.email, "deals", d.id, d.updated_at || "");
+  const cutoff = new Date(Date.now() - 90 * 864e5).toISOString();
+  const recent = Object.keys(seen).filter((e) => seen[e] >= cutoff).sort((a, b) => seen[b].localeCompare(seen[a])).slice(0, 250);
+  leadMailCache = { at: Date.now(), map, recent };
+  return leadMailCache;
+}
+async function importLeadMail(userId: string, token: string, msgs: { id: string; threadId: string }[]): Promise<number> {
+  if (!msgs.length) return 0;
+  const { map } = await leadMailMap(); if (!map.size) return 0;
+  const done = new Set<string>(); let found = 0;
+  for (const m of msgs.slice(0, 40)) {
+    if (done.has(m.threadId)) continue;
+    let meta: Any;
+    try { meta = await g(token, GMAIL + "messages/" + m.id + "?format=metadata&metadataHeaders=From"); } catch (_) { continue; }
+    const from = addrOf(((meta.payload && meta.payload.headers) || []).find((x: Any) => x.name.toLowerCase() === "from")?.value || "");
+    const origin = map.get(from); if (!origin) continue;
+    done.add(m.threadId);
+    found += (await readThread(userId, token, m.threadId, { ...origin })).found;
+  }
+  return found;
+}
+async function searchLeadMail(userId: string, token: string, known: Map<string, Any>): Promise<number> {
+  const { recent } = await leadMailMap(); if (!recent.length) return 0;
+  const stored = new Set(((must(await db.from("emails").select("gmail_thread_id").eq("user_id", userId).gte("sent_at", new Date(Date.now() - 5 * 864e5).toISOString())) || []) as Any[]).map((r) => r.gmail_thread_id));
+  let found = 0;
+  for (let i = 0; i < recent.length; i += 25) {
+    const q = "in:inbox newer_than:3d from:(" + recent.slice(i, i + 25).join(" OR ") + ")";
+    const r = await g(token, GMAIL + "messages?maxResults=50&q=" + encodeURIComponent(q));
+    const fresh = ((r && r.messages) || []).filter((m: Any) => !known.has(m.threadId) && !stored.has(m.threadId));
+    for (const m of fresh) stored.add(m.threadId);
+    if (fresh.length) found += await importLeadMail(userId, token, fresh.map((m: Any) => ({ id: m.id, threadId: m.threadId })));
+  }
+  return found;
+}
+
 // Quick check (every minute): ask Gmail only for what's new since the last check, then open just the
-// threads that were started from the workspace. Nothing else in the mailbox is read.
+// threads that are already on a record, and look at the sender of new inbox mail to spot leads (2026-11dp).
+// Other emails are not stored.
 async function quickReplies(userId: string): Promise<number> {
   const sc = await gmailScopes(userId); if (!sc.read) return 0;
   const link = must(await db.from("google_links").select("history_id").eq("user_id", userId).maybeSingle());
@@ -423,10 +481,15 @@ async function quickReplies(userId: string): Promise<number> {
   const resetBookmark = async () => { const prof = await g(token, GMAIL + "profile"); await db.from("google_links").update({ history_id: String(prof.historyId || "") }).eq("user_id", userId); };
   if (!link || !link.history_id) { await resetBookmark(); return 0; }
   let page = "", latest = String(link.history_id); const threadIds = new Set<string>();
+  const inbound: { id: string; threadId: string }[] = [];   // (2026-11dp) new mail that may be from a lead
   try {
     for (let i = 0; i < 5; i++) {
       const r = await g(token, GMAIL + "history?historyTypes=messageAdded&maxResults=500&startHistoryId=" + encodeURIComponent(link.history_id) + (page ? "&pageToken=" + encodeURIComponent(page) : ""));
-      for (const hh of r.history || []) for (const ma of hh.messagesAdded || []) if (ma.message && ma.message.threadId) threadIds.add(ma.message.threadId);
+      for (const hh of r.history || []) for (const ma of hh.messagesAdded || []) if (ma.message && ma.message.threadId) {
+        threadIds.add(ma.message.threadId);
+        const lab: string[] = ma.message.labelIds || [];
+        if (lab.includes("INBOX") && !lab.includes("SENT") && !lab.includes("DRAFT") && !lab.includes("SPAM")) inbound.push({ id: ma.message.id, threadId: ma.message.threadId });
+      }
       latest = String(r.historyId || latest); page = r.nextPageToken; if (!page) break;
     }
   } catch (_) {
@@ -435,10 +498,12 @@ async function quickReplies(userId: string): Promise<number> {
   }
   await db.from("google_links").update({ history_id: latest }).eq("user_id", userId);
   if (!threadIds.size) return 0;
-  const ours = must(await db.from("emails").select("gmail_thread_id,tbl,entity_id,subject").eq("user_id", userId).eq("direction", "out").in("gmail_thread_id", [...threadIds].slice(0, 300))) || [];
+  // conversations already on a record: started from the workspace, or (2026-11dp) started by a lead
+  const ours = must(await db.from("emails").select("gmail_thread_id,tbl,entity_id,subject").eq("user_id", userId).in("gmail_thread_id", [...threadIds].slice(0, 300))) || [];
   const map = new Map<string, Any>(); for (const o of ours) if (!map.has(o.gmail_thread_id)) map.set(o.gmail_thread_id, o);
   let found = 0;
   for (const [tid, origin] of map) found += (await readThread(userId, token, tid, origin)).found;
+  found += await importLeadMail(userId, token, inbound.filter((m) => !map.has(m.threadId)));
   return found;
 }
 async function syncReplies(userId: string) {
@@ -454,11 +519,12 @@ async function checkReplies(userId: string): Promise<{ found: number; checked: n
     return { found: 0, checked: 0, problem };
   }
   const since = new Date(Date.now() - 60 * 864e5).toISOString();
-  const outs = must(await db.from("emails").select("gmail_thread_id,tbl,entity_id,subject").eq("user_id", userId).eq("direction", "out").gte("sent_at", since).order("sent_at", { ascending: false }).limit(300)) || [];
+  const outs = must(await db.from("emails").select("gmail_thread_id,tbl,entity_id,subject").eq("user_id", userId).gte("sent_at", since).order("sent_at", { ascending: false }).limit(300)) || [];
   const threads = new Map<string, Any>(); for (const o of outs) if (o.gmail_thread_id && !threads.has(o.gmail_thread_id)) threads.set(o.gmail_thread_id, o);
-  if (!threads.size) return { found: 0, checked: 0, problem: "" };
   const token = await accessFor(userId);
   let found = 0, checked = 0, problem = "";
+  // (2026-11dp) emails leads sent first in the last 3 days that the 1-minute check missed
+  try { found += await searchLeadMail(userId, token, threads); } catch (e) { problem = "Couldn’t look for new emails from leads: " + String((e as Error)?.message || e).slice(0, 140); }
   for (const [tid, origin] of [...threads.entries()].slice(0, 150)) {
     const r = await readThread(userId, token, tid, origin);
     if (r.checked) checked++;
