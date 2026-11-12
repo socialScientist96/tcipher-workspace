@@ -2337,6 +2337,9 @@ dialog:has(.ai-imp) {width:min(1100px,calc(100vw - 24px))}
 
 /* chat: the phone browser's own pull-to-refresh is off here (a pull in the conversation reloaded the page) (2026-11dd) */
 html:has(#content .chat),html:has(#content .chat) body{overscroll-behavior-y:none}
+/* (2026-11dh) phone browsers: scrolling up fast past the top of any page no longer reloads it (Chrome's pull-to-refresh).
+   The Android and iPhone apps have their own, deliberate pull-to-refresh, which this doesn't touch. */
+@media (max-width:760px){ html,body{overscroll-behavior-y:none} }
 
 /* the phone menu's Back button (2026-11dd) */
 .side-back{display:none}
@@ -3002,8 +3005,11 @@ const ORDER = {
 };
 const LIMIT = { activity_log: 300, notifications: 60, attendance: 20000, meeting_joins: 20000 };   // attendance: years of history for the whole team
 
-const rows = t => t === "tasks" ? (S.cache.tasks || []).filter(r => !r.archived) : (S.cache[t] || []);
-const allRows = t => S.cache[t] || [];
+// which tables the page on screen was drawn from (2026-11dh): a live change to anything else doesn't redraw it
+let DRAWING_DEPS = null, PAGE_DEPS = null;
+const noteDep = t => { if (DRAWING_DEPS && t) DRAWING_DEPS.add(t); };
+const rows = t => { noteDep(t); return t === "tasks" ? (S.cache.tasks || []).filter(r => !r.archived) : (S.cache[t] || []); };
+const allRows = t => { noteDep(t); return S.cache[t] || []; };
 const byId = (t, id) => id ? allRows(t).find(r => r.id === id) : null;
 const ok = res => { if (res.error) throw res.error; return res.data; };
 
@@ -3043,7 +3049,7 @@ async function load(t, force){
 }
 // tables whose key is the person, not an id (sorting by "id" on these fails, and the whole list didn't load)
 const KEYED_BY_USER = new Set(["google_links", "presence", "user_status", "profile_private"]);
-const ensure = list => Promise.all([...new Set(list.filter(Boolean))].map(t => load(t)));
+const ensure = list => Promise.all([...new Set(list.filter(Boolean))].map(t => { noteDep(t); return load(t); }));
 
 /* Saving on a bad connection: if a save fails only because the connection dropped or was too slow, the change is
    kept on this device ("unsynced changes") and sent again when the connection is back, or with the Sync button.
@@ -11253,7 +11259,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11dg";
+const APP_VERSION = "2026-11dh";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -13517,6 +13523,7 @@ async function rerender(){
     loadingT = setTimeout(() => { if (seq === renderSeq) el.replaceChildren(h("div", { class: "loading" }, h("span", { class: "spinner", "aria-hidden": "true" }), "Loading…")); }, 250);
     page.className = "enter";
   }
+  const deps = new Set(); DRAWING_DEPS = deps;   // from here on, every table the page reads is noted
   try {
     if (!canSee(route)) page.append(noAccess());
     else if (route === "dashboard") await renderDashboard(page);
@@ -13559,7 +13566,10 @@ async function rerender(){
   try { if (canSee(route)) addDashSummary(page, route); } catch (e) {}   // the Summarize button on dashboards
   // (2026-11dd) phones and the apps: a Back button at the top of every page but Home (chat and notes have their own)
   if (route !== "dashboard" && route !== "chat" && !route.startsWith("note=")) page.prepend(h("button", { type: "button", class: "m-pageback", onclick: () => navBack() }, ic("chevronLeft", 18), h("span", {}, "Back")));
+  const keepScroll = lastRoute === route ? saveScrolls(el) : null;   // same page redrawn: boards, lists and strips stay where you were
   el.replaceChildren(page);
+  if (keepScroll) restoreScrolls(el, keepScroll);
+  PAGE_DEPS = { route, set: deps }; if (DRAWING_DEPS === deps) DRAWING_DEPS = null;
   if (route === "chat" && page._chatEls) { page._chatEls.pending = false; chatEls = page._chatEls; }
   if (lastRoute === route) window.scrollTo(0, sy);
   else window.scrollTo(0, 0);
@@ -13567,6 +13577,39 @@ async function rerender(){
   if (focused){ setTimeout(() => { const f = $(focused); if (f) { f.focus(); try { f.setSelectionRange(caret, caret); } catch (e) {} } }, 0); }
 }
 let lastRoute = null, loadingT = null, shellKey = "";
+// remember / restore every inner scroll position (sideways boards, lists in panels) across a redraw of the same page
+function scrollKey(n, root){
+  const parts = [];
+  for (let x = n; x && x !== root; x = x.parentElement) {
+    const c = typeof x.className === "string" ? x.className.split(" ")[0] : "";
+    let i = 0; for (let sb2 = x.previousElementSibling; sb2; sb2 = sb2.previousElementSibling) if (sb2.tagName === x.tagName && (typeof sb2.className === "string" ? sb2.className.split(" ")[0] : "") === c) i++;
+    parts.push(x.tagName + "." + c + ":" + i);
+  }
+  return parts.reverse().join(">");
+}
+function saveScrolls(root){
+  const m = new Map();
+  const pg = root.firstElementChild; if (!pg) return m;   // keys start below the page box (its class differs on first draw)
+  try { for (const n of pg.querySelectorAll("*")) if (n.scrollLeft || n.scrollTop) m.set(scrollKey(n, pg), [n.scrollLeft, n.scrollTop]); } catch (e) {}
+  return m;
+}
+function restoreScrolls(root, m){
+  if (!m || !m.size) return;
+  const pg = root.firstElementChild; if (!pg) return;
+  try { for (const n of pg.querySelectorAll("*")) { const v = m.get(scrollKey(n, pg)); if (v) { n.scrollLeft = v[0]; n.scrollTop = v[1]; } } } catch (e) {}
+}
+// a live change never redraws the page under your finger: wait until you've stopped touching, scrolling or typing
+let lastTouchAt = 0, liveRedrawT = 0;
+["pointerdown", "touchstart", "touchmove", "wheel", "keydown", "scroll"].forEach(ev => window.addEventListener(ev, () => { lastTouchAt = Date.now(); }, { passive: true, capture: true }));
+function userBusy(){
+  if (Date.now() - lastTouchAt < 1500) return true;
+  const a = document.activeElement, c = document.getElementById("content");
+  if (a && c && c.contains(a) && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) return true;
+  try { const sel = window.getSelection(); if (sel && String(sel).trim() && c && c.contains(sel.anchorNode)) return true; } catch (e) {}
+  for (const m of document.querySelectorAll("[role=menu], .nb-menu, .dv-menu, .status-menu, .emoji-pop")) if (m.offsetParent || getComputedStyle(m).position === "fixed" && m.getClientRects().length) return true;
+  return false;
+}
+function liveRedraw(){ clearTimeout(liveRedrawT); if (userBusy()) { liveRedrawT = setTimeout(liveRedraw, 1500); return; } rerender(); }
 
 /* ---------------------------------------------------------------------
    Notifications
@@ -13662,7 +13705,11 @@ function onChange(payload){
       if (me) S.me = me;
       if (!S.me.is_active) { await sb.auth.signOut(); return; }
     }
-    rerender();
+    // (2026-11dh) the page only redraws when something it shows changed; otherwise just the menu counts update.
+    // Before, every edit anywhere (activity log, read receipts, a teammate's check-in) redrew everyone's page.
+    const deps = PAGE_DEPS && PAGE_DEPS.route === S.route ? PAGE_DEPS.set : null;
+    if (deps && !list.some(t => deps.has(t) || t === "roles" || t === "settings")) { renderShell(); return; }
+    liveRedraw();
   }, 400);
 }
 async function loadSettings(){ try { const r = ok(await sb.from("settings").select("data").eq("id", 1).maybeSingle()); S.settings = (r && r.data) || {}; } catch (e) { S.settings = S.settings || {}; } }
@@ -14263,7 +14310,7 @@ function catchUpAfterDrop(){
     if (S.route === "dev-board") want.add("tasks");
     for (const t of want) if (S.loaded.has(t)) load(t, true).catch(() => {});
     if (typeof loadNotifications === "function") loadNotifications().catch(() => {});
-    setTimeout(() => rerender(), 800);
+    setTimeout(() => liveRedraw(), 800);
   } catch (e) {}
 }
 function liveWake(){
