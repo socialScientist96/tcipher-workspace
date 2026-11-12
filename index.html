@@ -9150,6 +9150,7 @@ async function renderChat(el){
   if (!C.ready) { el.append(h("div", { class: "loading" }, "Loading chat…")); await loadChat(); if (S.route !== "chat") return; el.replaceChildren(); }
   restoreChatView();
   if (!C.active){ const g = C.channels.find(c => c.kind === "channel" && c.name === "general") || C.channels[0]; if (g) await openChannel(g.id); }
+  else if (!C.msgs[C.active]) await openChannel(C.active);   // (2026-11de) a conversation restored after a reload loads its messages
   const list = h("div", { class: "chat-list" }), head = h("div", { class: "chat-head" }), msgs = h("div", { class: "chat-msgs", role: "log", "aria-live": "polite" });
   const ta = h("textarea", { class: "in", rows: 2, maxlength: "4000", placeholder: "Write a message… type @ to tag someone. Enter to send, Shift + Enter for a new line." });
   attachMentions(ta, { allLabel: () => { const c = C.channels.find(x => x.id === C.active); return !c ? "Everyone here" : c.kind === "channel" ? (c.vertical ? "Everyone in the " + c.vertical + " team" : "Everyone in the company") : "Everyone in this conversation"; } });
@@ -10789,7 +10790,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11dd";
+const APP_VERSION = "2026-11de";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
