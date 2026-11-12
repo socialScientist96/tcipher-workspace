@@ -2088,7 +2088,7 @@ body.nb-moving,body.nb-moving *{cursor:grabbing!important;user-select:none!impor
 }
 
 /* Tasks: what needs you (2026-11bx) */
-@media (min-width:761px){.m-only{display:none !important}}
+@media (min-width:761px){.m-only,.ph .acts .m-more{display:none !important}}
 .needs-you{border-color:var(--bad-t);background:#FFF8F8;margin-bottom:var(--s3);padding:var(--s3) var(--s4)}
 .ny-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--bad);margin-bottom:6px}
 .ny-h .muted{color:var(--ink2);font-size:var(--fs-sm)}
@@ -2470,11 +2470,22 @@ html:has(#content .chat),html:has(#content .chat) body{overscroll-behavior-y:non
   .mw .row > .pill:not(:first-child){grid-area:s}
   .mw .row > .y{grid-area:d;justify-self:end;min-width:0 !important;text-align:right}
   /* stats: one compact row of small figures, after the work */
-  .home .stats{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-  .home .stats .stat{padding:10px;border-top-width:1px}
-  .home .stats .stat .v{font-size:18px;line-height:1.25}
-  .home .stats .stat .l{font-size:12px;line-height:1.3}
   .m-only{display:block}
+  /* ===== Redesign batch 3 — lists, CRM, marketing (phones) ===== */
+  .ph .acts .m-hide{display:none !important}
+  .tablewrap > table:not(.tcal) > tbody > tr.m-titled{display:flex;flex-direction:column}
+  .tablewrap > table:not(.tcal) > tbody > tr.m-titled > td.m-title{order:-2;justify-content:flex-start;text-align:left;font-size:var(--fs-lg);font-weight:600;padding:0 0 2px}
+  .tablewrap > table:not(.tcal) > tbody > tr.m-titled > td.m-title::before{display:none}
+  .tablewrap > table:not(.tcal) > tbody > tr.m-titled > td.m-meta{order:-1;font-size:var(--fs-sm);font-weight:400;color:var(--ink3);padding:0 0 8px}
+  .stats:has(> :nth-child(4):last-child){grid-template-columns:repeat(2,minmax(0,1fr))}   /* 4 figures: 2 × 2, no orphan */
+  @media (max-width:359px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}   /* very narrow phones: labels keep whole words */
+  .ph .acts .m-more{flex:none;width:44px;height:44px;display:inline-grid;place-items:center;border:1px solid var(--line);border-radius:var(--r);background:var(--white)}
+  .ph .acts:has(.m-more){flex-wrap:nowrap}
+  /* stats on every page: one compact row of small figures (was big tiles, 2 per row) */
+  .stats{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px}
+  .stats .stat{padding:10px;border-top-width:1px}
+  .stats .stat .v{font-size:18px;line-height:1.25}
+  .stats .stat .l{font-size:12px;line-height:1.3;overflow-wrap:normal}
   .home .needs-you .ny-h .muted,.home .needs-you .ny-more{display:none}
   .home .needs-you > .ny-row:nth-child(n+5){display:none}   /* header is child 1, so this keeps rows 1–3 */
   .home .needs-you .ny-all{min-height:44px;margin-top:4px;padding:0;background:none;border:0;color:var(--p-ink);font:inherit;font-weight:600;cursor:pointer}
@@ -9025,8 +9036,12 @@ function phoneTables(root){
   for (const t of root.querySelectorAll(".tablewrap > table:not(.tcal)")) {   // (.tcal = the team calendar grid: stays a grid)
     const heads = [...t.querySelectorAll(":scope > thead th")].map(th => th.textContent.trim());
     t.classList.add("m-cards");
+    // when the first column is only a date or a number, the card is titled by the column that names the record
+    // (Activities: Subject, Meetings: Title, Leads: Person's name); the date/number becomes a small line under it (batch 3)
+    const ti = /^(date|when|day|month|no\.?|#)$/i.test(heads[0] || "") ? heads.findIndex((x, i) => i > 0 && /^(subject|title|name|person.s name|deal|campaign|keyword)$/i.test(x)) : -1;
     for (const tr of t.querySelectorAll(":scope > tbody > tr")) {
       if (tr.dataset.ml) continue; tr.dataset.ml = "1";
+      if (ti > 0 && tr.children[ti] && tr.children.length > 1) { tr.classList.add("m-titled"); tr.children[ti].classList.add("m-title"); tr.children[0].classList.add("m-meta"); }
       [...tr.children].forEach((td, i) => { if (heads[i] && !td.hasAttribute("data-label")) td.setAttribute("data-label", heads[i]); if (/^[\s–—-]*$/.test(td.textContent) && !td.querySelector("img,svg,button,input,select,a")) td.classList.add("m-empty"); });
     }
   }
@@ -9049,11 +9064,31 @@ function phoneFilters(root){
     draw();
   }
 }
+// phones: a page header keeps ONE main button (New …); Import, Export, Summarize and the like go in a ⋯ More menu
+// (redesign batch 3). The original buttons stay in the page, hidden, so their behaviour is unchanged.
+function phoneActs(root){
+  for (const acts of root.querySelectorAll(".ph .acts")) {
+    const sec = [...acts.children].filter(b => b.tagName === "BUTTON" && !b.classList.contains("pri") && !b.classList.contains("m-more") && !b.hidden && b.style.display !== "none");
+    let more = acts.querySelector(":scope > .m-more");
+    if (!more) {
+      if (sec.length < 2) continue;
+      const iconFor = t => /import/i.test(t) ? "file" : /export|download/i.test(t) ? "download" : /summar|\bai\b/i.test(t) ? "sparkle" : /manage|people/i.test(t) ? "users" : "more";
+      more = h("button", { type: "button", class: "iconbtn m-more", "aria-label": "More actions", title: "More actions", onclick: e => {
+        e.stopPropagation();
+        const hidden = [...acts.querySelectorAll(":scope > button.m-hide")];
+        nbMenu(more, hidden.map(b => { const t = (b.textContent || "").trim(); return [h("span", {}, ic(iconFor(t), 16), t), () => b.click()]; }), (document.querySelector("#content .ph h1") || {}).textContent || "More");
+      } }, ic("more", 20));
+      acts.prepend(more);
+    }
+    sec.forEach(b => b.classList.add("m-hide"));   // also buttons added later (Summarize)
+  }
+}
 function phoneKit(){
   if (!PHONE_MQ.matches) return;
   const root = document.getElementById("content"); if (!root) return;
   try { phoneTables(root); } catch (e) {}
   try { phoneFilters(root); } catch (e) {}
+  try { phoneActs(root); } catch (e) {}
   const d = document.getElementById("dlg"); if (d && d.open) { try { phoneTables(d); } catch (e) {} }
 }
 let phoneKitT = 0;
