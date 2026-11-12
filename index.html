@@ -988,6 +988,16 @@ button.is-busy{opacity:.6;cursor:progress;pointer-events:none}
   .tablewrap.t-cards > table > tbody > tr.m-titled > td.m-meta{order:-1;font-size:var(--fs-sm);font-weight:400;color:var(--ink3)}
   .tablewrap.t-cards > table > tbody > tr.m-titled > td.m-meta::before{display:none}
 }
+/* Today in sales (2026-11dn) */
+.sec-h{font-size:16px;font-weight:600;margin:4px 0 10px}
+.crm-today h2 .seg{margin-left:auto}
+.ct-sum{display:flex;flex-wrap:wrap;gap:4px 16px;margin:0 0 6px;color:var(--ink2);font-size:14px}
+.ct-sum b{color:var(--ink);font-size:18px;font-weight:600;font-variant-numeric:tabular-nums;margin-right:2px}
+.ct-sum .bad,.ct-sum .bad b{color:var(--bad)}
+.ct-h{margin:12px 0 2px;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink3)}
+.ct-demo{cursor:pointer} .ct-demo.done{opacity:.6}
+.ct-demo .btn{flex:none}
+.crm-today .row .x .muted{font-size:12.5px}
 /* back to top (2026-11dl) */
 .to-top{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:24px;z-index:45;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);
   background:var(--white);color:var(--ink);box-shadow:0 4px 14px rgba(0,0,0,.12);display:grid;place-items:center;cursor:pointer;
@@ -2592,7 +2602,7 @@ html:has(#content .chat),html:has(#content .chat) body{overscroll-behavior-y:non
   .home > .g-dash,.home > .g-dash > .grid{display:contents}
   .home > *{order:20;margin-bottom:12px}
   .home [data-sec]{margin:0 0 12px}
-  .home .hello{order:0} .home [data-sec=needs]{order:2} .home [data-sec=work]{order:3} .home [data-sec=meet]{order:4}
+  .home .hello{order:0} .home [data-sec=needs]{order:2} .home [data-sec=crm]{order:2} .home [data-sec=work]{order:3} .home [data-sec=meet]{order:4}
   .home [data-sec=msgs]{order:5} .home [data-sec=setup]{order:6} .home [data-sec=stats]{order:7} .home [data-sec=verticals]{order:8}
   .home [data-sec=ann]{order:9} .home [data-sec=pins]{order:10} .home [data-sec=hol]{order:11} .home [data-sec=away]{order:12}
   /* greeting: date + name, Summarize top-right, the check-in card under it */
@@ -4272,6 +4282,8 @@ const MOD = {
     csv: true,
     fields: [
       { k: "name", l: "Campaign name", t: "text", req: true, full: true },
+      // (2026-11dn) leads from website forms are matched to the campaign by this code (or by the campaign's name)
+      { k: "utm_code", l: "Tracking code (utm_campaign)", t: "text", ph: "e.g. ai_guide_nov — the same text as in the ad’s link", full: true, show: () => rows("campaigns").some(c => "utm_code" in c) },
       { k: "channel", l: "Channel", t: "select", o: ["Google Ads","Meta Ads","LinkedIn","Instagram","YouTube","Email","SEO","Content","Events","Cold outreach","Referral program","Other"], filter: true },
       { k: "objective", l: "Objective", t: "select", o: ["Lead generation","Brand awareness","App installs","Website traffic","Hiring","Event sign-ups"] },
       { k: "status", l: "Status", t: "select", o: ["Planned","Live","Paused","Completed"], req: true, def: "Planned" },
@@ -5806,6 +5818,58 @@ function paintHeroChat(){
   n.textContent = v > 99 ? "99+" : String(v); n.hidden = !v;
   n.parentElement.setAttribute("aria-label", "Chat" + (v ? ", " + v + " unread" : ""));
 }
+// (2026-11dn) "Today in sales": lead and deal follow-ups due today or overdue, and today's demo calls, on Home and the
+// Marketing / Sales hubs. Everyone in Marketing and Sales sees the whole team by default (owner's call); "Mine" narrows it.
+const LEAD_DONE = ["Converted","Not a fit","Closed","Unqualified","Ghosted"];
+const leadRoute = l => l && l.pipeline === "Instagram" ? "ig_leads" : "leads";
+function crmTodayData(all){
+  const t0 = today(), me = S.me.id;
+  const fu = [];
+  for (const l of rows("leads")) if (!LEAD_DONE.includes(l.status) && l.next_followup && l.next_followup <= t0 && (all || l.owner_id === me || l.sales_owner_id === me))
+    fu.push({ d: l.next_followup, kind: "Lead", name: l.name + (l.company ? " (" + l.company + ")" : ""), who: l.pipeline === "Instagram" ? (l.sales_owner_id || l.owner_id) : (l.owner_id || l.sales_owner_id), stage: l.status, open: () => openRecord(leadRoute(l), l.id) });
+  for (const d of rows("deals")) if (!["Won","Lost"].includes(d.stage) && d.next_followup && d.next_followup <= t0 && (all || d.owner_id === me))
+    fu.push({ d: d.next_followup, kind: "Deal", name: d.title, who: d.owner_id, stage: d.stage, open: () => openRecord("deals", d.id) });
+  fu.sort((a, b) => a.d.localeCompare(b.d) || a.name.localeCompare(b.name));
+  const demos = rows("meetings").filter(m => m.kind === "Sales demo" && occursOn(m, t0) && (all || (m.attendees || []).includes(me) || m.created_by === me))
+    .sort((a, b) => String(a.start_time || "").localeCompare(String(b.start_time || "")));
+  return { fu, overdue: fu.filter(x => x.d < t0).length, demos };
+}
+function crmTodayPanel(){
+  if (!(lvl("leads") >= 1 || lvl("sales") >= 1)) return null;
+  const canTeam = true;
+  const u = S.ui.crmToday = S.ui.crmToday || { all: true };
+  const all = canTeam && u.all;
+  const { fu, overdue, demos } = crmTodayData(all);
+  const t0 = today(), nowM = new Date().getHours() * 60 + new Date().getMinutes();
+  const mins = t => { const [hh, mm] = String(t || "0:0").split(":"); return (+hh || 0) * 60 + (+mm || 0); };
+  const p = h("div", { class: "panel crm-today", "data-sec": "crm" },
+    h("h2", {}, "Today in sales",
+      canTeam ? segmented([["mine", "Mine"], ["all", "Team"]], all ? "all" : "mine", v => { u.all = v === "all"; rerender(); }) : null));
+  const due = fu.length - overdue;
+  p.append(h("p", { class: "ct-sum" },
+    h("span", {}, h("b", {}, String(due)), due === 1 ? " follow-up today" : " follow-ups today"),
+    overdue ? h("span", { class: "bad" }, h("b", {}, String(overdue)), " overdue") : null,
+    h("span", {}, h("b", {}, String(demos.length)), demos.length === 1 ? " demo call" : " demo calls")));
+  if (demos.length) {
+    p.append(h("h3", { class: "ct-h" }, "Demo calls"));
+    for (const m of demos) {
+      const st = mins(m.start_time), done = m.start_time && st + (+m.duration_min || 30) < nowM;
+      const others = (m.attendees || []).filter(id => id !== S.me.id).map(id => (pname(id) || "").split(" ")[0]).filter(Boolean);
+      p.append(h("div", { class: "row ct-demo" + (done ? " done" : ""), role: "button", tabindex: "0", onclick: e => { if (!e.target.closest("a,button")) openRecord("meetings", m.id); } },
+        h("span", { class: "pill " + (done ? "grey" : "info"), style: "min-width:64px;justify-content:center" }, m.start_time ? fmtTimeOfDay(m.start_time) : "Today"),
+        h("span", { class: "x" }, m.title, others.length ? h("span", { class: "muted" }, " · with " + others.join(", ")) : null),
+        done ? h("span", { class: "y" }, "Done") : (joinButton(m, t0, true) || h("span", { class: "y" }, "No link"))));
+    }
+  }
+  if (fu.length) {
+    p.append(h("h3", { class: "ct-h" }, "Follow-ups"));
+    for (const x of fu.slice(0, 8)) p.append(rowBtn(h("span", { class: "pill grey", style: "min-width:52px;justify-content:center" }, x.kind),
+      [x.name, h("span", { class: "muted" }, " · " + x.stage + (all && x.who ? " · " + (pname(x.who) || "").split(" ")[0] : ""))], dueTag(x.d), x.open));
+    if (fu.length > 8) p.append(h("p", { class: "nothing" }, "and " + (fu.length - 8) + " more — set a Next follow-up date on each lead to keep this list right."));
+  }
+  if (!fu.length && !demos.length) p.append(h("p", { class: "nothing" }, all ? "No follow-ups due and no demo calls today for the team." : "No follow-ups due and no demo calls for you today."));
+  return p;
+}
 async function renderDashboard(el){
   const want = ["tasks","meetings","announcements","attendance","leave_requests","meeting_joins","calendar_events","google_links","notes"];
   if (lvl("sales") >= 1 || lvl("leads") >= 1) want.push("deals", "activities", "leads");
@@ -5861,6 +5925,7 @@ async function renderDashboard(el){
   const left = h("div", { class: "grid" }), right = h("div", { class: "grid" });
   el.append(h("div", { class: "grid g-dash" }, left, right));
 
+  const crm = crmTodayPanel(); if (crm) left.append(crm);
   const mw = h("div", { class: "panel mw", "data-sec": "work" }, h("h2", {}, "My work", h("button", { type: "button", class: "link", onclick: () => openRecord("tasks", null) }, "+ Add task")));
   if (!items.length) mw.append(h("p", { class: "nothing" }, "Nothing on your plate. Add a task or check your vertical’s board."));
   for (const i of items.slice(0, 12)) mw.append(h("button", { type: "button", class: "row", onclick: i.open },
@@ -5954,7 +6019,7 @@ async function renderDevHub(el){
 }
 
 async function renderSalesHub(el){
-  await ensure(["tasks","deals","leads","activities","proposals","targets","clients"]);
+  await ensure(["tasks","deals","leads","activities","proposals","targets","clients","meetings"]);
   if (S.route !== "sales") return;
   const t0 = today(), m = t0.slice(0, 7);
   const open = rows("deals").filter(d => !["Won","Lost"].includes(d.stage));
@@ -5973,6 +6038,7 @@ async function renderSalesHub(el){
   ]));
   const left = h("div", { class: "grid" }), right = h("div", { class: "grid" });
   el.append(h("div", { class: "grid g-dash" }, left, right));
+  { const crm = crmTodayPanel(); if (crm) right.append(crm); }
   const sellers = activePeople().filter(p => p.vertical === "Sales" || targetsM.some(t => t.user_id === p.id) || open.some(d => d.owner_id === p.id));
   const tp = h("div", { class: "panel" }, h("h2", {}, "Targets this month", lvl("sales") >= 3 ? h("button", { type: "button", class: "link", onclick: () => openRecord("targets", null) }, "+ Set target") : null));
   if (!sellers.length) tp.append(h("p", { class: "nothing" }, "Add Sales people in the admin panel, then set their monthly targets."));
@@ -5989,7 +6055,7 @@ async function renderSalesHub(el){
 }
 
 async function renderMarketingHub(el){
-  await ensure(["tasks","leads","campaigns","content","seo_keywords","social_stats"]);
+  await ensure(["tasks","leads","campaigns","content","seo_keywords","social_stats","deals","meetings"]);
   if (S.route !== "marketing") return;
   const t0 = today(), m = t0.slice(0, 7);
   const leadsM = rows("leads").filter(l => localDay(l.created_at || "").slice(0, 7) === m);
@@ -6008,9 +6074,16 @@ async function renderMarketingHub(el){
   ]));
   const left = h("div", { class: "grid" }), right = h("div", { class: "grid" });
   el.append(h("div", { class: "grid g-dash" }, left, right));
+  { const crm = crmTodayPanel(); if (crm) left.append(crm); }
   const bySource = {};
   for (const l of leadsM) bySource[l.source] = (bySource[l.source] || 0) + 1;
   left.append(h("div", { class: "panel" }, h("h2", {}, "Leads by source this month"), hbars(Object.entries(bySource).sort((a, b) => b[1] - a[1]).map(([s, n]) => [s, n, () => { S.ui.leads = Object.assign(S.ui.leads || {}, { filters: { source: s } }); go("leads"); }]))));
+  // (2026-11dn) which campaign this month's leads came from (matched automatically from the ad's tracking code)
+  const byCamp = {};
+  for (const l of leadsM) { const k = l.campaign_id || ""; byCamp[k] = (byCamp[k] || 0) + 1; }
+  left.append(h("div", { class: "panel" }, h("h2", {}, "Leads by campaign this month", h("button", { type: "button", class: "link", onclick: () => go("campaigns") }, "Campaigns")),
+    leadsM.length ? hbars(Object.entries(byCamp).sort((a, b) => (a[0] === "") - (b[0] === "") || b[1] - a[1]).map(([id, n]) => [id ? (refLabel("campaigns", id) || "Deleted campaign") : "No campaign", n, id ? () => openRecord("campaigns", id) : () => go("leads")]))
+      : h("p", { class: "nothing" }, "No leads this month yet.")));
   const cp = h("div", { class: "panel" }, h("h2", {}, "Campaigns", h("button", { type: "button", class: "link", onclick: () => go("campaigns") }, "All campaigns")));
   const camps = rows("campaigns").filter(c => ["Live","Paused","Planned"].includes(c.status));
   if (!camps.length) cp.append(h("p", { class: "nothing" }, "No active campaigns."));
@@ -8218,7 +8291,17 @@ async function renderAdminGoogle(el){
   const people = activePeople();
   const links = rows("google_links");
   const missing = people.filter(p => !links.some(l => l.user_id === p.id));
-  el.append(statStrip([["Connected", links.filter(l => people.some(p => p.id === l.user_id)).length + " of " + people.length, "var(--ok)"], ["Not connected", missing.length, missing.length ? "var(--warn)" : null], ["Sync problems", links.filter(l => l.last_error).length, "var(--bad)"]]));
+  // (2026-11dn) email from the CRM needs the Gmail permission; Marketing and Sales need it most
+  const hasMail = p => { const l = links.find(x => x.user_id === p.id); return !!(l && String(l.scopes || "").includes("gmail.send")); };
+  const crmPeople = people.filter(p => ["Marketing","Sales"].includes(p.vertical));
+  const noMail = crmPeople.filter(p => !hasMail(p) && p.id !== S.me.id);
+  const remindMail = async (ids) => {
+    if (!ids.length) return;
+    await notify(ids, "Please allow email from the workspace", "Click here and approve once (tick the Gmail boxes). You can then email leads from the CRM, and their replies show on the lead.", "connect-google", null);
+    toast("Reminder sent to " + ids.length + (ids.length === 1 ? " person." : " people."));
+  };
+  el.append(statStrip([["Connected", links.filter(l => people.some(p => p.id === l.user_id)).length + " of " + people.length, "var(--ok)"],
+    ["Marketing & Sales who can email", (crmPeople.length - crmPeople.filter(p => !hasMail(p)).length) + " of " + crmPeople.length, crmPeople.some(p => !hasMail(p)) ? "var(--warn)" : "var(--ok)"], ["Not connected", missing.length, missing.length ? "var(--warn)" : null], ["Sync problems", links.filter(l => l.last_error).length, "var(--bad)"]]));
   const remind = async (ids) => {
     if (!ids.length) return;
     await notify(ids, "Please connect your Google Calendar", "Click here and approve once. Your meetings will then show in the workspace with Join buttons.", "connect-google", null);
@@ -8230,12 +8313,14 @@ async function renderAdminGoogle(el){
     tb.append(h("tr", {}, h("td", {}, personChip(p.id)), h("td", {}, p.vertical || "–"),
       h("td", {}, l ? (l.last_error ? pill("Problem", "bad") : pill("Connected", "ok")) : pill("Not connected", "grey")),
       h("td", {}, l ? l.google_email : h("span", { class: "muted" }, "–")),
+      h("td", {}, hasMail(p) ? pill("Allowed", "ok") : h("span", { class: "muted" }, ["Marketing","Sales"].includes(p.vertical) ? "Not allowed" : "–")),
       h("td", {}, l && l.last_sync_at ? fmtAgo(l.last_sync_at) : h("span", { class: "muted" }, "–")),
       h("td", { style: "font-size:13px;color:var(--bad)" }, l && l.last_error ? l.last_error : ""),
       h("td", { class: "num" }, (!l || l.last_error) && p.id !== S.me.id ? h("button", { type: "button", class: "btn sm soft", onclick: () => remind([p.id]) }, "Remind") : null)));
   }
-  el.append(h("div", { class: "tb" }, h("button", { type: "button", class: "btn pri", disabled: !missing.length || !googleOn(), onclick: () => remind(missing.filter(p => p.id !== S.me.id).map(p => p.id)) }, "Remind everyone not connected (" + missing.filter(p => p.id !== S.me.id).length + ")")));
-  el.append(h("div", { class: "tablewrap" }, h("table", {}, h("thead", {}, h("tr", {}, ["Person","Vertical","Status","Google account","Last synced","Problem",""].map(x => h("th", {}, x)))), tb)));
+  el.append(h("div", { class: "tb" }, h("button", { type: "button", class: "btn pri", disabled: !missing.length || !googleOn(), onclick: () => remind(missing.filter(p => p.id !== S.me.id).map(p => p.id)) }, "Remind everyone not connected (" + missing.filter(p => p.id !== S.me.id).length + ")"),
+    h("button", { type: "button", class: "btn", disabled: !noMail.length || !googleOn(), onclick: () => remindMail(noMail.map(p => p.id)) }, "Ask Marketing & Sales to allow email (" + noMail.length + ")")));
+  el.append(h("div", { class: "tablewrap" }, h("table", {}, h("thead", {}, h("tr", {}, ["Person","Vertical","Status","Google account","Email","Last synced","Problem",""].map(x => h("th", {}, x)))), tb)));
 }
 /* ---------------------------------------------------------------------
    Menu highlights: red = due / needs you, purple = new since you last looked
@@ -8402,12 +8487,13 @@ function leadModule(pipeline){
       { k: "lost_reason", l: "Why not?", t: "text", full: true, show: r => ["Not a fit","Unqualified","Ghosted"].includes(r.status) },
       { k: "notes", l: "Notes", t: "textarea", full: true, mentions: true }
     ],
-    cols: [{ k: "lead_number", l: "No.", render: v => v ? h("span", { class: "tkey" }, v) : h("span", { class: "muted" }, "–") }, "name", "company", "lead_type", "source", "status", "priority",
+    cols: [{ k: "lead_number", l: "No.", render: v => v ? h("span", { class: "tkey" }, v) : h("span", { class: "muted" }, "–") }, "name", "company", "lead_type", "source",
+      { k: "campaign_id", l: "Campaign", get: r => refLabel("campaigns", r.campaign_id) || "–" }, "status", "priority",
       { k: "next_followup", l: "Follow-up", render: (v, r) => dueTag(v, ["Converted","Not a fit","Closed","Unqualified","Ghosted"].includes(r.status)) || h("span", { class: "muted" }, "–") },
       ig ? "sales_owner_id" : "owner_id",
       { k: "last_contacted_at", l: "Last contacted", get: r => r.last_contacted_at ? fmtAgo(r.last_contacted_at) : "Never" }],
     board: { field: "status", card: r => {
-      const c = genericCard("name", x => [x.company || null, pill(x.source, "grey"), x.budget ? money(x.budget, true) : null, x.next_followup ? dueTag(x.next_followup) : null], ig ? "sales_owner_id" : "owner_id")(r);
+      const c = genericCard("name", x => [x.company || null, pill(x.source, "grey"), x.campaign_id && refLabel("campaigns", x.campaign_id) ? h("span", { class: "pill info", title: "Campaign" }, refLabel("campaigns", x.campaign_id)) : null, x.budget ? money(x.budget, true) : null, x.next_followup ? dueTag(x.next_followup) : null], ig ? "sales_owner_id" : "owner_id")(r);
       if (r.lead_number) c.querySelector(".t").prepend(h("span", { class: "tkey" }, r.lead_number), " ");
       const subs = (r.form_submissions || []).length;
       if (subs) c.querySelector(".m").prepend(h("span", { class: "pill info", style: "font-size:11.5px" }, subs + " form" + (subs === 1 ? "" : "s")));
@@ -8451,6 +8537,27 @@ function findDuplicate(table, d, pipeline){
     ((em && String(r.email || "").toLowerCase() === em) || (ph.length >= 8 && normPhone(r.phone) === ph))) || null;
 }
 
+/* ---------- WhatsApp message templates (2026-11dn) ----------
+   The WhatsApp button offers saved messages; the chosen one opens in WhatsApp ready to send, and is logged on the
+   record. Admins edit them in Email › Templates. Same placeholders as email templates. */
+const DEFAULT_WA_TEMPLATES = [
+  { id: "wa_intro", name: "Introduction", body: "Hi {first_name}, this is {my_name} from Tcipher Technologies. Thanks for your interest! When is a good time for a quick call about what you need?" },
+  { id: "wa_demo", name: "Demo confirmation", body: "Hi {first_name}, confirming your demo with Tcipher Technologies. You’ll get a Google Meet link by email. Reply here if you need to change the time." },
+  { id: "wa_follow", name: "Follow-up", body: "Hi {first_name}, just following up on our conversation. Do you have any questions I can help with?" },
+  { id: "wa_missed", name: "Missed call", body: "Hi {first_name}, I tried calling you just now from Tcipher Technologies. When would be a good time to talk?" }
+];
+const waTemplates = () => (S.settings.wa_templates && S.settings.wa_templates.length) ? S.settings.wa_templates : DEFAULT_WA_TEMPLATES;
+function openWhatsApp(table, rec, anchor){
+  const phone = rec.phone; if (!phone) return;
+  const ctx = { name: rec.contact_name || rec.name || "", company: rec.company || "", deal: rec.title || "" };
+  const send = (t) => {
+    const text = t ? fillTemplate(t.body, ctx) : "Hi " + (String(ctx.name).split(/\s+/)[0] || "there") + ", ";
+    window.open("https://wa.me/" + waNumber(phone) + "?text=" + encodeURIComponent(text), "_blank", "noopener");
+    if (lvl(MOD.activities.area) >= 2) logActivity(table, rec, "WhatsApp", t ? { subject: "WhatsApp: " + t.name + " to " + (ctx.name || ""), outcome: text } : null);
+  };
+  nbMenu(anchor, [...waTemplates().map(t => [t.name, () => send(t)]), ["Blank message", () => send(null)]], "Send on WhatsApp");
+}
+
 /* ---------- contact buttons: open your own app, and log it ---------- */
 function waNumber(p){ let d = String(p || "").replace(/\D/g, ""); if (d.length === 10) d = "91" + d; return d; }
 function contactBar(table, rec){
@@ -8460,13 +8567,13 @@ function contactBar(table, rec){
     onclick: () => { if (href) { if (/^(tel|sms):/i.test(href)) location.href = href; else window.open(href, "_blank", "noopener"); } log(kind); } }, label);
   return h("div", { class: "cbar" },
     btn("Call", phone ? telHref(phone) : null, "Call", !!phone),
-    btn("WhatsApp", phone ? "https://wa.me/" + waNumber(phone) + "?text=" + encodeURIComponent("Hi " + first + ", ") : null, "WhatsApp", !!phone),
+    h("button", { type: "button", class: "btn sm", disabled: !phone, title: phone ? "Pick a saved message" : "No phone saved", "aria-haspopup": "menu", onclick: e => openWhatsApp(table, rec, e.currentTarget) }, "WhatsApp"),
     h("button", { type: "button", class: "btn sm", disabled: !email, title: email ? "" : "No email saved", onclick: () => { closeDlg(); openComposer({ ...emailCtx(table, rec), tbl: table, entity_id: rec.id }); } }, "✉️ Email"),
     btn("SMS", phone ? "sms:" + telHref(phone).slice(4) : null, "SMS", !!phone),
     h("button", { type: "button", class: "btn sm soft", onclick: () => log("Note") }, "+ Log activity"));
 }
-function logActivity(table, rec, kind){
-  const preset = { kind, activity_date: today(), owner_id: S.me.id, subject: (kind === "Call" ? "Call with " : kind === "Note" ? "" : kind + " to ") + (kind === "Note" ? "" : (rec.contact_name || rec.name || rec.title || "")) };
+function logActivity(table, rec, kind, extra){
+  const preset = { kind, activity_date: today(), owner_id: S.me.id, subject: (kind === "Call" ? "Call with " : kind === "Note" ? "" : kind + " to ") + (kind === "Note" ? "" : (rec.contact_name || rec.name || rec.title || "")), ...(extra || {}) };
   if (table === "leads") preset.lead_id = rec.id; else { preset.deal_id = rec.id; if (rec.client_id) preset.client_id = rec.client_id; if (rec.contact_id) preset.contact_id = rec.contact_id; }
   closeDlg(); openRecord("activities", null, preset);
 }
@@ -9179,7 +9286,7 @@ async function renderEmails(el){
         if (r && r.problem) openDialog("Replies couldn’t be checked", [h("p", {}, r.problem)], [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Close"), h("button", { type: "button", class: "btn pri", onclick: () => { closeDlg(); connectGoogle(); } }, "Reconnect Google")], true);
         else toast(r && r.replies ? r.replies + " new " + (r.replies === 1 ? "reply" : "replies") + "." : "No new replies" + (r && r.checked ? " (checked " + r.checked + " conversation" + (r.checked === 1 ? "" : "s") + ")." : "."));
         rerender(); } catch (e) { fail(e, "Couldn’t check"); b.disabled = false; b.textContent = "Check for replies"; } } }, "Check for replies") : null));
-  if (u.view === "templates") { el.append(templatesEditor()); return; }
+  if (u.view === "templates") { el.append(h("h2", { class: "sec-h" }, "Email templates"), templatesEditor(), h("h2", { class: "sec-h", style: "margin-top:24px" }, "WhatsApp messages"), waTemplatesEditor()); return; }
   el.append(listBox); draw();
 }
 function openEmail(e){
@@ -9192,6 +9299,29 @@ function openEmail(e){
 function newEmailToAnyone(){
   const cb = h("input", { type: "checkbox", checked: true });
   openComposer({ templateFor: "sales", saveAsLead: { checked: true, wrap: h("label", { class: "chk" }, cb, "Save this person as a lead, so the conversation is kept on their record"), get checked(){ return cb.checked; } } });
+}
+// (2026-11dn) the saved messages offered by every WhatsApp button
+function waTemplatesEditor(){
+  let list = clone(waTemplates());
+  const box = h("div", {});
+  const save = async () => {
+    try { const data = { ...(await latestSettings()), wa_templates: list.filter(t => String(t.body || "").trim()) }; ok(await sb.from("settings").upsert({ id: 1, data, updated_at: new Date().toISOString() })); S.settings = data; toast("WhatsApp messages saved."); }
+    catch (e) { fail(e, "Not saved"); }
+  };
+  function draw(){
+    box.replaceChildren(h("p", { class: "muted", style: "font-size:13px;margin:0 0 10px" }, "Offered by the WhatsApp button on leads, deals and contacts. Placeholders: {first_name}, {name}, {company}, {deal}, {my_name}, {my_phone}."));
+    list.forEach((t, i) => {
+      const nm = h("input", { class: "in", value: t.name }), bd = h("textarea", { class: "in", rows: 4 }); bd.value = t.body;
+      [nm, bd].forEach(x => x.addEventListener("change", () => { list[i] = { ...t, name: nm.value, body: bd.value }; }));
+      box.append(h("div", { class: "panel", style: "margin-bottom:12px" }, h("div", { class: "form" },
+        h("label", { class: "fl full" }, "Name", nm), h("label", { class: "fl full" }, "Message", bd)),
+        h("button", { type: "button", class: "btn sm ghost", onclick: () => { if (confirm("Delete the “" + t.name + "” message?")) { list.splice(i, 1); draw(); } } }, "Delete message")));
+    });
+    box.append(h("div", { style: "display:flex;gap:8px" }, h("button", { type: "button", class: "btn", onclick: () => { list.push({ id: "wa" + Date.now(), name: "New message", body: "Hi {first_name}, " }); draw(); } }, "+ Add message"),
+      h("button", { type: "button", class: "btn pri", onclick: save }, "Save WhatsApp messages")));
+  }
+  draw();
+  return box;
 }
 function templatesEditor(){
   let list = clone(emailTemplates());
@@ -11538,7 +11668,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11dm";
+const APP_VERSION = "2026-11dn";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -13941,7 +14071,7 @@ function drawNotifications(){
     list.append(h("button", { type: "button", class: "nitem" + (n.is_read ? "" : " unread"), onclick: async () => {
       p.hidden = true;
       if (!n.is_read) { try { await sb.from("notifications").update({ is_read: true }).eq("id", n.id); n.is_read = true; renderShell(); } catch (e) {} }
-      if (n.tbl === "connect-google") { if (googleConnected()) toast("Google is already connected."); else connectGoogle(); return; }
+      if (n.tbl === "connect-google") { if (googleConnected() && (canEmail() || !/email/i.test(n.title || ""))) toast("Google is already connected."); else connectGoogle(); return; }
       if (n.tbl === "team-day") { S.ui.day = { day: localDay(n.created_at || new Date()), user: n.entity_id || "" }; go("admin-day"); return; }
       if (n.tbl === "profiles") { if (n.entity_id === S.me.id) openMyProfile(); else if (isAdmin()) { await ensure(["profiles", "roles"]); openUserEditor(n.entity_id); } else openPerson(n.entity_id); return; }   // (2026-11cy) email change requests
       openTarget(n.tbl, n.entity_id);
