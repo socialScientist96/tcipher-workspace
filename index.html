@@ -2320,7 +2320,87 @@ html:has(#content .chat),html:has(#content .chat) body{overscroll-behavior-y:non
 .shot-box{display:flex;align-items:center;gap:12px;background:var(--white);color:var(--ink);border-radius:14px;padding:16px 20px;box-shadow:0 10px 40px rgba(0,0,0,.2);font-weight:600}
 .btn .spinner{width:14px;height:14px;margin-right:6px;vertical-align:-2px}
 
-/* ==============================================================/* Broken UI repairs — chat on phones (BU-016 bubbles off the left edge, BU-017 header wrapping with large text) */
+/* =====================================================================
+   Mobile excellence — batch 1 (phones ≤ 760 px). See TCIPHER-MOBILE-EXCELLENCE/MOBILE-DESIGN-SYSTEM.md.
+   ===================================================================== */
+.nb-pmore,.m-fbtn{display:none}
+@media (max-width:760px){
+  /* content before chrome: page descriptions are for desktop */
+  .ph > div > p,.ph > p{display:none}
+  .ph{margin-bottom:var(--s4)}
+  .ph h1{font-size:24px}
+
+  /* one back per surface: the page's ‹ Back (44 px); the bar keeps Menu · page · Bell */
+  .m-pageback{min-height:44px;padding:0 10px 0 0;margin:-6px 0 2px}
+  .topbar .back{display:none !important}
+
+  /* tables → stacked cards (labels from the header row) */
+  .tablewrap:has(> table:not(.tcal)){overflow:visible;background:none;border:0;border-radius:0}
+  .tablewrap > table:not(.tcal),.tablewrap > table:not(.tcal) > tbody{display:block;width:100%}
+  .tablewrap > table:not(.tcal) > thead{display:none}
+  .tablewrap > table:not(.tcal) > tbody > tr{display:block;background:var(--white);border:1px solid var(--line);border-radius:var(--r-lg);padding:12px 14px;margin:0 0 10px}
+  .tablewrap > table:not(.tcal) > tbody > tr > td{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:4px 0;border:0;min-width:0;text-align:right;white-space:normal;overflow-wrap:anywhere;font-size:var(--fs-ui)}
+  .tablewrap > table:not(.tcal) > tbody > tr > td::before{content:attr(data-label);flex:none;max-width:45%;color:var(--ink3);font-size:var(--fs-sm);text-align:left}
+  .tablewrap > table:not(.tcal) > tbody > tr > td:first-child{justify-content:flex-start;text-align:left;font-size:var(--fs-lg);font-weight:600;padding:0 0 6px}
+  .tablewrap > table:not(.tcal) > tbody > tr > td:first-child::before{display:none}
+  .tablewrap > table:not(.tcal) > tbody > tr > td:not([data-label])::before{display:none}
+  .tablewrap > table:not(.tcal) > tbody > tr > td.m-empty{display:none}
+  .tablewrap > table:not(.tcal) > tbody > tr > td > *{max-width:100%}
+  .tablewrap > table:not(.tcal) > tbody > tr.click{cursor:pointer}
+  .tablewrap > table:not(.tcal) > tbody > tr:active{background:var(--tint)}
+
+  /* filter bars: search + Filters (n); the dropdowns and chips open under it */
+  .m-fbtn{display:inline-flex;align-items:center;gap:6px;min-height:44px;justify-content:center}
+  .m-fbtn .m-fn{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--p);color:#fff;font-size:12px;font-weight:600}
+  .tb:not(.m-fopen) > .m-fitem,.dv-toolbar:not(.m-fopen) > .m-fitem{display:none !important}
+  .tb[data-mf]{display:grid;grid-template-columns:1fr auto;gap:8px}
+  .tb[data-mf] > *{min-width:0;width:100%}
+  .tb[data-mf] > .m-fbtn{width:auto}
+  .tb[data-mf].m-fopen > .m-fitem{grid-column:1 / -1}
+  .tb[data-mf] > .seg{grid-column:1 / -1}
+  .dv-toolbar[data-mf]{grid-template-columns:1fr auto}
+  .dv-toolbar[data-mf] > .dv-search{grid-column:1}
+  .dv-toolbar[data-mf].m-fopen > .m-fitem{grid-column:auto}
+  .dv-toolbar[data-mf].m-fopen{grid-template-columns:1fr 1fr}
+  .dv-toolbar[data-mf].m-fopen > .dv-search{grid-column:1}
+  .dv-toolbar > *{min-width:0}
+  .dv-chip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* Development board header: the "Spaces" crumb is desktop chrome */
+  .dv-crumb{display:none}
+
+  /* pipeline boards swipe one column at a time, like the Development board */
+  .boardwrap{scroll-snap-type:x mandatory;margin:0 -16px;padding:0 16px 8px;scroll-padding:0 16px;overscroll-behavior-x:contain}
+  .board{grid-auto-columns:calc(100vw - 48px)}
+  .board > .col{scroll-snap-align:start;min-width:0}
+
+  /* note page toolbar: Back · status · Share · More */
+  .nb-top .nb-wide{display:none !important}
+  .nb-pmore{display:inline-grid;place-items:center;width:44px;height:44px}
+  .nb-top .nb-crumbs{display:none}
+
+  /* tasks "Load…" rows wrap instead of running off the screen */
+  .load-row,.load-row > span{white-space:normal;min-width:0;max-width:100%;overflow-wrap:anywhere}
+  .related .ri,.related .ri > *{min-width:0;max-width:100%}
+  .related .ri .pill{white-space:normal}
+
+  /* touch targets */
+  .tcard-menu::after{content:"";position:absolute;inset:-9px}   /* the 26 px ⋯ gets a 44 px tap area (looks the same) */
+  .nb-handle{min-width:32px;min-height:44px}
+  .av.sm{font-size:11px}
+}
+
+/* Broken UI repairs (phase 3) */
+@media (max-width:760px){
+  /* tasks "Load…" rows: one column on phones, nothing runs off the screen (BU-004) */
+  .load-row{grid-template-columns:minmax(0,1fr);gap:2px;width:100%;margin:0}
+  .load-row > *,.load-row span{min-width:0;white-space:normal;overflow-wrap:anywhere}
+  /* team calendar: a real grid, scrolls inside its own box with the names pinned (BU-006) */
+  .tcal{min-width:640px}
+  .tcal th.who,.tcal td.who{width:112px}
+}
+
+/* Broken UI repairs — chat on phones (BU-016 bubbles off the left edge, BU-017 header wrapping with large text) */
 @media (max-width:760px){
   /* a bubble never grows past its column; what's inside shrinks to fit */
   .chat-msgs .bub{max-width:100%;min-width:0;box-sizing:border-box}
