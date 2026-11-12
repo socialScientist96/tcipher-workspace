@@ -2472,6 +2472,26 @@ html:has(#content .chat),html:has(#content .chat) body{overscroll-behavior-y:non
   /* stats: one compact row of small figures, after the work */
   .m-only{display:block}
   /* ===== Redesign batch 3 — lists, CRM, marketing (phones) ===== */
+  /* ===== Redesign batch 4 — windows as bottom sheets (phones, up to 760 px like every other phone rule; was 640) ===== */
+  dialog,dialog.narrow,dialog.dv-wide{width:100%;max-width:100%;margin:auto 0 0;border-radius:16px 16px 0 0;max-height:min(88dvh,calc(100dvh - 48px))}
+  dialog[open]{display:flex;flex-direction:column;animation:sheetIn .28s var(--ease)}
+  dialog[open] > *{flex:none}
+  dialog[open] > .db{flex:1 1 auto;min-height:0;max-height:none;overscroll-behavior:contain}
+  dialog[open]::before{content:"";display:block;flex:none;width:36px;height:4px;border-radius:2px;background:var(--tint3,#D4D4D8);margin:8px auto 0}   /* grab handle: drag down to close */
+  dialog[open] > .dh{padding-top:6px}
+  dialog .dh .btn,dialog .dh .iconbtn{min-width:44px;min-height:44px}
+  html:has(dialog[open]){overflow:hidden}   /* the page behind doesn't scroll */
+  .df{padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));gap:8px;background:var(--white)}
+  .df .sp{display:none}
+  .df > .btn{flex:1 1 auto;justify-content:center;min-height:44px}
+  .df > .btn.pri{flex-basis:100%;order:9}
+  /* task window: the status buttons (Start, Move to QA, Approve…) stay pinned at the bottom while you read */
+  dialog.dv-wide .dv-view{display:flex;flex-direction:column;align-items:stretch;gap:12px}
+  dialog.dv-wide .dv-view > .dv-right{display:contents}
+  dialog.dv-wide .dv-view > .dv-left{order:1}
+  dialog.dv-wide .dv-flow{order:2;position:sticky;bottom:-12px;z-index:3;margin:0 -16px -12px;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));border:0;border-top:1px solid var(--line);border-radius:0;background:var(--white);box-shadow:0 -6px 16px rgba(0,0,0,.06)}
+  dialog.dv-wide .dv-flow .dv-steps{display:none}   /* the status is in the window's header already */
+  dialog.dv-wide .dv-flowbtns > .btn{flex:1 1 auto;justify-content:center;min-height:44px}
   .ph .acts .m-hide{display:none !important}
   .tablewrap > table:not(.tcal) > tbody > tr.m-titled{display:flex;flex-direction:column}
   .tablewrap > table:not(.tcal) > tbody > tr.m-titled > td.m-title{order:-2;justify-content:flex-start;text-align:left;font-size:var(--fs-lg);font-weight:600;padding:0 0 2px}
@@ -4526,6 +4546,25 @@ function taskCard(r){
    --------------------------------------------------------------------- */
 function dlg(){ return $("dlg"); }
 function closeDlg(){ const d = dlg(); if (d.open) d.close(); S.dlg = null; }
+const PHONE_MQ_EARLY = window.matchMedia("(max-width:760px)");
+// phones: drag a window down by its handle or title bar to close it (same as its ✕, so windows that ask first still ask)
+(() => {
+  const d = document.getElementById("dlg"); if (!d) return;
+  let y0 = null, dy = 0;
+  d.addEventListener("touchstart", e => {
+    if (!PHONE_MQ_EARLY.matches || e.touches.length !== 1) return;
+    const t = e.target, top = d.getBoundingClientRect().top;
+    const onBar = e.touches[0].clientY - top < 24 || (t.closest && t.closest(".dh") && !t.closest("button,input,select,textarea,a,[contenteditable]"));
+    if (!onBar) return;
+    y0 = e.touches[0].clientY; dy = 0; d.style.transition = "none";
+  }, { passive: true });
+  d.addEventListener("touchmove", e => { if (y0 == null) return; dy = Math.max(0, e.touches[0].clientY - y0); d.style.transform = dy ? "translateY(" + dy + "px)" : ""; }, { passive: true });
+  const end = () => {
+    if (y0 == null) return; y0 = null; d.style.transition = ""; d.style.transform = "";
+    if (dy > 90) { const x = d.querySelector(".dh button[aria-label='Close'], .dh button[aria-label^='Close']"); if (x) x.click(); else closeDlg(); }
+  };
+  d.addEventListener("touchend", end); d.addEventListener("touchcancel", end);
+})();
 function openDialog(title, bodyNodes, footNodes, narrow){
   const d = dlg();
   d.className = narrow ? "narrow" : "";
