@@ -1769,6 +1769,42 @@ dialog{border-radius:var(--r-xl)}
 .ai-eng-row .ai-cell:first-of-type{color:var(--ink2)}
 .ai-dash .ic,.ai-row .ic{color:var(--p)}
 .hello > .ai-dash{align-self:center}
+/* ===== Home banner (2026-11dg) — flat: one dark surface, one accent, real numbers ===== */
+.hello.has-hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,380px);align-items:stretch;gap:0;margin-bottom:20px}
+.hero{grid-column:1 / -1;grid-row:1;--h-bg:#1A1630;--h-ink:#FFFFFF;--h-mute:#B8B2D8;--h-acc:#AFA3FF;--h-line:rgba(255,255,255,.10);--h-fill:rgba(255,255,255,.06);
+  background:var(--h-bg);color:var(--h-ink);border-radius:var(--r-xl,20px);padding:28px 32px 28px;padding-right:calc(380px + 44px);min-height:236px;display:flex;flex-direction:column;justify-content:center}
+.hero-brand{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--h-mute);margin-bottom:18px;min-width:0}
+.hero-brand b{color:var(--h-ink);font-family:var(--font-main);font-weight:600;font-size:15px;white-space:nowrap}
+.hero-logo{width:28px;height:28px;border-radius:8px;flex:none;background:#fff}
+.hero-sep{width:1px;height:18px;background:var(--h-line);flex:none}
+.hero-tag{display:inline-flex;align-items:center;gap:6px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hero-h{margin:0;font-family:var(--font-main);font-weight:600;font-size:clamp(28px,3.2vw,40px);line-height:1.12;letter-spacing:-.02em;color:var(--h-ink)}
+.hero-name{color:var(--h-acc)}
+.hello.has-hero .hero .hero-h{color:var(--h-ink);font-family:var(--font-main);font-weight:600}
+.hello.has-hero .hero .hero-h .hero-name{color:var(--h-acc)}
+.hello.has-hero .hero .hero-p{color:var(--h-mute)}
+.hero-p{margin:8px 0 0;color:var(--h-mute);font-size:15px;line-height:1.45}
+.hero-tiles{display:flex;gap:10px;margin-top:22px;flex-wrap:wrap}
+.hero-t{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:92px;min-height:76px;padding:10px 6px;
+  background:var(--h-fill);border:1px solid var(--h-line);border-radius:12px;color:var(--h-ink);font:inherit;font-size:13px;cursor:pointer;transition:background-color .15s var(--ease),border-color .15s var(--ease)}
+.hero-t:hover{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.18)}
+.hero-t:active{background:rgba(255,255,255,.14)}
+.hero-t:focus-visible{outline:2px solid var(--h-acc);outline-offset:2px}
+.hero-ic{display:grid;place-items:center;color:var(--h-acc)}
+.hero-l{white-space:nowrap;line-height:1.2}
+.hero-n{position:absolute;top:6px;right:6px;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--p);color:#fff;font-size:11.5px;font-weight:600;line-height:20px;text-align:center;font-variant-numeric:tabular-nums}
+.hero-n.ok{background:#1F7A45}
+.hero-n[hidden]{display:none}
+/* desktop: the check-in card and Summarize sit in the banner's right column (instead of a picture) */
+.hello.has-hero > .att{grid-column:2;grid-row:1;align-self:end;justify-self:stretch;margin:0 24px 24px 20px;z-index:1;flex-wrap:wrap;padding:12px 14px}
+.hello.has-hero > .ai-dash{grid-column:2;grid-row:1;align-self:start;justify-self:end;margin:22px 24px 0 0;z-index:1;background:transparent!important;color:var(--h-mute,#B8B2D8)!important;border-color:rgba(255,255,255,.16)!important}
+.hello.has-hero > .ai-dash:hover{color:#fff!important;border-color:rgba(255,255,255,.3)!important}
+@media (max-width:1100px) and (min-width:761px){
+  .hello.has-hero{grid-template-columns:1fr}
+  .hero{padding-right:32px}
+  .hello.has-hero > .att{grid-column:1;grid-row:2;margin:12px 0 0;align-self:auto}
+}
+@media (prefers-reduced-motion:reduce){.hero-t{transition:none}}
 .dv-top{flex-wrap:wrap}
 .dv-top > .ai-dash{flex:none}
 .toast-undo{background:none;border:0;color:#C9C3FB;font:inherit;font-weight:600;cursor:pointer;padding:0 0 0 8px;text-decoration:underline}
@@ -2451,6 +2487,27 @@ html:has(#content .chat),html:has(#content .chat) body{overscroll-behavior-y:non
   .home [data-sec=ann]{order:9} .home [data-sec=pins]{order:10} .home [data-sec=hol]{order:11} .home [data-sec=away]{order:12}
   /* greeting: date + name, Summarize top-right, the check-in card under it */
   .home .hello{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:4px 12px;margin-bottom:12px}
+  /* banner on phones: greeting, one line about today, five shortcuts — under 25 % of the screen */
+  .home .hello.has-hero{grid-template-columns:minmax(0,1fr);gap:0}
+  .hero{padding:14px 14px 12px;min-height:0;border-radius:16px}
+  .hero-brand{display:none}
+  .hero-h{line-height:1.2}
+  .hero-p{font-size:12.5px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hero-tiles{display:grid;grid-template-columns:repeat(var(--n,5),minmax(0,1fr));gap:6px;margin-top:12px;flex-wrap:nowrap}
+  .hero-t{width:auto;min-height:56px;padding:8px 2px 6px;gap:4px;font-size:11.5px;border-radius:10px}
+  .hero-l{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .hero-l[data-s]{font-size:0} .hero-l[data-s]::after{content:attr(data-s);font-size:11.5px}   /* "Dev Board" → "Board" on phones */
+  .home .hello.has-hero .hero .hero-h{font-size:clamp(18px,5.6vw,21px)}
+  /* short screens: the banner keeps to a quarter of the height — the summary line goes (the sections below say the same) */
+  @media (max-height:700px){ .hello.has-hero .hero .hero-p{display:none} .hero-tiles{margin-top:10px} .hero-t{min-height:52px} }
+  @media (max-height:600px){ .hero{padding:12px 12px 10px} .hero-tiles{margin-top:8px} .hero-t{min-height:48px;padding:6px 2px 4px;gap:2px} }
+  .hero-n{top:3px;right:3px;min-width:17px;height:17px;line-height:17px;font-size:10.5px;padding:0 4px;border-radius:9px}
+  .home .hello.has-hero > .att{grid-column:1;grid-row:2;margin:10px 0 0}
+  /* Summarize leaves the banner on phones: a small button in the check-in card's corner */
+  .home .hello.has-hero > .ai-dash{grid-column:1;grid-row:2;align-self:start;justify-self:end;margin:16px 10px 0 0;width:44px;height:44px;min-height:44px;padding:0;font-size:0;gap:0;justify-content:center;border-radius:12px;
+    background:var(--white)!important;color:var(--p-ink)!important;border:1px solid var(--line)!important}
+  .home .hello.has-hero:has(> .ai-dash) > .att .att-st{padding-right:52px}
+  .home .hello.has-hero > .ai-dash .ic{width:18px;height:18px}
   .home .hello h1{font-size:22px}
   .home .hello .ai-dash{grid-column:2;grid-row:1;min-height:44px;padding:0 12px}
   .home .hello .att{grid-column:1 / -1;margin-top:8px}
@@ -5541,6 +5598,46 @@ async function renderCalendar(el){
 /* ---------------------------------------------------------------------
    Home: what I need to do today
    --------------------------------------------------------------------- */
+// Home banner (2026-11dg): greeting, what today holds, and five live shortcuts. Flat and quiet on purpose: one accent,
+// no glow or gradient; every number on it is real and every tile goes somewhere.
+function homeHero(t0, me, scope){
+  const hr = new Date().getHours();
+  const greet = hr < 5 ? "Working late" : hr < 12 ? "Good morning" : hr < 17 ? "Good afternoon" : "Good evening";
+  const first = String(S.me.full_name || "").trim().split(/\s+/)[0] || "there";
+  const nNeed = rows("tasks").filter(taskNeedsMe).length;
+  const nDev = rows("tasks").filter(t => t.vertical === "Development" && t.status !== "Done" && (t.assignee_id === me || (t.collaborators || []).includes(me))).length;
+  let nMeet = 0; try { nMeet = agenda(t0, t0).filter(it => !(it.end && new Date(it.end) < Date.now())).length; } catch (e) {}
+  const nOnline = activePeople().filter(p => p.id !== me && isOnline(p.id)).length;
+  const date = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
+  const facts = [date,
+    nNeed ? nNeed + (nNeed === 1 ? " task needs you" : " tasks need you") : "nothing needs you right now",
+    nMeet ? nMeet + (nMeet === 1 ? " meeting" : " meetings") + " left today" : null].filter(Boolean);
+  const tile = (k, route, icon, label, n, say, tone) => canSee(route) ? h("button", { type: "button", class: "hero-t", "data-k": k,
+      "aria-label": label + (n ? ", " + say(n) : ""), onclick: () => go(route) },
+    h("span", { class: "hero-ic" }, ic(icon, 20)), h("span", { class: "hero-l", "data-s": label === "Dev Board" ? "Board" : null }, label),
+    h("span", { class: "hero-n" + (tone ? " " + tone : ""), hidden: !n, "aria-hidden": "true" }, n > 99 ? "99+" : String(n))) : null;
+  const chatN = (() => { try { const t = chatTotals(); return t.due + t.fresh; } catch (e) { return 0; } })();
+  return h("section", { class: "hero", "aria-label": "Welcome" },
+    h("div", { class: "hero-brand" }, h("img", { src: "icons/icon-192.png", alt: "", class: "hero-logo", width: "28", height: "28" }),
+      h("b", {}, "Tcipher Workspace"), h("span", { class: "hero-sep", "aria-hidden": "true" }),
+      h("span", { class: "hero-tag" }, ic("users", 15), "Internal team platform")),
+    h("h1", { class: "hero-h" }, greet + ", ", h("span", { class: "hero-name" }, first)),
+    h("p", { class: "hero-p" }, facts.join(" · ")),
+    (() => { const ts = [
+      tile("tasks", "tasks", "check", "Tasks", nNeed, n => n + " need you"),
+      tile("dev", "dev-board", "code", "Dev Board", nDev, n => n + " open of yours"),
+      tile("chat", "chat", "message", "Chat", chatN, n => n + " unread"),
+      tile("cal", "calendar", "calendar", "Calendar", nMeet, n => n + " left today"),
+      tile("team", "people", "users", "Team", nOnline, n => n + " online", "ok")].filter(Boolean);
+      return h("nav", { class: "hero-tiles", "aria-label": "Shortcuts", style: "--n:" + ts.length }, ts); })());
+}
+// keep the Chat number on the banner current without redrawing Home
+function paintHeroChat(){
+  const n = document.querySelector('.hero [data-k="chat"] .hero-n'); if (!n) return;
+  let v = 0; try { const t = chatTotals(); v = t.due + t.fresh; } catch (e) {}
+  n.textContent = v > 99 ? "99+" : String(v); n.hidden = !v;
+  n.parentElement.setAttribute("aria-label", "Chat" + (v ? ", " + v + " unread" : ""));
+}
 async function renderDashboard(el){
   const want = ["tasks","meetings","announcements","attendance","leave_requests","meeting_joins","calendar_events","google_links","notes"];
   if (lvl("sales") >= 1 || lvl("leads") >= 1) want.push("deals", "activities", "leads");
@@ -5552,8 +5649,7 @@ async function renderDashboard(el){
 
   // the page is titled by the day; check-in sits in a quiet card beside it
   const scope = S.me.vertical || (isAdmin() ? "All verticals" : "");
-  el.append(h("div", { class: "hello" }, h("div", {}, h("h1", {}, new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })),
-    h("p", {}, [S.me.full_name, scope].filter(Boolean).join(" · "))), attendanceWidget(true)));
+  el.append(h("div", { class: "hello has-hero" }, homeHero(t0, me, scope), attendanceWidget(true)));
 
   // everything on my plate, from every module
   const items = [];
@@ -10111,6 +10207,7 @@ function updateTabTitle(){
   let n = 0; try { const t = chatTotals(); n = t.due + t.fresh; } catch (e) {}
   const want = (n ? "(" + (n > 99 ? "99+" : n) + ") " : "") + baseTitle;
   if (document.title !== want) document.title = want;
+  try { paintHeroChat(); } catch (e) {}
 }
 // coming back to the window: what's on screen in the open chat is now read
 document.addEventListener("visibilitychange", () => {
