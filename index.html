@@ -6472,14 +6472,17 @@ async function syncGoogleNow(quiet){
 async function autoSyncGoogle(){
   if (!googleOn()) return;
   await ensure(["google_links"]);
-  const l = myGoogle(); if (!l || googleExpired()) return;
+  const l = myGoogle(); if (!l || googleExpired() || googlePushed(l)) return;
   if (!l.last_sync_at || Date.now() - new Date(l.last_sync_at) > 10 * 60000) syncGoogleNow(true);
 }
+// (2026-11ed, upgrade-2026-11ed.sql) Google tells the server when your calendar changes: no need for the browser to ask
+const googlePushed = (l, ahead) => !!(l && l.cal_live_until && new Date(l.cal_live_until) - Date.now() > (ahead || 0) && l.last_sync_at && Date.now() - new Date(l.last_sync_at) < 26 * 3600e3);
 // (2026-11ea) skip if your calendar was synced in the last 14 minutes (by the server's own sync, or another tab or device)
 setInterval(async () => {
   if (!S.me || !googleConnected() || document.visibilityState === "hidden") return;
+  if (googlePushed(myGoogle(), 20 * 60000)) return;
   try { await load("google_links", true); } catch (e) {}
-  const l = myGoogle(); if (!l || (l.last_sync_at && Date.now() - new Date(l.last_sync_at) < 14 * 60000)) return;
+  const l = myGoogle(); if (!l || googlePushed(l) || (l.last_sync_at && Date.now() - new Date(l.last_sync_at) < 14 * 60000)) return;
   syncGoogleNow(true);
 }, 15 * 60000);
 
@@ -12227,7 +12230,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ec";
+const APP_VERSION = "2026-11ed";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));

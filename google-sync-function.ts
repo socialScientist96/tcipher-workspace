@@ -78,15 +78,19 @@ async function g(token: string, url: string, init: RequestInit = {}) {
 }
 
 /* ---------------- calendar sync ---------------- */
-async function syncUser(userId: string) {
-  try { return await syncUserInner(userId); }
+// (2026-11ed) like WhatsApp: Google tells us when a calendar changes (push, see calWatch) and only what changed in the
+// last few minutes is fetched (calChanges). Google says a few pushes can go missing, so the scheduled job also asks for
+// the last 35 minutes of changes, and once a day reads the whole window again (calFull). Without push (setup not run,
+// or Google refused), everything works as before: a full read each time.
+async function syncUser(userId: string, mode: "full" | "auto" = "full") {
+  try { return await syncUserInner(userId, mode); }
   catch (e) {
     const msg = String((e as Error)?.message || e);
     await db.from("google_links").update({ last_error: "Sync failed: " + msg.slice(0, 300) }).eq("user_id", userId);
     throw e;
   }
 }
-async function syncUserInner(userId: string) {
+async function syncUserInner(userId: string, mode: "full" | "auto") {
   // someone who allowed only email (no calendar) has nothing to sync here: that isn't a problem
   const link = must(await db.from("google_links").select("scopes").eq("user_id", userId).maybeSingle());
   if (link && link.scopes && !String(link.scopes).includes("calendar")) {
@@ -95,46 +99,114 @@ async function syncUserInner(userId: string) {
     return 0;
   }
   const token = await accessFor(userId);
+  const ch = await calChannel(userId);
+  let n = 0;
+  const live = ch && ch.cal_channel_expires && Date.parse(ch.cal_channel_expires) > Date.now();
+  const fresh = ch && ch.cal_full_at && Date.now() - Date.parse(ch.cal_full_at) < 24 * 3600e3;
+  if (mode === "auto" && live && fresh) { try { n = await calChanges(userId, token, 35); } catch (_) { n = await calFull(userId, token); } }
+  else n = await calFull(userId, token);
+  if (ch) { try { await calWatch(userId, token, ch); } catch (_) { /* push is a bonus: the scheduled job still syncs */ } }
+  await db.from("google_links").update({ last_sync_at: new Date().toISOString(), last_error: "" }).eq("user_id", userId);
+  try { await syncReplies(userId); } catch (e) { await db.from("google_links").update({ last_error: "Reply check failed: " + String((e as Error)?.message || e).slice(0, 200) }).eq("user_id", userId); }
+  return n;
+}
+function calWindow() {
   const fromDay = addDays(today(), -7), toDay = addDays(today(), 45);
-  const timeMin = new Date(fromDay + "T00:00:00+05:30").toISOString();
-  const timeMax = new Date(toDay + "T23:59:59+05:30").toISOString();
-  const items: Any[] = [];
+  return { fromDay, timeMin: new Date(fromDay + "T00:00:00+05:30").toISOString(), timeMax: new Date(toDay + "T23:59:59+05:30").toISOString() };
+}
+async function calList(token: string, extra: string) {
+  const w = calWindow(), items: Any[] = [];
   let page = "";
   for (let i = 0; i < 8; i++) {
-    const r = await g(token, CAL + "?singleEvents=true&orderBy=startTime&maxResults=250&timeMin=" + encodeURIComponent(timeMin) + "&timeMax=" + encodeURIComponent(timeMax) + (page ? "&pageToken=" + encodeURIComponent(page) : ""));
+    const r = await g(token, CAL + "?singleEvents=true&maxResults=250&timeMin=" + encodeURIComponent(w.timeMin) + "&timeMax=" + encodeURIComponent(w.timeMax) + extra + (page ? "&pageToken=" + encodeURIComponent(page) : ""));
     items.push(...(r.items || []));
     page = r.nextPageToken; if (!page) break;
   }
-  const rows = items.filter((e) => e.status !== "cancelled").map((e) => {
-    const allDay = !!(e.start && e.start.date);
-    const startDate = allDay ? e.start.date : dayIn(new Date(e.start.dateTime));
-    const endDate = allDay ? addDays(e.end.date, -1) : dayIn(new Date(e.end.dateTime));
-    const video = (e.conferenceData && (e.conferenceData.entryPoints || []).find((p: Any) => p.entryPointType === "video")) || null;
-    const emails = new Set<string>([...(e.attendees || []).map((a: Any) => String(a.email || "").toLowerCase()), String((e.organizer && e.organizer.email) || "").toLowerCase()].filter(Boolean));
-    return {
-      user_id: userId, google_event_id: e.id, ical_uid: e.iCalUID || "", title: e.summary || "(no title)",
-      starts_at: allDay ? null : e.start.dateTime, ends_at: allDay ? null : e.end.dateTime, all_day: allDay,
-      start_date: startDate, end_date: endDate, meet_link: e.hangoutLink || (video && video.uri) || "",
-      html_link: e.htmlLink || "", location: e.location || "", organizer_email: String((e.organizer && e.organizer.email) || "").toLowerCase(),
-      attendee_emails: [...emails], updated_at: new Date().toISOString(),
-    };
-  });
-  // (2026-11dz) write only what changed: every sync used to delete and re-insert all of a person's events, which was
-  // one of the biggest uses of the database's disk. Now: new or changed events are upserted, removed ones deleted.
-  const have = (must(await db.from("calendar_events").select("google_event_id,ical_uid,title,starts_at,ends_at,all_day,start_date,end_date,meet_link,html_link,location,organizer_email,attendee_emails")
-    .eq("user_id", userId).gte("start_date", fromDay)) || []) as Any[];
-  const t = (v: unknown) => v ? Date.parse(String(v)) : 0;
-  const key = (e: Any) => JSON.stringify([e.ical_uid || "", e.title || "", t(e.starts_at), t(e.ends_at), !!e.all_day, e.start_date, e.end_date, e.meet_link || "", e.html_link || "",
-    e.location || "", e.organizer_email || "", [...(e.attendee_emails || [])].sort()]);
-  const old = new Map(have.map((e) => [e.google_event_id, key(e)]));
-  const changed = rows.filter((r: Any) => old.get(r.google_event_id) !== key(r));
-  const keep = new Set(rows.map((r: Any) => r.google_event_id));
-  const gone = have.map((e) => e.google_event_id).filter((id: string) => !keep.has(id));
+  return items;
+}
+function calRow(userId: string, e: Any) {
+  const allDay = !!(e.start && e.start.date);
+  const startDate = allDay ? e.start.date : dayIn(new Date(e.start.dateTime));
+  const endDate = allDay ? addDays(e.end.date, -1) : dayIn(new Date(e.end.dateTime));
+  const video = (e.conferenceData && (e.conferenceData.entryPoints || []).find((p: Any) => p.entryPointType === "video")) || null;
+  const emails = new Set<string>([...(e.attendees || []).map((a: Any) => String(a.email || "").toLowerCase()), String((e.organizer && e.organizer.email) || "").toLowerCase()].filter(Boolean));
+  return {
+    user_id: userId, google_event_id: e.id, ical_uid: e.iCalUID || "", title: e.summary || "(no title)",
+    starts_at: allDay ? null : e.start.dateTime, ends_at: allDay ? null : e.end.dateTime, all_day: allDay,
+    start_date: startDate, end_date: endDate, meet_link: e.hangoutLink || (video && video.uri) || "",
+    html_link: e.htmlLink || "", location: e.location || "", organizer_email: String((e.organizer && e.organizer.email) || "").toLowerCase(),
+    attendee_emails: [...emails], updated_at: new Date().toISOString(),
+  };
+}
+const CAL_COLS = "google_event_id,ical_uid,title,starts_at,ends_at,all_day,start_date,end_date,meet_link,html_link,location,organizer_email,attendee_emails";
+const calTime = (v: unknown) => v ? Date.parse(String(v)) : 0;
+const calKey = (e: Any) => JSON.stringify([e.ical_uid || "", e.title || "", calTime(e.starts_at), calTime(e.ends_at), !!e.all_day, e.start_date, e.end_date, e.meet_link || "", e.html_link || "",
+  e.location || "", e.organizer_email || "", [...(e.attendee_emails || [])].sort()]);
+// (2026-11dz) write only what changed: new or changed events are upserted, removed ones deleted
+async function calWrite(userId: string, rows: Any[], have: Any[], gone: string[]) {
+  const old = new Map(have.map((e) => [e.google_event_id, calKey(e)]));
+  const changed = rows.filter((r: Any) => old.get(r.google_event_id) !== calKey(r));
+  gone = gone.filter((id) => old.has(id));
   for (let i = 0; i < gone.length; i += 200) must(await db.from("calendar_events").delete().eq("user_id", userId).in("google_event_id", gone.slice(i, i + 200)));
   for (let i = 0; i < changed.length; i += 200) must(await db.from("calendar_events").upsert(changed.slice(i, i + 200), { onConflict: "user_id,google_event_id" }));
-  await db.from("google_links").update({ last_sync_at: new Date().toISOString(), last_error: "" }).eq("user_id", userId);
-  try { await syncReplies(userId); } catch (e) { await db.from("google_links").update({ last_error: "Reply check failed: " + String((e as Error)?.message || e).slice(0, 200) }).eq("user_id", userId); }
+  return changed.length + gone.length;
+}
+// the whole window (7 days back, 45 ahead)
+async function calFull(userId: string, token: string) {
+  const items = await calList(token, "");
+  const rows = items.filter((e) => e.status !== "cancelled").map((e) => calRow(userId, e));
+  const have = (must(await db.from("calendar_events").select(CAL_COLS).eq("user_id", userId).gte("start_date", calWindow().fromDay)) || []) as Any[];
+  const keep = new Set(rows.map((r: Any) => r.google_event_id));
+  await calWrite(userId, rows, have, have.map((e) => e.google_event_id).filter((id: string) => !keep.has(id)));
+  await db.from("google_tokens").update({ cal_full_at: new Date().toISOString() }).eq("user_id", userId).then(() => {}, () => {});
   return rows.length;
+}
+// only events changed in the last few minutes (Google includes deleted ones)
+async function calChanges(userId: string, token: string, minutes: number) {
+  const since = new Date(Date.now() - minutes * 60000).toISOString();
+  const items = await calList(token, "&showDeleted=true&updatedMin=" + encodeURIComponent(since));
+  if (!items.length) return 0;
+  const rows = items.filter((e) => e.status !== "cancelled").map((e) => calRow(userId, e));
+  const gone = items.filter((e) => e.status === "cancelled").map((e) => e.id);
+  const ids = items.map((e) => e.id), have: Any[] = [];
+  for (let i = 0; i < ids.length; i += 200) have.push(...(must(await db.from("calendar_events").select(CAL_COLS).eq("user_id", userId).in("google_event_id", ids.slice(i, i + 200))) || []));
+  return await calWrite(userId, rows, have, gone);
+}
+// push: Google calls this function when the calendar changes. A subscription lasts about a week; renewed a day early.
+async function calChannel(userId: string) {
+  const r = await db.from("google_tokens").select("cal_channel_id,cal_channel_resource,cal_channel_expires,cal_full_at").eq("user_id", userId).maybeSingle();
+  return r.error ? null : (r.data || null);   // null: the 2026-11ed columns aren't there yet
+}
+async function calWatch(userId: string, token: string, ch: Any) {
+  if (ch.cal_channel_id && ch.cal_channel_expires && Date.parse(ch.cal_channel_expires) > Date.now() + 24 * 3600e3) return;
+  const id = crypto.randomUUID(), secret = randomToken();
+  const r = await g(token, CAL + "/watch", { method: "POST", body: JSON.stringify({ id, type: "web_hook", token: secret,
+    address: Deno.env.get("SUPABASE_URL") + "/functions/v1/google-sync", params: { ttl: String(7 * 86400) } }) });
+  const until = r && r.expiration ? new Date(Number(r.expiration)).toISOString() : new Date(Date.now() + 6 * 86400e3).toISOString();
+  must(await db.from("google_tokens").update({ cal_channel_id: id, cal_channel_resource: r.resourceId || "", cal_channel_token: secret, cal_channel_expires: until }).eq("user_id", userId));
+  await db.from("google_links").update({ cal_live_until: until }).eq("user_id", userId);
+  if (ch.cal_channel_id) await calUnwatch(token, ch.cal_channel_id, ch.cal_channel_resource);
+}
+async function calUnwatch(token: string, id: string, resource: string) {
+  if (!id || !resource) return;
+  try { await g(token, "https://www.googleapis.com/calendar/v3/channels/stop", { method: "POST", body: JSON.stringify({ id, resourceId: resource }) }); } catch (_) { /* it runs out by itself */ }
+}
+// a push from Google: no body, only headers. Answered at once; the fetch runs right after.
+const pushBusy = new Map<string, number>();
+async function calPush(req: Request) {
+  const id = req.headers.get("x-goog-channel-id") || "", state = req.headers.get("x-goog-resource-state") || "";
+  if (state !== "exists") return;   // "sync" just confirms a new subscription
+  const r = await db.from("google_tokens").select("user_id,cal_channel_token").eq("cal_channel_id", id).maybeSingle();
+  if (r.error || !r.data || !r.data.cal_channel_token || r.data.cal_channel_token !== (req.headers.get("x-goog-channel-token") || "")) return;
+  const userId = r.data.user_id;
+  if ((pushBusy.get(userId) || 0) > Date.now() - 3000) return;   // a burst of changes: the first fetch covers them
+  pushBusy.set(userId, Date.now());
+  await new Promise((ok) => setTimeout(ok, 1500));   // let a burst of edits land first
+  try {
+    const token = await accessFor(userId);
+    await calChanges(userId, token, 10);
+    await db.from("google_links").update({ last_sync_at: new Date().toISOString(), last_error: "" }).eq("user_id", userId);
+  } catch (_) { /* the scheduled job catches up */ }
 }
 
 /* ---------------- workspace meeting -> Google Calendar event ---------------- */
@@ -860,6 +932,13 @@ async function mailRun() {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "Use POST." }, 405);
+  // (2026-11ed) Google Calendar push: answered straight away, the changes are fetched just after
+  if (req.headers.get("x-goog-channel-id")) {
+    const work = calPush(req).catch(() => {});
+    const rt = (globalThis as Any).EdgeRuntime;
+    if (rt && typeof rt.waitUntil === "function") rt.waitUntil(work); else await work;
+    return new Response(null, { status: 200 });
+  }
   try {
     if (!GID || !GSECRET) return json({ error: "Google isn’t set up on the server yet (missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET secret)." }, 500);
     const body = await req.json().catch(() => ({}));
@@ -886,7 +965,7 @@ Deno.serve(async (req) => {
       if (!CRON || req.headers.get("x-cron-secret") !== CRON) return json({ error: "Not allowed." }, 403);
       const links = must(await db.from("google_links").select("user_id"));
       const result: Any = { synced: 0, failed: 0, joins: 0, checkedIn: 0 };
-      for (const l of links) { try { await syncUser(l.user_id); result.synced++; } catch (_) { result.failed++; } }
+      for (const l of links) { try { await syncUser(l.user_id, "auto"); result.synced++; } catch (_) { result.failed++; } }
       const settings = (must(await db.from("settings").select("data").eq("id", 1).maybeSingle()) || { data: {} }).data || {};
       const wd = settings.working_days || [1, 2, 3, 4, 5, 6], hol = (settings.holidays || []).map((h: Any) => h.date);
       const connected = new Set(links.map((l: Any) => l.user_id));
@@ -951,6 +1030,8 @@ Deno.serve(async (req) => {
     }
     if (action === "disconnect") {
       const row = must(await db.from("google_tokens").select("refresh_token").eq("user_id", me.id).maybeSingle());
+      const ch = await calChannel(me.id);   // stop Google's change notices before the access goes
+      if (row && ch && ch.cal_channel_id) { try { await calUnwatch(await accessFor(me.id), ch.cal_channel_id, ch.cal_channel_resource); } catch (_) { /* runs out by itself */ } }
       if (row) await fetch("https://oauth2.googleapis.com/revoke?token=" + encodeURIComponent(row.refresh_token), { method: "POST" }).catch(() => {});
       await db.from("calendar_events").delete().eq("user_id", me.id);
       await db.from("google_tokens").delete().eq("user_id", me.id);
