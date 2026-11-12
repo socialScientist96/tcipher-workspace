@@ -3238,7 +3238,8 @@ const ensure = list => Promise.all([...new Set(list.filter(Boolean))].map(t => {
    kept on this device ("unsynced changes") and sent again when the connection is back, or with the Sync button.
    New records get their id here first, so sending one again can never make a second copy.
    Changes the server turns down (not allowed, invalid) are never kept: those show their error as before. */
-const OUTBOX_TABLES = new Set(["activities","announcements","attendance","calendar_events","campaigns","clients","comments","contacts","content","deals","documents",
+// (2026-11dy) attendance is not queued offline: a check-out sent hours later was refused and left the day open
+const OUTBOX_TABLES = new Set(["activities","announcements","calendar_events","campaigns","clients","comments","contacts","content","deals","documents",
   "features","leads","leave_requests","meetings","notes","projects","proposals","releases","seo_keywords","social_stats","sprints","targets","tasks","test_cases","tickets","work_logs"]);
 // a failure of the connection itself (the database library reports these as "TypeError: Failed to fetch" and the like, with no error code)
 const netDown = e => navigator.onLine === false || !!(e && (e.netSlow || e.name === "TypeError" ||
@@ -3931,7 +3932,8 @@ const MOD = {
     top: tasksTop,
     actions: (rec) => {
       const out = [];
-      if (rec.status === "In review" && (rec.reviewer_id === S.me.id || isAdmin()))
+      // (2026-11dy) Development tasks: the tester decides (the database refuses anyone else); other verticals: the reviewer
+      if (rec.status === "In review" && (isAdmin() || (rec.vertical === "Development" ? (rec.tester_id ? rec.tester_id === S.me.id : rec.reviewer_id === S.me.id) : rec.reviewer_id === S.me.id)))
         out.push(h("b", { style: "flex:1" }, "Waiting for your review"),
           h("button", { type: "button", class: "btn ok", onclick: () => reviewTask(rec, true) }, "Approve"),
           h("button", { type: "button", class: "btn danger", onclick: () => reviewTask(rec, false) }, "Send back"));
@@ -4426,6 +4428,15 @@ const MOD = {
     label: "Leave", one: "leave request", table: "leave_requests", area: "leave", title: "type", personal: true,
     desc: "Apply for leave or work-from-home, and see balances and approvals.", needs: [], comments: true, files: true,
     approval: { field: "status", pending: "Pending", options: ["Approved","Rejected"] },
+    // (2026-11dy) cancel your own request: pending, or approved leave that hasn't started
+    actions: (rec) => rec && rec.user_id === S.me.id && (rec.status === "Pending" || (rec.status === "Approved" && rec.start_date > today()))
+      ? [h("b", { style: "flex:1" }, rec.status === "Pending" ? "Waiting for approval" : "Approved"),
+         h("button", { type: "button", class: "btn", onclick: async () => {
+           if (!confirm("Cancel this leave request?")) return;
+           try { const r = await sb.rpc("cancel_leave", { p_id: rec.id }); if (r.error) throw r.error; upsertCache("leave_requests", r.data); toast("Leave request cancelled."); closeDlg(); rerender(); }
+           catch (e) { fail(e, /cancel_leave|function/i.test(String(e && e.message)) ? "Cancelling needs the latest database update" : "Couldn’t cancel"); }
+         } }, "Cancel request")]
+      : null,
     fieldEditable: (f, rec) => f.k !== "user_id" || (!rec && lvl("leave") >= 2),
     fields: [
       { k: "type", l: "Leave type", t: "select", o: settingList("leave_types", ["Paid leave","Sick leave","Work from home","Unpaid leave"]), req: true, def: "Paid leave", filter: true },
@@ -4565,8 +4576,23 @@ async function sendLeadToSales(rec){
     toast("Sent to Sales."); closeDlg(); rerender();
   } catch (e) { fail(e, "Couldn’t send"); }
 }
+let converting = null;
 async function convertLead(rec){
+  if (converting === rec.id) return;   // (2026-11dy) a second click while the first is still working
+  converting = rec.id;
   try {
+    // (2026-11dy) one locked step in the database: a retry, a double click or a deal already made from this lead
+    // returns that deal instead of creating another
+    const r = await sb.rpc("convert_lead", { p_lead: rec.id });
+    if (!r.error && r.data) {
+      const deal = r.data; upsertCache("deals", deal);
+      try { const l = ok(await sb.from("leads").select("*").eq("id", rec.id).maybeSingle()); if (l) upsertCache("leads", l); } catch (e) {}
+      if (rec.owner_id) notify([rec.owner_id], "Your lead became a deal: " + rec.name, deal.title, "leads", rec.id);
+      toast("Deal created."); closeDlg(); rerender(); openRecord("deals", deal.id);
+      return;
+    }
+    if (r.error && !/convert_lead|function|schema cache/i.test(r.error.message || "")) throw r.error;
+    // the database update for this isn't in yet: the previous way
     const ig = rec.pipeline === "Instagram";
     const deal = await insertRow("deals", { title: (rec.company || rec.name) + (rec.service ? " – " + rec.service : ""), company: rec.company || "", contact_name: rec.name,
       email: rec.email || "", phone: rec.phone || "", service: rec.service || "", value: rec.budget || null, stage: ig && ["Demo booked","Demo done","Follow up"].includes(rec.status) ? "Meeting" : "Qualified", source: rec.source || "",
@@ -4576,6 +4602,7 @@ async function convertLead(rec){
     if (rec.owner_id) notify([rec.owner_id], "Your lead became a deal: " + rec.name, deal.title, "leads", rec.id);
     toast("Deal created."); closeDlg(); rerender(); openRecord("deals", deal.id);
   } catch (e) { fail(e, "Couldn’t convert"); }
+  finally { converting = null; }
 }
 /* ---------------------------------------------------------------------
    Access checks for a module
@@ -4909,7 +4936,7 @@ async function openRecord(key, id, preset, opts){
     if (rec.created_at) stamp.push("Created " + fmtAgo(rec.created_at) + (rec.created_by && person(rec.created_by) ? " by " + pname(rec.created_by) : ""));
     if (rec.updated_at && rec.updated_at !== rec.created_at) stamp.push("updated " + fmtAgo(rec.updated_at));
     body.unshift(h("p", { class: "muted", style: "margin:0 0 12px;font-size:12.5px" }, stamp.join(", ")));
-    if (M.approval && A.isApprover && rec[M.approval.field] === M.approval.pending){
+    if (M.approval && A.isApprover && rec[M.approval.field] === M.approval.pending && (rec.user_id !== S.me.id || isAdmin())){   // (2026-11dy) not your own
       body.unshift(h("div", { class: "panel", style: "background:var(--warn-t);border-color:transparent;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap" },
         h("b", { style: "flex:1" }, "Waiting for your decision"),
         h("button", { type: "button", class: "btn ok", onclick: () => decide(M, rec, M.approval.options[0]) }, M.approval.options[0] === "Approved" ? "Approve" : M.approval.options[0]),
@@ -5440,6 +5467,7 @@ async function checkIn(mode){
     // today's row may exist already (another tab, or checked out earlier): never make a second one
     const ex = myToday() || ok(await sb.from("attendance").select("*").eq("user_id", S.me.id).eq("day", today()).maybeSingle());
     if (ex && ex.check_in && !ex.check_out) { upsertCache("attendance", ex); toast("You’re already checked in (since " + fmtTime(ex.check_in) + ")."); }
+    else if (ex && !ex.check_in) { toast("Today was already marked by an admin" + (ex.status ? " (" + ex.status + ")" : "") + ". Ask them to change it."); }   // (2026-11dy) never a second row for the same day
     else if (ex && ex.check_out) { await withDevice(d => updateRow("attendance", ex.id, Object.assign({ check_out: null }, d.out ? { check_out_device: "" } : {}))); toast("Checked in again at " + fmtTime(new Date()) + "."); }
     else { await withDevice(d => insertRow("attendance", Object.assign({ user_id: S.me.id, day: today(), check_in: new Date().toISOString(), mode: mode || "Office" }, d.in ? { check_in_device: MY_DEVICE } : {}))); toast("Checked in at " + fmtTime(new Date()) + "."); }
     if (typeof closeIdleWarning === "function") closeIdleWarning();
@@ -5453,6 +5481,9 @@ async function loadMyToday(){
 }
 async function checkOut(row){
   const t = myToday(), r = (row && row.id ? row : null) || (t && t.check_in && !t.check_out ? t : null) || lateShift() || t; if (!r) return;
+  // (2026-11dy) another device (or tab) may have checked out already: never overwrite that time with a later one
+  try { const fresh = ok(await sb.from("attendance").select("*").eq("id", r.id).maybeSingle()); if (fresh) { upsertCache("attendance", fresh); if (fresh.check_out) { toast("Already checked out at " + fmtTime(fresh.check_out) + "."); rerender(); return; } } }
+  catch (e) { if (!navigator.onLine) { toast("You’re offline. Check out when you’re back online, so the time is right."); return; } }
   try { await withDevice(d => updateRow("attendance", r.id, Object.assign({ check_out: new Date().toISOString() }, d.out ? { check_out_device: MY_DEVICE } : {}))); toast("Checked out at " + fmtTime(new Date()) + (r.day !== today() ? " (for " + fmtDate(r.day) + ")" : "") + "."); }
   catch (e) { fail(e, "Couldn’t check out"); }
   rerender();
@@ -6402,6 +6433,8 @@ async function refreshGoogleData(){ await Promise.all([load("google_links", true
 
 // Must be called straight from a click, so Google's pop-up isn't blocked.
 function connectGoogle(extraScopes){
+  // (2026-11dy) Google doesn't allow its sign-in inside apps: it would replace the workspace and never come back
+  if (IN_ANDROID_APP()) { toast("Connect Google on a computer (Google doesn’t allow its sign-in inside apps). It then works here too."); return Promise.resolve(false); }
   if (!googleOn()) { toast("Google Calendar isn’t set up yet. Ask your admin."); return Promise.resolve(false); }
   if (!G.ready) { loadGoogle(); toast("Getting Google ready… click again in a moment."); return Promise.resolve(false); }
   return new Promise(resolve => {
@@ -6691,7 +6724,7 @@ async function openTaskByNumber(n){
   if (!t) { toast("TC-" + n + " isn’t available to you."); return; }
   closeDlg(); openRecord("tasks", t.id);
 }
-const openDeps = t => (t.blocked_by || []).map(id => byId("tasks", id)).filter(x => x && x.status !== "Done");
+const openDeps = t => (t.blocked_by || []).map(id => byId("tasks", id)).filter(x => x && x.status !== "Done" && !x.archived);   // (2026-11dy) an archived blocker no longer blocks
 const checklistProgress = t => { const c = Array.isArray(t.checklist) ? t.checklist : []; return c.length ? c.filter(x => x.done).length + "/" + c.length : ""; };
 function branchName(t){
   const slug = String(t.title || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
@@ -6892,7 +6925,8 @@ function linkedNotesSection(field, rec){
       : h("p", { class: "nothing" }, "No notes linked yet."));
 }
 async function duplicateTask(rec){
-  const skip = ["id","number","created_at","updated_at","completed_at","created_by"];
+  // (2026-11dy) a copy starts clean: no QA result, tester, archive state, test case or board position of the original
+  const skip = ["id","number","created_at","updated_at","completed_at","created_by","qa_state","reopen_count","tester_id","reviewer_id","archived","archived_at","archived_by","test_case_id","board_rank","mentions","blocked_reason"];
   const d = {};
   for (const [k, v] of Object.entries(rec)) if (!skip.includes(k)) d[k] = v;
   d.title = "Copy of " + rec.title; d.status = "To do"; d.blocked = false;
@@ -8161,6 +8195,16 @@ let nbMenuEl = null, nbMenuSel = 0, nbSubEl = null;
 const nbMenuOpen = () => !!(nbMenuEl && nbMenuEl.isConnected);
 function closeNbSub(){ if (nbSubEl) { nbSubEl.remove(); nbSubEl = null; } if (nbMenuEl) nbMenuEl.querySelectorAll(".has-sub.open").forEach(b => b.classList.remove("open")); }
 function closeNbMenu(){ closeNbSub(); if (nbMenuEl) { nbMenuEl.remove(); nbMenuEl = null; } }
+// (2026-11dy) the Android app's Back button asks the page first: close the top-most thing that's open, the app's way
+window.tcAppBack = () => {
+  try {
+    if (nbMenuEl) { closeNbMenu(); return true; }
+    const np = document.getElementById("npanel"); if (np && !np.hidden) { np.hidden = true; return true; }
+    const sd = document.querySelector(".side.open"); if (sd) { sd.classList.remove("open"); return true; }
+    const d = dlg(); if (d && d.open) { closeDlg(); return true; }
+  } catch (e) {}
+  return false;
+};
 function nbMenuItems(items, close){
   return items.map(([label, fn, opt], k) => {
     const sub = opt && opt.sub;
@@ -8926,7 +8970,7 @@ async function setDealOutcome(rec, what){
   let d;
   if (what === "Lost"){ const why = prompt("Why was it lost? (e.g. price, timing, went with another vendor)"); if (why === null) return; d = { stage: "Lost", lost_reason: why.trim(), closed_at: new Date().toISOString() }; }
   else if (what === "Won") d = { stage: "Won", probability: 100, closed_at: new Date().toISOString() };
-  else { const to = prompt("Reopen to which stage? " + DEAL_STAGES.filter(s => !["Won","Lost"].includes(s)).join(", "), "Negotiation"); if (to === null) return; const st = DEAL_STAGES.find(s => s.toLowerCase() === to.trim().toLowerCase()) || "Negotiation"; d = { stage: st, closed_at: null }; }
+  else { const to = prompt("Reopen to which stage? " + DEAL_STAGES.filter(s => !["Won","Lost"].includes(s)).join(", "), "Negotiation"); if (to === null) return; const st = DEAL_STAGES.find(s => s.toLowerCase() === to.trim().toLowerCase() && !["Won","Lost"].includes(s)); if (!st) { toast("Pick one of: " + DEAL_STAGES.filter(s => !["Won","Lost"].includes(s)).join(", ")); return; } d = { stage: st, closed_at: null, lost_reason: "", probability: null }; }   // (2026-11dy) the old outcome doesn't stay behind
   try { const saved = await updateRow("deals", rec.id, d); MOD.deals.after(saved, rec); toast(what === "reopen" ? "Reopened." : "Marked " + what.toLowerCase() + "."); closeDlg(); rerender(); }
   catch (e) { fail(e, "Couldn’t update"); }
 }
@@ -9742,14 +9786,38 @@ const IN_IOS_APP = () => !!(window.TcipherApp && window.TcipherApp.platform === 
 const NATIVE_KEY = () => "tc_native_push_" + (S.me ? S.me.id : "");
 const nativeEp = () => { try { return localStorage.getItem(NATIVE_KEY()) || ""; } catch (e) { return ""; } };
 const pushSupported = () => IN_IOS_APP() || ("serviceWorker" in navigator && "PushManager" in window && "Notification" in window && window.isSecureContext);
-const notifPerm = () => IN_IOS_APP() ? (nativeEp() ? "granted" : "default") : (window.Notification ? Notification.permission : "denied");
+// (2026-11dy) the Android app (1.6+) says whether Android's own notification switch for it is still on
+const appNotifsOff = () => { try { return !!(window.TcipherAndroid && window.TcipherAndroid.notificationsEnabled && !window.TcipherAndroid.notificationsEnabled()); } catch (e) { return false; } };
+const notifPerm = () => IN_IOS_APP() ? (appNotifsOff() ? "denied" : nativeEp() ? "granted" : "default") : (window.Notification ? Notification.permission : "denied");
+const IN_ANDROID_APP = () => !!(window.TcipherApp && window.TcipherApp.platform === "android" && window.TcipherAndroid);
 // asks the iPhone app for its Apple device token (it asks the person first, the first time)
+// (2026-11dy) every caller waiting for the app's answer gets it: a second ask used to replace the first one's answer slot
+const nativeWaiters = [];
+window.tcNativePushToken = (token, kind, err) => { const ws = nativeWaiters.splice(0); for (const w of ws) { clearTimeout(w.t); err ? w.reject(new Error(err)) : w.resolve({ token, kind }); } };
 function nativeToken(){
   return new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error("The app didn’t answer. Close and reopen it, then try again.")), 30000);
-    window.tcNativePushToken = (token, kind, err) => { clearTimeout(t); err ? reject(new Error(err)) : resolve({ token, kind }); };
-    try { if (window.TcipherAndroid) window.TcipherAndroid.registerPush(); else window.webkit.messageHandlers.tcApp.postMessage({ type: "registerPush" }); } catch (e) { clearTimeout(t); reject(e); }
+    const w = { resolve, reject, t: setTimeout(() => { const i = nativeWaiters.indexOf(w); if (i >= 0) nativeWaiters.splice(i, 1); reject(new Error("The app didn’t answer. Close and reopen it, then try again.")); }, 30000) };
+    nativeWaiters.push(w);
+    if (nativeWaiters.length > 1) return;   // already asked: this one waits for the same answer
+    try { if (window.TcipherAndroid) window.TcipherAndroid.registerPush(); else window.webkit.messageHandlers.tcApp.postMessage({ type: "registerPush" }); } catch (e) { nativeWaiters.splice(0).forEach(x => { clearTimeout(x.t); x.reject(e); }); }
   });
+}
+// (2026-11dy) Firebase replaced this phone's token (the app tells the page): register the new one, so notifications keep arriving
+window.tcNativeTokenChanged = async (token) => {
+  if (!S.me || !nativeEp() || !token) return;
+  try { const ep = ok(await sb.rpc("claim_native_push", { p_token: token, p_kind: "fcm", p_device: MY_DEVICE })); localStorage.setItem(NATIVE_KEY(), ep); } catch (e) { console.warn("token change", e); }
+};
+// (2026-11dy) someone else used this phone before and their session ended without signing out here: stop their notifications
+async function releaseOtherNativePush(){
+  if (!S.me) return;
+  try {
+    for (const k of Object.keys(localStorage)) {
+      if (!k.startsWith("tc_native_push_") || k === NATIVE_KEY()) continue;
+      const ep = localStorage.getItem(k);
+      if (ep) { const r = await sb.rpc("release_push_endpoint", { p_endpoint: ep }); if (r.error && !/release_push_endpoint|function/i.test(r.error.message || "")) continue; }
+      localStorage.removeItem(k);
+    }
+  } catch (e) { console.warn("release push", e); }
 }
 async function nativeRegister(){
   const { token, kind } = await nativeToken();
@@ -9792,6 +9860,7 @@ async function disablePush(){
 }
 // on every start: a device that already allowed notifications keeps its registration current (and belongs to whoever is signed in)
 async function pushOnStart(){
+  if (IN_IOS_APP()) releaseOtherNativePush();
   if (IN_IOS_APP()) { if (S.me && nativeEp()) nativeRegister().catch(e => console.warn("push start", e)); return; }   // already allowed: no question asked again
   if (!pushSupported() || Notification.permission !== "granted" || !S.me) return;
   try { const reg = await swReady(); let sub = await reg.pushManager.getSubscription();
@@ -10322,9 +10391,27 @@ async function renderChat(el){
     sending = true; sendBtn.disabled = true;
     // the box empties straight away (so it can't be sent twice); if sending fails, the text comes back
     const cidAtSend = C.active; ta.value = ""; C.drafts[cidAtSend] = "";
+    // (2026-11dy) files being sent are locked: no second send picks them up, and they can't be removed mid-send
+    for (const u of ready) u.state = "sending";
+    drawUploads();
+    const replying = (C.replyTo || {})[C.active];
+    let m;
     try {
-      const replying = (C.replyTo || {})[C.active];
-      const m = ok(await sb.from("chat_messages").insert(Object.assign({ channel_id: C.active, body, mentions, author_id: S.me.id }, ready.length ? { attachments: ready.map(u => ({ id: u.file.id })) } : {}, replying ? { reply_to: replying.id } : {})).select().single());
+      m = ok(await sb.from("chat_messages").insert(Object.assign({ channel_id: cidAtSend, body, mentions, author_id: S.me.id }, ready.length ? { attachments: ready.map(u => ({ id: u.file.id })) } : {}, replying ? { reply_to: replying.id } : {})).select().single());
+    } catch (e) {
+      fail(e, "Not sent");
+      // (2026-11dy) the text always comes back to that conversation's draft, even if you opened another chat meanwhile
+      // or the composer was redrawn; it goes into the box on screen only if that's the same conversation and empty
+      if (!C.drafts[cidAtSend]) C.drafts[cidAtSend] = body;
+      const box = chatEls && chatEls.ta;
+      if (C.active === cidAtSend && box && !box.value.trim()) box.value = body;
+      for (const u of ready) if (u.state === "sending") u.state = "ready";
+      drawUploads();
+      sending = false; sendBtn.disabled = false; chatEls_markText(); if (box) box.focus();
+      return;
+    }
+    // saved: nothing below can turn it into "Not sent" (that made people send it twice)
+    try {
       if (replying) { delete C.replyTo[m.channel_id]; drawReplyBar(); }
       if (ready.length) { C.uploads[m.channel_id] = ups.filter(u => !ready.includes(u)); drawUploads(); }
       // filed under the conversation it was sent in, even if another chat was opened while it was sending
@@ -10332,18 +10419,15 @@ async function renderChat(el){
       // (2026-11cu) the live update can deliver this message before the save finishes: add it only once
       { const lst = (C.msgs[cid] = C.msgs[cid] || []); if (!lst.some(x => x.id === m.id)) lst.push(m); }
       C.last[cid] = m; C.reads[cid] = m.id;
-      C.seen = C.seen || new Set(); C.seen.add(m.id); if (m.id > (C.maxId || 0)) C.maxId = m.id;
+      C.seen = C.seen || new Set(); C.seen.add(m.id);
       // the database sends the live signal for this message to everyone in the conversation
       sb.from("chat_reads").upsert({ user_id: S.me.id, channel_id: cid, last_read_id: m.id }, { onConflict: "user_id,channel_id" }).then(() => {}, () => {});
-      const tagged = mentions.filter(x => x !== S.me.id && (ch.kind === "channel" || (ch.members || []).includes(x)));
       // notifications for this message are created by the database (no double notifications)
       if (C.active === cid) drawChatMessages(true); drawChatList();
-    } catch (e) {
-      fail(e, "Not sent");
-      if (C.active === cidAtSend && !ta.value.trim()) { ta.value = body; C.drafts[cidAtSend] = body; }
-    }
+    } catch (e) { console.warn("after send", e); }
     sending = false; sendBtn.disabled = false; chatEls_markText(); ta.focus();
   }
+  if (chatEls) chatEls.sendFn = send;   // (2026-11dy) the voice note's auto-send uses the composer on screen, not an old one
   drawChatList(); drawChatHead(); drawChatMessages(true);
   keepChatView();
   fitChat(); requestAnimationFrame(fitChat);
@@ -10542,6 +10626,10 @@ function drawChatMessages(toBottom){
       if (!was) row.classList.add("sel");
     });
     msgs.append(row); lastAuthor = m.author_id; lastT = t;
+    if (C.editing && C.editing.id === m.id && C.editing.cid === m.channel_id) {
+      // the old edit box just left the page, so focus fell back to the page itself: give it back only in that case
+      const ae = document.activeElement; editMessage(m, bubble, C.editing.text, !!(ae && ae !== document.body));
+    }
   });
   // opening a chat at a message found by search: centre it (and keep it there through the redraws right after opening)
   const jumpTo = C.pendingJump || (C.jumpHold && C.jumpHold.cid === C.active && C.jumpHold.until > Date.now() ? C.jumpHold.mid : null);
@@ -10585,17 +10673,22 @@ function drawJump(){
   if (!away) chatEls.jumpNew = false;
   chatEls.jump.textContent = chatEls.jumpNew ? "↓ New message" : "↓ Jump to latest";
 }
-function editMessage(m, bodyEl){
-  const ta = h("textarea", { class: "in", rows: 2, maxlength: "4000" }); ta.value = m.body;
+function editMessage(m, bodyEl, text, noFocus){
+  // (2026-11dy) the edit is remembered (C.editing), so a new message or a read receipt redrawing the list reopens it
+  // with what you typed, instead of throwing it away
+  C.editing = { id: m.id, cid: m.channel_id, text: text != null ? text : m.body };
+  const ta = h("textarea", { class: "in", rows: 2, maxlength: "4000" }); ta.value = C.editing.text;
+  ta.addEventListener("input", () => { if (C.editing && C.editing.id === m.id) C.editing.text = ta.value; });
+  const end = () => { C.editing = null; drawChatMessages(); };
   const save = async () => {
-    const v = ta.value.trim(); if (!v || v === m.body) { drawChatMessages(); return; }
-    try { const r = ok(await sb.from("chat_messages").update({ body: v, mentions: mentionIds(v, { channel: C.channels.find(c => c.id === m.channel_id) }) }).eq("id", m.id).select().single()); Object.assign(m, r); drawChatMessages(); }
+    const v = ta.value.trim(); if (!v || v === m.body) { end(); return; }
+    try { const r = ok(await sb.from("chat_messages").update({ body: v, mentions: mentionIds(v, { channel: C.channels.find(c => c.id === m.channel_id) }) }).eq("id", m.id).select().single()); Object.assign(m, r); end(); }
     catch (e) { fail(e, "Not saved"); }
   };
   let saving = false; const saveOnce = async () => { if (saving) return; saving = true; try { await save(); } finally { saving = false; } };
-  ta.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveOnce(); } if (e.key === "Escape") { e.preventDefault(); drawChatMessages(); } });
-  bodyEl.replaceChildren(ta, h("div", { style: "display:flex;gap:6px;margin-top:4px" }, h("button", { type: "button", class: "btn sm pri", onclick: save }, "Save"), h("button", { type: "button", class: "btn sm ghost", onclick: () => drawChatMessages() }, "Cancel")));
-  ta.focus();
+  ta.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveOnce(); } if (e.key === "Escape") { e.preventDefault(); end(); } });
+  bodyEl.replaceChildren(ta, h("div", { style: "display:flex;gap:6px;margin-top:4px" }, h("button", { type: "button", class: "btn sm pri", onclick: saveOnce }, "Save"), h("button", { type: "button", class: "btn sm ghost", onclick: end }, "Cancel")));
+  if (!noFocus) ta.focus();
 }
 
 /* ---------- on Home: unread conversations ---------- */
@@ -10626,12 +10719,15 @@ async function chatPoll(){
   const now = Date.now(), every = live ? 60000 : window.__mock ? (S.route === "chat" ? 2000 : 10000) : (S.route === "chat" ? 10000 : 30000);
   if (now - lastChatPoll < every - 200) return;
   lastChatPoll = now;
-  if (!C.maxId) C.maxId = Math.max(0, ...Object.values(C.last).filter(Boolean).map(x => x.id), ...Object.values(C.msgs).flat().map(x => x.id));
+  // (2026-11dy) the backup check keeps its own bookmark: only what it has itself fetched moves it on. A message that
+  // arrived live in another chat used to move the shared one past a message this check hadn't seen yet, which then
+  // never showed up until a reload. Messages already shown are skipped by chatOnChange (C.seen).
+  if (!C.pollMaxId) C.pollMaxId = Math.max(0, ...Object.values(C.last).filter(Boolean).map(x => x.id), ...Object.values(C.msgs).flat().map(x => x.id));
   try {
-    const rs = ok(await sb.from("chat_messages").select("*").gt("id", C.maxId || 0).order("id", { ascending: true }).limit(100)) || [];
+    const rs = ok(await sb.from("chat_messages").select("*").gt("id", C.pollMaxId || 0).order("id", { ascending: true }).limit(100)) || [];
     if (rs.length) chatLog("backup check found " + rs.length + " new message" + (rs.length === 1 ? "" : "s"));
     for (const m of rs) chatOnChange({ table: "chat_messages", eventType: "INSERT", new: m });
-    if (rs.length) C.maxId = Math.max(C.maxId, ...rs.map(x => x.id));
+    if (rs.length) { C.pollMaxId = Math.max(C.pollMaxId, ...rs.map(x => x.id)); C.maxId = Math.max(C.maxId || 0, C.pollMaxId); }
   } catch (e) { /* the next check tries again */ }
 }
 function startChatPolling(){
@@ -10661,15 +10757,18 @@ const typingAt = {}; let typingSentAt = 0;
 C.othersRead = C.othersRead || {};
 // sign the live connection in as this person, so private channels and access rules apply
 async function liveAuth(){ try { if (sb.realtime && sb.realtime.setAuth) await sb.realtime.setAuth(); } catch (e) { console.warn("live auth", e); } }
-let liveSubs = {}, userCh = null, liveRetry = 0, liveRetryT = null, liveStopping = false, liveReported = false, chatDownSince = 0;
+let liveSubs = {}, userCh = null, liveRetry = 0, liveRetryT = null, liveStopping = false, liveReported = false, chatDownSince = 0, liveGen = 0;
 async function startChatLive(){
+  // (2026-11dy) only the newest start counts: two starts overlapping (wake + retry) used to leave an extra connection open
+  const gen = ++liveGen;
   stopChatLive();
   await liveAuth();
-  if (!S.me) return;
+  if (!S.me || gen !== liveGen) return;
   try {
-    userCh = sb.channel("user:" + S.me.id, { config: { private: true } });
-    userCh.on("broadcast", { event: "notif" }, ({ payload }) => onLiveNotif(payload));
-    userCh.subscribe((st, err) => { S.userLive = st; if (st === "SUBSCRIBED") { chatDownSince = 0; liveRetry = 0; } drawLiveStatus(); liveTrouble(st, err); });
+    const mine = sb.channel("user:" + S.me.id, { config: { private: true } });
+    userCh = mine;
+    mine.on("broadcast", { event: "notif" }, ({ payload }) => onLiveNotif(payload));
+    mine.subscribe((st, err) => { if (userCh !== mine) return; S.userLive = st; if (st === "SUBSCRIBED") { chatDownSince = 0; liveRetry = 0; } drawLiveStatus(); liveTrouble(st, err); });
   } catch (e) { console.warn("user live", e); }
   syncChatSubs();
 }
@@ -10688,7 +10787,8 @@ function syncChatSubs(){
       ch.on("broadcast", { event: "mute" }, ({ payload }) => { if (payload && S.me && payload.uid === S.me.id) applyMute(payload.cid, !!payload.on); });   // (2026-11de) muted on another device
       liveSubs[id] = { ch, st: "" };
       ch.subscribe((st, err) => {
-        if (liveSubs[id]) liveSubs[id].st = st;
+        if (!liveSubs[id] || liveSubs[id].ch !== ch) return;   // (2026-11dy) a late signal from a connection already replaced
+        liveSubs[id].st = st;
         if (st === "SUBSCRIBED") { liveRetry = 0; if (id === C.active) { lastChatPoll = 0; chatPoll(); } }   // catch up on anything sent while connecting
         if (st === "SUBSCRIBED" && subRetry[id]) subRetry[id].n = 0;
         if (st === "SUBSCRIBED") chatDownSince = 0;
@@ -10716,7 +10816,7 @@ function liveTrouble(st, err, id){
   if (!liveReported && now - chatDownSince >= 10 * 60000) { liveReported = true; captureError("Instant chat has been down for several minutes: " + st + (err && err.message ? " (" + err.message + ")" : ""), "", { realtime: st }); }
   if (id) { retryChatSub(id); return; }
   // try again with growing pauses; the 2-second backup check keeps messages coming meanwhile
-  if (S.me && !liveStopping && !liveRetryT) { const wait = Math.min(30000, 3000 * Math.pow(2, liveRetry++)); liveRetryT = setTimeout(() => { liveRetryT = null; if (S.me) startChatLive(); }, wait); }
+  if (S.me && !liveRetryT) { const wait = Math.min(30000, 3000 * Math.pow(2, liveRetry++)); liveRetryT = setTimeout(() => { liveRetryT = null; if (S.me && !liveConnected()) startChatLive(); }, wait); }
 }
 function stopChatLive(){
   liveStopping = true; clearTimeout(liveRetryT); liveRetryT = null;
@@ -10733,7 +10833,7 @@ function drawLiveStatus(){
   const on = liveConnected();
   el.className = "live-dot" + (on ? " on" : "");
   el.textContent = on ? "Live" : "Connecting…";
-  el.title = on ? "Messages arrive instantly." : "Connecting to instant updates. Messages still arrive every 2 seconds meanwhile.";
+  el.title = on ? "Messages arrive instantly." : "Connecting to instant updates. Messages still arrive within a few seconds meanwhile.";
 }
 const notifSeen = new Set();
 async function onLiveNotif(p){
@@ -10942,7 +11042,7 @@ function addChatFiles(files){
     if (!f || !f.size) { toast("“" + (f && f.name || "That file") + "” is empty."); continue; }
     if (f.size > CHAT_MAX) { toast("“" + f.name + "” is " + chatSize(f.size) + ". Files can be up to 100 MB."); continue; }
     if (list.length >= 10) { toast("Up to 10 files per message."); break; }
-    const u = { key: Math.random().toString(36).slice(2), name: f.name || "file", size: f.size, mime: f.type || "application/octet-stream", progress: 0, state: "uploading", cid };
+    const u = { key: Math.random().toString(36).slice(2), name: f.name || "file", size: f.size, mime: f.type || "application/octet-stream", progress: 0, state: "uploading", cid, src: f };
     list.push(u); uploadChatFile(u, f);
   }
   drawUploads();
@@ -10961,6 +11061,7 @@ async function uploadDirect(tbl, entity, file, onProgress, keep, isCancelled){
 async function uploadChatFile(u, file){
   try {
     const f = await uploadDirect("chat", u.cid, file, p => { u.progress = p; drawUploads(true); }, x => { u.xhr = x; }, () => u.state === "cancelled");
+    if (f && u.state === "cancelled") { filesFn("delete", "&id=" + encodeURIComponent(f.id)).catch(() => {}); return; }   // (2026-11dy) cancelled while it was being registered: no orphan file
     if (!f || u.state === "cancelled") return;
     u.file = f; u.state = "ready"; u.progress = 1;
   } catch (e) {
@@ -10993,15 +11094,16 @@ function drawUploads(progressOnly){
     h("span", { class: "upx" }, h("b", {}, u.name), h("span", { class: "muted" }, " · " + chatSize(u.size)),
       u.state === "uploading" ? h("span", { class: "upbar" }, h("span", { style: "width:" + Math.round(u.progress * 100) + "%" })) : null,
       u.state === "error" ? h("span", { class: "err", style: "display:block;font-size:12px" }, u.error) : null),
-    u.state === "uploading" ? h("span", { class: "uppc muted" }, Math.round(u.progress * 100) + "%") : u.state === "ready" ? h("span", { class: "pill ok" }, "Ready") : null,
-    h("button", { type: "button", class: "upclose", title: u.state === "uploading" ? "Cancel" : "Remove", "aria-label": "Remove " + u.name, onclick: () => cancelUpload(u) }, ic("x", 14)))));
+    u.state === "uploading" ? h("span", { class: "uppc muted" }, Math.round(u.progress * 100) + "%") : u.state === "ready" ? h("span", { class: "pill ok" }, "Ready") : u.state === "sending" ? h("span", { class: "muted" }, "Sending…") : null,
+    u.state === "sending" ? null : h("button", { type: "button", class: "upclose", title: u.state === "uploading" ? "Cancel" : "Remove", "aria-label": "Remove " + u.name, onclick: () => cancelUpload(u) }, ic("x", 14)))));
   try { chatEls_markText(); } catch (e) {}
   if (chatEls.ta) chatEls.ta.placeholder = window.matchMedia("(max-width:760px)").matches ? (list.some(u => u.state === "ready") ? "Add a message (optional)" : "Message") : list.some(u => u.state === "ready") ? "Add a message (optional), then press Enter to send" : "Write a message… type @ to tag someone. Enter to send, Shift + Enter for a new line.";
 }
 function cancelUpload(u){
+  if (u.state === "sending") return;   // (2026-11dy) already going out with a message
   const wasReady = u.state === "ready";
   u.state = "cancelled"; try { if (u.xhr) u.xhr.abort(); } catch (e) {}
-  const list = (C.uploads || {})[u.cid] || []; list.splice(list.indexOf(u), 1);
+  const list = (C.uploads || {})[u.cid] || []; const i = list.indexOf(u); if (i >= 0) list.splice(i, 1);
   // a finished but unsent file is removed again
   if (wasReady && u.file) filesFn("delete", "&id=" + encodeURIComponent(u.file.id)).catch(() => {});
   drawUploads();
@@ -11060,6 +11162,12 @@ const tabPage = (title, body) => '<!doctype html><html><head><meta charset="utf-
   + '.box{background:#fff;border:1px solid #E4E4F2;border-radius:12px;padding:28px;text-align:center}</style></head><body>' + body + '</body></html>';
 const escHtml = t => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 async function openFileInTab(getUrl, a){
+  // (2026-11dy) the Android app has one window: a "new tab" replaced the workspace itself. Save the file instead.
+  if (IN_ANDROID_APP()) {
+    try { const url = await getUrl(); if (!/^https:\/\//i.test(String(url || ""))) throw new Error("The file link isn’t a secure web address."); await saveFetched(url, a.name, a.mime); }
+    catch (e) { fail(e, "Couldn’t open the file"); }
+    return;
+  }
   const tab = window.open("", "_blank");
   if (tab) try { tab.opener = null; } catch (e) {}
   const write = html => { try { tab.document.open(); tab.document.write(html); tab.document.close(); } catch (e) {} };
@@ -11223,7 +11331,7 @@ function voicePlayer0(a){
       catch (e) { au.src = url; }
       await new Promise(res => { if (au.readyState >= 1) return res(); au.addEventListener("loadedmetadata", res, { once: true }); au.addEventListener("error", res, { once: true }); au.load(); });
       if (!isFinite(au.duration)) {   // Chrome's recordings: ask for the end once to learn the length
-        await new Promise(res => { const done = () => { au.removeEventListener("timeupdate", done); au.currentTime = 0; res(); }; au.addEventListener("timeupdate", done); au.currentTime = 1e7; setTimeout(done, 1500); });
+        await new Promise(res => { let fired = false; const done = () => { if (fired) return; fired = true; au.removeEventListener("timeupdate", done); au.currentTime = 0; res(); }; au.addEventListener("timeupdate", done); au.currentTime = 1e7; setTimeout(done, 1500); });
       }
       if (isFinite(au.duration) && au.duration > 0) total = au.duration;
     } catch (e) {
@@ -11529,7 +11637,8 @@ async function startMeetNow(){
   }
   meetBusy = true; toast("Creating a Google Meet…");
   // open the tab now (browsers block tabs opened later), and send it to the Meet once the link is ready
-  const tab = window.open("about:blank", "_blank");
+  // (2026-11dy) not in the Android app: its one window would go blank. There the link opens the Meet app at the end.
+  const tab = IN_ANDROID_APP() ? null : window.open("about:blank", "_blank");
   if (tab) try { tab.opener = null; } catch (e) {}   // the new tab can't steer this one
   try {
     const now = new Date(), hhmm = String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0");
@@ -11630,19 +11739,22 @@ function voiceType(){
 }
 function voiceNoteButton(getSend){
   const btn = h("button", { type: "button", class: "btn ghost chat-attach chat-mic", id: "chatMic", title: "Record a voice note", "aria-label": "Record a voice note" }, ic("mic", 18));
-  let rec = null, stream = null, chunks = [], started = 0, timer = null, bar = null, cancelled = false;
+  let rec = null, stream = null, chunks = [], started = 0, timer = null, bar = null, cancelled = false, busy = false;   // busy: starting or recording
   const fmt = s => Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0");
-  const stopAll = () => { clearInterval(timer); timer = null; if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; if (bar) bar.remove(); bar = null; btn.hidden = false; };
-  const finish = () => { if (rec && rec.state !== "inactive") rec.stop(); };
+  const stopAll = () => { clearInterval(timer); timer = null; if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; if (bar) bar.remove(); bar = null; btn.hidden = false; busy = false; const live = document.getElementById("chatMic"); if (live) live.hidden = false; };
+  const finish = () => { if (rec && rec.state !== "inactive") rec.stop(); else stopAll(); };
   btn.addEventListener("click", async () => {
+    if (busy) return;   // (2026-11dy) one recording at a time: a second tap during the permission prompt used to open a second microphone
     const vt = voiceType();
     if (!vt || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { toast("This browser can’t record voice notes. Try Chrome, Edge or Safari."); return; }
     if (!C.active) return;
     if (typeof chatFilesReady === "function" && !chatFilesReady()) return;   // it explains what's missing (Google Drive)
+    busy = true; btn.hidden = true;
     try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-    catch (e) { toast(e && e.name === "NotAllowedError" ? (typeof IN_IOS_APP === "function" && IN_IOS_APP() ? "Microphone blocked. Allow it in your phone’s Settings › Apps › Tcipher Workspace › Permissions, then try again." : "Microphone blocked. Allow the microphone for this site, then try again.") : "No microphone found."); return; }
+    catch (e) { busy = false; btn.hidden = false; toast(e && e.name === "NotAllowedError" ? (typeof IN_IOS_APP === "function" && IN_IOS_APP() ? "Microphone blocked. Allow it in your phone’s Settings › Apps › Tcipher Workspace › Permissions, then try again." : "Microphone blocked. Allow the microphone for this site, then try again.") : "No microphone found."); return; }
     const cid = C.active; chunks = []; cancelled = false;
-    rec = new MediaRecorder(stream, { mimeType: vt.type });
+    try { rec = new MediaRecorder(stream, { mimeType: vt.type }); } catch (e) { stopAll(); toast("Couldn’t start recording: " + friendly(e)); return; }
+    rec.onerror = () => { cancelled = true; stopAll(); toast("Recording stopped because of a microphone error."); };
     rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
     rec.onstop = () => {
       const secs = (Date.now() - started) / 1000; stopAll();
@@ -11654,12 +11766,13 @@ function voiceNoteButton(getSend){
       // send it as soon as it's uploaded
       const t0 = Date.now();
       const wait = setInterval(() => {
-        const ups = (C.uploads && C.uploads[cid]) || [], mine = ups.find(u => u.name === file.name);
-        if (!mine || mine.state === "error" || mine.state === "cancelled" || Date.now() - t0 > 120000 || C.active !== cid) { clearInterval(wait); return; }
-        if (ups.every(u => u.state !== "uploading")) { clearInterval(wait); const s = getSend(); if (s) s.click(); }
+        const ups = (C.uploads && C.uploads[cid]) || [], mine = ups.find(u => u.src === file);   // (2026-11dy) this very file, not one with the same name
+        if (!mine || mine.state === "error" || mine.state === "cancelled" || mine.state === "sending" || Date.now() - t0 > 120000 || C.active !== cid) { clearInterval(wait); return; }
+        if (ups.every(u => u.state !== "uploading")) { clearInterval(wait); const s = chatEls && chatEls.sendFn; if (s) s(); else { const b = getSend(); if (b) b.click(); } }
       }, 300);
     };
-    rec.start(250); started = Date.now();
+    try { rec.start(250); } catch (e) { stopAll(); toast("Couldn’t start recording: " + friendly(e)); return; }
+    started = Date.now();
     btn.hidden = true;
     const clock = h("span", { class: "vrec-time" }, "0:00");
     bar = h("div", { class: "vrec", role: "status" }, h("span", { class: "vrec-dot", "aria-hidden": "true" }), h("span", {}, "Recording "), clock,
@@ -11668,7 +11781,9 @@ function voiceNoteButton(getSend){
     btn.after(bar);
     timer = setInterval(() => {
       // left Chat or switched conversation: stop recording instead of sending it later on its own
-      if (!bar || !bar.isConnected || C.active !== cid) { cancelled = true; finish(); toast("Voice note discarded: you left the conversation."); return; }
+      if (!bar || S.route !== "chat" || C.active !== cid) { cancelled = true; finish(); toast("Voice note discarded: you left the conversation."); return; }
+      // (2026-11dy) the composer was redrawn in the same conversation: move the recording bar onto the new one instead of discarding it
+      if (!bar.isConnected) { const nb = document.getElementById("chatMic"); if (nb) { nb.hidden = true; nb.after(bar); } else { cancelled = true; finish(); return; } }
       const s = (Date.now() - started) / 1000; clock.textContent = fmt(s); if (s >= VOICE_MAX_S) { toast("Voice notes can be up to 5 minutes."); finish(); } }, 250);
   });
   return btn;
@@ -11801,6 +11916,7 @@ function needsWarning(){
   const st = ustatus(S.me.id) || {}, me = typeof myToday === "function" ? myToday() : null;
   if (st.checked_out_at && new Date(st.checked_out_at).toDateString() === new Date().toDateString()) return;
   if (me && me.check_out) return;
+  if (me && (me.status === "Absent" || (me.marked_by && !me.check_in))) return;   // (2026-11dy) an admin marked today: no check-in prompt
   if (["lunch", "ooo"].includes(st.state) && st.until && new Date(st.until) > Date.now()) return;
   // after lunch, inactivity counts from when it ended
   const lunchEnd = st.state === "lunch" && st.until ? +new Date(st.until) : 0;
@@ -12006,7 +12122,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11dx";
+const APP_VERSION = "2026-11dy";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -13371,7 +13487,7 @@ function drawDevTask(id){
   if (A.canDelete) items.push(h("button", { type: "button", class: "dv-menuitem", id: "devDelete", style: "color:var(--bad)", onclick: async () => {
     if (!confirm("Delete this task? This can’t be undone.")) return;
     try { await deleteRow("tasks", t.id); S.devOpen = null; closeDlg(); toast("Deleted."); rerender(); } catch (e) { fail(e, "Couldn’t delete"); } } }, "Delete"));
-  if (devCanEdit(t, "archived")) items.unshift(h("button", { type: "button", class: "dv-menuitem", onclick: () => devSave(t, { archived: !t.archived }, t.archived ? "Restored." : "Archived.") }, t.archived ? "Restore" : "Archive"));
+  if (devCanEdit(t, "archived")) items.unshift(h("button", { type: "button", class: "dv-menuitem", onclick: () => devSave(t, t.archived ? { archived: false, archived_at: null, archived_by: null } : { archived: true, archived_at: new Date().toISOString(), archived_by: S.me.id }, t.archived ? "Restored." : "Archived.") }, t.archived ? "Restore" : "Archive"));
   if (dh) {
     // the same menu as notes: icons, and choices that open to the side
     const PRI = ["Critical", "High", "Medium", "Low"];
@@ -13381,7 +13497,7 @@ function drawDevTask(id){
       [h("span", {}, ic("share", 16), "Copy link"), () => copyText(location.origin + location.pathname + "#open/tasks/" + t.id, "Link copied")],
       [h("span", {}, ic("sparkle", 16), "Summarize"), () => taskSummary(t)],
       devCanEdit(t, "title") ? [h("span", {}, ic("languages", 16), "Convert to English"), () => taskEnglish(t)] : null,
-      devCanEdit(t, "archived") ? [h("span", {}, ic("archive2", 16), t.archived ? "Restore" : "Archive"), () => devSave(t, { archived: !t.archived }, t.archived ? "Restored." : "Archived.")] : null,
+      devCanEdit(t, "archived") ? [h("span", {}, ic("archive2", 16), t.archived ? "Restore" : "Archive"), () => devSave(t, t.archived ? { archived: false, archived_at: null, archived_by: null } : { archived: true, archived_at: new Date().toISOString(), archived_by: S.me.id }, t.archived ? "Restored." : "Archived.")] : null,
       A.canDelete ? [h("span", {}, ic("trash", 16), "Delete"), async () => {
         if (!confirm("Delete this task? This can’t be undone.")) return;
         try { await deleteRow("tasks", t.id); S.devOpen = null; closeDlg(); toast("Deleted."); rerender(); } catch (e) { fail(e, "Couldn’t delete"); } }, { danger: true }] : null
@@ -14409,7 +14525,7 @@ function drawNotifications(){
   for (const n of S.notifications){
     list.append(h("button", { type: "button", class: "nitem" + (n.is_read ? "" : " unread"), onclick: async () => {
       p.hidden = true;
-      if (!n.is_read) { try { await sb.from("notifications").update({ is_read: true }).eq("id", n.id); n.is_read = true; renderShell(); } catch (e) {} }
+      if (!n.is_read) { try { const { error } = await sb.from("notifications").update({ is_read: true }).eq("id", n.id); if (!error) { n.is_read = true; renderShell(); } } catch (e) {} }
       if (n.tbl === "connect-google") { if (googleConnected() && (canEmail() || !/email/i.test(n.title || ""))) toast("Google is already connected."); else connectGoogle(); return; }
       if (n.tbl === "team-day") { S.ui.day = { day: localDay(n.created_at || new Date()), user: n.entity_id || "" }; go("admin-day"); return; }
       if (n.tbl === "profiles") { if (n.entity_id === S.me.id) openMyProfile(); else if (isAdmin()) { await ensure(["profiles", "roles"]); openUserEditor(n.entity_id); } else openPerson(n.entity_id); return; }   // (2026-11cy) email change requests
@@ -14418,7 +14534,7 @@ function drawNotifications(){
   }
   p.replaceChildren(h("div", { class: "nh" }, h("b", {}, "Notifications"),
     h("button", { type: "button", class: "btn sm ghost", onclick: async () => {
-      try { await sb.from("notifications").update({ is_read: true }).eq("user_id", S.me.id).eq("is_read", false); S.notifications.forEach(n => n.is_read = true); drawNotifications(); renderShell(); } catch (e) { fail(e); }
+      try { ok(await sb.from("notifications").update({ is_read: true }).eq("user_id", S.me.id).eq("is_read", false)); S.notifications.forEach(n => n.is_read = true); drawNotifications(); renderShell(); } catch (e) { fail(e); }
     } }, "Mark all read")), list);
 }
 
@@ -14710,7 +14826,7 @@ async function pLink(path){
 }
 function pFileTile(f){
   const isImg = /^image\/(png|jpe?g|gif|webp)$/.test(f.mime || "");
-  const tile = h("button", { type: "button", class: "pt-file" + (isImg ? " img" : ""), title: f.name, onclick: async () => { try { window.open(await pLink(f.path), "_blank", "noopener"); } catch (e) { toast(pErr(e)); } } },
+  const tile = h("button", { type: "button", class: "pt-file" + (isImg ? " img" : ""), title: f.name, onclick: async () => { try { if (IN_ANDROID_APP()) { await saveFetched(await pLink(f.path), f.name, f.mime); return; } window.open(await pLink(f.path), "_blank", "noopener"); } catch (e) { toast(pErr(e)); } } },
     isImg ? h("span", { class: "pt-thumb" }) : h("span", { class: "pt-file-ic" }, ic(/^video\//.test(f.mime || "") ? "film" : "file", 18)),
     h("span", { class: "pt-file-name" }, f.name), h("span", { class: "muted" }, fmtSize(f.size || 0) + (f.by ? " · " + (f.from_team ? "Tcipher" : f.by) : "")));
   if (isImg) pLink(f.path).then(u => { tile.querySelector(".pt-thumb").style.backgroundImage = "url(\"" + u.replace(/"/g, "%22") + "\")"; }, () => {});
@@ -15072,7 +15188,7 @@ function liveWake(){
   if (liveDownSince) liveDownSince = Date.now();   // time spent hidden or asleep doesn't count as an outage
   if (chatDownSince) chatDownSince = Date.now(); liveRetry = 0;
   if (S.live !== "SUBSCRIBED") { clearTimeout(wsRetryT); wsRetryT = null; wsRetry = 0; startLive(); }
-  if (typeof startChatLive === "function") startChatLive();
+  if (typeof startChatLive === "function" && !liveConnected()) startChatLive();   // (2026-11dy) still connected: nothing to rebuild
 }
 window.addEventListener("online", liveWake);
 // (2026-11cy) a computer that slept with the page on screen gives no "visible again" signal (Safari): notice the gap in time instead
