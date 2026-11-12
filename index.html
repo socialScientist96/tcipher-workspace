@@ -639,6 +639,7 @@ select.in.sm{padding:4px 6px;font-size:13px;min-width:120px}
 .pcard b{display:block;font-size:15px}
 .pcard small{color:var(--ink2)}
 .pcard .c{font-size:13px;color:var(--ink2);overflow-wrap:anywhere}
+.pcard,.pcard .top > div{min-width:0} .pcard b,.pcard small{overflow-wrap:anywhere}   /* long names / emails wrap instead of stretching the card (BU-029) */
 
 /* calendar */
 .cal{background:var(--white);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
@@ -2231,12 +2232,12 @@ dialog:has(.ai-imp) {width:min(1100px,calc(100vw - 24px))}
 @media (min-width:761px){ .chat-send .ic{display:none} .chat-send .bl{margin-left:0} }
 @media (max-width:760px){
   .chat-foot{flex-wrap:nowrap;align-items:flex-end;gap:6px;padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px))}
-  .chat-foot textarea{order:0;flex:1 1 auto;min-width:0;min-height:42px;max-height:132px;padding:10px 14px;border-radius:21px;font-size:16px;line-height:1.35;overflow-y:auto}
-  .chat-foot .chat-attach{flex:none;width:42px;height:42px;min-height:42px;padding:0;justify-content:center;border-radius:50%}
+  .chat-foot textarea{order:0;flex:1 1 auto;min-width:0;min-height:44px;max-height:132px;padding:11px 14px;border-radius:22px;font-size:16px;line-height:1.35;overflow-y:auto}
+  .chat-foot .chat-attach{flex:none;width:44px;height:44px;min-height:44px;padding:0;justify-content:center;border-radius:50%}
   .chat-foot .chat-attach[title="Emoji"]{display:none}     /* the phone keyboard has emoji */
   .chat-foot > .chat-attach:not(.chat-mic){order:0} .chat-foot textarea{order:1} .chat-foot .chat-mic{order:2} .chat-foot .chat-send{order:3}
   .chat-foot textarea.in{width:auto;box-sizing:border-box}
-  .chat-foot .chat-send{flex:none;width:42px;height:42px;min-height:42px;padding:0;border-radius:50%;justify-content:center;margin-left:0}
+  .chat-foot .chat-send{flex:none;width:44px;height:44px;min-height:44px;padding:0;border-radius:50%;justify-content:center;margin-left:0}
   .chat-foot .chat-send .bl{display:none}
   .chat-foot:not(.has-text) .chat-send{display:none}
   .chat-foot.has-text .chat-mic{display:none}
@@ -2343,6 +2344,10 @@ html:has(#content .chat),html:has(#content .chat) body{overscroll-behavior-y:non
   .tablewrap > table:not(.tcal) > tbody > tr > td::before{content:attr(data-label);flex:none;max-width:45%;color:var(--ink3);font-size:var(--fs-sm);text-align:left}
   .tablewrap > table:not(.tcal) > tbody > tr > td:first-child{justify-content:flex-start;text-align:left;font-size:var(--fs-lg);font-weight:600;padding:0 0 6px}
   .tablewrap > table:not(.tcal) > tbody > tr > td:first-child::before{display:none}
+  /* title cell with a sub-line (name + description, name + email): the sub-line goes underneath instead of squeezing
+     the title to a few letters per line (BU-031) */
+  .tablewrap > table:not(.tcal) > tbody > tr > td:first-child{flex-wrap:wrap;row-gap:2px;column-gap:8px}
+  .tablewrap > table:not(.tcal) > tbody > tr > td:first-child > :is(div,p){flex:1 1 100%}
   .tablewrap > table:not(.tcal) > tbody > tr > td:not([data-label])::before{display:none}
   .tablewrap > table:not(.tcal) > tbody > tr > td.m-empty{display:none}
   .tablewrap > table:not(.tcal) > tbody > tr > td > *{max-width:100%}
@@ -2392,6 +2397,59 @@ html:has(#content .chat),html:has(#content .chat) body{overscroll-behavior-y:non
 
 /* Broken UI repairs (phase 3) */
 @media (max-width:760px){
+  /* list rows (Home panels, people, notes…): the title wraps instead of being cut off with its status tag (BU-018) */
+  .row{align-items:flex-start}
+  .row .x{white-space:normal;overflow:visible;overflow-wrap:anywhere}
+  .row .x .pill{white-space:nowrap;margin-top:2px}
+  /* the detail on the right of a row (time, "overdue by 2 days") wraps rather than being pushed off-screen (BU-019) */
+  .row{flex-wrap:wrap}
+  .row .y{white-space:normal;flex:0 1 auto;max-width:100%;overflow-wrap:anywhere}
+  .row .y > *{white-space:normal}
+  /* attendance: "Join morning scrum · 10:00 am" and Check in/out wrap inside the card at any text size (BU-020) */
+  .att{flex-wrap:wrap;min-width:0;max-width:100%}
+  .att .btn{white-space:normal;max-width:100%;height:auto;min-height:44px;text-align:center}
+  /* option lists with descriptions (Admin › Task rules) wrap inside their box (BU-021) */
+  .multi label{flex-wrap:wrap;min-width:0}
+  .multi label .muted{white-space:normal;min-width:0}
+  /* tap targets (BU-013): 44 px where it doesn't change the look; invisible tap rings where it would */
+  .btn.sm{min-height:44px}
+  .note-more,.nb-cropbtn,.vp-speed{min-height:44px;min-width:44px}
+  .nb-mbox .nb-cropbtn{white-space:nowrap;flex:none;align-self:center;width:max-content}   /* a small picture no longer squeezes "Crop" to one letter per line (BU-032) */
+  .nb-handle,.nb-add{position:relative}
+  .nb-handle::after,.nb-add::after{content:"";position:absolute;inset:-10px -6px}
+  /* task window owners: chips and "+ Add owner" wrap inside the window; ✕ gets a 44 px tap ring (BU-022) */
+  .dv-owners{display:flex;flex-wrap:wrap;gap:8px;min-width:0;max-width:100%}
+  .dv-addowner{max-width:100%;min-width:0;height:44px;min-height:44px}
+  .dv-ownerchip{max-width:100%;min-width:0;padding:4px 4px 4px 4px}
+  .dv-ownerchip .iconbtn{width:30px;height:30px;position:relative}
+  .dv-ownerchip .iconbtn::after{content:"";position:absolute;inset:-7px}
+  /* side menu: search field and expand arrows are full-size targets (BU-023) */
+  .side-search-in{min-height:44px}
+  .nav-exp{min-width:44px;min-height:44px}
+  .nav-tree-tog{position:relative}
+  .nav-tree-tog::after{content:"";position:absolute;inset:-6px}
+  /* chat with the keyboard up: a phone conversation keeps its full width (the call button was cut off) (BU-024) */
+  body.kb-open #content .chat.m-conv{left:0;right:0;border-radius:0}
+  /* header buttons keep their size; the name shortens instead (BU-025) */
+  .chat-head .chat-acts .btn,.chat-head .m-back{flex:none}
+  /* voice notes fit a 320 px bubble: the decorative mic icon goes, tighter gaps, download keeps a 44 px tap ring (BU-026) */
+  .cvoice.vp{gap:6px;padding:6px}
+  .cvoice-ic{display:none}
+  .vp .vp-dl{min-width:32px;width:32px;padding:0;position:relative;flex:none}
+  .vp .vp-dl::after{content:"";position:absolute;inset:-6px}
+  /* chat header: the Meet button keeps its size too; back arrow 40 px + tap ring; button labels stay readable by
+     screen readers (they were display:none, so "Email" had no name at all) (BU-027) */
+  /* long words / URLs / file names (BU-030): break-word only wraps after the layout is sized, so one long word still
+     stretches its card; "anywhere" lets the card shrink too. Short fixed labels keep whole words. */
+  .content,dialog,.npanel{overflow-wrap:anywhere}
+  :is(.content,dialog,.npanel) :is(.pill,.btn,.iconbtn,.linkbtn,.link,.chip,.seg,.av,.tkey,.kbd,.bl){overflow-wrap:normal}
+  .note-wrap,.note-card,.hello > div,.ny-h > *{min-width:0}
+  .chat-head .chat-meet{flex:none;width:40px}
+  .chat-head .chat-acts .btn,.chat-head .chat-meet{height:40px;min-height:40px;position:relative}
+  .chat-head .chat-acts .btn::after,.chat-head .chat-meet::after{content:"";position:absolute;inset:-2px}
+  .chat-head .m-back{width:40px;height:40px;position:relative}
+  .chat-head .m-back::after{content:"";position:absolute;inset:-4px}
+  .chat-head .btn .bl{display:inline !important;position:absolute !important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
   /* tasks "Load…" rows: one column on phones, nothing runs off the screen (BU-004) */
   .load-row{grid-template-columns:minmax(0,1fr);gap:2px;width:100%;margin:0}
   .load-row > *,.load-row span{min-width:0;white-space:normal;overflow-wrap:anywhere}
@@ -13260,7 +13318,7 @@ async function rerender(){
     else page.append(h("div", { class: "panel empty" }, h("b", {}, "Page not found"), h("a", { href: "#dashboard" }, "Go to the dashboard")));
   } catch (e) {
     console.error(e);
-    page.replaceChildren(h("div", { class: "panel empty" }, h("b", {}, "Something went wrong showing this page"), friendly(e)));
+    page.replaceChildren(h("div", { class: "panel empty" }, h("b", {}, "Something went wrong showing this page"), h("div", {}, friendly(e)), h("button", { type: "button", class: "btn", style: "margin-top:12px", onclick: () => rerender() }, "Try again")));   // a way out on a bad connection (BU-028)
   }
   if (seq !== renderSeq) { if (page._chatEls) page._chatEls.pending = false; if (route === "chat" && typeof visibleChat === "function") visibleChat(); return; }   // a newer draft won: follow the one on screen
   clearTimeout(loadingT);
