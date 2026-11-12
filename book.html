@@ -191,7 +191,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{
   function detailsForm(){
     const L = st.data.lead || {};
     const f = (id, label, type, val, opts) => el("label", { class: (opts && opts.full) ? "full" : null, for: id }, label,
-      type === "textarea" ? el("textarea", { id, name: id, rows: "3", placeholder: (opts && opts.ph) || null }) : el("input", { id, name: id, type, value: val || "", required: opts && opts.req, autocomplete: (opts && opts.ac) || null }));
+      type === "textarea" ? el("textarea", { id, name: id, rows: "3", placeholder: (opts && opts.ph) || null }) : el("input", { id, name: id, type, value: val || "", required: opts && opts.req, autocomplete: (opts && opts.ac) || null, inputmode: (opts && opts.im) || null, placeholder: (opts && opts.ph) || null }));
     const err = el("p", { class: "err", hidden: true, role: "alert" });
     const btn = el("button", { type: "submit", class: "btn" }, "Book " + t12(st.time));
     const form = el("form", { novalidate: true, onsubmit: async e => {
@@ -200,9 +200,12 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{
       const show = (msg, focusId) => { err.textContent = msg; err.hidden = false; if (focusId) form.querySelector("#" + focusId).focus(); };
       if (v("f-name").trim().length < 2) return show("Please enter your name", "f-name");
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v("f-email").trim())) return show("Please enter a valid email address. The invite goes there.", "f-email");
+      const others = v("f-guests").split(/[\s,;]+/).map(x => x.trim()).filter(Boolean);
+      if (others.some(x => !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(x))) return show("One of the other people’s emails doesn’t look right", "f-guests");
+      if (others.length > 5) return show("You can add up to 5 other people", "f-guests");
       st.sending = true; btn.disabled = true; btn.textContent = "Booking…"; err.hidden = true;
       try {
-        const r = await call({ action: "book", lead, day: st.day, time: st.time, name: v("f-name"), email: v("f-email"), phone: v("f-phone"), company: v("f-company"), note: v("f-note"), website: v("f-website"), whatsapp: !!(form.querySelector("#f-wa") || {}).checked });
+        const r = await call({ action: "book", lead, day: st.day, time: st.time, name: v("f-name"), email: v("f-email"), phone: v("f-phone"), company: v("f-company"), guests: v("f-guests"), note: v("f-note"), website: v("f-website"), whatsapp: !!(form.querySelector("#f-wa") || {}).checked });
         done(r, v("f-email").trim());
       } catch (ex) {
         st.sending = false;
@@ -217,6 +220,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{
       f("f-email", "Email for the invite", "email", L.email, { req: true, ac: "email" }),
       f("f-phone", "Phone or WhatsApp (optional)", "tel", L.phone, { ac: "tel" }),
       f("f-company", "Company (optional)", "text", L.company, { ac: "organization" }),
+      f("f-guests", "Others to invite (optional)", "text", "", { full: true, im: "email", ph: "Colleagues’ emails, separated by commas" }),
       f("f-note", "What would you like to see? (optional)", "textarea", "", { full: true, ph: "For example, an ordering app for our 3 restaurants" }),
       el("label", { class: "full check", for: "f-wa" }, el("input", { id: "f-wa", type: "checkbox" }), "You can message me on WhatsApp about this demo, at the number above"),
       el("div", { class: "hp", "aria-hidden": "true" }, el("label", { for: "f-website" }, "Website", el("input", { id: "f-website", name: "website", type: "text", tabindex: "-1", autocomplete: "off" }))),
@@ -227,7 +231,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{
     app.replaceChildren(el("div", { class: "done" },
       el("div", { class: "picked" }, leaf(r.day), el("div", { class: "when" }, el("b", { text: range(r.time, r.minutes) + " IST" }), el("span", { text: fmt(r.day, { weekday: "long", day: "numeric", month: "long" }) + (r.with ? " · with " + r.with : "") }))),
       el("h2", { text: "You’re booked" }),
-      el("p", { class: "ok" }, icon('<path d="M20 6 9 17l-5-5"/>'), r.invited ? "Google Calendar invite sent to " + email : "Booked. We’ll email the meeting link to " + email),
+      el("p", { class: "ok" }, icon('<path d="M20 6 9 17l-5-5"/>'), r.invited ? "Google Calendar invite sent to " + email + (r.others ? " and " + r.others + (r.others === 1 ? " other person" : " others") : "") : "Booked. We’ll email the meeting link to " + email),
       r.link ? el("p", {}, el("a", { href: r.link, target: "_blank", rel: "noopener" }, "Open the meeting link")) : null,
       el("p", { text: "Need another time? Reply to the invite and we’ll move it." })));
     app.scrollIntoView({ behavior: "smooth", block: "start" });

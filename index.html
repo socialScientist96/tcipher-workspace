@@ -995,6 +995,11 @@ button.is-busy{opacity:.6;cursor:progress;pointer-events:none}
 .demo-slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:6px;margin-top:4px}
 .demo-slots .btn{flex-direction:column;align-items:flex-start;gap:0;line-height:1.25}
 .demo-slots .btn small{font-size:11.5px;opacity:.7;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.demo-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.demo-chips:empty{display:none}
+.demo-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 4px 2px 10px;border-radius:999px;background:var(--p-soft,#F1EFFE);color:var(--ink);font-size:13px}
+.demo-chip button{border:0;background:none;color:var(--ink3,#777);font-size:16px;line-height:1;width:22px;height:22px;border-radius:50%;cursor:pointer}
+.demo-chip button:hover{background:rgba(0,0,0,.06)}
 .demo-team{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px 14px;margin:6px 0 12px}
 .meet-files{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 /* Today in sales (2026-11dn) */
@@ -8603,7 +8608,7 @@ const DEMO = () => {
   const s = S.settings || {};
   return { team: Array.isArray(s.demo_team) ? s.demo_team : null, len: Math.max(15, +s.demo_minutes || 45),
     buffer: s.demo_buffer_min != null && s.demo_buffer_min !== "" ? Math.max(0, +s.demo_buffer_min) : 15,
-    ahead: Math.min(30, Math.max(3, +s.demo_days_ahead || 10)) };
+    ahead: Math.min(30, Math.max(3, +s.demo_days_ahead || 10)), parallel: s.demo_parallel === true };
 };
 const hhmm = n => String(Math.floor(n / 60)).padStart(2, "0") + ":" + String(n % 60).padStart(2, "0");
 const minsOfDay = d => d.getHours() * 60 + d.getMinutes();
@@ -8616,7 +8621,9 @@ async function demoSlots(){
   for (const m of av.meetings || []) for (let d = t0; d <= to; d = addDays(d, 1)) {
     if (!occursOn(m, d)) continue;
     const a = hm(m.start_time);
-    for (const u of m.attendees || []) add(u, d, a, a + (+m.duration_min || 30));
+    // (2026-11dv) one demo at a time: a booked demo blocks its time for the whole demo team
+    const who = m.kind === "Sales demo" && !D.parallel && (m.attendees || []).length ? team : (m.attendees || []);
+    for (const u of who) add(u, d, a, a + (+m.duration_min || 30));
   }
   for (const e of av.events || []) {
     if (!e.starts_at) continue;
@@ -8687,15 +8694,31 @@ async function bookDemo(table, rec){
     const who = st.who || lighter(s.free, day);
     const guest = h("input", { class: "in", type: "email", value: rec.email || (lead && lead.email) || "", placeholder: "Lead’s email, for the invite" });
     const agenda = h("textarea", { class: "in", rows: 3, placeholder: "What they want to see (optional)" });
+    // (2026-11dv) more people from the team, and other outside guests
+    const extraIds = new Set();
+    const staff = rows("profiles").filter(p => p.is_active && !p.client_id && p.id !== who && p.id !== S.me.id).sort((a, b) => String(a.full_name).localeCompare(String(b.full_name)));
+    const chips = h("div", { class: "demo-chips" });
+    const pick = h("select", { class: "in" });
+    const drawChips = () => {
+      chips.replaceChildren(...[...extraIds].map(id => h("span", { class: "demo-chip" }, pname(id),
+        h("button", { type: "button", "aria-label": "Remove " + pname(id), onclick: () => { extraIds.delete(id); drawChips(); } }, "×"))));
+      pick.replaceChildren(h("option", { value: "" }, "Add someone from the team…"), ...staff.filter(p => !extraIds.has(p.id)).map(p => h("option", { value: p.id }, p.full_name + (p.vertical ? " · " + p.vertical : ""))));
+      pick.value = "";
+    };
+    pick.onchange = () => { if (pick.value) { extraIds.add(pick.value); drawChips(); } };
+    drawChips();
+    const others = h("input", { class: "in", type: "text", inputmode: "email", placeholder: "Emails, separated by commas" });
     const err = h("p", { class: "err", hidden: true });
     const go2 = h("button", { type: "button", class: "btn pri" }, "Book demo");
     go2.onclick = async () => {
       const email = guest.value.trim().toLowerCase();
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err.textContent = "That email doesn’t look right."; err.hidden = false; return; }
+      const more = [...new Set(others.value.toLowerCase().split(/[\s,;]+/).map(x => x.trim()).filter(Boolean))];
+      if (more.some(x => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x))) { err.textContent = "One of the other guests’ emails doesn’t look right."; err.hidden = false; return; }
       go2.disabled = true; go2.textContent = "Booking…";
       const m = { title: "Demo: " + (who0 || "lead") + (company ? " (" + company + ")" : ""), kind: "Sales demo", repeat: "Does not repeat",
-        meeting_date: day, start_time: hhmm(s.start), duration_min: D.len, attendees: [...new Set([who, S.me.id])],
-        lead_id: leadId, guest_emails: email ? [email] : [], agenda: agenda.value.trim() };
+        meeting_date: day, start_time: hhmm(s.start), duration_min: D.len, attendees: [...new Set([who, S.me.id, ...extraIds])],
+        lead_id: leadId, guest_emails: [...new Set([email, ...more].filter(Boolean))], agenda: agenda.value.trim() };
       let saved;
       try { saved = await insertRow("meetings", m); }
       catch (e) { go2.disabled = false; go2.textContent = "Book demo"; err.textContent = /lead_id|guest_emails/.test(String(e && e.message)) ? "Demo booking needs a database update first (upgrade-2026-11do.sql). Ask your admin." : friendly(e); err.hidden = false; return; }
@@ -8703,6 +8726,7 @@ async function bookDemo(table, rec){
       if (googleOn() && googleConnected()) { try { await syncMeetingToGoogle(saved); invited = true; } catch (e) { inviteErr = friendly(e); } }
       const when = fmtDate(day) + ", " + fmtTimeOfDay(m.start_time);
       notify([who], "Demo booked with you", m.title + " · " + when + (who !== S.me.id ? " · booked by " + first(S.me.id) : ""), "meetings", saved.id);
+      if (extraIds.size) notify([...extraIds], "Added to a demo", m.title + " · " + when + " · with " + (pname(who) || ""), "meetings", saved.id);
       if (lead && lead.pipeline === "Instagram" && IG_STAGES.indexOf(lead.status) < IG_STAGES.indexOf("Demo booked")) { try { await updateRow("leads", lead.id, { status: "Demo booked" }); } catch (e) { /* their role may not edit leads */ } }
       if (lvl(MOD.activities.area) >= 2) {
         const a = { kind: "Demo", direction: "Outbound", activity_date: today(), owner_id: S.me.id, subject: "Demo booked for " + when + " with " + (pname(who) || "the team") };
@@ -8718,7 +8742,10 @@ async function bookDemo(table, rec){
     body.replaceChildren(
       h("div", { class: "panel", style: "margin:0 0 12px" }, h("b", {}, fmtDate(day) + ", " + fmtTimeOfDay(hhmm(s.start)) + "–" + fmtTimeOfDay(hhmm(s.start + D.len))),
         h("div", { class: "muted", style: "font-size:13px;margin-top:2px" }, "Taken by " + (pname(who) || "") + (st.who ? "" : s.free.length > 1 ? " (lighter day; " + s.free.filter(x => x !== who).map(first).join(", ") + " also free)" : ""))),
-      h("div", { class: "form" }, h("label", { class: "fl full" }, "Send the invite to", guest), h("label", { class: "fl full" }, "Agenda", agenda)),
+      h("div", { class: "form" }, h("label", { class: "fl full" }, "Send the invite to", guest),
+        h("label", { class: "fl full" }, "Also from the team (optional)", pick, chips),
+        h("label", { class: "fl full" }, "Other outside guests (optional)", others),
+        h("label", { class: "fl full" }, "Agenda", agenda)),
       googleOn() && googleConnected() ? h("p", { class: "muted", style: "font-size:12.5px" }, "A Google Calendar invite with a Meet link goes to the lead and to " + first(who) + " from your Google account.")
         : h("p", { class: "muted", style: "font-size:12.5px" }, "Your Google isn’t connected, so no invite or Meet link will be sent. ", h("button", { type: "button", class: "linkbtn", onclick: () => connectGoogle() }, "Connect Google"), " first to send it."),
       err,
@@ -8789,6 +8816,7 @@ function demoTeamPanel(){
   const len = num(D.len, 15, 180), buf = num(D.buffer, 0, 60), ahead = num(D.ahead, 3, 30);
   // (2026-11dq) the public booking page
   const pub = h("input", { type: "checkbox", checked: !!S.settings.demo_public });
+  const par = h("input", { type: "checkbox", checked: !!S.settings.demo_parallel });
   const notice = num(S.settings.demo_notice_hours != null && S.settings.demo_notice_hours !== "" ? S.settings.demo_notice_hours : 3, 0, 72);
   const err = h("p", { class: "err", hidden: true });
   const save = h("button", { type: "button", class: "btn pri" }, "Save demo team");
@@ -8796,13 +8824,14 @@ function demoTeamPanel(){
     err.hidden = true;
     if (!chosen.size) { err.textContent = "Pick at least one person."; err.hidden = false; return; }
     const data = { ...(await latestSettings()), demo_team: [...chosen], demo_minutes: +len.value || 45, demo_buffer_min: Math.max(0, +buf.value || 0), demo_days_ahead: +ahead.value || 10,
-      demo_public: pub.checked, demo_notice_hours: Math.max(0, +notice.value || 0) };
+      demo_public: pub.checked, demo_notice_hours: Math.max(0, +notice.value || 0), demo_parallel: par.checked };
     try { ok(await sb.from("settings").upsert({ id: 1, data, updated_at: new Date().toISOString() })); S.settings = data; toast("Demo team saved."); rerender(); } catch (e) { fail(e, "Not saved"); }
   };
   return h("div", { class: "panel", style: "margin-bottom:14px" }, h("h2", {}, "Demo team"),
     h("p", { class: "muted", style: "margin:0 0 6px;font-size:13px" }, D.team ? "These people take demo calls. “Book demo” on a lead shows the times when any of them is free." : "Not saved yet. Tick who takes demo calls and save; “Book demo” on a lead then shows the times when any of them is free."),
     boxes,
     h("div", { class: "form" }, h("label", { class: "fl" }, "Demo length (minutes)", len), h("label", { class: "fl" }, "Keep free before and after (minutes)", buf), h("label", { class: "fl" }, "Show free times for the next (days)", ahead)),
+    h("label", { class: "chk", style: "margin-top:10px" }, par, "Two demos can run at the same time (with different people). Off: a booked demo blocks that time for the whole team"),
     h("h3", { class: "ct-h", style: "margin-top:16px" }, "Online booking"),
     h("label", { class: "chk" }, pub, "Let leads book a demo themselves on the booking page"),
     h("div", { class: "form", style: "margin-top:6px" }, h("label", { class: "fl" }, "Earliest booking (hours from now)", notice)),
@@ -11940,7 +11969,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11du";
+const APP_VERSION = "2026-11dv";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));

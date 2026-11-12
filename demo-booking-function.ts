@@ -1,4 +1,4 @@
-// Supabase Edge Function: demo-booking (2026-11dr; one database call since 2026-11ds)
+// Supabase Edge Function: demo-booking (2026-11dr; one database call since 2026-11ds; one demo at a time and guests since 2026-11dv)
 // The public demo booking page (internal.tcipher.com/book.html) asks this small function for free times and books
 // one. It is kept separate from google-sync so the page opens quickly: no client library, a few database reads.
 // Only times are shown, never names or events. When booking, the time is checked again, the demo goes to whoever on
@@ -65,7 +65,7 @@ function occursOn(m: Any, d: string, wd: number[], hol: string[]) {
 /* ---------------- free times ---------------- */
 function configFrom(st: Any, people: Any[]) {
   return {
-    on: st.demo_public === true, team: people.filter((p) => p.is_active).map((p) => p.id) as string[], people,
+    on: st.demo_public === true, parallel: st.demo_parallel === true, team: people.filter((p) => p.is_active).map((p) => p.id) as string[], people,
     len: Math.max(15, +st.demo_minutes || 45), buffer: st.demo_buffer_min != null && st.demo_buffer_min !== "" ? Math.max(0, +st.demo_buffer_min) : 15,
     ahead: Math.min(30, Math.max(3, +st.demo_days_ahead || 10)), notice: Math.max(0, st.demo_notice_hours != null && st.demo_notice_hours !== "" ? +st.demo_notice_hours : 3),
     start: hmMin(st.work_start || "10:00"), end: hmMin(st.work_end || "18:00"), wd: (st.working_days || [1, 2, 3, 4, 5, 6]) as number[],
@@ -87,7 +87,7 @@ async function gather(lead?: string) {
   const C = configFrom(st, people);
   const team = C.team.length ? q(inList(C.team)) : "";
   const [ms, evs, lv, links, leads] = await Promise.all([
-    rest("meetings?select=meeting_date,start_time,duration_min,repeat,repeat_days,attendees&start_time=not.is.null&meeting_date=lte." + to),
+    rest("meetings?select=kind,meeting_date,start_time,duration_min,repeat,repeat_days,attendees&start_time=not.is.null&meeting_date=lte." + to),
     team ? rest("calendar_events?select=user_id,starts_at,ends_at&all_day=eq.false&start_date=lte." + to + "&end_date=gte." + t0 + "&user_id=in." + team) : Promise.resolve([]),
     team ? rest("leave_requests?select=user_id,start_date,end_date,type&status=eq.Approved&start_date=lte." + to + "&end_date=gte." + t0 + "&user_id=in." + team) : Promise.resolve([]),
     team ? rest("google_links?select=user_id&user_id=in." + team) : Promise.resolve([]),
@@ -102,8 +102,10 @@ function freeTimes(C: Any, ms: Any[], evs: Any[], lv: Any[]) {
   for (const m of ms) {
     const rep = m.repeat && m.repeat !== "Does not repeat";
     if (!rep && (m.meeting_date < t0 || m.meeting_date > to)) continue;
-    const who = (m.attendees || []).length ? (m.attendees as string[]).filter((a) => team.includes(a)) : team;
+    let who = (m.attendees || []).length ? (m.attendees as string[]).filter((a) => team.includes(a)) : team;
     if (!who.length) continue;
+    // (2026-11dv) one demo at a time: a booked demo blocks its time for the whole demo team
+    if (m.kind === "Sales demo" && !C.parallel) who = team;
     for (let d = rep ? t0 : m.meeting_date; d <= to; d = addDays(d, 1)) {
       if (occursOn(m, d, C.wd, C.hol)) { const a = hmMin(m.start_time); for (const u of who) add(u, d, a, a + (+m.duration_min || 30)); }
       if (!rep) break;
@@ -144,6 +146,10 @@ async function book(body: Any, ip: string) {
   const clean = (v: unknown, n: number) => String(v ?? "").replace(/[\u0000-\u001f]+/g, " ").trim().slice(0, n);
   const name = clean(body.name, 80), email = clean(body.email, 120).toLowerCase(), phone = clean(body.phone, 24), company = clean(body.company, 100), note = clean(body.note, 600);
   const day = clean(body.day, 10), time = clean(body.time, 5), waOk = body.whatsapp === true;
+  // (2026-11dv) colleagues the lead wants on the call (up to 5 emails)
+  const extra = [...new Set(String(body.guests ?? "").toLowerCase().split(/[\s,;]+/).map((x) => x.trim()).filter(Boolean))];
+  if (extra.some((e) => !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e))) throw new Error("One of the other people’s emails doesn’t look right.");
+  if (extra.length > 5) throw new Error("You can add up to 5 other people.");
   if (clean(body.website, 200)) return { ok: true, day, time };   // hidden field only robots fill in
   if (name.length < 2) throw new Error("Please enter your name.");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new Error("Please enter a valid email address.");
@@ -179,7 +185,7 @@ async function book(body: Any, ip: string) {
   }
   const title = "Demo: " + (lead.name || name) + ((lead.company || company) ? " (" + (lead.company || company) + ")" : "");
   const meeting = (await rest("meetings", { method: "POST", body: JSON.stringify({ title, kind: "Sales demo", repeat: "Does not repeat", meeting_date: day, start_time: time, duration_min: C.len,
-    attendees: [who], created_by: who, lead_id: lead.id, guest_emails: [email],
+    attendees: [who], created_by: who, lead_id: lead.id, guest_emails: [...new Set([email, ...extra])],
     agenda: [note ? "From " + (lead.name || name) + ": " + note : "", "Booked by the lead on the booking page."].filter(Boolean).join("\n\n") }) }))[0];
   // the Google invite + Meet link, from the person's own calendar (google-sync holds the Google access)
   let invited = false, link = "";
@@ -200,7 +206,7 @@ async function book(body: Any, ip: string) {
       subject: "Booked a demo for " + when + " on the booking page", outcome: note }) }),
     rest("booking_log", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ip, email, ok: true }) }),
   ]);
-  return { ok: true, day, time, minutes: C.len, with: whoName.split(" ")[0], invited, link };
+  return { ok: true, day, time, minutes: C.len, with: whoName.split(" ")[0], invited, link, others: extra.filter((e) => e !== email).length };
 }
 
 Deno.serve(async (req) => {
