@@ -10091,9 +10091,9 @@ function startPresence(){
     });
     presenceCh.subscribe(st => { if (st === "SUBSCRIBED") { try { presenceCh.track({ at: Date.now(), device: MY_DEVICE }); } catch (e) {} } });
   } catch (e) { console.warn("presence", e); }
+  startUsage();
   heartbeat();
   presenceTimer = setInterval(heartbeat, 60000);
-  startUsage();
 }
 /* ---------- time in the workspace (2026-11cn, upgrade-2026-11cf.sql) ----------
    Every browser checks in twice a minute while the workspace is on screen, saying which device it is and whether the
@@ -10118,18 +10118,104 @@ async function usagePing(){
     if (r.error && /usage_ping|function|schema cache/i.test(r.error.message || "")) USAGE.off = true;   // not set up yet: stop asking
   } catch (e) {}
 }
+/* (2026-11ec, upgrade-2026-11ec.sql) saved like WhatsApp: the browser counts the minutes itself (on screen, active or not)
+   and sends them in one go when the workspace opens or comes back, when it's left, and every 5 minutes while it stays open.
+   "Last seen" and "last active" go with them. Each minute is also kept in this browser until it's sent, so a crash or a
+   closed laptop loses nothing: the next time the workspace opens it sends what was left. Until that SQL is run, the
+   twice-a-minute check-in above carries on. */
+const UT = { mins: new Map(), tab: Math.random().toString(36).slice(2, 10), v3: null, v3At: 0, flushAt: 0, hiddenAt: 0, uid: "", token: "", busy: false };
+const UT_KEY = "tc-up-", UT_EVERY = 5 * 60000;
+const utMinute = () => Math.floor(Date.now() / 60000);
+function utStore(){
+  try {
+    if (UT.mins.size) localStorage.setItem(UT_KEY + UT.tab, JSON.stringify({ u: UT.uid, d: MY_DEVICE, at: Date.now(), m: [...UT.mins] }));
+    else localStorage.removeItem(UT_KEY + UT.tab);
+  } catch (e) {}
+}
+// minutes left behind by a tab that crashed or was closed before it could send them (any tab quiet for 2 minutes)
+function utAdopt(){
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith(UT_KEY) || k === UT_KEY + UT.tab) continue;
+      let v = null; try { v = JSON.parse(localStorage.getItem(k)); } catch (e) {}
+      if (!v || Date.now() - (+v.at || 0) > 3 * 864e5) { localStorage.removeItem(k); continue; }
+      if (v.u !== UT.uid || v.d !== MY_DEVICE || Date.now() - v.at < 120000) continue;
+      for (const [m, a] of v.m || []) UT.mins.set(+m, Math.max(UT.mins.get(+m) || 0, a ? 1 : 0));
+      localStorage.removeItem(k);
+    }
+  } catch (e) {}
+}
+function utTick(){
+  if (USAGE.off || !S.me || S.portal) return;
+  if (UT.v3 === false && Date.now() - UT.v3At < 600000) { usagePing(); return; }   // SQL not run yet: the older check-in
+  if (document.visibilityState === "hidden") return;
+  const m = utMinute(), a = Date.now() - USAGE.last < 120000 ? 1 : 0;
+  UT.mins.set(m, Math.max(UT.mins.get(m) || 0, a));
+  utStore();
+  if (Date.now() - UT.flushAt >= UT_EVERY) utFlush();
+}
+async function utFlush(leave){
+  if (USAGE.off || !UT.uid || UT.busy) return;
+  if (UT.v3 === false && Date.now() - UT.v3At < 600000) return;
+  const now = utMinute(), sent = [...UT.mins].filter(([m]) => m > now - 2880);
+  const body = { p_device: MY_DEVICE, p_session: USAGE_ID, p_minutes: sent,
+    p_last: new Date(Math.min(Date.now(), typeof lastInput === "number" ? lastInput : USAGE.last)).toISOString() };
+  UT.flushAt = Date.now();
+  if (leave) {
+    // the page may be closing: a request the browser finishes on its own. What it carried stays saved here until the next
+    // send confirms it (sending a minute twice changes nothing).
+    if (!UT.token) return;
+    try { fetch(SUPABASE_URL + "/rest/v1/rpc/usage_flush", { method: "POST", keepalive: true, body: JSON.stringify(body),
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + UT.token, "Content-Type": "application/json" } }).catch(() => {}); } catch (e) {}
+    return;
+  }
+  UT.busy = true;
+  try {
+    const r = await sb.rpc("usage_flush", body);
+    if (!r.error) {
+      UT.v3 = true;
+      for (const [m, a] of sent) if (m < now && UT.mins.get(m) === a) UT.mins.delete(m);   // the current minute stays: it may still turn active
+      for (const m of [...UT.mins.keys()]) if (m <= now - 2880) UT.mins.delete(m);
+      utStore();
+    } else if (/usage_flush|function|schema cache/i.test(r.error.message || "")) { UT.v3 = false; UT.v3At = Date.now(); usagePing(); }
+  } catch (e) {} finally { UT.busy = false; }
+}
+function utVisible(){
+  if (!UT.uid) return;
+  if (document.visibilityState === "hidden") {
+    UT.hiddenAt = Date.now();
+    if (Date.now() - UT.flushAt > 60000) utFlush(true);   // switching back and forth quickly doesn't send each time
+  } else {
+    utTick();
+    if (Date.now() - UT.hiddenAt > 120000 && Date.now() - UT.flushAt > 60000) utFlush();   // back after a while: "last seen" now
+  }
+}
+addEventListener("pagehide", () => { if (UT.uid && Date.now() - UT.flushAt > 2000) utFlush(true); });
 function startUsage(){
   if (USAGE.timer) clearInterval(USAGE.timer);
-  usagePing(); USAGE.timer = setInterval(usagePing, 30000);
+  UT.uid = S.me ? S.me.id : ""; UT.mins.clear(); utAdopt();
+  if (S.me && !S.portal && document.visibilityState !== "hidden") UT.mins.set(utMinute(), Date.now() - USAGE.last < 120000 ? 1 : 0);
+  utStore(); UT.flushAt = 0;
+  utFlush();   // opening the workspace: "last seen" now, plus anything a closed tab left behind
+  USAGE.timer = setInterval(utTick, 30000);
 }
+function stopUsage(){
+  if (USAGE.timer) clearInterval(USAGE.timer);
+  USAGE.timer = null;
+  if (UT.uid && UT.v3) utFlush(true);   // signing out: send what's counted (the sign-in is still valid for this one request)
+  UT.uid = ""; UT.mins.clear();   // what was counted stays saved in this browser until that person's next sign-in confirms it
+}
+const serverSeen = () => (UT.v3 || USAGE.v2) && !USAGE.off;   // the server keeps "last seen" and "last active" from the check-ins
 function stopPresence(){
+  stopUsage();
   if (presenceTimer) { clearInterval(presenceTimer); presenceTimer = null; }
   if (presenceCh) { try { presenceCh.untrack && presenceCh.untrack(); sb.removeChannel(presenceCh); } catch (e) {} presenceCh = null; }
   ONLINE = new Set();
 }
 async function heartbeat(){
   if (!S.me || document.visibilityState === "hidden") return;
-  if (!USAGE.v2 || USAGE.off) try {   // (2026-11eb) the usage check-in already refreshes "last seen" on the server
+  if (!serverSeen() && !(UT.uid && UT.v3 === null)) try {   // (2026-11eb/ec) the usage check-in already refreshes "last seen" on the server (the first one is on its way)
     // the device is saved once upgrade-2026-11cc.sql has added its column; until then, without it
     const row = { user_id: S.me.id, last_seen_at: new Date().toISOString() };
     if (S.devCols !== false) row.device = MY_DEVICE;
@@ -10141,7 +10227,7 @@ async function heartbeat(){
   // (2026-11eb) "last active" times aren't sent live any more (only real status changes are): refreshed here too
   if (!heartbeat.n || ++heartbeat.n % 5 === 0) { heartbeat.n = heartbeat.n || 1; await load("presence", true); if (heartbeat.n > 1 && S.loaded.has("user_status")) await load("user_status", true).catch(() => {}); paintPresence(); if (typeof paintStatus === "function") paintStatus(); }
 }
-document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && S.me) { heartbeat(); usagePing(); } });
+document.addEventListener("visibilitychange", () => { utVisible(); if (document.visibilityState === "visible" && S.me) { heartbeat(); if (UT.v3 === false) usagePing(); } });
 const isOnline = id => ONLINE.has(id);
 function lastActive(id){
   if (typeof statusOf === "function") return statusOf(id).label;   // lunch, out of office, leave, back tomorrow…
@@ -11910,7 +11996,7 @@ async function activityTick(){
     lastSent = Date.now();
     const back = st && ["idle", "offline"].includes(st.state);
     // (2026-11eb) the usage check-in keeps "last active" current on the server; save here only when the status itself changes
-    if (!(st && !back && USAGE.v2 && !USAGE.off)) await saveMyStatus(Object.assign({ last_active_at: new Date(lastInput).toISOString() }, back || !st ? { state: "active", idle_since: null } : {}));
+    if (!(st && !back && (serverSeen() || (UT.uid && UT.v3 === null)))) await saveMyStatus(Object.assign({ last_active_at: new Date(lastInput).toISOString() }, back || !st ? { state: "active", idle_since: null } : {}));
     // activity answers an idle warning, not the check-in one (closing it here made it reappear with a chime every minute)
     if (warnState && !(warnEl && warnEl.dataset.kind === "checkin")) closeIdleWarning();
   } else if (st && st.state === "active" && idleMin >= 10) {
@@ -12141,7 +12227,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11eb";
+const APP_VERSION = "2026-11ec";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -15557,6 +15643,7 @@ async function init(){
   sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { realtime: { worker: true }, global: { fetch: netFetch } });   // keep-alive runs in a worker, so background tabs aren’t disconnected
   let started = null;
   sb.auth.onAuthStateChange((evt, session) => {
+    if (session && session.access_token) UT.token = session.access_token;   // for the time-tracking send as a page closes
     if (evt === "PASSWORD_RECOVERY") setTimeout(openRecoveryDialog, 300);
     if (session && session.user){
       if (started !== session.user.id){ started = session.user.id; setTimeout(() => startSession(session), 0); }

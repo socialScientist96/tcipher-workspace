@@ -758,7 +758,9 @@ async function sendPendingEmails(row: Any, token: string) {
     if (pref === "direct" && !isDirect(n)) { await skip("skipped: not direct"); continue; }
     if (n.tbl === "chat" && muted.has(n.user_id + "|" + n.entity_id) && !/mentioned you|tagged you/i.test(String(n.title || ""))) { await skip("skipped: muted"); continue; }
     const last = seen.get(n.user_id);
-    if (last && last > cutoff) continue;                                   // they're in the app: they'll see it there
+    // they're in the app: they'll see it there. (2026-11ec) "last seen" is saved on opening, leaving and every 5 minutes, so
+    // anything in the last 6 minutes means they're there (or only just left: the email follows on a later run if it's still unread)
+    if (last && last > new Date(now - 6 * 60000).toISOString()) continue;
     const to = [...new Set([p.email, personal.get(n.user_id)].map((x) => String(x || "").trim().toLowerCase()).filter((x) => /^[^@\s<>"]+@[^@\s<>"]+\.[^@\s<>"]+$/.test(x)))];
     if (!to.length) { await skip("skipped: no address"); continue; }
     // still unread right now?
