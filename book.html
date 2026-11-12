@@ -128,9 +128,8 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{
 </main>
 <script>
 (() => {
-  // the workspace's Supabase project; the publishable key is public by design
+  // the workspace's demo-booking function (public, no sign-in)
   const API = "https://pfdnziybqaumnofjknsj.supabase.co/functions/v1/demo-booking";
-  const KEY = "sb_publishable_pqodY5Y9HWb0dsYTJy4CnA_c6nzCJ1q";
   const app = document.getElementById("app");
   const lead = (new URLSearchParams(location.search).get("lead") || "").trim();
   const st = { data: null, day: null, time: null, sending: false };
@@ -147,7 +146,8 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{
   };
   const icon = (paths) => { const s = document.createElementNS(SVG, "svg"); s.setAttribute("viewBox", "0 0 24 24"); s.setAttribute("class", "ic"); s.setAttribute("aria-hidden", "true"); s.innerHTML = paths; return s; };
   const call = async (body) => {
-    const res = await fetch(API, { method: "POST", headers: { "Content-Type": "application/json", apikey: KEY }, body: JSON.stringify(body) });
+    // (2026-11du) sent as plain text with no extra header, so the browser doesn't ask the server first (no preflight)
+    const res = await fetch(API, { method: "POST", headers: { "Content-Type": "text/plain;charset=UTF-8" }, body: JSON.stringify(body) });
     const j = await res.json().catch(() => ({}));
     if (!res.ok || j.error) { const e = new Error(j.error || "Something went wrong. Please try again."); e.status = res.status; throw e; }
     return j;
