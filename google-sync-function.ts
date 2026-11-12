@@ -225,6 +225,129 @@ async function fetchNotes(meetingId: string) {
   return { meeting, activity, found: { notes: !!found.notes, transcript: !!found.transcript, recording: !!found.recording }, copied: !!text, needScope };
 }
 
+/* ---------------- public demo booking page (2026-11dq) ----------------
+   book.html asks for free times ("public_slots") and books one ("public_book") without signing in. Only times
+   are shown, never names or events. The time is checked again when booking; the demo goes to whoever on the demo
+   team is free (Google-connected first, then the lighter day), and the invite + Meet link go from their calendar. */
+const hmMin = (t: string) => { const [a, b] = String(t || "0:0").split(":").map(Number); return (a || 0) * 60 + (b || 0); };
+const minHM = (n: number) => String(Math.floor(n / 60)).padStart(2, "0") + ":" + String(n % 60).padStart(2, "0");
+const minIn = (d: Date) => hmMin(new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(d));
+const isUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v || ""));
+async function demoConfig() {
+  const st = (must(await db.from("settings").select("data").eq("id", 1).maybeSingle()) || { data: {} }).data || {};
+  const ids: string[] = (Array.isArray(st.demo_team) ? st.demo_team : []).filter(isUuid);
+  const people = ids.length ? (must(await db.from("profiles").select("id,full_name,is_active").in("id", ids)) || []) : [];
+  return {
+    on: st.demo_public === true, team: people.filter((p: Any) => p.is_active).map((p: Any) => p.id) as string[], people,
+    len: Math.max(15, +st.demo_minutes || 45), buffer: st.demo_buffer_min != null && st.demo_buffer_min !== "" ? Math.max(0, +st.demo_buffer_min) : 15,
+    ahead: Math.min(30, Math.max(3, +st.demo_days_ahead || 10)), notice: Math.max(0, st.demo_notice_hours != null && st.demo_notice_hours !== "" ? +st.demo_notice_hours : 3),
+    start: hmMin(st.work_start || "10:00"), end: hmMin(st.work_end || "18:00"), wd: (st.working_days || [1, 2, 3, 4, 5, 6]) as number[],
+    hol: ((st.holidays || []) as Any[]).map((h) => h.date) as string[], company: String(st.company || "Tcipher Technologies"),
+  };
+}
+async function demoFree(C: Any) {
+  const t0 = today(), to = addDays(t0, C.ahead), team: string[] = C.team;
+  const busy: Record<string, Record<string, number[][]>> = {};
+  const add = (u: string, d: string, a: number, b: number) => { const x = busy[u] = busy[u] || {}; (x[d] = x[d] || []).push([a, b]); };
+  if (team.length) {
+    const ms = must(await db.from("meetings").select("meeting_date,start_time,duration_min,repeat,repeat_days,attendees").not("start_time", "is", null).lte("meeting_date", to)) || [];
+    for (const m of ms) {
+      const rep = m.repeat && m.repeat !== "Does not repeat";
+      if (!rep && m.meeting_date < t0) continue;
+      const who = (m.attendees || []).length ? (m.attendees as string[]).filter((a) => team.includes(a)) : team;
+      if (!who.length) continue;
+      for (let d = rep ? t0 : m.meeting_date; d <= to; d = addDays(d, 1)) {
+        if (occursOn(m, d, C.wd, C.hol)) { const a = hmMin(m.start_time); for (const u of who) add(u, d, a, a + (+m.duration_min || 30)); }
+        if (!rep) break;
+      }
+    }
+    const evs = must(await db.from("calendar_events").select("user_id,starts_at,ends_at").in("user_id", team).eq("all_day", false).lte("start_date", to).gte("end_date", t0)) || [];
+    for (const e of evs) {
+      if (!e.starts_at) continue;
+      const a = new Date(e.starts_at), b = new Date(e.ends_at || e.starts_at), first = dayIn(a), last = dayIn(b);
+      for (let d = first, i = 0; d <= last && i < 40; d = addDays(d, 1), i++) add(e.user_id, d, d === first ? minIn(a) : 0, d === last ? minIn(b) : 1440);
+    }
+    const lv = must(await db.from("leave_requests").select("user_id,start_date,end_date,type").in("user_id", team).eq("status", "Approved").lte("start_date", to).gte("end_date", t0)) || [];
+    for (const l of lv) if (l.type !== "Work from home") for (let d = l.start_date, i = 0; d <= l.end_date && i < 60; d = addDays(d, 1), i++) add(l.user_id, d, 0, 1440);
+  }
+  const nowAbs = minIn(new Date()) + C.notice * 60;   // minutes from the start of today
+  const days: Any[] = [];
+  for (let d = t0, i = 0; d <= to; d = addDays(d, 1), i++) {
+    if (!C.wd.includes(weekday(d)) || C.hol.includes(d)) continue;
+    const slots: Any[] = [];
+    for (let s = Math.ceil(C.start / 30) * 30; s + C.len <= C.end; s += 30) {
+      if (i * 1440 + s < nowAbs) continue;
+      const free = team.filter((u) => !((busy[u] || {})[d] || []).some(([a, b]) => a < s + C.len + C.buffer && b > s - C.buffer));
+      if (free.length) slots.push({ start: s, free });
+    }
+    days.push({ day: d, slots });
+  }
+  return { days, busy };
+}
+async function publicSlots(body: Any) {
+  const C = await demoConfig();
+  if (!C.on || !C.team.length) return { open: false, company: C.company };
+  const { days } = await demoFree(C);
+  let lead: Any = null;
+  if (isUuid(body.lead)) {
+    const l = must(await db.from("leads").select("name,email,phone,company").eq("id", body.lead).maybeSingle());
+    if (l) lead = { name: l.name || "", email: l.email || "", phone: l.phone || "", company: l.company || "" };
+  }
+  return { open: true, company: C.company, minutes: C.len, timezone: "India (IST)", lead,
+    days: days.map((x: Any) => ({ day: x.day, times: x.slots.map((s: Any) => minHM(s.start)) })) };
+}
+async function publicBook(body: Any, ip: string) {
+  const clean = (v: unknown, n: number) => String(v ?? "").replace(/[\u0000-\u001f]+/g, " ").trim().slice(0, n);
+  const name = clean(body.name, 80), email = clean(body.email, 120).toLowerCase(), phone = clean(body.phone, 24), company = clean(body.company, 100), note = clean(body.note, 600);
+  const day = clean(body.day, 10), time = clean(body.time, 5);
+  if (clean(body.website, 200)) return { ok: true, day, time };   // hidden field only robots fill in
+  if (name.length < 2) throw new Error("Please enter your name.");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new Error("Please enter a valid email address.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !/^\d{2}:\d{2}$/.test(time)) throw new Error("Please pick a time.");
+  const hourAgo = new Date(Date.now() - 3600e3).toISOString(), weekAgo = new Date(Date.now() - 7 * 864e5).toISOString();
+  const tries = (await db.from("booking_log").select("id", { count: "exact", head: true }).eq("ip", ip).gte("at", hourAgo)).count || 0;
+  if (tries >= 5) throw new Error("Too many tries from this connection. Please try again in an hour, or reply to our email.");
+  await db.from("booking_log").insert({ ip, email, ok: false });
+  const booked = (await db.from("booking_log").select("id", { count: "exact", head: true }).eq("email", email).eq("ok", true).gte("at", weekAgo)).count || 0;
+  if (booked >= 2) throw new Error("You already have a demo booked with us. Check your email for the invite, or reply to it to change the time.");
+  const C = await demoConfig();
+  if (!C.on || !C.team.length) throw new Error("Online booking is closed right now. Please reply to our email and we’ll find a time.");
+  const { days, busy } = await demoFree(C);
+  const slot = (days.find((x: Any) => x.day === day)?.slots || []).find((x: Any) => x.start === hmMin(time));
+  if (!slot) { const e = new Error("That time was just taken. Please pick another one."); (e as Any).status = 409; throw e; }
+  const linked = new Set(((must(await db.from("google_links").select("user_id").in("user_id", slot.free)) || []) as Any[]).map((l) => l.user_id));
+  const who = (slot.free as string[]).slice().sort((a, b) => (+linked.has(b) - +linked.has(a)) || (((busy[a] || {})[day] || []).length - ((busy[b] || {})[day] || []).length))[0];
+  // the lead: the one the personal link was for, else the newest lead with this email, else a new one
+  let lead: Any = null;
+  if (isUuid(body.lead)) lead = must(await db.from("leads").select("*").eq("id", body.lead).maybeSingle());
+  if (!lead) lead = (must(await db.from("leads").select("*").ilike("email", email.replace(/[%_\\]/g, "\\$&")).order("created_at", { ascending: false }).limit(1)) || [])[0] || null;
+  if (lead) {
+    const patch: Any = {};
+    if (!lead.email) patch.email = email;
+    if (!lead.phone && phone) patch.phone = phone;
+    if (!lead.company && company) patch.company = company;
+    if (lead.pipeline === "Instagram" && ["Lead", "Called", "Picked up", "Qualified"].includes(lead.status)) patch.status = "Demo booked";
+    if (Object.keys(patch).length) lead = must(await db.from("leads").update(patch).eq("id", lead.id).select().single());
+  } else {
+    lead = must(await db.from("leads").insert({ name, email, phone, company, source: "Website", status: "New", pipeline: "General", created_by: null,
+      notes: "Booked a demo on the booking page." + (note ? "\n\n" + note : "") }).select().single());
+  }
+  const title = "Demo: " + (lead.name || name) + ((lead.company || company) ? " (" + (lead.company || company) + ")" : "");
+  const meeting = must(await db.from("meetings").insert({ title, kind: "Sales demo", repeat: "Does not repeat", meeting_date: day, start_time: time, duration_min: C.len,
+    attendees: [who], created_by: who, lead_id: lead.id, guest_emails: [email], agenda: [note ? "From " + (lead.name || name) + ": " + note : "", "Booked by the lead on the booking page."].filter(Boolean).join("\n\n") }).select().single());
+  let invited = false, link = "";
+  if (linked.has(who)) { try { const m2 = await saveEvent(who, meeting.id); invited = true; link = m2.link || ""; } catch (_) { /* the team is told below; they can send it from the meeting */ } }
+  const t12 = (() => { const m = hmMin(time), h = Math.floor(m / 60); return ((h % 12) || 12) + ":" + String(m % 60).padStart(2, "0") + (h < 12 ? " am" : " pm"); })();
+  const when = new Date(day + "T12:00:00Z").toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }) + ", " + t12;
+  const tell = [...new Set([who, lead.owner_id, lead.sales_owner_id].filter(Boolean))];
+  if (tell.length) await db.from("notifications").insert(tell.map((u) => ({ user_id: u, title: "Demo booked by a lead", created_by: null,
+    body: title + " · " + when + (u === who ? "" : " · with " + String((C.people.find((p: Any) => p.id === who) || {}).full_name || "")) + (invited ? "" : " · no Google invite was sent: open the meeting to send it"), tbl: "meetings", entity_id: meeting.id })));
+  await db.from("activities").insert({ kind: "Demo", direction: "Inbound", activity_date: today(), owner_id: who, lead_id: lead.id, subject: "Booked a demo for " + when + " on the booking page", outcome: note });
+  await db.from("booking_log").insert({ ip, email, ok: true });
+  const first = String((C.people.find((p: Any) => p.id === who) || {}).full_name || "").split(" ")[0];
+  return { ok: true, day, time, minutes: C.len, with: first, invited, link };
+}
+
 /* ---------------- Google Meet joins ---------------- */
 async function listAll(token: string, path: string, key: string) {
   let out: Any[] = [], page = "";
@@ -768,6 +891,14 @@ Deno.serve(async (req) => {
         if (result.notes >= 20) break;
       }
       return json(result);
+    }
+
+    // (2026-11dq) the public booking page: no sign-in
+    if (action === "public_slots") return json(await publicSlots(body));
+    if (action === "public_book") {
+      const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
+      try { return json(await publicBook(body, ip)); }
+      catch (e) { return json({ error: String((e as Error)?.message || e) }, (e as Any).status || 400); }
     }
 
     // Everything else: a signed-in, active workspace user

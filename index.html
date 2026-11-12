@@ -8558,12 +8558,13 @@ const DEFAULT_WA_TEMPLATES = [
   { id: "wa_intro", name: "Introduction", body: "Hi {first_name}, this is {my_name} from Tcipher Technologies. Thanks for your interest! When is a good time for a quick call about what you need?" },
   { id: "wa_demo", name: "Demo confirmation", body: "Hi {first_name}, confirming your demo with Tcipher Technologies. You’ll get a Google Meet link by email. Reply here if you need to change the time." },
   { id: "wa_follow", name: "Follow-up", body: "Hi {first_name}, just following up on our conversation. Do you have any questions I can help with?" },
+  { id: "wa_book", name: "Book a demo", body: "Hi {first_name}, here’s a link to pick a time for your free demo with Tcipher Technologies: {booking_link}" },
   { id: "wa_missed", name: "Missed call", body: "Hi {first_name}, I tried calling you just now from Tcipher Technologies. When would be a good time to talk?" }
 ];
 const waTemplates = () => (S.settings.wa_templates && S.settings.wa_templates.length) ? S.settings.wa_templates : DEFAULT_WA_TEMPLATES;
 function openWhatsApp(table, rec, anchor){
   const phone = rec.phone; if (!phone) return;
-  const ctx = { name: rec.contact_name || rec.name || "", company: rec.company || "", deal: rec.title || "" };
+  const ctx = { name: rec.contact_name || rec.name || "", company: rec.company || "", deal: rec.title || "", lead_id: table === "leads" ? rec.id : (rec.lead_id || null) };
   const send = (t) => {
     const text = t ? fillTemplate(t.body, ctx) : "Hi " + (String(ctx.name).split(/\s+/)[0] || "there") + ", ";
     window.open("https://wa.me/" + waNumber(phone) + "?text=" + encodeURIComponent(text), "_blank", "noopener");
@@ -8714,7 +8715,9 @@ function demosSection(table, rec){
   if (!ms.length && !leadId) return null;
   const t0 = today();
   return h("div", { class: "section" },
-    h("h3", {}, "Demos", h("button", { type: "button", class: "link", style: "margin-left:auto;font-weight:500", onclick: () => bookDemo(table, rec) }, "+ Book demo")),
+    h("h3", {}, "Demos", h("span", { style: "margin-left:auto;display:inline-flex;gap:12px" },
+      S.settings.demo_public && leadId ? h("button", { type: "button", class: "link", style: "font-weight:500", title: "A page where the lead picks a free time themselves", onclick: () => copyText(bookingLink(leadId), "Booking link copied") }, "Copy booking link") : null,
+      h("button", { type: "button", class: "link", style: "font-weight:500", onclick: () => bookDemo(table, rec) }, "+ Book demo"))),
     ms.length ? ms.map(m => rowBtn(pill(m.meeting_date < t0 ? "Done" : m.meeting_date === t0 ? "Today" : "Booked", m.meeting_date < t0 ? "grey" : "info"),
         [fmtDate(m.meeting_date) + (m.start_time ? ", " + fmtTimeOfDay(m.start_time) : ""), h("span", { class: "muted" }, " · " + (m.attendees || []).filter(x => x !== S.me.id).map(x => (pname(x) || "").split(" ")[0]).join(", "))],
         m.notes_doc_url || (m.notes || "").trim() ? h("span", { class: "pill ok" }, "Notes") : m.recording_url ? h("span", { class: "pill grey" }, "Recording") : null,
@@ -8766,19 +8769,30 @@ function demoTeamPanel(){
   }));
   const num = (v, min, max) => h("input", { class: "in", type: "number", min: String(min), max: String(max), value: String(v) });
   const len = num(D.len, 15, 180), buf = num(D.buffer, 0, 60), ahead = num(D.ahead, 3, 30);
+  // (2026-11dq) the public booking page
+  const pub = h("input", { type: "checkbox", checked: !!S.settings.demo_public });
+  const notice = num(S.settings.demo_notice_hours != null && S.settings.demo_notice_hours !== "" ? S.settings.demo_notice_hours : 3, 0, 72);
   const err = h("p", { class: "err", hidden: true });
   const save = h("button", { type: "button", class: "btn pri" }, "Save demo team");
   save.onclick = async () => {
     err.hidden = true;
     if (!chosen.size) { err.textContent = "Pick at least one person."; err.hidden = false; return; }
-    const data = { ...(await latestSettings()), demo_team: [...chosen], demo_minutes: +len.value || 45, demo_buffer_min: Math.max(0, +buf.value || 0), demo_days_ahead: +ahead.value || 10 };
+    const data = { ...(await latestSettings()), demo_team: [...chosen], demo_minutes: +len.value || 45, demo_buffer_min: Math.max(0, +buf.value || 0), demo_days_ahead: +ahead.value || 10,
+      demo_public: pub.checked, demo_notice_hours: Math.max(0, +notice.value || 0) };
     try { ok(await sb.from("settings").upsert({ id: 1, data, updated_at: new Date().toISOString() })); S.settings = data; toast("Demo team saved."); rerender(); } catch (e) { fail(e, "Not saved"); }
   };
   return h("div", { class: "panel", style: "margin-bottom:14px" }, h("h2", {}, "Demo team"),
     h("p", { class: "muted", style: "margin:0 0 6px;font-size:13px" }, D.team ? "These people take demo calls. “Book demo” on a lead shows the times when any of them is free." : "Not saved yet. Tick who takes demo calls and save; “Book demo” on a lead then shows the times when any of them is free."),
     boxes,
     h("div", { class: "form" }, h("label", { class: "fl" }, "Demo length (minutes)", len), h("label", { class: "fl" }, "Keep free before and after (minutes)", buf), h("label", { class: "fl" }, "Show free times for the next (days)", ahead)),
-    err, h("div", { style: "margin-top:8px" }, save));
+    h("h3", { class: "ct-h", style: "margin-top:16px" }, "Online booking"),
+    h("label", { class: "chk" }, pub, "Let leads book a demo themselves on the booking page"),
+    h("div", { class: "form", style: "margin-top:6px" }, h("label", { class: "fl" }, "Earliest booking (hours from now)", notice)),
+    h("p", { class: "muted", style: "font-size:13px;margin:6px 0 0" }, "The page shows only free times, never names or events. The demo goes to whoever is free, with a Google invite and Meet link from their calendar (people who connected Google are picked first). Each lead also has a personal link (Copy booking link on the lead) that fills in their details; put the general link on the website and in ads."),
+    h("div", { style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px" }, h("code", { class: "code", style: "font-size:13px" }, bookingLink()),
+      h("button", { type: "button", class: "btn sm", onclick: () => copyText(bookingLink(), "Booking link copied") }, "Copy link"),
+      h("a", { class: "btn sm ghost", href: bookingLink(), target: "_blank", rel: "noopener" }, "Open")),
+    err, h("div", { style: "margin-top:12px" }, save));
 }
 
 function contactBar(table, rec){
@@ -9307,8 +9321,11 @@ const DEFAULT_TEMPLATES = [
 ];
 const emailTemplates = () => (S.settings.email_templates && S.settings.email_templates.length) ? S.settings.email_templates : DEFAULT_TEMPLATES;
 function mySignature(){ return [S.me.full_name, S.me.title, "Tcipher Technologies", S.me.phone].filter(Boolean).join("\n"); }
+// (2026-11dq) the public demo booking page; with a lead, the link is that lead's own (their details filled in)
+const bookingLink = leadId => location.origin + "/book.html" + (leadId ? "?lead=" + leadId : "");
 function fillTemplate(text, ctx){
   return String(text || "").replace(/\{(\w+)\}/g, (m, k) => {
+    if (k === "booking_link") return bookingLink(ctx.lead_id);
     const v = { first_name: String(ctx.name || "").split(/\s+/)[0] || "there", name: ctx.name || "", company: ctx.company || "your business", deal: ctx.deal || ctx.company || "",
       title: ctx.title || "", my_name: S.me.full_name, my_title: S.me.title || "", my_phone: S.me.phone || "", my_signature: mySignature(),
       start_date_text: ctx.start_date ? " on " + fmtDate(ctx.start_date, true) : "", work_email: ctx.work_email || "your work email" }[k];
@@ -9403,7 +9420,7 @@ async function saveRecipientAsLead(toStr, name, email){
 
 /* ---------- email thread on a record ---------- */
 function emailCtx(tbl, rec){
-  if (tbl === "leads") return { to: rec.email, name: rec.name, company: rec.company, templateFor: "sales", defaultTemplate: "intro" };
+  if (tbl === "leads") return { to: rec.email, name: rec.name, company: rec.company, lead_id: rec.id, templateFor: "sales", defaultTemplate: "intro" };
   if (tbl === "deals") return { to: rec.email || (byId("contacts", rec.contact_id) || {}).email || "", name: rec.contact_name || (byId("contacts", rec.contact_id) || {}).name || "", company: refLabel("clients", rec.client_id) || rec.company, deal: rec.title, templateFor: "sales", defaultTemplate: "followup" };
   if (tbl === "clients") { const pc = rows("contacts").find(c => c.client_id === rec.id && c.is_primary) || rows("contacts").find(c => c.client_id === rec.id); return { to: rec.email || (pc && pc.email) || "", name: (pc && pc.name) || rec.contact_person || "", company: rec.name, templateFor: "sales" }; }
   if (tbl === "contacts") return { to: rec.email, name: rec.name, company: refLabel("clients", rec.client_id), templateFor: "sales" };
@@ -9533,7 +9550,7 @@ function waTemplatesEditor(){
     catch (e) { fail(e, "Not saved"); }
   };
   function draw(){
-    box.replaceChildren(h("p", { class: "muted", style: "font-size:13px;margin:0 0 10px" }, "Offered by the WhatsApp button on leads, deals and contacts. Placeholders: {first_name}, {name}, {company}, {deal}, {my_name}, {my_phone}."));
+    box.replaceChildren(h("p", { class: "muted", style: "font-size:13px;margin:0 0 10px" }, "Offered by the WhatsApp button on leads, deals and contacts. Placeholders: {first_name}, {name}, {company}, {deal}, {my_name}, {my_phone}, {booking_link} (the lead’s own demo booking link)."));
     list.forEach((t, i) => {
       const nm = h("input", { class: "in", value: t.name }), bd = h("textarea", { class: "in", rows: 4 }); bd.value = t.body;
       [nm, bd].forEach(x => x.addEventListener("change", () => { list[i] = { ...t, name: nm.value, body: bd.value }; }));
@@ -9555,7 +9572,7 @@ function templatesEditor(){
     catch (e) { fail(e, "Not saved"); }
   };
   function draw(){
-    box.replaceChildren(h("p", { class: "muted", style: "font-size:13px;margin:0 0 10px" }, "Placeholders: {first_name}, {name}, {company}, {deal}, {title}, {my_name}, {my_title}, {my_phone}, {my_signature}, {work_email}, {start_date_text}. They’re filled in when someone picks the template."));
+    box.replaceChildren(h("p", { class: "muted", style: "font-size:13px;margin:0 0 10px" }, "Placeholders: {first_name}, {name}, {company}, {deal}, {title}, {my_name}, {my_title}, {my_phone}, {my_signature}, {work_email}, {start_date_text}, {booking_link}. They’re filled in when someone picks the template."));
     list.forEach((t, i) => {
       const nm = h("input", { class: "in", value: t.name }), sj = h("input", { class: "in", value: t.subject }), bd = h("textarea", { class: "in", rows: 7 }); bd.value = t.body;
       const fr = h("select", { class: "in" }, [["sales","Sales and Marketing"], ["people","New joinees"], ["any","Everywhere"]].map(([v, l]) => h("option", { value: v }, l))); fr.value = t.for || "any";
@@ -11892,7 +11909,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11dp";
+const APP_VERSION = "2026-11dq";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
