@@ -2296,6 +2296,29 @@ dialog:has(.ai-imp) {width:min(1100px,calc(100vw - 24px))}
   .nb-mbox > .nb-media,.nb-mbox > .nb-caption{align-self:stretch}
   .nb-resize{top:20%;bottom:auto;height:50%;width:22px;opacity:.7}
 }
+
+/* chat: the phone browser's own pull-to-refresh is off here (a pull in the conversation reloaded the page) (2026-11dd) */
+html:has(#content .chat),html:has(#content .chat) body{overscroll-behavior-y:none}
+
+/* the phone menu's Back button (2026-11dd) */
+.side-back{display:none}
+@media (max-width:960px){
+  .side-back{display:flex;align-items:center;gap:6px;width:100%;border:0;background:var(--tint);color:var(--ink);font:inherit;font-weight:600;
+    font-size:15px;padding:12px 14px;margin:0 0 8px;border-radius:10px;cursor:pointer;min-height:44px}
+  .side-back:active{background:var(--tint2)}
+}
+
+/* Back at the top of every page on phones and in the apps (2026-11dd) */
+.m-pageback{display:none}
+@media (max-width:960px){
+  .m-pageback{display:inline-flex;align-items:center;gap:4px;border:0;background:none;color:var(--p);font:inherit;font-weight:600;font-size:15px;
+    padding:6px 8px 6px 0;margin:0 0 6px;min-height:40px;cursor:pointer}
+}
+
+/* Report a problem: shown while the screenshot is taken (2026-11dd) */
+.shot-wait{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:rgba(15,12,45,.25)}
+.shot-box{display:flex;align-items:center;gap:12px;background:var(--white);color:var(--ink);border-radius:14px;padding:16px 20px;box-shadow:0 10px 40px rgba(0,0,0,.2);font-weight:600}
+.btn .spinner{width:14px;height:14px;margin-right:6px;vertical-align:-2px}
 </style>
 </head>
 <body>
@@ -8760,6 +8783,7 @@ async function signOutHere(){ try { const sub = await pushSub(); if (sub) await 
 let navDepth = 0, navBacking = false;
 window.addEventListener("hashchange", () => { if (navBacking) { navBacking = false; navDepth = Math.max(0, navDepth - 1); } else navDepth++; });
 function navBack(){
+  { const sd = document.getElementById("side"); if (sd && sd.classList.contains("open")) { sd.classList.remove("open"); return; } }
   try { if (dlg().open) { closeDlg(); return; } } catch (e) {}
   if (navDepth > 0) { navBacking = true; history.back(); } else go("dashboard");
 }
@@ -9114,8 +9138,17 @@ function chatOnChange0(payload){
 
 /* ---------- the Chat page ---------- */
 let chatEls = null, chatEls_markText = () => {};
+// (2026-11dd) if the page reloads while you're in a conversation (a pull-down in the phone's browser, an update, the
+// phone freeing memory), you come back to that conversation instead of the list of chats
+const CHAT_KEEP = "tc_chat_view";
+function keepChatView(){ try { sessionStorage.setItem(CHAT_KEEP, JSON.stringify({ view: C.mobileView || "", id: C.active || "", at: Date.now() })); } catch (e) {} }
+function restoreChatView(){
+  if (C.mobileView !== undefined) return;
+  try { const k = JSON.parse(sessionStorage.getItem(CHAT_KEEP) || "null"); if (k && k.view === "conv" && k.id && Date.now() - k.at < 30 * 60000 && C.channels.some(c => c.id === k.id)) { C.mobileView = "conv"; C.active = k.id; } } catch (e) {}
+}
 async function renderChat(el){
   if (!C.ready) { el.append(h("div", { class: "loading" }, "Loading chat…")); await loadChat(); if (S.route !== "chat") return; el.replaceChildren(); }
+  restoreChatView();
   if (!C.active){ const g = C.channels.find(c => c.kind === "channel" && c.name === "general") || C.channels[0]; if (g) await openChannel(g.id); }
   const list = h("div", { class: "chat-list" }), head = h("div", { class: "chat-head" }), msgs = h("div", { class: "chat-msgs", role: "log", "aria-live": "polite" });
   const ta = h("textarea", { class: "in", rows: 2, maxlength: "4000", placeholder: "Write a message… type @ to tag someone. Enter to send, Shift + Enter for a new line." });
@@ -9202,6 +9235,7 @@ async function renderChat(el){
     sending = false; sendBtn.disabled = false; chatEls_markText(); ta.focus();
   }
   drawChatList(); drawChatHead(); drawChatMessages(true);
+  keepChatView();
   fitChat(); requestAnimationFrame(fitChat);
   setTimeout(() => ta.focus(), 50);
 }
@@ -9303,7 +9337,7 @@ function drawChatHead(){
   drawChatHead0();
   if (chatEls && chatEls.head) {
     // ‹ Back to the list of chats (phones only)
-    chatEls.head.prepend(h("button", { type: "button", class: "m-back", "aria-label": "Back to chats", onclick: () => { C.mobileView = "list"; const c = chatEls.msgs.closest(".chat"); if (c) c.classList.remove("m-conv"); drawChatList(); } }, "‹"));
+    chatEls.head.prepend(h("button", { type: "button", class: "m-back", "aria-label": "Back to chats", onclick: () => { C.mobileView = "list"; keepChatView(); const c = chatEls.msgs.closest(".chat"); if (c) c.classList.remove("m-conv"); drawChatList(); } }, "‹"));
     if (C.channels.some(c => c.id === C.active)) { const mb = chatMuteButton(); if (mb) chatEls.head.append(mb); chatEls.head.append(chatMeetButton()); }
     if (chatEls.live) { chatEls.head.append(chatEls.live); drawLiveStatus(); }
   }
@@ -10755,7 +10789,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11dc";
+const APP_VERSION = "2026-11dd";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -10828,7 +10862,7 @@ async function capturePage(){
     const scale = Math.min(2, window.devicePixelRatio || 1);
     const shot = (el, opts) => Promise.race([window.html2canvas(el, Object.assign({ backgroundColor: "#ffffff", scale, useCORS: true, logging: false }, opts)),
       new Promise((_, rej) => setTimeout(() => rej(new Error("The screenshot took too long.")), 10000))]);
-    const canvas = await shot(document.body, { x: window.scrollX, y: window.scrollY, width: window.innerWidth, height: window.innerHeight, ignoreElements: el => el.id === "dlg" });
+    const canvas = await shot(document.body, { x: window.scrollX, y: window.scrollY, width: window.innerWidth, height: window.innerHeight, ignoreElements: el => el.id === "dlg" || el.id === "shotWait" });
     if (popup) {
       const r = popup.getBoundingClientRect();
       const keep = popup.querySelector(".db") ? popup.querySelector(".db").scrollTop : 0;
@@ -10851,8 +10885,15 @@ async function openReportDialog(){
   // take the screenshot first, so it shows the page the person was looking at
   let auto = null;
   // only when the screenshot tool is already loaded (it loads quietly after sign-in): never make people wait for the dialog
-  // (2026-11dc) it can take a few seconds on a phone: say so at once
-  if (window.html2canvas && !(dlg && dlg().open && dlg().querySelector(".bugdlg"))) { toast("Taking a screenshot of this page…"); try { auto = await capturePage(); } catch (e) { console.info("screenshot", e && e.message); } }
+  // (2026-11dd) it can take a few seconds (more on phones) and the page freezes meanwhile: a "Taking a screenshot…"
+  // panel goes up first and is given time to appear, and the screenshot itself leaves it out
+  if (window.html2canvas && !(dlg && dlg().open && dlg().querySelector(".bugdlg"))) {
+    const wait = h("div", { id: "shotWait", class: "shot-wait", role: "status" }, h("div", { class: "shot-box" }, h("span", { class: "spinner", "aria-hidden": "true" }), h("span", {}, "Taking a screenshot of this page…")));
+    document.body.append(wait);
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 60))));
+    try { auto = await capturePage(); } catch (e) { console.info("screenshot", e && e.message); }
+    wait.remove();
+  }
   else loadShotLib().catch(() => {});
   const note = h("textarea", { class: "in", rows: 5, maxlength: "4000", placeholder: "What went wrong? What were you trying to do, and what did you expect to happen?" });
   let shot = null;
@@ -10878,7 +10919,7 @@ async function openReportDialog(){
   send.addEventListener("click", async () => {
     err.hidden = true;
     if (!note.value.trim() && !shot) { err.textContent = "Add a short description or a screenshot."; err.hidden = false; return; }
-    send.disabled = true; send.textContent = "Sending…";
+    send.disabled = true; send.replaceChildren(h("span", { class: "spinner", "aria-hidden": "true" }), "Sending…");
     try {
       const rep = ok(await sb.from("problem_reports").insert({ user_id: S.me.id, kind: "user", status: "Open", page: S.route || "", message: (RECENT_ERRORS.length ? "Recent error: " + RECENT_ERRORS[RECENT_ERRORS.length - 1].m : ""), note: note.value.trim(),
         details: { steps: CRUMBS.slice(-15), recent_errors: RECENT_ERRORS.slice(-5), version: APP_VERSION, ...browserInfo(), online: navigator.onLine } }).select().single());
@@ -12932,6 +12973,8 @@ function renderShell(){
       canNewTask ? h("button", { type: "button", class: "side-ic", title: "New task", "aria-label": "New task", onclick: () => { closeSide(); openRecord("tasks", null); } }, ic("squarePen", 18)) : null,
       h("button", { type: "button", class: "side-ic side-hide", title: "Hide sidebar (Ctrl+\\)", "aria-label": "Hide sidebar", onclick: () => setSideHidden(true) }, ic("panelLeft", 18)),
       h("button", { type: "button", class: "side-ic side-close", title: "Close menu", "aria-label": "Close menu", onclick: closeSide }, ic("x", 20))));   // phones (2026-11dc)
+  // (2026-11dd) phones: a clear Back button at the very top of the menu, to collapse it
+  side.prepend(h("button", { type: "button", class: "side-back", onclick: closeSide }, ic("chevronLeft", 18), h("span", {}, "Back")));
   // search: narrows the menu as you type (Ctrl+K or ⌘K jumps here)
   const search = h("input", { class: "side-search-in", id: "sideSearch", type: "search", placeholder: "Search", "aria-label": "Search the menu", autocomplete: "off", enterkeyhint: "go",
     oninput: () => { sideQuery = search.value; filterSide(); },
@@ -13050,6 +13093,8 @@ async function rerender(){
   if (seq !== renderSeq) { if (page._chatEls) page._chatEls.pending = false; if (route === "chat" && typeof visibleChat === "function") visibleChat(); return; }   // a newer draft won: follow the one on screen
   clearTimeout(loadingT);
   try { if (canSee(route)) addDashSummary(page, route); } catch (e) {}   // the Summarize button on dashboards
+  // (2026-11dd) phones and the apps: a Back button at the top of every page but Home (chat and notes have their own)
+  if (route !== "dashboard" && route !== "chat" && !route.startsWith("note=")) page.prepend(h("button", { type: "button", class: "m-pageback", onclick: () => navBack() }, ic("chevronLeft", 18), h("span", {}, "Back")));
   el.replaceChildren(page);
   if (route === "chat" && page._chatEls) { page._chatEls.pending = false; chatEls = page._chatEls; }
   if (lastRoute === route) window.scrollTo(0, sy);
