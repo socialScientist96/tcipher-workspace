@@ -9382,7 +9382,7 @@ const DEFAULT_TEMPLATES = [
 const emailTemplates = () => (S.settings.email_templates && S.settings.email_templates.length) ? S.settings.email_templates : DEFAULT_TEMPLATES;
 function mySignature(){ return [S.me.full_name, S.me.title, "Tcipher Technologies", S.me.phone].filter(Boolean).join("\n"); }
 // (2026-11dq) the public demo booking page; with a lead, the link is that lead's own (their details filled in)
-const bookingLink = leadId => location.origin + "/book.html" + (leadId ? "?lead=" + leadId : "");
+const bookingLink = leadId => location.origin + "/book" + (leadId ? "?lead=" + leadId : "");   // (2026-11dw) GitHub Pages serves book.html at /book
 function fillTemplate(text, ctx){
   return String(text || "").replace(/\{(\w+)\}/g, (m, k) => {
     if (k === "booking_link") return bookingLink(ctx.lead_id);
@@ -11969,7 +11969,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11dv";
+const APP_VERSION = "2026-11dw";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
