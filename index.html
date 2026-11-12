@@ -2437,6 +2437,7 @@ html:has(#content .chat),html:has(#content .chat) body{overscroll-behavior-y:non
   .cvoice-ic{display:none}
   .vp .vp-dl{min-width:32px;width:32px;padding:0;position:relative;flex:none}
   .vp .vp-dl::after{content:"";position:absolute;inset:-6px}
+  .vp .vp-time{white-space:nowrap;flex:none;overflow-wrap:normal}   /* "0:04" never splits across lines at large text (BU-034) */
   /* chat header: the Meet button keeps its size too; back arrow 40 px + tap ring; button labels stay readable by
      screen readers (they were display:none, so "Email" had no name at all) (BU-027) */
   /* long words / URLs / file names (BU-030): break-word only wraps after the layout is sized, so one long word still
