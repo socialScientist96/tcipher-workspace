@@ -393,6 +393,7 @@ button.row{max-width:calc(100% + 12px);min-width:0}
 /* button loaders */
 @keyframes tc-spin{to{transform:rotate(360deg)}}
 .btn.busy,.iconbtn.busy,.linkbtn.busy,.link.busy{cursor:progress;opacity:.85}
+.btn.busy:has(.spinner)::before,.linkbtn.busy:has(.spinner)::before{display:none!important}
 .btn.busy::before,.linkbtn.busy::before,.link.busy::before{content:"";display:inline-block;width:13px;height:13px;margin-right:7px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;vertical-align:-2px;animation:tc-spin .7s linear infinite;flex:none}
 .iconbtn.busy{color:transparent;position:relative}
 .iconbtn.busy::after{content:"";position:absolute;inset:0;margin:auto;width:14px;height:14px;border:2px solid var(--p);border-right-color:transparent;border-radius:50%;animation:tc-spin .7s linear infinite}
@@ -538,6 +539,7 @@ select.in.sm{padding:4px 6px;font-size:13px;min-width:120px}
 .ftile.audio{grid-column:1/-1;max-width:640px;padding:8px}
 .fthumb{padding:0;border:0;background:#F1F0F8;cursor:zoom-in;display:block;aspect-ratio:4/3}
 .fthumb img{width:100%;height:100%;object-fit:cover;display:block}
+.fthumb-none{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--ink2);font-size:12px}
 .fvideo{width:100%;max-height:360px;background:#000;display:block}
 .faudio{width:100%}
 .ftile figcaption{display:flex;flex-direction:column;gap:2px;padding:6px 8px;font-size:12.5px}
@@ -931,6 +933,13 @@ dialog.dv-wide .dh .iconbtn{flex:none}
 .vrec{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;background:#FFECEB;color:#AE2E24;font-size:13.5px;font-weight:600;align-self:center}
 .vrec-dot{width:10px;height:10px;border-radius:50%;background:#E5493A;animation:vrecblink 1s infinite}
 .vrec-time{font-variant-numeric:tabular-nums;min-width:36px}
+/* (2026-11dl) while recording, the bar is the whole composer row: no message box beside it, nothing wraps
+   ("Re/co/rdi/ng" on phones) */
+.chat-foot:has(> .vrec) > :not(.vrec){display:none !important}
+.chat-foot > .vrec{flex:1 1 auto;align-self:stretch;justify-content:flex-start;min-height:48px;border-radius:24px;padding:4px 6px 4px 14px;white-space:nowrap}
+.chat-foot > .vrec > span:nth-child(2){white-space:nowrap}
+.chat-foot > .vrec .vrec-time{margin-right:auto}
+.chat-foot > .vrec .btn{min-height:40px;padding:0 14px;flex:none}
 @keyframes vrecblink{50%{opacity:.25}}
 
 /* a button whose action is still running (one click, one action) */
@@ -947,6 +956,71 @@ button.is-busy{opacity:.6;cursor:progress;pointer-events:none}
 .vp-time{font-size:12px;color:var(--ink2);font-variant-numeric:tabular-nums;min-width:74px;text-align:right}
 .vp-speed{border:1px solid var(--line);background:#fff;border-radius:999px;font:inherit;font-size:11.5px;font-weight:700;padding:2px 8px;cursor:pointer;color:var(--ink2)}
 .vp-speed{white-space:nowrap;min-width:42px;text-align:center;flex:none}
+/* (2026-11dl) a voice note in your own (violet) bubble: no white box inside the bubble — white controls on violet */
+.cmsg.mine .bub .cvoice.vp{background:transparent;border:0;padding:2px 0;color:#fff}
+.cmsg.mine .bub .vp-play{background:#fff;color:var(--p)}
+.cmsg.mine .bub .vp-bar{background:rgba(255,255,255,.35)}
+.cmsg.mine .bub .vp-fill{background:#fff}
+.cmsg.mine .bub .vp-knob{background:#fff;box-shadow:0 0 0 2px var(--p)}
+.cmsg.mine .bub .vp-time{color:rgba(255,255,255,.9)}
+.cmsg.mine .bub .vp-speed{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.45);color:#fff}
+.cmsg.mine .bub .vp-dl{color:#fff;background:transparent;border:0}
+/* the speed button stays a small pill; its 44 px tap area is an invisible ring (it bulged into a circle on phones) */
+.vp .vp-speed{min-height:28px!important;height:28px;min-width:40px!important;position:relative;padding:0 8px}
+.vp .vp-speed::after{content:"";position:absolute;inset:-8px -2px}
+/* tables as cards on tablets and small laptops when they don't fit (2026-11dl, MB-031) */
+@media (min-width:761px) and (max-width:1100px){
+  .tablewrap.t-cards{overflow:visible;background:none;border:0;border-radius:0}
+  .tablewrap.t-cards > table{display:block;width:100%}
+  .tablewrap.t-cards > table > thead{display:none}
+  .tablewrap.t-cards > table > tbody{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;width:100%}
+  .tablewrap.t-cards > table > tbody > tr{display:block;background:var(--white);border:1px solid var(--line);border-radius:var(--r-lg);padding:12px 14px;min-width:0}
+  .tablewrap.t-cards > table > tbody > tr > td{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:4px 0;border:0;min-width:0;text-align:right;white-space:normal;overflow-wrap:anywhere}
+  .tablewrap.t-cards > table > tbody > tr > td::before{content:attr(data-label);flex:none;max-width:45%;color:var(--ink3);font-size:var(--fs-sm);text-align:left}
+  .tablewrap.t-cards > table > tbody > tr > td:not([data-label])::before,.tablewrap.t-cards > table > tbody > tr > td:first-child::before{display:none}
+  .tablewrap.t-cards > table > tbody > tr > td:first-child{justify-content:flex-start;text-align:left;font-weight:600;flex-wrap:wrap;row-gap:2px;column-gap:8px;padding:0 0 6px}
+  .tablewrap.t-cards > table > tbody > tr > td:first-child > :is(div,p){flex:1 1 100%}
+  .tablewrap.t-cards > table > tbody > tr > td.m-empty{display:none}
+  .tablewrap.t-cards > table > tbody > tr > td > *{max-width:100%}
+  .tablewrap.t-cards > table > tbody > tr.m-titled{display:flex;flex-direction:column}
+  .tablewrap.t-cards > table > tbody > tr.m-titled > td.m-title{order:-2;justify-content:flex-start;text-align:left;font-weight:600}
+  .tablewrap.t-cards > table > tbody > tr.m-titled > td.m-title::before{display:none}
+  .tablewrap.t-cards > table > tbody > tr.m-titled > td.m-meta{order:-1;font-size:var(--fs-sm);font-weight:400;color:var(--ink3)}
+  .tablewrap.t-cards > table > tbody > tr.m-titled > td.m-meta::before{display:none}
+}
+/* back to top (2026-11dl) */
+.to-top{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:24px;z-index:45;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);
+  background:var(--white);color:var(--ink);box-shadow:0 4px 14px rgba(0,0,0,.12);display:grid;place-items:center;cursor:pointer;
+  opacity:0;transform:translateY(8px);pointer-events:none;transition:opacity .18s var(--ease,ease),transform .18s var(--ease,ease)}
+.to-top.on{opacity:1;transform:none;pointer-events:auto}
+.to-top:hover{background:var(--tint)} .to-top:focus-visible{outline:2px solid var(--p);outline-offset:2px}
+@media (max-width:960px){ .to-top{bottom:calc(72px + env(safe-area-inset-bottom,0px))} }
+@media (prefers-reduced-motion:reduce){ .to-top{transition:none} }
+@media print{ .to-top{display:none} }
+/* message sheet on phones (2026-11dl) */
+dialog.msheet{position:fixed;left:0;right:0;bottom:0;top:auto;width:100%!important;max-width:520px!important;margin:auto auto 0!important;max-height:80dvh!important;border-radius:16px 16px 0 0!important;padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));background:var(--white);border:0;box-shadow:0 -10px 30px rgba(0,0,0,.18);display:flex;flex-direction:column;gap:8px}
+dialog.msheet::backdrop{background:rgba(9,9,11,.35)}
+.ms-reacts{display:flex;justify-content:space-between;gap:4px;padding:4px 2px 8px;border-bottom:1px solid var(--line)}
+.ms-emoji{width:44px;height:44px;border:0;border-radius:50%;background:var(--tint);font-size:22px;cursor:pointer;display:grid;place-items:center}
+.ms-emoji.ms-more{font-size:20px;color:var(--ink2)}
+.ms-acts{display:flex;flex-direction:column}
+.ms-act{display:flex;align-items:center;gap:14px;min-height:48px;padding:0 10px;border:0;background:none;font:inherit;font-size:15px;color:var(--ink);text-align:left;border-radius:10px;cursor:pointer}
+.ms-act:active{background:var(--tint)} .ms-act.bad{color:var(--bad)}
+.ms-act > .ms-ic{width:22px;flex:none;display:inline-grid;place-items:center;font-size:17px}
+.ms-act > .ms-l{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ms-cancel{min-height:48px;border:0;border-radius:12px;background:var(--tint);font:inherit;font-weight:600;color:var(--ink);cursor:pointer}
+/* picture viewer (2026-11dl) */
+dialog.lightbox{position:fixed;inset:0;width:100vw!important;height:100dvh!important;max-width:none!important;max-height:none!important;margin:0!important;padding:0;border:0;border-radius:0!important;background:#0B0A10;color:#fff;display:flex;flex-direction:column;animation:none}
+dialog.lightbox::before{display:none!important}
+dialog.lightbox::backdrop{background:#0B0A10}
+.lb-bar{flex:none;display:flex;align-items:center;gap:6px;padding:calc(6px + env(safe-area-inset-top,0px)) 8px 6px 14px;background:rgba(0,0,0,.35)}
+.lb-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px;color:rgba(255,255,255,.85)}
+.lb-btn{display:inline-flex;align-items:center;gap:6px;min-height:44px;min-width:44px;justify-content:center;padding:0 12px;border:0;border-radius:10px;background:rgba(255,255,255,.1);color:#fff;font:inherit;font-size:14px;cursor:pointer}
+.lb-btn:hover{background:rgba(255,255,255,.18)} .lb-btn:focus-visible{outline:2px solid #fff;outline-offset:2px}
+dialog.lightbox > .lb-stage{flex:1 1 auto!important;min-height:0!important;width:100%!important;max-height:none!important;display:grid;place-items:center;overflow:hidden;touch-action:none;padding-bottom:env(safe-area-inset-bottom,0px)}
+.lb-stage.zoomed{display:block;overflow:auto;touch-action:pan-x pan-y}
+.lb-img{max-width:100%;max-height:100%;object-fit:contain;user-select:none;-webkit-user-select:none}
+.lb-stage.zoomed .lb-img{max-width:none;max-height:none;height:auto;display:block}
 .pwwrap{position:relative;display:block;width:100%}
 .pwwrap .in{padding-right:40px}
 .pweye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:32px;height:32px;display:grid;place-items:center;border:0;background:transparent;color:var(--ink3);border-radius:6px;cursor:pointer;padding:0}
@@ -1811,6 +1885,11 @@ dialog{border-radius:var(--r-xl)}
 .hello.has-hero .hero .hero-h .hero-name{color:var(--h-acc)}
 .hello.has-hero .hero .hero-p{color:var(--h-mute)}
 .hero-p{margin:8px 0 0;color:var(--h-mute);font-size:15px;line-height:1.45}
+.hero-f b{color:var(--h-ink);font-weight:600;font-variant-numeric:tabular-nums}
+.hero-f + .hero-f::before{content:"·";margin:0 8px;color:var(--h-mute)}
+.hero-date{margin-left:auto;white-space:nowrap;color:var(--h-mute)}
+.hero-date .d-short{display:none}
+@media (max-width:1500px){ .hero-tag,.hero-sep{display:none} }   /* the date takes its place; the tag only fits on wide screens */
 .hero-tiles{display:flex;gap:10px;margin-top:22px;flex-wrap:wrap}
 .hero-t{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:92px;min-height:76px;padding:10px 6px;
   background:var(--h-fill);border:1px solid var(--h-line);border-radius:12px;color:var(--h-ink);font:inherit;font-size:13px;cursor:pointer;transition:background-color .15s var(--ease),border-color .15s var(--ease)}
@@ -2525,17 +2604,19 @@ html:has(#content .chat),html:has(#content .chat) body{overscroll-behavior-y:non
   .hero-brand b{font-size:13px}
   .hero-logo{width:20px;height:20px;border-radius:6px}
   .hero-sep,.hero-tag{display:none}
-  .hero-brand::after{content:"Home";margin-left:auto;color:var(--h-mute);font-size:12.5px}
-  @media (max-height:640px){ .hero-brand{display:none} }
+  .hero-date{font-size:12.5px} .hero-date .d-long{display:none} .hero-date .d-short{display:inline}
+  @media (max-height:600px){ .hero-brand{display:none} }
   .hero-h{line-height:1.2}
-  .hero-p{font-size:12.5px;margin-top:3px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .hero-p{font-size:13px;margin-top:4px;line-height:1.45;display:flex;flex-direction:column;gap:1px}
+  .hero-f + .hero-f::before{content:none}
   .hero-tiles{display:grid;grid-template-columns:repeat(var(--n,5),minmax(0,1fr));gap:6px;margin-top:10px;flex-wrap:nowrap}
   .hero-t{width:auto;min-height:52px;padding:7px 2px 5px;gap:3px;font-size:11.5px;border-radius:10px}
   .hero-l{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
   .hero-l[data-s]{font-size:0} .hero-l[data-s]::after{content:attr(data-s);font-size:11.5px}   /* "Dev Board" → "Board" on phones */
+  @media (max-width:350px){ .hero-tiles{gap:4px} .hero-t{padding-left:0;padding-right:0} .hero-l,.hero-l[data-s]::after{font-size:10.5px;letter-spacing:-.01em} }   /* "Calendar" fits at 320 px (2026-11dl) */
   .home .hello.has-hero .hero .hero-h{font-size:clamp(18px,5.6vw,21px)}
   /* short screens: the banner keeps to a quarter of the height — the summary line goes (the sections below say the same) */
-  @media (max-height:700px){ .hello.has-hero .hero .hero-p{display:none} .hero-tiles{margin-top:10px} .hero-t{min-height:52px} }
+  @media (max-height:600px){ .hello.has-hero .hero .hero-p{flex-direction:row;flex-wrap:wrap;column-gap:0} .hello.has-hero .hero .hero-f + .hero-f::before{content:"·";margin:0 6px} }
   @media (max-height:600px){ .hero{padding:12px 12px 10px} .hero-tiles{margin-top:8px} .hero-t{min-height:48px;padding:6px 2px 4px;gap:2px} }
   .hero-n{top:3px;right:3px;min-width:17px;height:17px;line-height:17px;font-size:10.5px;padding:0 4px;border-radius:9px}
   .home .hello.has-hero > .att{grid-column:1;grid-row:2;margin:10px 0 0}
@@ -2883,7 +2964,7 @@ const $ = id => document.getElementById(id);
       const r = fn.call(this, e);
       if (r && typeof r.then === "function"){
         btn.dataset.busy = "1"; btn.setAttribute("aria-busy", "true");
-        btn._busyT = setTimeout(() => btn.classList.add("busy"), 120);            // no flicker for quick actions
+        btn._busyT = setTimeout(() => { if (!btn.querySelector(".spinner")) btn.classList.add("busy"); }, 120);   // no flicker; no second loader when the button draws its own
         btn._busyMax = setTimeout(() => done(btn), 60000);                         // never stuck for good
         r.then(() => done(btn), () => done(btn));
       }
@@ -3018,7 +3099,25 @@ const PALETTE = ["#6450F5","#8B5CF6","#2F5DA8","#1D7748","#B3243A","#955600","#8
 function colorFor(id){ let s = 0; for (const c of String(id || "")) s = (s * 31 + c.charCodeAt(0)) >>> 0; return PALETTE[s % PALETTE.length]; }
 
 let toastT;
-function toast(msg){ const el = $("toast"); el.textContent = msg; el.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove("show"), 3200); }
+// (2026-11dl) Back to top: a round button that appears once you have scrolled more than a screen and a half down.
+// Not on chat (its own list scrolls, with "Jump to latest") and never while typing on a phone.
+(function backToTop(){
+  let btn = null, raf = 0;
+  const want = () => scrollY > innerHeight * 1.5 && !/^#?chat/.test(location.hash) && !document.body.classList.contains("kb-open");
+  const paint = () => { raf = 0;
+    if (!btn) { if (!want()) return;
+      btn = document.createElement("button"); btn.type = "button"; btn.className = "to-top"; btn.setAttribute("aria-label", "Back to top"); btn.title = "Back to top";
+      btn.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>';
+      btn.addEventListener("click", () => { const quick = matchMedia("(prefers-reduced-motion:reduce)").matches; window.scrollTo({ top: 0, behavior: quick ? "auto" : "smooth" }); btn.blur(); });
+      document.body.append(btn); }
+    btn.classList.toggle("on", want()); };
+  const ask = () => { if (!raf) raf = setTimeout(paint, 80); };   // a timer, not an animation frame: background tabs get none
+  addEventListener("scroll", ask, { passive: true }); addEventListener("hashchange", ask); addEventListener("resize", ask);
+})();
+function toast(msg){
+  // (2026-11dl) never let a missing toast element break the caller (it aborted showing an incoming chat message)
+  let el = $("toast"); if (!el) { el = document.createElement("div"); el.id = "toast"; el.className = "toast"; el.setAttribute("role", "status"); el.setAttribute("aria-live", "polite"); document.body.append(el); }
+  el.textContent = msg; el.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove("show"), 3200); }
 function fail(e, what){ console.error(e); toast((what || "That didn’t work") + ": " + friendly(e)); }
 function friendly(e){
   const m = (e && (e.message || e.error_description || e.error)) || String(e || "");
@@ -4938,7 +5037,8 @@ function filesSection(tbl, id, canUpload){
         const k = kind(f), who = (pname(f.uploaded_by) || "someone") + " · " + chatSize(f.size || 0);
         if (k === "image") {
           const img = h("img", { alt: f.name, loading: "lazy" });
-          mediaLink(f).then(u => { img.src = u; }, () => {});
+          imgWithRetry(img, long => { if (long && f.storage === "drive") LINKS.delete(f.id + ":long"); return mediaLink(f, long); },
+            () => img.replaceWith(h("span", { class: "fthumb-none" }, ic("file", 22), h("span", {}, "Preview unavailable"))));
           gal.append(h("figure", { class: "ftile" }, h("button", { type: "button", class: "fthumb", title: "Open " + f.name, onclick: () => openStored(f) }, img),
             h("figcaption", {}, h("span", { class: "fn", title: f.name }, f.name), h("span", { class: "fs" }, who), h("span", { class: "fact" }, h("button", { type: "button", class: "btn sm ghost", onclick: () => downloadFile(f) }, "Download"), delBtn(f)))));
         } else if (k === "video" || k === "audio") {
@@ -5672,9 +5772,11 @@ function homeHero(t0, me, scope){
   let nMeet = 0; try { nMeet = agenda(t0, t0).filter(it => !(it.end && new Date(it.end) < Date.now())).length; } catch (e) {}
   const nOnline = activePeople().filter(p => p.id !== me && isOnline(p.id)).length;
   const date = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
-  const facts = [date,
-    nNeed ? nNeed + (nNeed === 1 ? " task needs you" : " tasks need you") : "nothing needs you right now",
-    nMeet ? nMeet + (nMeet === 1 ? " meeting" : " meetings") + " left today" : null].filter(Boolean);
+  const dateShort = new Date().toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+  // (2026-11dl) one fact per line on phones; the number carries the weight, the words stay quiet
+  const fact = (n, one, many, none) => n ? h("span", { class: "hero-f" }, h("b", {}, String(n)), " " + (n === 1 ? one : many)) : none ? h("span", { class: "hero-f" }, none) : null;
+  const facts = [fact(nNeed, "task needs you", "tasks need you", "Nothing needs you right now"),
+    fact(nMeet, "meeting left today", "meetings left today")].filter(Boolean);
   const tile = (k, route, icon, label, n, say, tone) => canSee(route) ? h("button", { type: "button", class: "hero-t", "data-k": k,
       "aria-label": label + (n ? ", " + say(n) : ""), onclick: () => go(route) },
     h("span", { class: "hero-ic" }, ic(icon, 20)), h("span", { class: "hero-l", "data-s": label === "Dev Board" ? "Board" : null }, label),
@@ -5683,9 +5785,10 @@ function homeHero(t0, me, scope){
   return h("section", { class: "hero", "aria-label": "Welcome" },
     h("div", { class: "hero-brand" }, h("img", { src: "icons/icon-192.png", alt: "", class: "hero-logo", width: "28", height: "28" }),
       h("b", {}, "Tcipher Workspace"), h("span", { class: "hero-sep", "aria-hidden": "true" }),
-      h("span", { class: "hero-tag" }, ic("users", 15), "Internal team platform")),
+      h("span", { class: "hero-tag" }, ic("users", 15), "Internal team platform"),
+      h("time", { class: "hero-date", datetime: new Date().toISOString().slice(0, 10), title: date }, h("span", { class: "d-long" }, date), h("span", { class: "d-short" }, dateShort))),
     h("h1", { class: "hero-h" }, greet + ", ", h("span", { class: "hero-name" }, first)),
-    h("p", { class: "hero-p" }, facts.join(" · ")),
+    h("p", { class: "hero-p" }, facts),
     (() => { const ts = [
       tile("tasks", "tasks", "check", "Tasks", nNeed, n => n + " need you"),
       tile("dev", "dev-board", "code", "Dev Board", nDev, n => n + " open of yours"),
@@ -6108,7 +6211,7 @@ const myGoogle = () => rows("google_links").find(l => l.user_id === S.me.id) || 
 const gExpiredKey = () => "tc_g_expired_" + (S.me ? S.me.id : "");
 const googleExpired = () => { try { return localStorage.getItem(gExpiredKey()) === "1"; } catch (e) { return false; } };
 function setGoogleExpired(on){ try { on ? localStorage.setItem(gExpiredKey(), "1") : localStorage.removeItem(gExpiredKey()); } catch (e) {} }
-const isGoogleExpiry = e => /expired or revoked|invalid_grant|reconnect google|token has been revoked/i.test(String(e && e.message || e));
+const isGoogleExpiry = e => /expired or revoked|invalid_grant|reconnect google|token has been revoked|invalid authentication credentials/i.test(String(e && e.message || e));
 const googleConnected = () => !!myGoogle() && !googleExpired();
 
 function loadGoogle(){
@@ -6138,6 +6241,9 @@ async function callGoogle(action, extra, retried){
       if (!retried) { await new Promise(r => setTimeout(r, 2000)); return callGoogle(action, extra, true); }
       const e2 = new Error("Couldn’t reach Google sync (connection problem). It will try again by itself."); e2.transient = true; throw e2;
     }
+    // (2026-11dl) the workspace sign-in (not Google) lapsed and couldn't be renewed, e.g. a phone waking up: the app asks the
+    // person to sign in by itself, so this isn't a fault to file in Admin › Problems
+    if (/sign in again|session has expired/i.test(msg)) { const e3 = new Error("Your session has expired. Sign in again."); e3.transient = true; throw e3; }
     throw new Error(msg);
   }
   if (data && data.error) throw new Error(data.error);
@@ -7318,7 +7424,7 @@ async function renderNotePage(el, id){
         nbMediaLink(b.file, b.type === "video").then(url => {
           const el = b.type === "video" ? h("video", { class: "nb-video", src: url, controls: true, preload: "metadata", playsinline: true, draggable: "false" }) : h("img", { class: "nb-img", src: url, alt: nbText(b.html) || b.name || "Picture", draggable: "false" });
           if (b.type === "image") {
-            el.addEventListener("click", () => { const bx = el.closest(".nb-mbox"); if (!bx || !bx.classList.contains("nb-resizing")) window.open(url, "_blank", "noopener"); });
+            el.addEventListener("click", () => { const bx = el.closest(".nb-mbox"); if (!bx || !bx.classList.contains("nb-resizing")) openImageViewer(b.name || "Picture", url, () => saveFrom(url, b.name || "picture")); });
             // a tall phone photo starts at a comfortable height instead of filling the whole column
             el.addEventListener("load", () => { if (!b.width && el.naturalHeight > el.naturalWidth * 1.2) box.style.width = Math.round(560 * el.naturalWidth / el.naturalHeight) + "px"; }, { once: true });
           }
@@ -9284,7 +9390,22 @@ function phoneActs(root){
     sec.forEach(b => b.classList.add("m-hide"));   // also buttons added later (Summarize)
   }
 }
+// (2026-11dl, MB-031) tablets and small laptops (761–1,100 px): a table that doesn't fit its box becomes cards in a grid,
+// instead of scrolling sideways inside the box. Tables that fit stay tables.
+const TABLET_MQ = window.matchMedia("(min-width:761px) and (max-width:1100px)");
+function tabletTables(root){
+  phoneTables(root);   // labels each cell with its column name (used by the card layout)
+  for (const t of root.querySelectorAll(".tablewrap > table:not(.tcal)")) {
+    const w = t.parentElement;
+    if (!TABLET_MQ.matches) { w.classList.remove("t-cards"); continue; }
+    if (w.classList.contains("t-cards")) { if (w.dataset.tw && w.clientWidth > +w.dataset.tw + 40) w.classList.remove("t-cards"); else continue; }
+    if (t.scrollWidth > w.clientWidth + 2) { w.dataset.tw = t.scrollWidth; w.classList.add("t-cards"); }
+  }
+}
+TABLET_MQ.addEventListener("change", () => { const r = document.getElementById("content"); if (r) try { tabletTables(r); } catch (e) {} });
+window.addEventListener("resize", () => { if (!TABLET_MQ.matches) return; clearTimeout(phoneKitT); phoneKitT = setTimeout(phoneKit, 120); });
 function phoneKit(){
+  if (TABLET_MQ.matches) { const r = document.getElementById("content"); if (r) try { tabletTables(r); } catch (e) {} return; }
   if (!PHONE_MQ.matches) return;
   const root = document.getElementById("content"); if (!root) return;
   try { phoneTables(root); } catch (e) {}
@@ -9944,7 +10065,8 @@ function drawChatMessages(toBottom){
     if (mine) row.prepend(row.lastChild);            // the toolbar sits to the left of your bubble
     // phones: tap a message to show its reply / react / delete buttons (they'd squeeze every bubble otherwise)
     row.addEventListener("click", e => {
-      if (e.target.closest("a,button,audio,video,textarea,input")) return;
+      if (e.target.closest("a,button,audio,video,textarea,input,.vp,.cfile")) return;
+      if (PHONE_MQ_EARLY.matches) { openMessageSheet(m, bubble); return; }   // phones: one sheet for every message, yours or theirs
       const was = row.classList.contains("sel");
       row.parentElement && row.parentElement.querySelectorAll(".cmsg.sel").forEach(x => x.classList.remove("sel"));
       if (!was) row.classList.add("sel");
@@ -10069,7 +10191,7 @@ const typingAt = {}; let typingSentAt = 0;
 C.othersRead = C.othersRead || {};
 // sign the live connection in as this person, so private channels and access rules apply
 async function liveAuth(){ try { if (sb.realtime && sb.realtime.setAuth) await sb.realtime.setAuth(); } catch (e) { console.warn("live auth", e); } }
-let liveSubs = {}, userCh = null, liveRetry = 0, liveRetryT = null, liveStopping = false, liveReported = false;
+let liveSubs = {}, userCh = null, liveRetry = 0, liveRetryT = null, liveStopping = false, liveReported = false, chatDownSince = 0;
 async function startChatLive(){
   stopChatLive();
   await liveAuth();
@@ -10077,7 +10199,7 @@ async function startChatLive(){
   try {
     userCh = sb.channel("user:" + S.me.id, { config: { private: true } });
     userCh.on("broadcast", { event: "notif" }, ({ payload }) => onLiveNotif(payload));
-    userCh.subscribe((st, err) => { S.userLive = st; drawLiveStatus(); liveTrouble(st, err); });
+    userCh.subscribe((st, err) => { S.userLive = st; if (st === "SUBSCRIBED") { chatDownSince = 0; liveRetry = 0; } drawLiveStatus(); liveTrouble(st, err); });
   } catch (e) { console.warn("user live", e); }
   syncChatSubs();
 }
@@ -10099,6 +10221,7 @@ function syncChatSubs(){
         if (liveSubs[id]) liveSubs[id].st = st;
         if (st === "SUBSCRIBED") { liveRetry = 0; if (id === C.active) { lastChatPoll = 0; chatPoll(); } }   // catch up on anything sent while connecting
         if (st === "SUBSCRIBED" && subRetry[id]) subRetry[id].n = 0;
+        if (st === "SUBSCRIBED") chatDownSince = 0;
         drawLiveStatus(); liveTrouble(st, err, id);
       });
     } catch (e) { console.warn("chat live", e); }
@@ -10116,8 +10239,11 @@ function retryChatSub(id){
 function liveTrouble(st, err, id){
   if (st !== "CHANNEL_ERROR" && st !== "TIMED_OUT") return;
   // short drops are normal (laptop sleep, Wi-Fi); report only after repeated failures, about 3 minutes of trying, while someone is looking
-  const tries = id ? (subRetry[id] || {}).n || 0 : liveRetry;
-  if (!liveReported && tries >= 6 && navigator.onLine !== false && document.visibilityState === "visible") { liveReported = true; captureError("Instant chat has been down for several minutes: " + st + (err && err.message ? " (" + err.message + ")" : ""), "", { realtime: st }); }
+  // (2026-11dl) count real minutes on screen, not retries: phones that wake up fail a few times before the network is back,
+  // and those were filed as problems. Messages keep arriving every 2 seconds meanwhile, so only a long outage is worth a report.
+  const now = Date.now();
+  if (!chatDownSince || document.visibilityState !== "visible" || navigator.onLine === false) chatDownSince = now;
+  if (!liveReported && now - chatDownSince >= 10 * 60000) { liveReported = true; captureError("Instant chat has been down for several minutes: " + st + (err && err.message ? " (" + err.message + ")" : ""), "", { realtime: st }); }
   if (id) { retryChatSub(id); return; }
   // try again with growing pauses; the 2-second backup check keeps messages coming meanwhile
   if (S.me && !liveStopping && !liveRetryT) { const wait = Math.min(30000, 3000 * Math.pow(2, liveRetry++)); liveRetryT = setTimeout(() => { liveRetryT = null; if (S.me) startChatLive(); }, wait); }
@@ -10429,7 +10555,7 @@ function chatAttachments(m){
     if (/^audio\//.test(a.mime || "")) return voicePlayer(a);
     if (isImg) {
       const img = h("img", { class: "cimg", alt: a.name, loading: "lazy", width: "280", height: "200" });   // a fixed box, so the chat doesn't jump when the picture arrives
-      fileLink(a.id).then(u => { img.src = u; }, () => { img.replaceWith(fileCard(a)); });
+      imgWithRetry(img, long => { if (long) LINKS.delete(a.id + ":long"); return fileLink(a.id, long); }, () => { if (img.isConnected) img.replaceWith(fileCard(a)); });
       return h("button", { type: "button", class: "cimgbtn", title: "Open " + a.name, onclick: () => openChatFile(a, false) }, img);
     }
     return fileCard(a);
@@ -10487,8 +10613,42 @@ async function openFileInTab(getUrl, a){
     else fail(e, "Couldn’t open the file");
   }
 }
+// (2026-11dl) pictures open in a viewer inside the workspace: fitted to the screen, pinch or double-tap to zoom, drag
+// to move, Download, and ✕ / Back / Esc to close. They used to open as a bare file in a new tab — in the Android app
+// that replaced the workspace with a zoomed-in picture and no way back.
+async function openImageViewer(name, getUrl, download){
+  let url; try { url = typeof getUrl === "function" ? await getUrl() : getUrl; } catch (e) { fail(e, "Couldn’t open the picture"); return; }
+  const old = document.getElementById("imgView"); if (old) { try { old.close(); } catch (e) {} old.remove(); }
+  const img = h("img", { class: "lb-img", src: url, alt: name || "Picture", draggable: "false" });
+  const stage = h("div", { class: "lb-stage" }, img);
+  let scale = 1;
+  const apply = (cx, cy) => {
+    const before = { x: stage.scrollLeft, y: stage.scrollTop, w: stage.scrollWidth || 1, h: stage.scrollHeight || 1 };
+    stage.classList.toggle("zoomed", scale > 1.01);
+    img.style.width = scale > 1.01 ? (scale * 100) + "%" : "";
+    if (scale > 1.01 && cx != null) {   // keep the point under the finger where it was
+      const r = stage.getBoundingClientRect(), fx = (before.x + cx - r.left) / before.w, fy = (before.y + cy - r.top) / before.h;
+      requestAnimationFrame(() => { stage.scrollLeft = fx * stage.scrollWidth - (cx - r.left); stage.scrollTop = fy * stage.scrollHeight - (cy - r.top); });
+    }
+  };
+  stage.addEventListener("dblclick", e => { scale = scale > 1.01 ? 1 : 2.5; apply(e.clientX, e.clientY); });
+  // pinch with two fingers
+  const pts = new Map(); let pinch0 = 0, scale0 = 1;
+  stage.addEventListener("pointerdown", e => { pts.set(e.pointerId, e); if (pts.size === 2) { const [p1, p2] = [...pts.values()]; pinch0 = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY); scale0 = scale; } });
+  stage.addEventListener("pointermove", e => { if (!pts.has(e.pointerId)) return; pts.set(e.pointerId, e); if (pts.size === 2 && pinch0) { const [p1, p2] = [...pts.values()]; const d = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY); scale = Math.max(1, Math.min(5, scale0 * d / pinch0)); apply((p1.clientX + p2.clientX) / 2, (p1.clientY + p2.clientY) / 2); } });
+  const up = e => { pts.delete(e.pointerId); if (pts.size < 2) pinch0 = 0; };
+  stage.addEventListener("pointerup", up); stage.addEventListener("pointercancel", up);
+  const v = h("dialog", { id: "imgView", class: "lightbox", "aria-label": name || "Picture" },
+    h("div", { class: "lb-bar" }, h("span", { class: "lb-name" }, name || ""),
+      download ? h("button", { type: "button", class: "lb-btn", onclick: download }, ic("download", 18), h("span", {}, "Download")) : null,
+      h("button", { type: "button", class: "lb-btn lb-x", "aria-label": "Close", onclick: () => v.close() }, ic("x", 20))),
+    stage);
+  v.addEventListener("close", () => v.remove());
+  document.body.append(v); v.showModal();
+}
 async function openChatFile(a, download){
   try {
+    if (!download && /^image\//.test(a.mime || "")) { await openImageViewer(a.name, () => fileLink(a.id, true), () => openChatFile(a, true)); return; }
     if (!download) { await openFileInTab(() => fileLink(a.id, true), a); return; }
     if (a.size <= 20 * 1048576) { toast("Downloading " + a.name + "…"); await saveFetched(await fileLink(a.id, true), a.name, a.mime); return; }
     const url = await fileLink(a.id, true), piece = 8 * 1048576, parts = [];
@@ -10510,6 +10670,17 @@ function toastProgress(text){
 }
 
 // a viewable link for a stored file (Drive or the older Supabase storage)
+// (2026-11dl) pictures load lazily, so a short signed link can expire before the picture scrolls into view
+// (a broken-image icon on task and ticket screenshots). On an error, fetch a fresh long link once; then show a plain tile.
+function imgWithRetry(img, getUrl, onGiveUp){
+  let tries = 0;
+  img.addEventListener("error", async () => {
+    if (tries++ >= 1) { if (onGiveUp) onGiveUp(); return; }
+    try { const u = await getUrl(true); img.src = u + (u.includes("?") ? "&" : "?") + "r=" + Date.now(); } catch (e) { if (onGiveUp) onGiveUp(); }
+  });
+  getUrl(false).then(u => { img.src = u; }, () => { if (onGiveUp) onGiveUp(); });
+  return img;
+}
 async function mediaLink(f, long){
   if (f.storage === "drive") return fileLink(f.id, long);
   return storeLink(f, false);
@@ -10536,7 +10707,17 @@ async function toWav(arrayBuf){
 }
 const voiceSecs = name => { const m = String(name || "").match(/\((\d+):(\d\d)\)/); return m ? +m[1] * 60 + +m[2] : 0; };
 const mmss = s => !isFinite(s) || s < 0 ? "0:00" : Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0");
+// (2026-11dl) one player per voice note: when the conversation is redrawn (a new message, a read receipt) the same
+// player moves into the new bubble. A fresh player each time left the old one playing out of sight, so ▶/⏸ and the
+// bar on screen never followed what you were hearing.
+const VP_BOXES = new Map();
 function voicePlayer(a){
+  if (a && a.id && VP_BOXES.has(a.id)) return VP_BOXES.get(a.id);
+  const box0 = voicePlayer0(a);
+  if (a && a.id) { VP_BOXES.set(a.id, box0); if (VP_BOXES.size > 80) { const k = VP_BOXES.keys().next().value; const old = VP_BOXES.get(k); if (!old.classList.contains("playing")) VP_BOXES.delete(k); } }
+  return box0;
+}
+function voicePlayer0(a){
   const au = new Audio(); au.preload = "none";
   const playBtn = h("button", { type: "button", class: "vp-play", "aria-label": "Play voice note", "data-multi": "1" }, "▶");
   const fill = h("span", { class: "vp-fill" }), knob = h("span", { class: "vp-knob" });
@@ -10737,6 +10918,28 @@ function reactionsRow(m){
   if (!groups.length) return h("div", { class: "reacts", hidden: true });
   return h("div", { class: "reacts" }, groups.map(g => h("button", { type: "button", class: "react" + (g.who.includes(S.me.id) ? " mine" : ""),
     title: g.who.map(id => id === S.me.id ? "You" : (pname(id) || "Someone")).join(", ") + " reacted " + g.e, onclick: () => toggleReaction(m, g.e) }, g.e, h("span", {}, String(g.who.length)))));
+}
+// (2026-11dl) phones: tap a message → a small sheet with quick reactions and Reply · Copy · Info · Edit · Delete.
+// The inline toolbar had no room beside long bubbles from other people, so their messages had no options.
+function openMessageSheet(m, bubble){
+  const old = document.getElementById("msgSheet"); if (old) { try { old.close(); } catch (e) {} old.remove(); }
+  const mine = m.author_id === S.me.id, gone = !!m.unsent_at;
+  const close = () => { try { v.close(); } catch (e) {} v.remove(); };
+  const act = (icon, label, fn, cls) => h("button", { type: "button", class: "ms-act" + (cls ? " " + cls : ""), onclick: () => { close(); fn(); } }, h("span", { class: "ms-ic", "aria-hidden": "true" }, icon), h("span", { class: "ms-l" }, label));
+  const text = String(m.body || "").trim();
+  const v = h("dialog", { id: "msgSheet", class: "msheet", "aria-label": "Message options" },
+    gone ? null : h("div", { class: "ms-reacts" }, QUICK_REACT.slice(0, 6).map(e => h("button", { type: "button", class: "ms-emoji", "aria-label": "React " + e, onclick: () => { close(); toggleReaction(m, e); } }, e)),
+      h("button", { type: "button", class: "ms-emoji ms-more", "aria-label": "More reactions", onclick: () => { close(); openEmojiPicker(chatEls && chatEls.ta || document.body, e2 => toggleReaction(m, e2)); } }, "+")),
+    h("div", { class: "ms-acts" },
+      gone ? null : act("↩", "Reply", () => setReplyTo(m)),
+      !gone && text ? act(ic("copy", 18), "Copy text", async () => { try { await navigator.clipboard.writeText(text); toast("Copied."); } catch (e) { toast("Couldn’t copy on this device."); } }) : null,
+      mine && !gone ? act("ⓘ", "Info", () => openMessageInfo(m)) : null,
+      mine && !gone ? act(ic("pencil", 18), "Edit", () => editMessage(m, bubble)) : null,
+      act(ic("trash", 18), "Delete", () => openDeleteChoice(m), "bad")),
+    h("button", { type: "button", class: "ms-cancel", onclick: close }, "Cancel"));
+  v.addEventListener("click", e => { if (e.target === v) close(); });   // tap outside the sheet
+  v.addEventListener("close", () => v.remove());
+  document.body.append(v); v.showModal();
 }
 // the small toolbar on a message: reply, react, edit, delete
 function messageActions(m, bubble){
@@ -11333,7 +11536,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11dk";
+const APP_VERSION = "2026-11dl";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -13664,7 +13867,9 @@ function scrollKey(n, root){
 function saveScrolls(root){
   const m = new Map();
   const pg = root.firstElementChild; if (!pg) return m;   // keys start below the page box (its class differs on first draw)
-  try { for (const n of pg.querySelectorAll("*")) if (n.scrollLeft || n.scrollTop) m.set(scrollKey(n, pg), [n.scrollLeft, n.scrollTop]); } catch (e) {}
+  // (2026-11dl) not the chat's message list: the chat keeps itself at the newest message, and putting back an old
+  // position after a redraw left a just-sent message half-hidden behind the box with "Jump to latest" over it
+  try { for (const n of pg.querySelectorAll("*")) if ((n.scrollLeft || n.scrollTop) && !n.closest(".chat-msgs")) m.set(scrollKey(n, pg), [n.scrollLeft, n.scrollTop]); } catch (e) {}
   return m;
 }
 function restoreScrolls(root, m){
@@ -14368,7 +14573,7 @@ function startLive(){
     if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
       if (!liveDownSince) liveDownSince = Date.now();
       // the backup checks keep things current meanwhile; tell an admin only if it's been down for 3 minutes
-      if (!liveReportedDown && Date.now() - liveDownSince > 180000 && navigator.onLine !== false && document.visibilityState === "visible") {
+      if (!liveReportedDown && Date.now() - liveDownSince > 600000 && navigator.onLine !== false && document.visibilityState === "visible") {
         liveReportedDown = true;
         captureError("Live updates have been down for 3 minutes: " + status + (err && err.message ? " (" + err.message + ")" : ""), "", { realtime: status });
       }
@@ -14394,6 +14599,7 @@ function catchUpAfterDrop(){
 function liveWake(){
   if (!S.me) return;
   if (liveDownSince) liveDownSince = Date.now();   // time spent hidden or asleep doesn't count as an outage
+  if (chatDownSince) chatDownSince = Date.now(); liveRetry = 0;
   if (S.live !== "SUBSCRIBED") { clearTimeout(wsRetryT); wsRetryT = null; wsRetry = 0; startLive(); }
   if (typeof startChatLive === "function") startChatLive();
 }
