@@ -10106,7 +10106,15 @@ let usageMove = 0; addEventListener("pointermove", () => { const n = Date.now();
 async function usagePing(){
   if (USAGE.off || !S.me || S.portal || document.visibilityState === "hidden") return;
   try {
-    const r = await sb.rpc("usage_ping", { p_device: MY_DEVICE, p_active: Date.now() - USAGE.last < 120000, p_session: USAGE_ID });
+    const args = { p_device: MY_DEVICE, p_active: Date.now() - USAGE.last < 120000, p_session: USAGE_ID };
+    // (2026-11eb) one check-in also refreshes "last seen" and "last active" on the server (upgrade-2026-11eb.sql), so
+    // the app no longer sends those two separately. Until that SQL is run, the older call and the separate saves stay.
+    let r;
+    if (USAGE.v2 !== false || Date.now() - (USAGE.v2At || 0) > 600000) {
+      r = await sb.rpc("usage_ping", Object.assign({ p_last: new Date(Math.min(Date.now(), typeof lastInput === "number" ? lastInput : USAGE.last)).toISOString() }, args));
+      if (!r.error) USAGE.v2 = true;
+      else if (/p_last|usage_ping|function|schema cache/i.test(r.error.message || "")) { USAGE.v2 = false; USAGE.v2At = Date.now(); r = await sb.rpc("usage_ping", args); }
+    } else r = await sb.rpc("usage_ping", args);
     if (r.error && /usage_ping|function|schema cache/i.test(r.error.message || "")) USAGE.off = true;   // not set up yet: stop asking
   } catch (e) {}
 }
@@ -10121,7 +10129,7 @@ function stopPresence(){
 }
 async function heartbeat(){
   if (!S.me || document.visibilityState === "hidden") return;
-  try {
+  if (!USAGE.v2 || USAGE.off) try {   // (2026-11eb) the usage check-in already refreshes "last seen" on the server
     // the device is saved once upgrade-2026-11cc.sql has added its column; until then, without it
     const row = { user_id: S.me.id, last_seen_at: new Date().toISOString() };
     if (S.devCols !== false) row.device = MY_DEVICE;
@@ -10130,7 +10138,8 @@ async function heartbeat(){
     else if (!r.error && row.device) S.devCols = true;
   } catch (e) {}
   // (2026-11ea) who's online comes live (presence channel); the "last seen" times only need a refresh every 5 minutes
-  if (!heartbeat.n || ++heartbeat.n % 5 === 0) { heartbeat.n = heartbeat.n || 1; await load("presence", true); paintPresence(); }
+  // (2026-11eb) "last active" times aren't sent live any more (only real status changes are): refreshed here too
+  if (!heartbeat.n || ++heartbeat.n % 5 === 0) { heartbeat.n = heartbeat.n || 1; await load("presence", true); if (heartbeat.n > 1 && S.loaded.has("user_status")) await load("user_status", true).catch(() => {}); paintPresence(); if (typeof paintStatus === "function") paintStatus(); }
 }
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && S.me) { heartbeat(); usagePing(); } });
 const isOnline = id => ONLINE.has(id);
@@ -11900,7 +11909,8 @@ async function activityTick(){
   if (lastInput > lastSent && idleMin < 1.5) {
     lastSent = Date.now();
     const back = st && ["idle", "offline"].includes(st.state);
-    await saveMyStatus(Object.assign({ last_active_at: new Date(lastInput).toISOString() }, back || !st ? { state: "active", idle_since: null } : {}));
+    // (2026-11eb) the usage check-in keeps "last active" current on the server; save here only when the status itself changes
+    if (!(st && !back && USAGE.v2 && !USAGE.off)) await saveMyStatus(Object.assign({ last_active_at: new Date(lastInput).toISOString() }, back || !st ? { state: "active", idle_since: null } : {}));
     // activity answers an idle warning, not the check-in one (closing it here made it reappear with a chime every minute)
     if (warnState && !(warnEl && warnEl.dataset.kind === "checkin")) closeIdleWarning();
   } else if (st && st.state === "active" && idleMin >= 10) {
@@ -12131,7 +12141,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ea";
+const APP_VERSION = "2026-11eb";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
