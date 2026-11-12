@@ -2264,7 +2264,8 @@ dialog:has(.ai-imp) {width:min(1100px,calc(100vw - 24px))}
   .dv-toolbar .dv-who{min-width:0;max-width:none;width:100%}
   .dv-toolbar .dv-chip{white-space:nowrap}
   .dv-toolbar > .dv-chip:first-of-type{grid-column:1}
-  .dv-boardwrap{max-height:none;overflow-x:auto;overflow-y:visible;scroll-snap-type:x mandatory;margin:0 -16px;padding:0 16px 8px;scroll-padding:0 16px}
+  .dv-boardwrap{max-height:none;overflow-x:auto;overflow-y:visible;scroll-snap-type:x mandatory;margin:0 -16px;padding:0 16px 8px;scroll-padding:0 16px;
+    overscroll-behavior-x:contain;overscroll-behavior-y:auto;touch-action:pan-x pan-y}   /* up/down swipes scroll the page (2026-11db) */
   .dv-board{display:grid;grid-auto-flow:column;grid-template-columns:none;grid-auto-columns:calc(100vw - 48px);min-width:0;gap:12px}
   .dv-col{scroll-snap-align:start;min-width:0}
   .dv-card{min-width:0;max-width:100%}
@@ -8725,7 +8726,21 @@ async function pushOnStart(){
 // signing out stops this device getting that person's notifications
 async function signOutHere(){ try { const sub = await pushSub(); if (sub) await sb.from("push_subscriptions").delete().eq("endpoint", sub.endpoint); if (IN_IOS_APP()) localStorage.removeItem(NATIVE_KEY()); } catch (e) {} return sb.auth.signOut(); }
 // tapping a notification while the workspace is open: go to that item here
-window.tcOpenUrl = url => { try { const u = new URL(url, location.href); if (u.origin === location.origin && u.hash) location.hash = u.hash; } catch (e) {} };   // called by the iPhone app
+// called by the iPhone and Android apps when a notification (or a workspace link) is tapped: close whatever window or
+// menu is open, then go to that item (2026-11db: it used to open behind an open window, or not at all for the same link)
+// (2026-11db) the iPhone app switches its pull-to-refresh off on the chat screen (the Android app asks the page itself)
+const tellAppRoute = () => { try { if (window.TcipherApp && window.TcipherApp.platform === "ios" && window.webkit && window.webkit.messageHandlers.tcApp) window.webkit.messageHandlers.tcApp.postMessage({ type: "route", chat: /^#(chat|open\/chat)/.test(location.hash) }); } catch (e) {} };
+window.addEventListener("hashchange", tellAppRoute); setTimeout(tellAppRoute, 0);
+window.tcOpenUrl = url => {
+  try {
+    const u = new URL(url, location.href); if (u.origin !== location.origin) return;
+    try { closeDlg(); } catch (e) {}
+    const np = document.getElementById("npanel"); if (np) np.hidden = true;
+    document.querySelectorAll(".side.open").forEach(x => x.classList.remove("open"));   // the phone menu
+    if (!u.hash || u.hash === "#") { go("dashboard"); return; }
+    if (u.hash === location.hash) window.dispatchEvent(new HashChangeEvent("hashchange")); else location.hash = u.hash;
+  } catch (e) {}
+};
 if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", e => {
   const d = e.data || {}; if (d.type !== "open" || !d.url) return;
   try { const u = new URL(d.url, location.href); if (u.origin === location.origin) { if (u.hash && u.hash !== location.hash) location.hash = u.hash; window.focus(); } } catch (err) {}
@@ -10337,7 +10352,7 @@ function voiceNoteButton(getSend){
     if (!C.active) return;
     if (typeof chatFilesReady === "function" && !chatFilesReady()) return;   // it explains what's missing (Google Drive)
     try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-    catch (e) { toast(e && e.name === "NotAllowedError" ? "Microphone blocked. Allow the microphone for this site, then try again." : "No microphone found."); return; }
+    catch (e) { toast(e && e.name === "NotAllowedError" ? (typeof IN_IOS_APP === "function" && IN_IOS_APP() ? "Microphone blocked. Allow it in your phone’s Settings › Apps › Tcipher Workspace › Permissions, then try again." : "Microphone blocked. Allow the microphone for this site, then try again.") : "No microphone found."); return; }
     const cid = C.active; chunks = []; cancelled = false;
     rec = new MediaRecorder(stream, { mimeType: vt.type });
     rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
@@ -10703,7 +10718,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11da";
+const APP_VERSION = "2026-11db";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -13019,6 +13034,8 @@ function openTarget(tbl, id){
     if (!C.channels.find(c => c.id === id)) { toast("That conversation isn’t available to you."); go("chat"); return; }
     await openChannel(id); go("chat"); rerender(); })(); return; }
   if (tbl === "emails") { (async () => { await load("emails", true); const e = byId("emails", id); if (e) openEmail(e); else go("emails"); })(); return; }
+  // (2026-11db) on a phone or in the apps a note opens as its full page, not a small preview
+  if (tbl === "notes" && id && (window.matchMedia("(max-width:760px)").matches || (typeof IN_IOS_APP === "function" && IN_IOS_APP()))) { go("note=" + id); return; }
   const key = Object.keys(MOD).find(k => MOD[k].table === tbl);
   if (key && id) { openRecord(key, id); return; }
 }
