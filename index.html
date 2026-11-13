@@ -2288,10 +2288,13 @@ body.nb-moving,body.nb-moving *{cursor:grabbing!important;user-select:none!impor
 .dv-card,.card.tcard{position:relative}
 .tc-news{display:flex;width:fit-content;align-items:center;gap:5px;align-self:flex-start;max-width:100%;font-size:11.5px;line-height:18px;color:var(--p-ink);background:var(--p-soft);border:1px solid var(--p);border-radius:999px;padding:1px 8px 1px 6px;margin:0 30px 6px 0}
 .tc-news b{font-weight:700;white-space:nowrap}
+@media (max-width:760px){.cmsg .bub{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}.cmsg .bub a,.cmsg .bub img{-webkit-touch-callout:none}}
 .tc-news .av.xs{width:16px;height:16px;font-size:8px}
 .tc-news .av.xs.on::after{display:none}
 .tc-news-ago{color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .card.tcard.has-news,.dv-card.has-news{box-shadow:0 0 0 2px var(--p)}
+tr.has-news>td:first-child{box-shadow:inset 3px 0 0 var(--p)}
+td>.tc-news{margin:0 0 4px}
 .tcard-menu{position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:6px;display:grid;place-items:center;color:var(--ink2);background:rgba(255,255,255,.92);opacity:0;transition:opacity .12s;z-index:2}
 .dv-card:hover .tcard-menu,.card.tcard:hover .tcard-menu,.tcard-menu:focus,.dv-card:focus-visible .tcard-menu{opacity:1}
 .tcard-menu:hover{background:var(--tint);color:var(--ink)}
@@ -2405,7 +2408,7 @@ dialog:has(.ai-imp) {width:min(1100px,calc(100vw - 24px))}
 
 /* (2026-11cy) the board scrolls on its own and the column names (To Do, In Progress…) stay at the top */
 .dv-boardwrap{overflow:auto;max-height:calc(100dvh - var(--dv-top, 220px));min-height:360px;overscroll-behavior:contain}
-.dv-colh{position:sticky;top:-8px;z-index:2;background:inherit;margin:-8px -8px 0;padding:14px 14px 10px;border-radius:10px 10px 0 0}
+.dv-colh{position:sticky;top:-8px;z-index:4;background:inherit;margin:-8px -8px 0;padding:14px 14px 10px;border-radius:10px 10px 0 0}
 .dv-col{background:var(--tint)}
 @media (max-width:760px){.dv-boardwrap{max-height:none;overflow-y:visible}.dv-colh{position:static;margin:0;padding:6px 6px 10px}}
 
@@ -4802,9 +4805,12 @@ function tableView(M, rs, A){
     return wrap;
   }
   const tb = h("tbody");
-  for (const r of rs){
-    tb.append(h("tr", { class: "click", tabindex: "0", onclick: () => openRecord(M.key, r.id), onkeydown: e => { if (e.key === "Enter") openRecord(M.key, r.id); } },
+  const isTasks = M.table === "tasks";   // (2026-11ef) tasks with new comments: tagged and on top, as on the boards
+  for (const r of (isTasks ? newsFirst(rs) : rs)){
+    const news = isTasks ? newsTag(r) : null;
+    tb.append(h("tr", { class: "click" + (news ? " has-news" : ""), tabindex: "0", onclick: () => openRecord(M.key, r.id), onkeydown: e => { if (e.key === "Enter") openRecord(M.key, r.id); } },
       cols.map((c, i) => h("td", { class: c.cls || null },
+        news && c.k === "title" ? news : null,
         c.get ? c.get(r) : c.render ? c.render(r[c.k], r) : (i === 0 && c.f && ["text","select"].includes(c.f.t) && c.f.t === "text") ? h("b", {}, r[c.k] || "–") : display(c.f, r[c.k], r)))));
   }
   wrap.append(h("table", {}, h("thead", {}, h("tr", {}, cols.map(c => h("th", { class: c.cls || null }, c.l)))), tb));
@@ -6718,11 +6724,14 @@ function attachMentions(ta, opts){
   };
   const query = () => {
     const pos = ta.selectionStart, before = ta.value.slice(0, pos);
-    const m = before.match(/(^|[\s(])@([^\s@]{0,24})$/u);
+    // (2026-11ef) a full name can be typed ("@Saurabh Mi"), and everyone who matches is listed (it scrolls), not just the first six
+    const m = before.match(/(^|[\s(])@([^\s@]{0,24}(?: [^\s@]{0,24}){0,2})$/u);
     if (!m) { close(); return; }
     start = pos - m[2].length - 1;
-    const q = m[2].toLowerCase();
-    items = activePeople().filter(p => p.id !== S.me.id && (!q || p.full_name.toLowerCase().startsWith(q) || p.full_name.toLowerCase().split(/\s+/).some(w => w.startsWith(q)))).slice(0, 6);
+    const q = m[2].toLowerCase().replace(/\s+/g, " ");
+    const nm = p => String(p.full_name || "").toLowerCase().replace(/\s+/g, " ");
+    items = activePeople().filter(p => p.id !== S.me.id && (!q || nm(p).startsWith(q) || (" " + nm(p)).includes(" " + q)))
+      .sort((a, b) => (nm(b).startsWith(q) ? 1 : 0) - (nm(a).startsWith(q) ? 1 : 0) || nm(a).localeCompare(nm(b)));
     // @all comes first when it matches what's typed
     if ("all".startsWith(q)) items.unshift({ id: "__all", all: true, full_name: "all", title: typeof opts.allLabel === "function" ? opts.allLabel() : (opts.allLabel || "Everyone who can see this") });
     if (!items.length) { close(); return; }
@@ -6731,8 +6740,9 @@ function attachMentions(ta, opts){
   ta.addEventListener("input", query);
   ta.addEventListener("keydown", e => {
     if (box.hidden) return;
-    if (e.key === "ArrowDown") { idx = (idx + 1) % items.length; draw(); e.preventDefault(); }
-    else if (e.key === "ArrowUp") { idx = (idx - 1 + items.length) % items.length; draw(); e.preventDefault(); }
+    const seen = () => { const on = box.querySelector(".mention-item.on"); if (on) on.scrollIntoView({ block: "nearest" }); };
+    if (e.key === "ArrowDown") { idx = (idx + 1) % items.length; draw(); seen(); e.preventDefault(); }
+    else if (e.key === "ArrowUp") { idx = (idx - 1 + items.length) % items.length; draw(); seen(); e.preventDefault(); }
     else if (e.key === "Enter" || e.key === "Tab") { pick(items[idx]); e.preventDefault(); e.stopImmediatePropagation(); }
     else if (e.key === "Escape") { close(); e.preventDefault(); e.stopPropagation(); }
   });
@@ -10772,6 +10782,8 @@ function drawChatMessages(toBottom){
       row.parentElement && row.parentElement.querySelectorAll(".cmsg.sel").forEach(x => x.classList.remove("sel"));
       if (!was) row.classList.add("sel");
     });
+    // (2026-11ef) phones: hold any message (a link, a file or a Meet card too, which a tap opens) for its options, as in WhatsApp
+    onLongPress(row, () => { if (PHONE_MQ_EARLY.matches) openMessageSheet(m, bubble); });
     msgs.append(row); lastAuthor = m.author_id; lastT = t;
     if (C.editing && C.editing.id === m.id && C.editing.cid === m.channel_id) {
       // the old edit box just left the page, so focus fell back to the page itself: give it back only in that case
@@ -10961,7 +10973,9 @@ function liveTrouble(st, err, id){
   // (2026-11dl) count real minutes on screen, not retries: phones that wake up fail a few times before the network is back,
   // and those were filed as problems. Messages keep arriving every 2 seconds meanwhile, so only a long outage is worth a report.
   const now = Date.now();
-  if (!chatDownSince || document.visibilityState !== "visible" || navigator.onLine === false) chatDownSince = now;
+  // (2026-11ef) and not time spent asleep: a laptop or phone waking up gets the dead connection's error before it notices the
+  // gap, and that was filed as "down for several minutes" a second after waking (every report on 13 Nov was this)
+  if (!chatDownSince || document.visibilityState !== "visible" || navigator.onLine === false || !awakeNow()) chatDownSince = now;
   if (!liveReported && now - chatDownSince >= 10 * 60000) { liveReported = true; captureError("Instant chat has been down for several minutes: " + st + (err && err.message ? " (" + err.message + ")" : ""), "", { realtime: st }); }
   if (id) { retryChatSub(id); return; }
   // try again with growing pauses; the 2-second backup check keeps messages coming meanwhile
@@ -11648,6 +11662,21 @@ function reactionsRow(m){
 }
 // (2026-11dl) phones: tap a message → a small sheet with quick reactions and Reply · Copy · Info · Edit · Delete.
 // The inline toolbar had no room beside long bubbles from other people, so their messages had no options.
+// a long press on a touch screen (about half a second, without moving): runs fn, and the tap that ends it does nothing else
+function onLongPress(el, fn){
+  let t = null, x0 = 0, y0 = 0, fired = false;
+  const stop = () => { clearTimeout(t); t = null; };
+  el.addEventListener("touchstart", e => {
+    if (e.touches.length !== 1) { stop(); return; }
+    fired = false; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; stop();
+    t = setTimeout(() => { t = null; fired = true; try { navigator.vibrate && navigator.vibrate(12); } catch (er) {} fn(); }, 450);
+  }, { passive: true });
+  el.addEventListener("touchmove", e => { if (t && Math.hypot(e.touches[0].clientX - x0, e.touches[0].clientY - y0) > 10) stop(); }, { passive: true });
+  el.addEventListener("touchend", e => { stop(); if (fired && e.cancelable) e.preventDefault(); });
+  el.addEventListener("touchcancel", stop);
+  el.addEventListener("contextmenu", e => { if (fired || PHONE_MQ_EARLY.matches) e.preventDefault(); });   // no browser link menu on top of ours
+  el.addEventListener("click", e => { if (fired) { fired = false; e.preventDefault(); e.stopImmediatePropagation(); } }, true);
+}
 function openMessageSheet(m, bubble){
   const old = document.getElementById("msgSheet"); if (old) { try { old.close(); } catch (e) {} old.remove(); }
   const mine = m.author_id === S.me.id, gone = !!m.unsent_at;
@@ -12272,7 +12301,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ee";
+const APP_VERSION = "2026-11ef";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -15384,7 +15413,7 @@ function startLive(){
       wsRetry = 0; liveDownSince = 0; liveReportedDown = false; return;
     }
     if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-      if (!liveDownSince) liveDownSince = Date.now();
+      if (!liveDownSince || !awakeNow()) liveDownSince = Date.now();   // (2026-11ef) time asleep isn't an outage
       // the backup checks keep things current meanwhile; tell an admin only if it's been down for 3 minutes
       if (!liveReportedDown && Date.now() - liveDownSince > 600000 && navigator.onLine !== false && document.visibilityState === "visible") {
         liveReportedDown = true;
@@ -15424,6 +15453,8 @@ function liveWake(){
 window.addEventListener("online", liveWake);
 // (2026-11cy) a computer that slept with the page on screen gives no "visible again" signal (Safari): notice the gap in time instead
 let wakeTick = Date.now();
+// the page has been running without a gap (no sleep, no frozen app) up to now: the 15-second tick below has kept up
+function awakeNow(){ return Date.now() - wakeTick < 30000; }
 setInterval(() => { const now = Date.now(); if (now - wakeTick > 60000) liveWake(); wakeTick = now; }, 15000);
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") liveWake(); });
 
