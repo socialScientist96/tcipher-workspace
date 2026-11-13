@@ -2288,11 +2288,13 @@ body.nb-moving,body.nb-moving *{cursor:grabbing!important;user-select:none!impor
 .dv-card,.card.tcard{position:relative}
 .tc-news{display:flex;width:fit-content;align-items:center;gap:5px;align-self:flex-start;max-width:100%;font-size:11.5px;line-height:18px;color:var(--p-ink);background:var(--p-soft);border:1px solid var(--p);border-radius:999px;padding:1px 8px 1px 6px;margin:0 30px 6px 0}
 .tc-news b{font-weight:700;white-space:nowrap}
+.dv-due{display:inline-flex;align-items:center;gap:3px;font-size:12px;color:var(--ink2);white-space:nowrap}
+.dv-due .ic{flex:none;opacity:.7}
 @media (max-width:760px){.cmsg .bub{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}.cmsg .bub a,.cmsg .bub img{-webkit-touch-callout:none}}
 .tc-news .av.xs{width:16px;height:16px;font-size:8px}
 .tc-news .av.xs.on::after{display:none}
 .tc-news-ago{color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.card.tcard.has-news,.dv-card.has-news{box-shadow:0 0 0 2px var(--p)}
+.card.tcard.has-news,.dv-card.has-news{box-shadow:inset 0 0 0 2px var(--p)}   /* (2026-11eg) inside the card: an outer ring was cut off under the sticky column header */
 tr.has-news>td:first-child{box-shadow:inset 3px 0 0 var(--p)}
 td>.tc-news{margin:0 0 4px}
 .tcard-menu{position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:6px;display:grid;place-items:center;color:var(--ink2);background:rgba(255,255,255,.92);opacity:0;transition:opacity .12s;z-index:2}
@@ -12068,9 +12070,16 @@ async function activityTick(){
   // tell the server about real use, at most once a minute
   if (lastInput > lastSent && idleMin < 1.5) {
     lastSent = Date.now();
-    const back = st && ["idle", "offline"].includes(st.state);
+    let back = st && ["idle", "offline"].includes(st.state);
+    // (2026-11eg) before switching back to active, ask the server: lunch or out of office may have been started on another
+    // device while this one was asleep, and switching "back" here ended the lunch early
+    if (back || !st) {
+      try { const fresh = ok(await sb.from("user_status").select("*").eq("user_id", S.me.id).maybeSingle()); if (fresh) { upsertCache("user_status", fresh); st = fresh; back = ["idle", "offline"].includes(st.state); } } catch (e) {}
+    }
+    const awayNow = st && ["lunch", "ooo"].includes(st.state) && st.until && new Date(st.until) > Date.now();
     // (2026-11eb) the usage check-in keeps "last active" current on the server; save here only when the status itself changes
-    if (!(st && !back && (serverSeen() || (UT.uid && UT.v3 === null)))) await saveMyStatus(Object.assign({ last_active_at: new Date(lastInput).toISOString() }, back || !st ? { state: "active", idle_since: null } : {}));
+    if (awayNow) { /* a lunch or out of office still running stays as it is; "I'm back" ends it */ }
+    else if (!(st && !back && (serverSeen() || (UT.uid && UT.v3 === null)))) await saveMyStatus(Object.assign({ last_active_at: new Date(lastInput).toISOString() }, back || !st ? { state: "active", idle_since: null } : {}));
     // activity answers an idle warning, not the check-in one (closing it here made it reappear with a chime every minute)
     if (warnState && !(warnEl && warnEl.dataset.kind === "checkin")) closeIdleWarning();
   } else if (st && st.state === "active" && idleMin >= 10) {
@@ -12301,7 +12310,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ef";
+const APP_VERSION = "2026-11eg";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -13445,9 +13454,22 @@ async function renderDevBoard(el){
   if (u.project && u.project !== "none" && !byId("projects", u.project)) u.project = "";
   const projSel = h("select", { class: "in dv-who", "aria-label": "Show one project’s work", onchange: e => { u.project = e.target.value; rerender(); } },
     h("option", { value: "" }, "All projects"), projs.map(p => h("option", { value: p.id, selected: u.project === p.id }, p.name)), h("option", { value: "none", selected: u.project === "none" }, "No project"));
-  el.append(h("div", { class: "dv-toolbar" }, q, whoSel, projSel,
+  // (2026-11eg) by due date: what's for today, what's late, what can wait
+  const dueSel = h("select", { class: "in dv-who", "aria-label": "Show tasks by due date", onchange: e => { u.due = e.target.value; rerender(); } },
+    [["", "Any due date"], ["now", "Due today or overdue"], ["today", "Due today"], ["overdue", "Overdue"], ["week", "Due in the next 7 days"], ["later", "Due later"], ["none", "No due date"]]
+      .map(([v, l]) => h("option", { value: v, selected: (u.due || "") === v }, l)));
+  el.append(h("div", { class: "dv-toolbar" }, q, whoSel, projSel, dueSel,
     chip("mine", "Only my work"), unChip("undev", "Unassigned Dev", nDev), unChip("unqa", "Unassigned QA", nQA), chip("archived", "Archived")), body);
   draw();
+}
+// the board's due-date filter (2026-11eg)
+function dueMatch(t, due){
+  if (!due) return true;
+  if (due === "none") return !t.due_date;
+  if (!t.due_date) return false;
+  const d = dayDiff(today(), String(t.due_date).slice(0, 10));
+  return due === "now" ? d <= 0 && t.status !== "Done" : due === "today" ? d === 0 : due === "overdue" ? d < 0 && t.status !== "Done"
+    : due === "week" ? d >= 0 && d <= 7 : due === "later" ? d > 7 : true;
 }
 function devBoard(u){
   const s = (u.q || "").toLowerCase(), since = Date.now() - DONE_DAYS * 864e5;
@@ -13460,7 +13482,8 @@ function devBoard(u){
     && (!u.needqa || (t.status === "In review" && !t.tester_id))
     && (!u.undev || (t.status !== "Done" && t.status !== "In review" && !ownersOf(t).length))
     && (!u.unqa || (t.status === "In review" && !t.tester_id))
-    && (!u.project || (u.project === "none" ? !t.project_id : t.project_id === u.project)))
+    && (!u.project || (u.project === "none" ? !t.project_id : t.project_id === u.project))
+    && dueMatch(t, u.due))
     .sort(boardOrder);
   const board = h("div", { class: "dv-board" });
   for (const [st, label] of FLOW){
@@ -13502,7 +13525,7 @@ function devCard(t){
     t.blocked ? h("span", { class: "dv-flag" }, ic("flag", 12), "Blocked") : null,
     h("span", { class: "dv-title" }, t.title),
     t.project_id && byId("projects", t.project_id) ? h("span", { class: "dv-proj", title: "Project" }, byId("projects", t.project_id).name) : null,
-    h("span", { class: "dv-foot" }, h("span", { class: "dv-key" }, taskKey(t)), h("span", { class: "grow" }),
+    h("span", { class: "dv-foot" }, h("span", { class: "dv-key" }, taskKey(t)), t.due_date && t.status !== "Done" ? h("span", { class: "dv-due", title: "Due " + fmtDate(t.due_date) }, ic("calendar", 12), dueTag(t.due_date, false)) : null, h("span", { class: "grow" }),
       t.status === "In review" ? (t.tester_id ? h("span", { class: "dv-qa", title: "Tester: " + pname(t.tester_id) }, "QA ", avatar(t.tester_id, "sm")) : h("span", { class: "dv-needqa" }, "Needs a tester")) : null,
       ownersOf(t).length ? faces(ownersOf(t)) : noone()));
   card.addEventListener("dragstart", e => { devDrag = t.id; card.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", t.id); });
@@ -15441,8 +15464,16 @@ function catchUpAfterDrop(){
     setTimeout(() => liveRedraw(), 800);
   } catch (e) {}
 }
+// (2026-11eg) my own status as saved (lunch or out of office may have been set on another device while this one slept)
+let myStatusAt = 0;
+async function refreshMyStatus(){
+  if (!S.me || Date.now() - myStatusAt < 20000) return;
+  myStatusAt = Date.now();
+  try { const r = ok(await sb.from("user_status").select("*").eq("user_id", S.me.id).maybeSingle()); if (r) { upsertCache("user_status", r); if (typeof paintStatus === "function") paintStatus(); } } catch (e) {}
+}
 function liveWake(){
   if (!S.me) return;
+  if (!liveHiddenOrOffline()) refreshMyStatus();
   if (liveHiddenOrOffline()) return;   // (2026-11dz) reconnect only for someone looking, with a network
   if (liveParked) { liveParked = false; wsRetry = 0; liveRetry = 0; startLive(); if (typeof startChatLive === "function") startChatLive(); if (typeof catchUpAfterDrop === "function") { lastCatchUp = 0; catchUpAfterDrop(); } return; }
   if (liveDownSince) liveDownSince = Date.now();   // time spent hidden or asleep doesn't count as an outage
