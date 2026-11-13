@@ -2286,6 +2286,12 @@ body.nb-moving,body.nb-moving *{cursor:grabbing!important;user-select:none!impor
 
 /* "⋯" on task cards (2026-11cb) */
 .dv-card,.card.tcard{position:relative}
+.tc-news{display:flex;width:fit-content;align-items:center;gap:5px;align-self:flex-start;max-width:100%;font-size:11.5px;line-height:18px;color:var(--p-ink);background:var(--p-soft);border:1px solid var(--p);border-radius:999px;padding:1px 8px 1px 6px;margin:0 30px 6px 0}
+.tc-news b{font-weight:700;white-space:nowrap}
+.tc-news .av.xs{width:16px;height:16px;font-size:8px}
+.tc-news .av.xs.on::after{display:none}
+.tc-news-ago{color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card.tcard.has-news,.dv-card.has-news{box-shadow:0 0 0 2px var(--p)}
 .tcard-menu{position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:6px;display:grid;place-items:center;color:var(--ink2);background:rgba(255,255,255,.92);opacity:0;transition:opacity .12s;z-index:2}
 .dv-card:hover .tcard-menu,.card.tcard:hover .tcard-menu,.tcard-menu:focus,.dv-card:focus-visible .tcard-menu{opacity:1}
 .tcard-menu:hover{background:var(--tint);color:var(--ink)}
@@ -3343,6 +3349,40 @@ async function notify(userIds, title, body, tbl, entityId){
   if (!ids.length) return;
   try { await sb.from("notifications").insert(ids.map(user_id => ({ user_id, title, body: body || "", tbl: tbl || "", entity_id: entityId || null }))); }
   catch (e) { console.warn("notify", e); }
+}
+// (2026-11ee) new comments on a task that I haven't opened since: my unread "commented on" / "tagged you in"
+// notifications for it. Opening the task marks them read, which clears the tag and its place at the top.
+const COMMENT_NOTE = / (commented on|tagged you in) /;
+async function loadTaskNews(){
+  if (!S.me) return;
+  try { S.taskNews = (ok(await sb.from("notifications").select("id,title,entity_id,created_by,created_at").eq("user_id", S.me.id).eq("tbl", "tasks").eq("is_read", false).order("created_at", { ascending: false }).limit(500)) || []).filter(n => n.entity_id && COMMENT_NOTE.test(n.title || "")); }
+  catch (e) {}
+}
+function taskNews(id){
+  if (!id || !S.taskNews || !S.taskNews.length) return null;
+  const ns = S.taskNews.filter(n => String(n.entity_id) === String(id));
+  if (!ns.length) return null;
+  return { count: ns.length, who: [...new Set(ns.map(n => n.created_by).filter(x => x && x !== S.me.id))], at: ns[0].created_at };
+}
+const taskNewsSig = () => (S.taskNews || []).map(n => n.id).join();
+// tasks with new comments go to the top of their column, the latest comment first; the rest keep their order
+function newsFirst(list){
+  if (!S.taskNews || !S.taskNews.length) return list;
+  return list.map((t, i) => { const n = taskNews(t.id); return [n ? +new Date(n.at) : 0, i, t]; })
+    .sort((a, b) => (b[0] ? 1 : 0) - (a[0] ? 1 : 0) || (b[0] - a[0]) || (a[1] - b[1])).map(x => x[2]);
+}
+function newsTag(t){
+  const n = taskNews(t.id); if (!n) return null;
+  const who = n.who.length ? n.who.map(x => pname(x).split(" ")[0]).join(", ") : "Someone";
+  return h("span", { class: "tc-news", title: who + " commented " + fmtAgo(n.at) + ". Open the task to read it." },
+    ic("message", 13), h("b", {}, n.count > 1 ? n.count + " new comments" : "New comment"),
+    n.who[0] ? avatar(n.who[0], "xs") : null, h("span", { class: "tc-news-ago" }, fmtAgo(n.at)));
+}
+function dropTaskNews(match){
+  if (!S.taskNews) return;
+  const before = S.taskNews.length;
+  S.taskNews = S.taskNews.filter(n => !match(n));
+  if (S.taskNews.length !== before && ["tasks", "dev-board"].includes(S.route)) rerender();
 }
 
 /* ---------------------------------------------------------------------
@@ -4780,7 +4820,7 @@ function boardView(M, rs, A){
   const wrap = h("div", { class: "boardwrap" }), board = h("div", { class: "board" });
   wrap.append(board);
   for (const o of opts(f)){
-    const items = rs.filter(r => r[f.k] === o.v);
+    const items = M.table === "tasks" ? newsFirst(rs.filter(r => r[f.k] === o.v)) : rs.filter(r => r[f.k] === o.v);
     const sum = M.board.sum ? items.reduce((s, r) => s + (+r[M.board.sum] || 0), 0) : null;
     const col = h("section", { class: "col", "aria-label": o.l },
       h("div", { class: "colh" }, h("b", {}, o.l), h("span", {}, items.length + (sum ? " · " + money(sum, true) : ""))),
@@ -4822,8 +4862,9 @@ function genericCard(titleKey, metaFn, personKey){
 }
 function taskCard(r){
   const proj = r.vertical === "Development" ? refLabel("projects", r.project_id) : (isAdmin() ? r.vertical : "");
-  return h("button", { type: "button", class: "card tcard edge-" + String(r.priority || "medium").toLowerCase() },
+  return h("button", { type: "button", class: "card tcard edge-" + String(r.priority || "medium").toLowerCase() + (taskNews(r.id) ? " has-news" : "") },
     taskCardMenu(r, () => openRecord("tasks", r.id)),
+    newsTag(r),
     r.blocked ? h("span", { class: "flag" }, "Blocked" + (r.blocked_reason ? ": " + r.blocked_reason : "")) : null,
     openDeps(r).length ? h("span", { class: "flag", style: "background:var(--info-t);color:var(--info)" }, "Waits on " + openDeps(r).map(taskKey).join(", ")) : null,
     h("p", { class: "t" }, taskKey(r) ? h("span", { class: "tkey" }, taskKey(r)) : null, " ", r.title),
@@ -4885,6 +4926,7 @@ async function openRecord(key, id, preset, opts){
     if (!rec && key === "notes") { closeDlg(); go("note=" + id); return; }   // the page explains, and offers "Request access"
     if (!rec) { toast("That " + M.one + " isn’t available any more."); return; }
   }
+  if (key === "tasks" && rec && taskNews(rec.id)) markNotifsReadFor("tasks", rec.id);   // (2026-11ee) opened: its new comments are read
   // Development tasks open in the simpler, Jira-style view (the full form is one click away from there)
   if (key === "tasks" && rec && rec.vertical === "Development" && !(opts && opts.form) && typeof openDevTask === "function") { openDevTask(rec.id); return; }
   // a new task starts with the simple form (the full one is behind "More options")
@@ -12230,7 +12272,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ed";
+const APP_VERSION = "2026-11ee";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -12710,7 +12752,7 @@ async function addComment(tbl, id, body){ try { await sb.from("comments").insert
   T.deleteConfirm = rec => "Delete " + (taskKey(rec) || "this task") + " permanently? Its comments and history go too. (Admins keep a copy.) If you just want it off the boards, use Archive instead.";
   // QA stage on the cards
   const card0 = T.board.card;
-  T.board.card = (r, M) => { const c = card0(r, M); const b = qaBadge(r); if (b) { const slot = c.querySelector(".cm") || c; slot.prepend(b); } return c; };
+  T.board.card = (r, M) => { const c = card0(r, M); const b = qaBadge(r); if (b) { const slot = c.querySelector(".cm") || c; const nt = slot.querySelector(":scope > .tc-news"); if (nt) nt.before(b); else slot.prepend(b); } return c; };
   T.quick.splice(4, 0, ["qa", "In QA", t => t.status === "In review" && !!t.qa_state]);
   // a bug's test case follows the bug: fixed → Retest for the tester
   const after0 = T.after;
@@ -13393,7 +13435,7 @@ function devBoard(u){
     .sort(boardOrder);
   const board = h("div", { class: "dv-board" });
   for (const [st, label] of FLOW){
-    const items = list.filter(t => t.status === st);
+    const items = newsFirst(list.filter(t => t.status === st));
     const col = h("section", { class: "dv-col", "aria-label": label, "data-status": st },
       h("div", { class: "dv-colh" }, h("span", {}, label), h("span", { class: "dv-n" }, String(items.length)), st === "Done" ? h("span", { class: "muted", style: "font-weight:400" }, "last 2 weeks") : null),
       h("div", { class: "dv-cards" }, items.slice(0, 200).map(devCard)));
@@ -13424,8 +13466,9 @@ function dropTo(t, st){
 let devDrag = null;
 function devCard(t){
   const back = t.status === "In progress" && t.qa_state === "Failed";
-  const card = h("button", { type: "button", class: "dv-card", draggable: "true", "data-id": t.id, onclick: () => openDevTask(t.id) },
+  const card = h("button", { type: "button", class: "dv-card" + (taskNews(t.id) ? " has-news" : ""), draggable: "true", "data-id": t.id, onclick: () => openDevTask(t.id) },
     taskCardMenu(t, () => openDevTask(t.id)),
+    newsTag(t),
     back ? h("span", { class: "dv-flag" }, "↩ Sent back by QA") : null,
     t.blocked ? h("span", { class: "dv-flag" }, ic("flag", 12), "Blocked") : null,
     h("span", { class: "dv-title" }, t.title),
@@ -13569,6 +13612,7 @@ async function openDevTask(id){
   if (!t) { toast("That task isn’t available any more."); return; }
   if (t.vertical !== "Development") { openRecord("tasks", id, null, { form: true }); return; }
   if (S.devOpen !== id) S.devTab = "comments";
+  if (taskNews(id)) markNotifsReadFor("tasks", id);
   S.devOpen = id;
   drawDevTask(id);
 }
@@ -14589,9 +14633,11 @@ function liveRedraw(){ clearTimeout(liveRedrawT); if (userBusy()) { liveRedrawT 
    Notifications
    --------------------------------------------------------------------- */
 async function loadNotifications(){
-  await load("notifications", true);
+  const sig = taskNewsSig();
+  await Promise.all([load("notifications", true), loadTaskNews()]);
   S.notifications = rows("notifications");
   renderShell();
+  if (taskNewsSig() !== sig && ["tasks", "dev-board"].includes(S.route)) rerender();
   if (!$("npanel").hidden) drawNotifications();
 }
 // open a record, chat or email by its table and id (from a notification, or a link in an email)
@@ -14622,6 +14668,7 @@ async function markNotifsReadFor(tbl, id){
     const { error } = await sb.from("notifications").update({ is_read: true }).eq("user_id", S.me.id).eq("tbl", tbl).eq("entity_id", id).eq("is_read", false);
     if (error) return;
     (S.notifications || []).forEach(n => { if (n.tbl === tbl && String(n.entity_id) === String(id)) n.is_read = true; });
+    if (tbl === "tasks") dropTaskNews(n => String(n.entity_id) === String(id));
     renderShell();
     const np = document.getElementById("npanel"); if (np && !np.hidden && typeof drawNotifications === "function") drawNotifications();
   } catch (e) {}
@@ -14633,7 +14680,7 @@ function drawNotifications(){
   for (const n of S.notifications){
     list.append(h("button", { type: "button", class: "nitem" + (n.is_read ? "" : " unread"), onclick: async () => {
       p.hidden = true;
-      if (!n.is_read) { try { const { error } = await sb.from("notifications").update({ is_read: true }).eq("id", n.id); if (!error) { n.is_read = true; renderShell(); } } catch (e) {} }
+      if (!n.is_read) { try { const { error } = await sb.from("notifications").update({ is_read: true }).eq("id", n.id); if (!error) { n.is_read = true; dropTaskNews(x => x.id === n.id); renderShell(); } } catch (e) {} }
       if (n.tbl === "connect-google") { if (googleConnected() && (canEmail() || !/email/i.test(n.title || ""))) toast("Google is already connected."); else connectGoogle(); return; }
       if (n.tbl === "team-day") { S.ui.day = { day: localDay(n.created_at || new Date()), user: n.entity_id || "" }; go("admin-day"); return; }
       if (n.tbl === "profiles") { if (n.entity_id === S.me.id) openMyProfile(); else if (isAdmin()) { await ensure(["profiles", "roles"]); openUserEditor(n.entity_id); } else openPerson(n.entity_id); return; }   // (2026-11cy) email change requests
@@ -14642,7 +14689,7 @@ function drawNotifications(){
   }
   p.replaceChildren(h("div", { class: "nh" }, h("b", {}, "Notifications"),
     h("button", { type: "button", class: "btn sm ghost", onclick: async () => {
-      try { ok(await sb.from("notifications").update({ is_read: true }).eq("user_id", S.me.id).eq("is_read", false)); S.notifications.forEach(n => n.is_read = true); drawNotifications(); renderShell(); } catch (e) { fail(e); }
+      try { ok(await sb.from("notifications").update({ is_read: true }).eq("user_id", S.me.id).eq("is_read", false)); S.notifications.forEach(n => n.is_read = true); dropTaskNews(() => true); drawNotifications(); renderShell(); } catch (e) { fail(e); }
     } }, "Mark all read")), list);
 }
 
