@@ -10978,7 +10978,7 @@ function liveTrouble(st, err, id){
   // (2026-11ef) and not time spent asleep: a laptop or phone waking up gets the dead connection's error before it notices the
   // gap, and that was filed as "down for several minutes" a second after waking (every report on 13 Nov was this)
   if (!chatDownSince || document.visibilityState !== "visible" || navigator.onLine === false || !awakeNow()) chatDownSince = now;
-  if (!liveReported && now - chatDownSince >= 10 * 60000) { liveReported = true; captureError("Instant chat has been down for several minutes: " + st + (err && err.message ? " (" + err.message + ")" : ""), "", { realtime: st }); }
+  lastChatErr = st + (err && err.message ? " (" + err.message + ")" : "");   // (2026-11eh) reported from trackOutage, which counts only awake time
   if (id) { retryChatSub(id); return; }
   // try again with growing pauses; the 2-second backup check keeps messages coming meanwhile
   if (S.me && !liveRetryT && !liveHiddenOrOffline()) { const wait = Math.min(liveRetry >= 6 ? 300000 : 30000, 3000 * Math.pow(2, liveRetry++)); liveRetryT = setTimeout(() => { liveRetryT = null; if (S.me && !liveConnected() && !liveHiddenOrOffline()) startChatLive(); }, wait); }
@@ -12310,7 +12310,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11eg";
+const APP_VERSION = "2026-11eh";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -15438,10 +15438,7 @@ function startLive(){
     if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
       if (!liveDownSince || !awakeNow()) liveDownSince = Date.now();   // (2026-11ef) time asleep isn't an outage
       // the backup checks keep things current meanwhile; tell an admin only if it's been down for 3 minutes
-      if (!liveReportedDown && Date.now() - liveDownSince > 600000 && navigator.onLine !== false && document.visibilityState === "visible") {
-        liveReportedDown = true;
-        captureError("Live updates have been down for 3 minutes: " + status + (err && err.message ? " (" + err.message + ")" : ""), "", { realtime: status });
-      }
+      lastLiveErr = status + (err && err.message ? " (" + err.message + ")" : "");   // (2026-11eh) reported from trackOutage
       // (2026-11dz) every reconnect makes the database record a subscription for each table (and remove it again):
       // phones and hidden tabs retrying all day were most of the project's disk use. No retries while hidden or
       // offline (coming back to the page reconnects once), and after repeated failures wait up to 5 minutes.
@@ -15486,7 +15483,19 @@ window.addEventListener("online", liveWake);
 let wakeTick = Date.now();
 // the page has been running without a gap (no sleep, no frozen app) up to now: the 15-second tick below has kept up
 function awakeNow(){ return Date.now() - wakeTick < 30000; }
-setInterval(() => { const now = Date.now(); if (now - wakeTick > 60000) liveWake(); wakeTick = now; }, 15000);
+// (2026-11eh) outages are measured on this clock: only the time between two on-time ticks counts, and a gap (sleep, a frozen
+// app, a hidden window) starts the count again. Measuring from the first error counted the night a laptop slept as an outage.
+let liveDownAwake = 0, chatDownAwake = 0, lastLiveErr = "", lastChatErr = "";
+function trackOutage(gap){
+  if (!S.me) { liveDownAwake = chatDownAwake = 0; return; }
+  const counts = gap < 30000 && document.visibilityState === "visible" && navigator.onLine !== false;
+  const add = (down, n) => !down || !counts ? 0 : n + gap;
+  liveDownAwake = add(!liveParked && S.live !== "SUBSCRIBED", liveDownAwake);
+  chatDownAwake = add(!liveParked && !!S.userLive && !liveConnected(), chatDownAwake);
+  if (!liveReportedDown && liveDownAwake >= 600000) { liveReportedDown = true; captureError("Live updates have been down for 10 minutes: " + (lastLiveErr || S.live), "", { realtime: S.live }); }
+  if (!liveReported && chatDownAwake >= 600000) { liveReported = true; captureError("Instant chat has been down for several minutes: " + (lastChatErr || S.userLive), "", { realtime: S.userLive }); }
+}
+setInterval(() => { const now = Date.now(), gap = now - wakeTick; if (gap > 60000) liveWake(); wakeTick = now; try { trackOutage(gap); } catch (e) {} }, 15000);
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") liveWake(); });
 
 // Quietly load every section this person can open, so switching pages is instant.
