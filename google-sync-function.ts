@@ -16,6 +16,10 @@ const TZ = "Asia/Kolkata";
 const GID = Deno.env.get("GOOGLE_CLIENT_ID") ?? "";
 const GSECRET = Deno.env.get("GOOGLE_CLIENT_SECRET") ?? "";
 const CRON = Deno.env.get("CRON_SECRET") ?? "";
+// (2026-11eh) Gmail push: Gmail tells Google Pub/Sub about new mail, and Pub/Sub calls this function
+// (…/functions/v1/google-sync?gmail_push=<GMAIL_PUSH_KEY>). Without these two secrets, replies are checked every 2 minutes as before.
+const GMAIL_TOPIC = Deno.env.get("GMAIL_PUSH_TOPIC") ?? "";   // projects/<project id>/topics/<topic>
+const GMAIL_KEY = Deno.env.get("GMAIL_PUSH_KEY") ?? "";
 const CAL = "https://www.googleapis.com/calendar/v3/calendars/primary/events";
 const MEET = "https://meet.googleapis.com/v2/";
 
@@ -714,7 +718,50 @@ async function quickReplies(userId: string): Promise<number> {
 }
 async function syncReplies(userId: string) {
   const r = await checkReplies(userId);
+  try { await userGmailWatch(userId); } catch (_) { /* push is a bonus: the 2-minute check still runs without it */ }
   return r.found;
+}
+/* ---------------- Gmail push (2026-11eh) ---------------- */
+// Ask Gmail to tell us about new mail in the inbox. A watch lasts 7 days; renewed when under a day is left.
+async function gmailWatch(token: string, until: string | null): Promise<string | null> {
+  if (!GMAIL_TOPIC) return null;
+  if (until && Date.parse(until) > Date.now() + 24 * 3600e3) return null;
+  const r = await g(token, GMAIL + "watch", { method: "POST", body: JSON.stringify({ topicName: GMAIL_TOPIC, labelIds: ["INBOX"], labelFilterBehavior: "INCLUDE" }) });
+  return r && r.expiration ? new Date(Number(r.expiration)).toISOString() : null;
+}
+async function userGmailWatch(userId: string) {
+  const r = await db.from("google_links").select("scopes,gmail_watch_until").eq("user_id", userId).maybeSingle();
+  if (r.error || !r.data || !String(r.data.scopes || "").includes("gmail.readonly")) return;   // no column yet, or no Gmail reading
+  const until = await gmailWatch(await accessFor(userId), r.data.gmail_watch_until);
+  if (until) await db.from("google_links").update({ gmail_watch_until: until }).eq("user_id", userId);
+}
+async function senderGmailWatch() {
+  const r = await db.from("mail_sender").select("*").eq("id", 1).maybeSingle();
+  if (r.error || !r.data || !r.data.refresh_token || !String(r.data.scopes || "").includes("gmail.readonly") || !("watch_until" in r.data)) return;
+  const until = await gmailWatch(await senderToken(r.data), r.data.watch_until);
+  if (until) await db.from("mail_sender").update({ watch_until: until }).eq("id", 1);
+}
+const watchLive = (until: unknown) => !!until && Date.parse(String(until)) > Date.now();
+// a push from Pub/Sub: { message: { data: base64 {"emailAddress","historyId"} } }. Answered at once; the reading runs just after.
+const gmailBusy = new Map<string, number>();
+async function gmailPush(body: Any) {
+  let addr = "";
+  try { addr = String(JSON.parse(atob(String(body && body.message && body.message.data || ""))).emailAddress || "").trim().toLowerCase(); } catch (_) { return; }
+  if (!addr || (gmailBusy.get(addr) || 0) > Date.now() - 3000) return;   // a burst: the first read covers it
+  gmailBusy.set(addr, Date.now());
+  await new Promise((ok) => setTimeout(ok, 1500));
+  const sender = must(await db.from("mail_sender").select("google_email").eq("id", 1).maybeSingle());
+  if (sender && String(sender.google_email || "").toLowerCase() === addr) {
+    try {
+      const r = await mailRun(true);
+      if (r && (r as Any).busy) { await new Promise((ok) => setTimeout(ok, 20000)); await mailRun(true); }   // a send was running: read after it
+    } catch (_) { /* the 30-minute safety check catches up */ }
+  }
+  const links = must(await db.from("google_links").select("user_id,google_email,scopes")) || [];
+  for (const l of links) {
+    if (String(l.google_email || "").toLowerCase() !== addr || !String(l.scopes || "").includes("gmail.readonly")) continue;
+    try { await quickReplies(l.user_id); } catch (_) { /* the safety check catches up */ }
+  }
 }
 async function checkReplies(userId: string): Promise<{ found: number; checked: number; problem: string }> {
   const sc = await gmailScopes(userId);
@@ -884,7 +931,7 @@ async function readSenderReplies(row: Any, token: string) {
       latest = String(r.historyId || latest); page = r.nextPageToken; if (!page) break;
     }
   } catch (_) { const prof = await g(token, GMAIL + "profile"); await db.from("mail_sender").update({ history_id: String(prof.historyId || "") }).eq("id", 1); return 0; }
-  await db.from("mail_sender").update({ history_id: latest }).eq("id", 1);
+  if (latest !== String(row.history_id)) await db.from("mail_sender").update({ history_id: latest }).eq("id", 1);   // only when Gmail's bookmark moved
   if (!ids.size) return 0;
   const done = new Set(((must(await db.from("email_reply_log").select("gmail_message_id").in("gmail_message_id", [...ids])) || []) as Any[]).map((x) => x.gmail_message_id));
   let posted = 0;
@@ -914,16 +961,16 @@ async function readSenderReplies(row: Any, token: string) {
   return posted;
 }
 // one run every 2 minutes; a lock stops two runs overlapping
-async function mailRun() {
+async function mailRun(fromPush = false) {
   const until = new Date(Date.now() + 100000).toISOString(), nowIso = new Date().toISOString();
   const lock = must(await db.from("mail_sender").update({ running_until: until }).eq("id", 1).neq("refresh_token", "")
     .or('running_until.is.null,running_until.lt."' + nowIso + '"').select("*"));
-  const row = lock && lock[0]; if (!row) return { emailed: 0, posted: 0 };
+  const row = lock && lock[0]; if (!row) return { emailed: 0, posted: 0, busy: true };
   try {
     const token = await senderToken(row);
     let posted = 0;
-    try { posted = await readSenderReplies(row, token); } catch (e) { await db.from("mail_sender").update({ last_error: "Reading replies failed: " + String((e as Error)?.message || e).slice(0, 200) }).eq("id", 1); }
-    const emailed = await sendPendingEmails(row, token);
+    if (fromPush || !watchLive(row.watch_until)) try { posted = await readSenderReplies(row, token); } catch (e) { await db.from("mail_sender").update({ last_error: "Reading replies failed: " + String((e as Error)?.message || e).slice(0, 200) }).eq("id", 1); }
+    const emailed = fromPush ? 0 : await sendPendingEmails(row, token);
     return { emailed, posted };
   } finally { await db.from("mail_sender").update({ running_until: null }).eq("id", 1); }
 }
@@ -932,6 +979,16 @@ async function mailRun() {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "Use POST." }, 405);
+  // (2026-11eh) Gmail push through Pub/Sub: answered straight away, the new mail is read just after
+  const gk = new URL(req.url).searchParams.get("gmail_push");
+  if (gk !== null) {
+    if (!GMAIL_KEY || gk !== GMAIL_KEY) return new Response(null, { status: 204 });   // not ours: nothing to retry
+    const body = await req.json().catch(() => ({}));
+    const work = gmailPush(body).catch(() => {});
+    const rt = (globalThis as Any).EdgeRuntime;
+    if (rt && typeof rt.waitUntil === "function") rt.waitUntil(work); else await work;
+    return new Response(null, { status: 204 });
+  }
   // (2026-11ed) Google Calendar push: answered straight away, the changes are fetched just after
   if (req.headers.get("x-goog-channel-id")) {
     const work = calPush(req).catch(() => {});
@@ -947,9 +1004,11 @@ Deno.serve(async (req) => {
     // Scheduled job: sync everyone + import today's and yesterday's Meet joins
     if (action === "replies_all") {
       if (!CRON || req.headers.get("x-cron-secret") !== CRON) return json({ error: "Not allowed." }, 403);
-      const links = must(await db.from("google_links").select("user_id,scopes")) || [];
+      // (2026-11eh) called by the database only when an email is due, or (every 2 minutes) while Gmail push isn't on for someone
+      const lr = await db.from("google_links").select("user_id,scopes,gmail_watch_until");
+      const links = lr.error ? (must(await db.from("google_links").select("user_id,scopes")) || []) : (lr.data || []);
       let replies = 0, failed = 0;
-      for (const l of links.filter((x: Any) => String(x.scopes || "").includes("gmail.readonly"))) { try { replies += await quickReplies(l.user_id); } catch (_) { failed++; } }
+      for (const l of links.filter((x: Any) => String(x.scopes || "").includes("gmail.readonly") && !watchLive(x.gmail_watch_until))) { try { replies += await quickReplies(l.user_id); } catch (_) { failed++; } }
       let mail: Any = { emailed: 0, posted: 0 };
       try { mail = await mailRun(); } catch (e) { mail = { error: String((e as Error)?.message || e).slice(0, 200) }; }
       return json({ ok: true, replies, failed, ...mail });
@@ -966,6 +1025,8 @@ Deno.serve(async (req) => {
       const links = must(await db.from("google_links").select("user_id"));
       const result: Any = { synced: 0, failed: 0, joins: 0, checkedIn: 0 };
       for (const l of links) { try { await syncUser(l.user_id, "auto"); result.synced++; } catch (_) { result.failed++; } }
+      try { await senderGmailWatch(); } catch (_) { /* the 2-minute check still reads replies */ }
+      try { await mailRun(true); } catch (_) { /* safety: replies to notification emails a lost push missed */ }
       const settings = (must(await db.from("settings").select("data").eq("id", 1).maybeSingle()) || { data: {} }).data || {};
       const wd = settings.working_days || [1, 2, 3, 4, 5, 6], hol = (settings.holidays || []).map((h: Any) => h.date);
       const connected = new Set(links.map((l: Any) => l.user_id));
