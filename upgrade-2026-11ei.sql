@@ -1,17 +1,17 @@
 -- 2026-11ei · Notification-email check every 5 minutes, and not at night
 -- Before (2026-11eh): the database checked every minute, day and night, whether a notification email was due.
--- Now: every 5 minutes, and only between 8 am and 10 pm India time.
+-- Now: every 5 minutes, and only between 9 am and 10 pm India time.
 --   - A notification email goes out 2 to 7 minutes after the notification (was 2 to 3), if it's still unread.
 --   - At night nothing is checked. Notifications are emailed only while they're under 3 hours old, so one made at
---     night isn't emailed at all: it's waiting in the workspace in the morning. (Ones from after 5 am are emailed at 8 am.)
+--     night isn't emailed at all: it's waiting in the workspace in the morning. (Ones from after 6 am are emailed at 9 am.)
 --   - Replies still arrive within seconds (Gmail push). An inbox whose push has lapsed is checked every 5 minutes in the day.
 -- Run in Supabase › SQL editor. Safe to run more than once. Needs upgrade-2026-11eh.sql (already run).
 
 create or replace function public.mail_due() returns boolean
 language sql stable security definer set search_path = public as $$
   select
-    -- only in the day: 8 am to 10 pm India time
-    (now() at time zone 'Asia/Kolkata')::time between time '08:00' and time '21:59:59'
+    -- only in the day: 9 am to 10 pm India time (night is 10 pm to 9 am)
+    (now() at time zone 'Asia/Kolkata')::time between time '09:00' and time '21:59:59'
     and (
       -- a notification unread for 2 minutes (and under 3 hours), for someone not seen in the workspace for 6 minutes
       (exists (select 1 from public.mail_sender where id = 1 and refresh_token <> '')
