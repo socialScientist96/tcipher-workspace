@@ -293,6 +293,26 @@ a.tkey:hover{background:var(--tint2)}
 .frow .fbar{height:10px;border-radius:5px;background:var(--tint);overflow:hidden}
 .frow .fbar span{display:block;height:100%;background:var(--p);border-radius:5px}
 .frow .fn{white-space:nowrap;font-size:12.5px}
+/* WhatsApp conversations (2026-11es) */
+.wa-thread{display:flex;flex-direction:column;gap:6px;max-height:420px;min-height:90px;overflow:auto;padding:10px;background:var(--bg);border:1px solid var(--line);border-radius:12px}
+.wa-msg{max-width:80%;padding:7px 10px;border-radius:12px;font-size:14px;line-height:1.45;background:var(--white);border:1px solid var(--line);align-self:flex-start;overflow-wrap:anywhere}
+.wa-msg.out{align-self:flex-end;background:var(--tint);border-color:var(--tint2)}
+.wa-msg.failed{border-color:var(--bad)}
+.wa-msg .wa-body{white-space:pre-wrap}
+.wa-msg .wa-tpl{font-size:11.5px;color:var(--ink3);margin-bottom:2px}
+.wa-msg .wm{display:flex;gap:8px;justify-content:flex-end;font-size:11.5px;color:var(--ink3);margin-top:3px}
+.wa-msg .wa-st.read{color:var(--info)} .wa-msg .wa-st.failed,.wa-err{color:var(--bad)} .wa-err{font-size:12.5px;margin-top:3px}
+.wa-comp{display:flex;gap:8px;align-items:flex-end;margin-top:8px}
+.wa-comp textarea{flex:1;min-width:0;min-height:42px;max-height:180px;resize:vertical}
+.wa-btns{display:flex;flex-direction:column;gap:6px}
+.wa-win{font-size:12.5px;margin:6px 0 0}
+.wa-row{display:flex;gap:10px;align-items:center;width:100%;text-align:left;padding:10px 14px;border:0;border-bottom:1px solid var(--line);background:none;cursor:pointer;color:inherit;font:inherit}
+.wa-row:last-child{border-bottom:0} .wa-row:hover{background:var(--tint)}
+.wa-av{width:38px;height:38px;border-radius:50%;background:var(--tint2);color:var(--ink2);display:grid;place-items:center;font-weight:600;font-size:14px;flex:none}
+.wa-row .wx{flex:1;min-width:0} .wa-row .wx b,.wa-row .wx span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wa-row .wx b{font-weight:600} .wa-row .wx span{color:var(--ink3);font-size:13px} .wa-row.unread .wx b{font-weight:700} .wa-row.unread .wx span{color:var(--ink)}
+.wa-row .wt{display:flex;flex-direction:column;align-items:flex-end;gap:4px;font-size:12px;color:var(--ink3);flex:none}
+.wa-badge{background:var(--ok);color:#fff;border-radius:999px;min-width:20px;height:20px;padding:0 6px;display:grid;place-items:center;font-size:11.5px;font-weight:700}
 .ethread{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px}
 .ethread .eth{display:flex;justify-content:space-between;gap:10px;margin-bottom:6px;font-size:13.5px}
 .emsg{border-left:3px solid var(--line);padding:6px 10px;margin:6px 0;border-radius:0 8px 8px 0;background:#FBFBFE}
@@ -3192,14 +3212,14 @@ let sb = null, channel = null;
    --------------------------------------------------------------------- */
 const ORDER = {
   profiles: ["full_name", true], roles: ["name", true], targets: ["month", false], social_stats: ["month", false], activities: ["activity_date", false],
-  meetings: ["meeting_date", false], attendance: ["day", false], meeting_joins: ["joined_at", false], notes: ["updated_at", false], tasks: ["created_at", false], features: ["name", true], test_cases: ["number", true], google_links: ["connected_at", false], emails: ["sent_at", false], problem_reports: ["created_at", false], presence: ["last_seen_at", false], user_status: ["updated_at", false], calendar_events: ["start_date", true], settings: ["id", true], time_entries: ["work_date", false],
+  meetings: ["meeting_date", false], attendance: ["day", false], meeting_joins: ["joined_at", false], notes: ["updated_at", false], tasks: ["created_at", false], features: ["name", true], test_cases: ["number", true], google_links: ["connected_at", false], emails: ["sent_at", false], whatsapp_messages: ["sent_at", false], problem_reports: ["created_at", false], presence: ["last_seen_at", false], user_status: ["updated_at", false], calendar_events: ["start_date", true], settings: ["id", true], time_entries: ["work_date", false],
   activity_log: ["at", false], notifications: ["created_at", false], invoices: ["issue_date", false],
   leave_requests: ["start_date", false], expenses: ["spent_on", false],
   finance_entries: ["entry_date", false], salary_slips: ["month", false], finance_accounts: ["name", true], salary_setup: ["updated_at", false],
   // these tables have no created_at or id column
   user_status: ["updated_at", false], presence: ["last_seen_at", false]
 };
-const LIMIT = { activity_log: 300, notifications: 60, attendance: 20000, meeting_joins: 20000 };   // attendance: years of history for the whole team
+const LIMIT = { activity_log: 300, notifications: 60, whatsapp_messages: 3000, attendance: 20000, meeting_joins: 20000 };   // attendance: years of history for the whole team
 
 // which tables the page on screen was drawn from (2026-11dh): a live change to anything else doesn't redraw it
 let DRAWING_DEPS = null, PAGE_DEPS = null;
@@ -8741,6 +8761,7 @@ function badgeInfo(route){
       if (working && !onLeave && !rows("attendance").some(a => a.user_id === me && a.day === t0)) { due += 1; why.push("you haven’t checked in today"); return { due, fresh, why, bang: true }; }
     } break;
     case "chat": if (C.ready) { const t = chatTotals(); add(t.due, "unread direct messages and mentions", "due"); add(t.fresh, "unread in channels", "new"); } break;
+    case "whatsapp": if (L("whatsapp_messages")) add(waUnreadCount(), "unread WhatsApp messages", "due"); break;
     case "emails": if (L("emails")) {
       add(rows("emails").filter(e => e.user_id === me && e.direction === "in" && !e.read_at).length, "new " + "replies", "due");
     } break;
@@ -9129,7 +9150,7 @@ function contactBar(table, rec){
     onclick: () => { if (href) { if (/^(tel|sms):/i.test(href)) location.href = href; else window.open(href, "_blank", "noopener"); } log(kind); } }, label);
   return h("div", { class: "cbar" },
     btn("Call", phone ? telHref(phone) : null, "Call", !!phone),
-    h("button", { type: "button", class: "btn sm", disabled: !phone, title: phone ? "Pick a saved message" : "No phone saved", "aria-haspopup": "menu", onclick: e => openWhatsApp(table, rec, e.currentTarget) }, "WhatsApp"),
+    h("button", { type: "button", class: "btn sm", disabled: !phone, title: phone ? (waOn() ? "Message them from the business number" : "Pick a saved message") : "No phone saved", "aria-haspopup": waOn() ? null : "menu", onclick: e => { const sec = waOn() && document.getElementById("waSection"); if (sec) { sec.scrollIntoView({ behavior: "smooth", block: "start" }); const t = sec.querySelector("textarea:not([disabled])"); if (t) setTimeout(() => t.focus(), 400); } else openWhatsApp(table, rec, e.currentTarget); } }, "WhatsApp"),
     h("button", { type: "button", class: "btn sm", disabled: !email, title: email ? "" : "No email saved", onclick: () => { closeDlg(); openComposer({ ...emailCtx(table, rec), tbl: table, entity_id: rec.id }); } }, "✉️ Email"),
     btn("SMS", phone ? "sms:" + telHref(phone).slice(4) : null, "SMS", !!phone),
     h("button", { type: "button", class: "btn sm soft", onclick: () => log("Note") }, "+ Log activity"));
@@ -9178,6 +9199,7 @@ async function setDealOutcome(rec, what){
 function crmDetail(table, rec, box){
   box.append(h("div", { class: "section" }, h("h3", {}, "Contact"), contactBar(table, rec),
     h("p", { class: "muted", style: "font-size:12.5px;margin:6px 0 0" }, "Opens your phone, WhatsApp or email, and logs it here." + (rec.last_contacted_at ? " Last contacted " + fmtAgo(rec.last_contacted_at) + "." : " Not contacted yet.")), waConsentLine(table, rec)));
+  { const was = waSection(table, rec); if (was) box.append(was); }   // (2026-11es)
   if (table === "leads"){
     if ((rec.form_submissions || []).length) box.append(formAnswersSection(rec));
     if (rec.deal_id){
@@ -9820,6 +9842,251 @@ for (const [key, tbl] of [["leads","leads"], ["ig_leads","leads"], ["deals","dea
       after: async () => { if (["Draft", ""].includes(rec.status || "")) { try { await updateRow("proposals", rec.id, { status: "Sent", sent_on: today() }); } catch (e) {} } } }); } }, "✉️ Email this proposal"));
     return out;
   };
+}
+
+/* ---------- WhatsApp Business (2026-11es) ----------
+   Messages to and from the business number live on the lead (or deal) they belong to: the WhatsApp section on a lead
+   or deal shows the conversation with a reply box, and Communication › WhatsApp lists every conversation. Meta's
+   key stays in the whatsapp-send function. Within 24 hours of the person's last message anything can be sent; after
+   that only an approved template, and only if they agreed to WhatsApp messages. Until an admin switches on "Send from
+   the dashboard", the WhatsApp button opens WhatsApp on your own phone as before. */
+const WA = { templates: null, status: null };
+const waCan = () => isAdmin() || lvl("leads") >= 1 || lvl("sales") >= 1;
+const waOn = () => S.settings && S.settings.whatsapp_api === true;
+const WA_DAY = 86400000;
+async function waCall(body, file){
+  let payload = body;
+  if (file) { payload = new FormData(); payload.append("payload", JSON.stringify(body)); payload.append("file", file, file.name || "file"); }
+  const { data, error } = await sb.functions.invoke("whatsapp-send", { body: payload });
+  if (error){
+    let j = null; try { j = await error.context.json(); } catch (e) {}
+    const status = error.context && error.context.status;
+    const e2 = new Error((j && j.error) || (status === 404 ? "The “whatsapp-send” function isn’t set up yet." : error.message || "WhatsApp didn’t answer."));
+    if (j) { e2.needsTemplate = !!j.needs_template; e2.needsConsent = !!j.needs_consent; }
+    throw e2;
+  }
+  return data;
+}
+const waPhone = p => { const d = String(p || "").replace(/\D/g, ""); return d.length === 10 ? "91" + d : d; };
+const waShowPhone = d => { d = String(d || ""); return d.startsWith("91") && d.length === 12 ? "+91 " + d.slice(2, 7) + " " + d.slice(7) : "+" + d; };
+const waMsgs = () => rows("whatsapp_messages");
+function waLastIn(phone){ let t = 0; for (const m of waMsgs()) if (m.phone === phone && m.direction === "in") { const x = Date.parse(m.sent_at); if (x > t) t = x; } return t; }
+function waWho(m){
+  const l = m.lead_id && byId("leads", m.lead_id), d = m.deal_id && byId("deals", m.deal_id);
+  return (l && l.name) || (d && (d.contact_name || d.title)) || m.profile_name || waShowPhone(m.phone);
+}
+// the conversations, newest first: one per phone number
+function waConvos(){
+  const by = new Map();
+  for (const m of waMsgs()){
+    let c = by.get(m.phone);
+    if (!c) { c = { phone: m.phone, last: m, unread: 0, lead_id: null, deal_id: null, profile: "" }; by.set(m.phone, c); }
+    if (String(m.sent_at) > String(c.last.sent_at)) c.last = m;
+    if (m.direction === "in" && !m.read_at) c.unread++;
+    if (m.lead_id && !c.lead_id) c.lead_id = m.lead_id;
+    if (m.deal_id && !c.deal_id) c.deal_id = m.deal_id;
+    if (m.profile_name && !c.profile) c.profile = m.profile_name;
+  }
+  return [...by.values()].sort((a, b) => String(b.last.sent_at).localeCompare(String(a.last.sent_at)));
+}
+function waOwners(c){
+  const l = c.lead_id && byId("leads", c.lead_id), d = c.deal_id && byId("deals", c.deal_id);
+  return [l && l.sales_owner_id, l && l.owner_id, d && d.owner_id].filter(Boolean);
+}
+function waUnreadCount(){ let n = 0; for (const m of waMsgs()) if (m.direction === "in" && !m.read_at) n++; return n; }
+async function waMarkRead(list){
+  const ids = list.filter(m => m.direction === "in" && !m.read_at).map(m => m.id);
+  if (!ids.length) return;
+  const t = new Date().toISOString();
+  try { ok(await sb.from("whatsapp_messages").update({ read_at: t }).in("id", ids)); for (const m of waMsgs()) if (ids.includes(m.id)) m.read_at = t; renderShell(); } catch (e) { console.warn("wa read", e); }
+}
+const WA_TICK = { sending: "Sending…", sent: "✓ Sent", delivered: "✓✓ Delivered", read: "✓✓ Read", failed: "Not sent" };
+async function waOpenFile(id){
+  try { const f = ok(await sb.from("files").select("*").eq("id", id).maybeSingle()); if (!f) { toast("That file is no longer there."); return; } window.open(await storeLink(f), "_blank", "noopener"); }
+  catch (e) { fail(e, "Couldn’t open the file"); }
+}
+function waBubble(m){
+  const when = new Date(m.sent_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+  const out = m.direction === "out";
+  const parts = [];
+  if (m.template_name) parts.push(h("div", { class: "wa-tpl" }, "Template · " + m.template_name));
+  if (m.type === "location" && m.meta && m.meta.lat != null) parts.push(h("a", { href: "https://maps.google.com/?q=" + encodeURIComponent(m.meta.lat + "," + m.meta.lng), target: "_blank", rel: "noopener" }, m.body));
+  else parts.push(h("div", { class: "wa-body" }, m.body));
+  if (m.file_id) parts.push(h("button", { type: "button", class: "linkbtn", onclick: () => waOpenFile(m.file_id) }, ic(m.type === "image" ? "image" : m.type === "video" ? "film" : m.type === "audio" ? "music" : "paperclip", 13), " Open " + (m.type === "image" ? "photo" : m.type === "document" ? (m.meta && m.meta.filename) || "document" : m.type)));
+  else if (m.media_id) parts.push(h("span", { class: "muted", style: "font-size:12px" }, "(file not saved: open WhatsApp Manager to see it)"));
+  if (m.status === "failed") parts.push(h("div", { class: "wa-err" }, m.error_text || "Not sent."));
+  parts.push(h("div", { class: "wm" }, out && m.sent_by ? h("span", {}, pname(m.sent_by).split(" ")[0]) : null, h("span", {}, when), out ? h("span", { class: "wa-st " + m.status }, WA_TICK[m.status] || m.status) : null));
+  return h("div", { class: "wa-msg " + m.direction + (m.status === "failed" ? " failed" : "") }, parts);
+}
+// the conversation with one person, and the reply box. target: { lead, deal, phone }
+function waConversation(target, opts){
+  opts = opts || {};
+  const phone = waPhone(target.phone || (target.deal && target.deal.phone) || (target.lead && target.lead.phone));
+  const box = h("div", { class: "wa-conv", "data-live": "wa" });
+  const draw = () => {
+    const list = waMsgs().filter(m => m.phone === phone || (target.lead && m.lead_id === target.lead.id) || (target.deal && m.deal_id === target.deal.id))
+      .sort((a, b) => String(a.sent_at).localeCompare(String(b.sent_at)));
+    const thread = h("div", { class: "wa-thread" }, list.length ? list.slice(-150).map(waBubble) : h("p", { class: "nothing", style: "margin:auto" }, "No WhatsApp messages yet."));
+    box.replaceChildren(thread, waComposer(target, phone, () => draw()));
+    requestAnimationFrame(() => { thread.scrollTop = thread.scrollHeight; });
+    if (opts.markRead !== false) setTimeout(() => waMarkRead(list), 800);
+  };
+  box._refresh = draw;
+  draw();
+  return box;
+}
+function waComposer(target, phone, redraw){
+  const lead = target.lead, deal = target.deal;
+  const wrap = h("div", { class: "wa-compwrap" });
+  if (!waOn()) {
+    wrap.append(h("p", { class: "muted wa-win" }, "Sending from the dashboard isn’t switched on yet. ",
+      (lead || deal) ? h("button", { type: "button", class: "linkbtn", onclick: e => openWhatsApp(lead ? "leads" : "deals", lead || deal, e.currentTarget) }, "Open WhatsApp on this device") : null));
+    return wrap;
+  }
+  if (!phone || phone.length < 11) { wrap.append(h("p", { class: "muted wa-win" }, "Add a phone number to message them on WhatsApp.")); return wrap; }
+  const lastIn = waLastIn(phone), open = lastIn && Date.now() - lastIn < WA_DAY;
+  const optedOut = lead && lead.whatsapp_opted_out_at;
+  const ids = { lead_id: lead ? lead.id : undefined, deal_id: !lead && deal ? deal.id : undefined };
+  const ta = h("textarea", { class: "in", rows: 2, placeholder: open ? "Message" : lastIn ? "Their last message was over 24 hours ago: send a template" : "They haven’t written yet: send a template", disabled: !open, "aria-label": "WhatsApp message" });
+  const sendBtn = h("button", { type: "button", class: "btn pri", disabled: !open }, ic("send", 15), "Send");
+  const fileIn = h("input", { type: "file", hidden: true, accept: "image/jpeg,image/png,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv" });
+  const attach = h("button", { type: "button", class: "iconbtn", title: "Send a photo or document", "aria-label": "Send a photo or document", disabled: !open, onclick: () => fileIn.click() }, ic("paperclip", 16));
+  const tplBtn = h("button", { type: "button", class: "btn", disabled: !!optedOut, title: optedOut ? "They sent STOP" : "Send an approved template", onclick: e => waPickTemplate(e.currentTarget, target, ids, redraw) }, "Template");
+  const busy = on => { sendBtn.disabled = on || !open; attach.disabled = on || !open; ta.disabled = on || !open; sendBtn.classList.toggle("busy", on); };
+  const after = r => { if (r && r.message) { S.cache.whatsapp_messages = [r.message, ...waMsgs().filter(x => x.id !== r.message.id)]; } redraw(); };
+  sendBtn.onclick = async () => {
+    const text = ta.value.trim(); if (!text) { ta.focus(); return; }
+    busy(true);
+    try { after(await waCall({ action: "send", kind: "text", text, ...ids })); }
+    catch (e) { busy(false); toast(friendly(e)); if (e.needsTemplate) redraw(); }
+  };
+  ta.addEventListener("keydown", e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); sendBtn.click(); } });
+  fileIn.onchange = async () => {
+    const f = fileIn.files && fileIn.files[0]; fileIn.value = ""; if (!f) return;
+    if (f.size > 16 * 1048576) { toast("That file is over 16 MB, which WhatsApp doesn’t allow."); return; }
+    const caption = prompt("Add a caption (optional)", "") ; if (caption === null) return;
+    busy(true);
+    try {
+      let saved = null;   // keep a copy in the record's Files too
+      try { saved = await storeUpload(lead ? "leads" : "deals", (lead || deal).id, f); } catch (e) { console.warn("wa file copy", e); }
+      after(await waCall({ action: "send", kind: "file", caption: caption.trim(), file_id: saved ? saved.id : undefined, ...ids }, f));
+    } catch (e) { busy(false); toast(friendly(e)); }
+  };
+  const win = open
+    ? "You can reply freely until " + new Date(lastIn + WA_DAY).toLocaleString("en-IN", { weekday: "short", hour: "numeric", minute: "2-digit" }) + "."
+    : lastIn ? "More than 24 hours since their last message: only an approved template can be sent." : "They haven’t messaged the business number yet: start with an approved template.";
+  wrap.append(h("div", { class: "wa-comp" }, attach, ta, h("div", { class: "wa-btns" }, sendBtn, tplBtn)), fileIn,
+    h("p", { class: "muted wa-win" }, optedOut ? "They sent STOP on " + fmtDate(localDay(optedOut), true) + ": templates are blocked. You can still reply if they write again. " : "", win,
+      !open && lead && !lead.whatsapp_consent_at && !optedOut ? " Templates need their agreement: use “They agreed” on the lead." : ""));
+  return wrap;
+}
+async function waApproved(force){
+  if (WA.templates && !force) return WA.templates;
+  const r = await waCall({ action: "templates" });
+  WA.templates = (r && r.templates) || [];
+  return WA.templates;
+}
+async function waPickTemplate(anchor, target, ids, redraw){
+  let list;
+  try { anchor.classList.add("busy"); list = await waApproved(); } catch (e) { toast(friendly(e)); return; } finally { anchor.classList.remove("busy"); }
+  if (!list.length) { toast("No templates are approved yet. Create them in Meta’s WhatsApp Manager; approval usually takes minutes to a day."); return; }
+  nbMenu(anchor, list.map(t => [t.name.replace(/_/g, " ") + (t.language && t.language !== "en" ? " (" + t.language + ")" : ""), () => waFillTemplate(t, target, ids, redraw)]), "Approved templates");
+}
+function waFillTemplate(t, target, ids, redraw){
+  const rec = target.lead || target.deal || {};
+  const first = String(rec.contact_name || rec.name || "").trim().split(/\s+/)[0] || "";
+  const guess = [first, S.me.full_name.split(" ")[0]];
+  const inputs = Array.from({ length: t.params }, (_, i) => h("input", { class: "in", value: i < 2 ? guess[i] : "", placeholder: "{{" + (i + 1) + "}}" }));
+  const preview = h("div", { class: "wa-msg out", style: "max-width:100%;margin-top:10px" });
+  const fill = () => t.body.replace(/\{\{\s*(\d+)\s*\}\}/g, (_, n) => (inputs[+n - 1] && inputs[+n - 1].value.trim()) || "{{" + n + "}}");
+  const paint = () => preview.replaceChildren(h("div", { class: "wa-body" }, fill()));
+  inputs.forEach(x => x.addEventListener("input", paint)); paint();
+  const send = h("button", { type: "button", class: "btn pri" }, ic("send", 15), "Send template");
+  send.onclick = async () => {
+    const params = inputs.map(x => x.value.trim());
+    if (params.some(p => !p)) { toast("Fill in every blank."); return; }
+    send.disabled = true; send.classList.add("busy");
+    try {
+      const r = await waCall({ action: "send", kind: "template", template: { name: t.name, language: t.language, params, preview: fill() }, ...ids });
+      if (r && r.message) S.cache.whatsapp_messages = [r.message, ...waMsgs().filter(x => x.id !== r.message.id)];
+      closeDlg(); toast("Sent on WhatsApp."); reopenWa(target);
+    } catch (e) { send.disabled = false; send.classList.remove("busy"); toast(friendly(e)); }
+  };
+  openDialog("Template: " + t.name.replace(/_/g, " "), [
+    t.params ? h("p", { class: "muted" }, "Fill in the blanks. Meta approved the rest of the wording, so it can’t be changed here.") : null,
+    ...inputs.map((x, i) => h("label", { class: "fl", style: "display:block;margin-bottom:8px" }, "Blank " + (i + 1), x)),
+    preview].filter(Boolean), [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: () => { closeDlg(); reopenWa(target); } }, "Cancel"), send], true);
+}
+// after a template dialog: back to where the person was
+function reopenWa(target){
+  if (S.route === "whatsapp") { const c = waConvos().find(x => x.phone === waPhone(target.phone || (target.lead || target.deal || {}).phone)); if (c) openWaChat(c.phone); return; }
+  if (target.lead) openRecord(target.lead.pipeline === "Instagram" ? "ig_leads" : "leads", target.lead.id);
+  else if (target.deal) openRecord("deals", target.deal.id);
+}
+// the WhatsApp section on a lead or deal
+function waSection(table, rec){
+  if (!waCan() || !["leads", "deals"].includes(table)) return null;
+  const has = waMsgs().some(m => (table === "leads" ? m.lead_id : m.deal_id) === rec.id || (rec.phone && m.phone === waPhone(rec.phone)));
+  if (!waOn() && !has) return null;
+  const target = table === "leads" ? { lead: rec, deal: rec.deal_id ? byId("deals", rec.deal_id) : null } : { deal: rec, lead: rec.lead_id ? byId("leads", rec.lead_id) : null };
+  if (table === "deals") target.phone = rec.phone;
+  return h("div", { class: "section", id: "waSection" }, h("h3", {}, "WhatsApp", rec.phone ? h("span", { class: "muted", style: "font-weight:500;font-size:12.5px" }, waShowPhone(waPhone(rec.phone))) : null), waConversation(target));
+}
+function openWaChat(phone){
+  const c = waConvos().find(x => x.phone === phone); if (!c) return;
+  const lead = c.lead_id && byId("leads", c.lead_id), deal = c.deal_id && byId("deals", c.deal_id);
+  const target = { lead: lead || null, deal: deal || null, phone };
+  const open = lead ? h("button", { type: "button", class: "btn", onclick: () => { closeDlg(); openRecord(lead.pipeline === "Instagram" ? "ig_leads" : "leads", lead.id); } }, "Open lead")
+    : deal ? h("button", { type: "button", class: "btn", onclick: () => { closeDlg(); openRecord("deals", deal.id); } }, "Open deal") : null;
+  openDialog(waWho(c.last) + " · " + waShowPhone(phone), [waConversation(target)], [h("span", { class: "sp" }), open, h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Close")].filter(Boolean));
+}
+/* the WhatsApp page: every conversation */
+async function renderWhatsApp(el){
+  await ensure(["whatsapp_messages", "leads", "deals"]);
+  if (S.route !== "whatsapp") return;
+  if (!S.ui.wa) S.ui.wa = { view: "all", q: "" };
+  const u = S.ui.wa;
+  el.append(h("div", { class: "ph" }, h("div", {}, h("h1", {}, "WhatsApp"), h("p", {}, "Every conversation with the business number. Each one is attached to a lead or deal; a message from a new number becomes a lead."))));
+  if (isAdmin()) el.append(waAdminPanel());
+  const q = h("input", { class: "in search", type: "search", placeholder: "Search name, number or message", value: u.q });
+  const listBox = h("div", { class: "panel wa-list", style: "padding:0" });
+  const draw = () => {
+    const s = u.q.trim().toLowerCase();
+    let cs = waConvos();
+    if (u.view === "mine") cs = cs.filter(c => waOwners(c).includes(S.me.id));
+    if (u.view === "unassigned") cs = cs.filter(c => !waOwners(c).length);
+    if (u.view === "unread") cs = cs.filter(c => c.unread);
+    if (s) cs = cs.filter(c => (waWho(c.last) + " " + c.phone + " " + c.last.body).toLowerCase().includes(s));
+    listBox.replaceChildren(...(cs.length ? cs.slice(0, 300).map(c => {
+      const name = waWho(c.last);
+      return h("button", { type: "button", class: "wa-row" + (c.unread ? " unread" : ""), onclick: () => openWaChat(c.phone) },
+        h("span", { class: "wa-av" }, initials(name)),
+        h("span", { class: "wx" }, h("b", {}, name), h("span", {}, (c.last.direction === "out" ? "You: " : "") + c.last.body)),
+        h("span", { class: "wt" }, fmtAgo(c.last.sent_at), c.unread ? h("span", { class: "wa-badge" }, String(c.unread)) : null));
+    }) : [h("div", { class: "empty" }, h("b", {}, u.q || u.view !== "all" ? "No conversations match" : "No WhatsApp messages yet"), waOn() ? "Messages to the business number appear here within seconds." : "Once WhatsApp Business is connected, messages to the business number appear here.")]));
+  };
+  q.addEventListener("input", () => { u.q = q.value; draw(); });
+  const unread = waConvos().filter(c => c.unread).length;
+  el.append(h("div", { class: "tb" }, q, segmented([["all", "All"], ["unread", "Unread" + (unread ? " (" + unread + ")" : "")], ["mine", "Mine"], ["unassigned", "Unassigned"]], u.view, v => { u.view = v; rerender(); })));
+  el.append(listBox); draw();
+}
+function waAdminPanel(){
+  const p = h("div", { class: "panel", style: "margin-bottom:14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap" });
+  const line = h("span", { style: "flex:1;min-width:220px" }, "Checking the WhatsApp Business connection…");
+  const sw = h("input", { type: "checkbox", checked: waOn() });
+  sw.onchange = async () => {
+    try { const data = { ...(await latestSettings()), whatsapp_api: sw.checked }; ok(await sb.from("settings").upsert({ id: 1, data, updated_at: new Date().toISOString() })); S.settings = data; toast(sw.checked ? "The team now sends WhatsApp from the dashboard." : "WhatsApp buttons open WhatsApp on each person’s device again."); rerender(); }
+    catch (e) { sw.checked = !sw.checked; fail(e, "Not saved"); }
+  };
+  p.append(line, h("label", { style: "display:flex;gap:8px;align-items:center;cursor:pointer" }, sw, h("span", {}, "Send from the dashboard")));
+  (async () => {
+    try {
+      const s = WA.status || (WA.status = await waCall({ action: "status" }));
+      line.replaceChildren(s.connected ? h("span", {}, h("b", {}, "Connected: "), (s.name || "") + " " + (s.number || ""), s.quality ? h("span", { class: "pill " + (s.quality === "GREEN" ? "ok" : s.quality === "YELLOW" ? "warn" : "bad"), style: "margin-left:8px" }, "Quality " + s.quality.toLowerCase()) : null)
+        : h("span", {}, h("b", {}, "Not connected yet. "), s.problem || "Add the Meta secrets in Supabase and deploy the two functions (see the setup guide)."));
+    } catch (e) { line.replaceChildren(h("span", {}, h("b", {}, "Not connected yet. "), friendly(e))); }
+  })();
+  return p;
 }
 
 /* ---------- new joinees: offer letter and onboarding ---------- */
@@ -12535,7 +12802,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11er";
+const APP_VERSION = "2026-11es";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -15697,7 +15964,7 @@ const NAV = [
   ["", [["dashboard","Home"], ["overview","Company overview"], ["tasks","Tasks"], ["notes","Notes"], ["calendar","Calendar"], ["team-calendar","Team calendar"]]],
   // Development and QA work on one simple board (2026-11ad); the older pages are hidden, their data is kept
   ["Development & QA", [["dev-board","Board"], ["projects","Projects"]]],   // projects: added 2026-11cy
-  ["Communication", [["chat","Chat"], ["emails","Emails"], ["announcements","Announcements"]]],
+  ["Communication", [["chat","Chat"], ["whatsapp","WhatsApp"], ["emails","Emails"], ["announcements","Announcements"]]],
   ["Sales", [["sales","Sales dashboard"], ["deals","Pipeline"], ["leads","Leads"], ["ig_leads","Instagram leads"], ["activities","Activities"], ["proposals","Proposals"], ["targets","Targets"], ["crm-analytics","Analytics"]]],
   // clients and everything they send through the client portal (2026-11bu)
   ["Clients", [["clients","Clients"], ["tickets","Requests & bugs"], ["contacts","Contacts"]]],
@@ -15717,6 +15984,7 @@ function canSee(route){
   if (route.startsWith("admin-")) return !!S.me.is_admin;
   if (route === "crm-analytics") return lvl("sales") >= 1 || lvl("leads") >= 1 || lvl("marketing") >= 1;
   if (route === "emails") return true;
+  if (route === "whatsapp") return waCan();   // (2026-11es)
   if (route === "my-salary") return !S.me.client_id;   // (2026-11ek) everyone on the team: their own salary
   if (["qa", "qa-import", "bugs"].includes(route)) return lvl("qa") >= 1;
   const M = MOD[route]; if (!M) return false;
@@ -15732,7 +16000,7 @@ function navOpen(group){
 function setNavOpen(group, open){ const st = navState(); st[group] = open; try { localStorage.setItem("tc_nav_" + S.me.id, JSON.stringify(st)); } catch (e) {} }
 // Notion-style sidebar helpers: an icon per page, recents, the menu search, and hiding the sidebar
 const ROUTE_ICON = { tickets: "bug", dashboard: "home", overview: "layoutGrid", tasks: "checkSquare", notes: "fileText", calendar: "calendar", "team-calendar": "calendarDays",
-  "dev-board": "kanban", chat: "message", emails: "mail", announcements: "megaphone", sales: "trendingUp", deals: "kanban", leads: "userPlus", ig_leads: "atSign",
+  "dev-board": "kanban", chat: "message", whatsapp: "smartphone", emails: "mail", announcements: "megaphone", sales: "trendingUp", deals: "kanban", leads: "userPlus", ig_leads: "atSign",
   clients: "briefcase", contacts: "contact", activities: "activity", proposals: "fileText", targets: "target", "crm-analytics": "barChart", marketing: "megaphone",
   campaigns: "send", content: "calendarDays", seo_keywords: "search", social_stats: "share", people: "users", leave_requests: "sun", holidays: "gift",
   attendance: "clock", meetings: "video", documents: "folder", "admin-users": "shield",
@@ -15930,6 +16198,7 @@ async function rerender(){
     else if (route === "admin-activity") await renderAdminActivity(page);
     else if (route === "crm-analytics") await renderCrmAnalytics(page);
     else if (route === "emails") await renderEmails(page);
+    else if (route === "whatsapp") await renderWhatsApp(page);
     else if (route === "chat") await renderChat(page);
     else if (route === "qa") await renderQA(page);
     else if (route === "qa-import") await renderQAImport(page);
@@ -16063,6 +16332,18 @@ const pendingTables = new Set(); let liveT;
 function onChange(payload){
   const t = payload.table;
   if (t === "chat_messages" || t === "chat_channels") { chatOnChange(payload); return; }
+  // (2026-11es) a WhatsApp message: refresh the open conversation in place (a reply box mustn't lose what's typed)
+  if (t === "whatsapp_messages") {
+    if (!S.loaded.has(t)) return;
+    clearTimeout(onChange.waT);
+    onChange.waT = setTimeout(async () => {
+      await liveRefresh(t);
+      document.querySelectorAll("[data-live='wa']").forEach(b => { const ta = b.querySelector("textarea"); const keep = ta ? ta.value : ""; const had = ta && document.activeElement === ta; b._refresh && b._refresh(); const nt = b.querySelector("textarea"); if (nt && keep) { nt.value = keep; } if (nt && had) nt.focus(); });
+      renderShell();
+      if (S.route === "whatsapp" && !S.dlg) liveRedraw();
+    }, 300);
+    return;
+  }
   // someone's status changed: update their status line without redrawing the page
   if (t === "profiles" && payload.new && payload.old !== undefined && payload.new.avatar_url !== undefined) { upsertCache("profiles", payload.new); if (typeof refreshAvatars === "function") refreshAvatars(payload.new.id); }
   if (t === "user_status") { if (payload.new && payload.new.user_id) upsertCache("user_status", payload.new); if (typeof paintStatus === "function") paintStatus(); return; }
@@ -16099,7 +16380,7 @@ function onChange(payload){
 // (2026-11ea) after a live signal, fetch only what changed instead of the whole table again (much less data on the
 // free plan). These tables stamp updated_at on every save; a 2-minute overlap covers saves that commit late.
 // Deleted rows: a list of ids only (tiny) shows what's gone. Anything unusual falls back to the full reload.
-const DELTA_TABLES = new Set(["activities","announcements","attendance","campaigns","clients","contacts","content","deals","documents","features","leads","leave_requests","meetings","notes","projects","proposals","releases","seo_keywords","social_stats","sprints","targets","tasks","tickets"]);
+const DELTA_TABLES = new Set(["whatsapp_messages","activities","announcements","attendance","campaigns","clients","contacts","content","deals","documents","features","leads","leave_requests","meetings","notes","projects","proposals","releases","seo_keywords","social_stats","sprints","targets","tasks","tickets"]);
 async function liveRefresh(t){
   const cache = S.cache[t];
   if (!DELTA_TABLES.has(t) || !S.loaded.has(t) || !cache || !cache.length || !("updated_at" in cache[0])) return load(t, true);
@@ -16704,6 +16985,7 @@ async function startSession(session){
     if (typeof loadMyToday === "function") loadMyToday().then(() => renderShell());
     setTimeout(() => { if (typeof loadShotLib === "function") loadShotLib().catch(() => {}); }, 3000);   // so 🐞 can attach a screenshot instantly
     if (isAdmin()) load("problem_reports").then(() => renderShell());   // Google ready before anyone clicks; calendar synced if it's been a while
+    if (waCan()) load("whatsapp_messages").then(() => renderShell(), () => {});   // (2026-11es)
     startLive();
     rerender();
   } catch (e) {
