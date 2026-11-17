@@ -3194,6 +3194,7 @@ const ORDER = {
   meetings: ["meeting_date", false], attendance: ["day", false], meeting_joins: ["joined_at", false], notes: ["updated_at", false], tasks: ["created_at", false], features: ["name", true], test_cases: ["number", true], google_links: ["connected_at", false], emails: ["sent_at", false], problem_reports: ["created_at", false], presence: ["last_seen_at", false], user_status: ["updated_at", false], calendar_events: ["start_date", true], settings: ["id", true], time_entries: ["work_date", false],
   activity_log: ["at", false], notifications: ["created_at", false], invoices: ["issue_date", false],
   leave_requests: ["start_date", false], expenses: ["spent_on", false],
+  finance_entries: ["entry_date", false], salary_slips: ["month", false], finance_accounts: ["name", true], salary_setup: ["updated_at", false],
   // these tables have no created_at or id column
   user_status: ["updated_at", false], presence: ["last_seen_at", false]
 };
@@ -3242,7 +3243,7 @@ async function load(t, force){
   return p;
 }
 // tables whose key is the person, not an id (sorting by "id" on these fails, and the whole list didn't load)
-const KEYED_BY_USER = new Set(["google_links", "presence", "user_status", "profile_private"]);
+const KEYED_BY_USER = new Set(["google_links", "presence", "user_status", "profile_private", "salary_setup"]);
 const ensure = list => Promise.all([...new Set(list.filter(Boolean))].map(t => { noteDep(t); return load(t); }));
 
 /* Saving on a bad connection: if a save fails only because the connection dropped or was too slow, the change is
@@ -3401,7 +3402,8 @@ const PERM_AREAS = [
   ["leads","Leads (shared by Marketing and Sales)"],
   ["marketing","Marketing: campaigns, content, SEO, social"],
   ["meetings","Company: meetings"], ["leave","Company: leave approvals"], ["attendance","Company: attendance"],
-  ["announcements","Company: announcements"], ["documents","Company: documents"]
+  ["announcements","Company: announcements"], ["documents","Company: documents"],
+  ["finance","Finance: invoices, balance sheet, salaries"]
 ];
 const LEVELS = [["none","No access"], ["view","View"], ["edit","View & edit"], ["manage","Full, incl. delete"]];
 const LVL = { none: 0, view: 1, edit: 2, manage: 3 };
@@ -3472,7 +3474,8 @@ const REF_LABEL = {
   projects: r => r.name, clients: r => r.name, campaigns: r => r.name, tasks: r => (r.number ? "TC-" + r.number + " " : "") + r.title, meetings: r => r.title, releases: r => r.version + (r.name ? " " + r.name : ""),
   sprints: r => { const p = byId("projects", r.project_id); return (p ? p.name + " · " : "") + r.name; },
   roles: r => r.name, contacts: r => r.name, deals: r => r.title,
-  leads: r => r.name + (r.company ? " (" + r.company + ")" : "")
+  leads: r => r.name + (r.company ? " (" + r.company + ")" : ""),
+  finance_accounts: r => r.name
 };
 function refLabel(table, id){ const r = byId(table, id); if (r) return REF_LABEL[table](r); return table === "campaigns" && id ? campaignName(id) : ""; }
 // (2026-11dr) people who can't open Marketing's campaigns (Sales) still see a campaign's name: loaded once
@@ -4373,6 +4376,77 @@ const MOD = {
     sort: (a, b) => String(b.month).localeCompare(String(a.month)) || pname(a.user_id).localeCompare(pname(b.user_id))
   },
 
+
+  /* ---------------- Finance (2026-11ek) ---------------- */
+  invoices: {
+    label: "Invoices", one: "invoice", table: "invoices", area: "finance", title: "number",
+    desc: "GST and export invoices from your billing accounts. Download them, or send them by email or WhatsApp.",
+    needs: ["finance_accounts", "clients", "client_billing"], canCreateFn: () => false, fields: [], cols: [], render: (el, A) => renderInvoices(el, A)
+  },
+  client_billing: {
+    label: "Clients & dues", one: "billing plan", table: "client_billing", area: "finance", title: "description",
+    desc: "Every client, what they’re billed, what they owe and when the next invoice is due.",
+    needs: ["clients", "invoices", "finance_accounts"], canCreateFn: () => false, fields: [], cols: [], render: (el, A) => renderDues(el, A)
+  },
+  finance_entries: {
+    label: "Balance sheet", one: "entry", table: "finance_entries", area: "finance", title: "description",
+    desc: "Money in, money out and what you owe. Paid invoices and paid salaries are added by themselves.",
+    needs: ["invoices", "finance_accounts"], files: true, csv: true,
+    canEdit: (rec, L) => L >= 2 && !(rec && rec.auto), canDelete: (rec, L) => L >= 3 && !(rec && rec.auto),
+    rowFilter: r => inPeriod(r.entry_date, (S.ui.finance_entries || {}).period || "fy"),
+    top: el => ledgerTop(el),
+    fields: [
+      { k: "kind", l: "Type", t: "select", o: ["Expense", "Revenue", "Liability"], req: true, def: "Expense", filter: true },
+      { k: "category", l: "Category", t: "select", o: () => [...EXPENSE_CATS, ...REVENUE_CATS, ...LIABILITY_CATS], req: true, def: "Other expense", filter: true },
+      { k: "description", l: "Description", t: "text", full: true, req: true },
+      { k: "amount", l: "Amount (₹)", t: "money", req: true },
+      { k: "entry_date", l: "Date", t: "date", req: true, def: () => today() },
+      { k: "account_id", l: "Account", t: "ref", ref: "finance_accounts", none: "–" },
+      { k: "payment_mode", l: "Paid by", t: "select", o: () => PAY_MODES },
+      { k: "reference", l: "Reference (bill no., UTR…)", t: "text" },
+      { k: "status", l: "Status", t: "select", o: ["Open", "Settled"], def: "Open", show: r => r.kind === "Liability" },
+      { k: "due_date", l: "Due date", t: "date", show: r => r.kind === "Liability" },
+      { k: "settled_on", l: "Settled on", t: "date", show: r => r.kind === "Liability" && r.status === "Settled" }
+    ],
+    cols: ["entry_date", "kind", "category", "description",
+      { k: "amount", l: "Amount", render: (v, r) => h("span", { style: "white-space:nowrap;color:" + (r.kind === "Revenue" ? "var(--ok)" : "inherit") }, (r.kind === "Expense" ? "− " : "") + money(v)) },
+      { k: "status", l: "", render: (v, r) => r.auto ? h("span", { class: "pill" }, "auto") : r.kind === "Liability" ? h("span", { class: "pill" }, v || "Open") : "" }],
+    sort: (a, b) => String(b.entry_date).localeCompare(String(a.entry_date))
+  },
+  salary_slips: {
+    label: "Salaries", one: "salary slip", table: "salary_slips", area: "finance", title: "month",
+    desc: "Monthly salaries and slips. Issued slips appear in each person’s My salary page.",
+    needs: ["salary_setup", "finance_accounts"], canCreateFn: () => false, fields: [], cols: [], render: (el, A) => renderSalaries(el, A)
+  },
+  finance_accounts: {
+    label: "Billing accounts", one: "billing account", table: "finance_accounts", area: "finance", title: "name",
+    desc: "Your companies and bank accounts. Each invoice is raised from one of these, with its details, bank and signature.",
+    needs: ["invoices"], canCreateFn: L => L >= 3, canEdit: (rec, L) => L >= 3,
+    canDelete: (rec, L) => L >= 3 && !!rec && !rows("invoices").some(i => i.account_id === rec.id),
+    actions: rec => access(MOD.finance_accounts, rec).canEdit ? [h("span", { style: "flex:1" }), h("button", { type: "button", class: "btn sm", onclick: () => uploadSignature(rec) }, rec.signature ? "Change signature image" : "Add signature image")] : [],
+    fields: [
+      { k: "name", l: "Short name (for you)", t: "text", req: true, ph: "e.g. Tcipher · ICICI" },
+      { k: "legal_name", l: "Legal name (printed)", t: "text", req: true, ph: "Tcipher Technologies" },
+      { k: "owner_line", l: "Line under the name", t: "text", ph: "e.g. Prop. Saurabh Mishra" },
+      { k: "gstin", l: "GSTIN", t: "text" }, { k: "pan", l: "PAN", t: "text" },
+      { k: "state", l: "State (decides CGST+SGST or IGST)", t: "select", o: () => INDIAN_STATES },
+      { k: "address", l: "Address", t: "textarea", full: true, rows: 3 },
+      { k: "email", l: "Email", t: "text" }, { k: "phone", l: "Phone", t: "text" }, { k: "website", l: "Website (footer)", t: "text", ph: "tcipher.com" },
+      { k: "_h_bank", l: "Bank details (page 2 of each invoice)", t: "heading" },
+      { k: "account_name", l: "Account name", t: "text" }, { k: "bank_name", l: "Bank", t: "text" },
+      { k: "account_number", l: "Account number", t: "text" }, { k: "ifsc", l: "IFSC", t: "text" },
+      { k: "upi_id", l: "UPI ID", t: "text" }, { k: "swift", l: "SWIFT (foreign clients)", t: "text" },
+      { k: "_h_inv", l: "Invoices", t: "heading" },
+      { k: "invoice_prefix", l: "Number prefix", t: "text", def: "TCT", ph: "TCT gives TCT/26-27/001" },
+      { k: "next_number", l: "Next number", t: "int", min: 1, def: 1 },
+      { k: "signatory", l: "Signatory name", t: "text", ph: "Saurabh Mishra" }, { k: "signatory_title", l: "Signatory title", t: "text", ph: "Proprietor" },
+      { k: "lut_number", l: "LUT number (exports without GST)", t: "text" },
+      { k: "terms", l: "Default terms (one per line)", t: "textarea", full: true, rows: 3, ph: "Payment due within 7 days of the invoice date.\nPlease quote the invoice number with your payment." },
+      { k: "is_default", l: "Default", t: "bool", cb: "Use this account for new invoices" }
+    ],
+    cols: ["name", "legal_name", "gstin", "state", { k: "invoice_prefix", l: "Next number", get: r => (r.invoice_prefix || "TCT") + " · " + r.next_number },
+      { k: "is_default", l: "", render: v => v ? h("span", { class: "pill" }, "Default") : "" }]
+  },
 
   /* ---------------- Marketing ---------------- */
   campaigns: {
@@ -12316,7 +12390,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ej";
+const APP_VERSION = "2026-11ek";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -14236,10 +14310,10 @@ const ACCESS_COLS = [
   ["Development", ["projects", "tasks", "releases", "support", "timesheets"]], ["QA & testing", ["qa"]],
   ["Sales", ["sales"]], ["Clients", ["clients"]], ["Leads", ["leads"]], ["Marketing", ["marketing"]],
   ["Meetings", ["meetings"]], ["Leave approvals", ["leave"]], ["Everyone’s attendance", ["attendance"]],
-  ["Announcements", ["announcements"]], ["Documents", ["documents"]]
+  ["Announcements", ["announcements"]], ["Documents", ["documents"]], ["Finance", ["finance"]]
 ];
 const ACCESS_HELP = { "Development": "Everyone’s projects, sprints, tasks, releases, support tickets and timesheets", "QA & testing": "Test cases and QA. Full access makes them a tester",
-  "Leave approvals": "Approve or decline everyone’s leave", "Everyone’s attendance": "See and correct everyone’s attendance", "Announcements": "Post and change announcements", "Documents": "Add and change company documents" };
+  "Leave approvals": "Approve or decline everyone’s leave", "Everyone’s attendance": "See and correct everyone’s attendance", "Announcements": "Post and change announcements", "Documents": "Add and change company documents", "Finance": "Invoices, client dues, balance sheet and everyone’s salaries" };
 async function savePerms(p, perms){
   try { await updateRow("profiles", p.id, { permissions: perms }); }
   catch (e) {
@@ -14493,6 +14567,790 @@ async function renderAdminActivity(el){
 /* ---------------------------------------------------------------------
    Navigation
    --------------------------------------------------------------------- */
+/* =====================================================================
+   Finance (2026-11ek, upgrade-2026-11ek.sql): invoices from your billing accounts (GST or export), clients and what
+   they owe, a balance sheet (revenue, expenses, liabilities), salaries and salary slips. Finance people (super admins
+   and anyone ticked "Finance") see it all; everyone sees their own salary and slips under My salary.
+   ===================================================================== */
+const INDIAN_STATES = ["Andaman and Nicobar Islands","Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chandigarh","Chhattisgarh",
+  "Dadra and Nagar Haveli and Daman and Diu","Delhi","Goa","Gujarat","Haryana","Himachal Pradesh","Jammu and Kashmir","Jharkhand","Karnataka",
+  "Kerala","Ladakh","Lakshadweep","Madhya Pradesh","Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Puducherry","Punjab",
+  "Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh","Uttarakhand","West Bengal"];
+const FIN_CURRENCIES = ["INR","USD","EUR","GBP","AED","AUD","CAD","SGD"];
+const REVENUE_CATS = ["Client payment","Interest","Refund received","Other income"];
+const EXPENSE_CATS = ["Salaries","Rent","Software & subscriptions","Hardware & equipment","Marketing & ads","Travel","Utilities & internet",
+  "Taxes & fees","Professional services","Office & supplies","Bank charges","Other expense"];
+const LIABILITY_CATS = ["GST payable","TDS payable","Loan","Vendor bill","Credit card","Salary payable","Other liability"];
+const PAY_MODES = ["Bank transfer","UPI","Cash","Card","Cheque"];
+const BILL_CYCLES = ["Monthly","Quarterly","Half-yearly","Yearly","One-off"];
+const r2 = n => Math.round((+n || 0) * 100) / 100;
+function money2(n, cur){
+  try { return new Intl.NumberFormat("en-IN", { style: "currency", currency: cur || "INR", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(+n || 0); }
+  catch (e) { return (cur || "INR") + " " + (+n || 0).toFixed(2); }
+}
+const finReady = t => S.loaded.has(t);
+function finMissing(el){
+  el.append(h("div", { class: "panel empty" }, h("b", {}, "Finance isn’t set up in the database yet"),
+    "An admin runs upgrade-2026-11ek.sql once in Supabase › SQL editor. Then reload this page."));
+}
+// amounts in words: Indian numbering for rupees (lakh, crore), international for other currencies
+function amountWords(n, cur){
+  const ones = ["","One","Two","Three","Four","Five","Six","Seven","Eight","Nine","Ten","Eleven","Twelve","Thirteen","Fourteen","Fifteen","Sixteen","Seventeen","Eighteen","Nineteen"];
+  const tens = ["","","Twenty","Thirty","Forty","Fifty","Sixty","Seventy","Eighty","Ninety"];
+  const two = x => x < 20 ? ones[x] : tens[Math.floor(x / 10)] + (x % 10 ? " " + ones[x % 10] : "");
+  const three = x => [x >= 100 ? ones[Math.floor(x / 100)] + " Hundred" : "", x % 100 ? two(x % 100) : ""].filter(Boolean).join(" ");
+  const indian = x => {
+    if (!x) return "";
+    const crore = Math.floor(x / 1e7), lakh = Math.floor(x / 1e5) % 100, th = Math.floor(x / 1000) % 100, rest = x % 1000;
+    return [crore ? indian(crore) + " Crore" : "", lakh ? two(lakh) + " Lakh" : "", th ? two(th) + " Thousand" : "", rest ? three(rest) : ""].filter(Boolean).join(" ");
+  };
+  const intl = x => {
+    if (!x) return "";
+    const parts = [[1e9, "Billion"], [1e6, "Million"], [1e3, "Thousand"]], out = [];
+    for (const [d, w] of parts) { const q = Math.floor(x / d); if (q) { out.push(three(q % 1000) + " " + w); x %= d; } }
+    if (x) out.push(three(x));
+    return out.join(" ");
+  };
+  n = r2(Math.abs(+n || 0));
+  const whole = Math.floor(n), frac = Math.round((n - whole) * 100);
+  if ((cur || "INR") === "INR") return "Rupees " + (indian(whole) || "Zero") + (frac ? " and " + two(frac) + " Paise" : "") + " Only";
+  const names = { USD: ["US Dollars", "Cents"], EUR: ["Euros", "Cents"], GBP: ["Pounds", "Pence"], AED: ["Dirhams", "Fils"], AUD: ["Australian Dollars", "Cents"], CAD: ["Canadian Dollars", "Cents"], SGD: ["Singapore Dollars", "Cents"] };
+  const [big, small] = names[cur] || [cur, "Cents"];
+  return big + " " + (intl(whole) || "Zero") + (frac ? " and " + two(frac) + " " + small : "") + " Only";
+}
+
+/* ---------- PDFs: each page is drawn as an A4 sheet and saved as a PDF (jsPDF, loaded only when needed) ---------- */
+let pdfLib = null;
+function loadPdfLib(){
+  if (window.jspdf && window.jspdf.jsPDF) return Promise.resolve();
+  if (!pdfLib) pdfLib = new Promise((res, rej) => {
+    const sc = document.createElement("script"); sc.integrity = "sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk";
+    sc.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"; sc.async = true; sc.crossOrigin = "anonymous";
+    sc.onload = () => res(); sc.onerror = () => { pdfLib = null; rej(new Error("The PDF maker didn’t load. Check your internet connection.")); };
+    document.head.append(sc);
+  });
+  return pdfLib;
+}
+async function docToPdf(pages){
+  pages = Array.isArray(pages) ? pages : [pages];
+  await Promise.all([loadShotLib(), loadPdfLib()]);
+  const holder = h("div", { style: "position:fixed;left:-12000px;top:0;z-index:-1" }, pages);
+  document.body.append(holder);
+  try {
+    await Promise.all([...holder.querySelectorAll("img")].map(i => i.complete ? null : new Promise(r => { i.onload = i.onerror = r; })));
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    const pdf = new window.jspdf.jsPDF({ unit: "pt", format: "a4", compress: true });
+    const pw = pdf.internal.pageSize.getWidth(), ph = pdf.internal.pageSize.getHeight();
+    let first = true;
+    for (const node of pages) {
+      const canvas = await window.html2canvas(node, { scale: 2, backgroundColor: "#ffffff", useCORS: true, logging: false });
+      const imgH = canvas.height * pw / canvas.width, data = canvas.toDataURL("image/jpeg", 0.93);
+      for (let y = 0; y < imgH - 1; y += ph) { if (!first) pdf.addPage(); first = false; pdf.addImage(data, "JPEG", 0, -y, pw, imgH); }
+    }
+    return pdf.output("blob");
+  } finally { holder.remove(); }
+}
+const pdfName = s => String(s || "document").replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim() + ".pdf";
+function saveBlob(blob, name){ const u = URL.createObjectURL(blob); saveFrom(u, name); setTimeout(() => URL.revokeObjectURL(u), 60000); }
+// GST state codes (printed as "Delhi (07)")
+const STATE_CODE = { "Jammu and Kashmir": "01", "Himachal Pradesh": "02", "Punjab": "03", "Chandigarh": "04", "Uttarakhand": "05", "Haryana": "06", "Delhi": "07", "Rajasthan": "08",
+  "Uttar Pradesh": "09", "Bihar": "10", "Sikkim": "11", "Arunachal Pradesh": "12", "Nagaland": "13", "Manipur": "14", "Mizoram": "15", "Tripura": "16", "Meghalaya": "17", "Assam": "18",
+  "West Bengal": "19", "Jharkhand": "20", "Odisha": "21", "Chhattisgarh": "22", "Madhya Pradesh": "23", "Gujarat": "24", "Dadra and Nagar Haveli and Daman and Diu": "26",
+  "Maharashtra": "27", "Karnataka": "29", "Goa": "30", "Lakshadweep": "31", "Kerala": "32", "Tamil Nadu": "33", "Puducherry": "34", "Andaman and Nicobar Islands": "35",
+  "Telangana": "36", "Andhra Pradesh": "37", "Ladakh": "38" };
+const withCode = st => st ? st + (STATE_CODE[st] ? " (" + STATE_CODE[st] + ")" : "") : "";
+// the look of the documents (the same as Tcipher's own invoice)
+const INK = "#0E0D16", MUTE = "#6B6880", SOFT = "#F4F3FD", LINE = "#E3E2EE", VIO = "#6450F5";
+const num2 = n => (+n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const curSym = c => ({ INR: "₹", USD: "$", EUR: "€", GBP: "£" })[c] || (c + " ");
+const capLabel = (t, st) => h("div", { style: "font-size:10.5px;letter-spacing:1.4px;font-weight:600;color:" + MUTE + ";text-transform:uppercase;" + (st || "") }, t);
+function docPage(o){
+  // o: { title, sub, body: [nodes], acc }
+  const acc = o.acc || {};
+  return h("div", { style: "width:794px;height:1123px;box-sizing:border-box;position:relative;background:#fff;color:" + INK + ";font:13px/1.5 Manrope,Roboto,Arial,sans-serif;overflow:hidden" },
+    h("div", { style: "height:6px;background:" + VIO }),
+    h("div", { style: "padding:28px 56px 0" },
+      h("div", { style: "display:flex;justify-content:space-between;align-items:flex-start" },
+        h("img", { src: "icons/logo.png", alt: "", style: "height:40px;width:auto;margin-top:4px" }),
+        h("div", { style: "text-align:right" }, h("div", { style: "font-size:27px;font-weight:800;letter-spacing:-.4px" }, o.title),
+          h("div", { style: "font-size:11px;letter-spacing:1.4px;font-weight:700;color:" + VIO + ";text-transform:uppercase;margin-top:2px" }, o.sub))),
+      h("div", { style: "margin-top:20px" }, o.body)),
+    h("div", { style: "position:absolute;left:56px;right:56px;bottom:30px;border-top:1px solid " + LINE + ";padding-top:10px;display:flex;justify-content:space-between;font-size:11px;color:" + MUTE },
+      h("span", {}, [acc.legal_name || acc.name || (S.settings && S.settings.company) || "Tcipher Technologies", acc.website].filter(Boolean).join(" · ")), h("span", {}, o.foot || "This is a computer-generated document.")));
+}
+const card = (kids, st) => h("div", { style: "border:1px solid " + LINE + ";border-radius:12px;padding:16px 18px;" + (st || "") }, kids);
+// a compact account block for salary slips
+function companyBlock(acc){
+  acc = acc || {};
+  return h("div", {}, h("div", { style: "font-size:15px;font-weight:700" }, acc.legal_name || acc.name || (S.settings && S.settings.company) || "Tcipher Technologies"),
+    acc.address ? h("div", { style: "white-space:pre-line;color:" + MUTE }, acc.address) : null,
+    acc.gstin ? h("div", { style: "color:" + MUTE }, "GSTIN " + acc.gstin) : null);
+}
+
+/* ---------- invoices ---------- */
+function invoiceTotals(inv, acc){
+  const items = inv.items || [];
+  let sub = 0, cgst = 0, sgst = 0, igst = 0;
+  const intra = !!(acc && acc.state && inv.place_of_supply && acc.state === inv.place_of_supply);
+  const bySac = {};
+  for (const it of items) {
+    const amt = r2((+it.qty || 0) * (+it.rate || 0)); sub += amt;
+    if (inv.kind === "GST") {
+      const t = amt * (+it.gst || 0) / 100; if (intra) { cgst += t / 2; sgst += t / 2; } else igst += t;
+      const k = (it.sac || "–") + "|" + (+it.gst || 0); bySac[k] = bySac[k] || { sac: it.sac || "–", rate: +it.gst || 0, taxable: 0, tax: 0 }; bySac[k].taxable += amt; bySac[k].tax += t;
+    }
+  }
+  [sub, cgst, sgst, igst] = [sub, cgst, sgst, igst].map(r2);
+  return { subtotal: sub, cgst, sgst, igst, total: r2(sub + cgst + sgst + igst), intra, bySac: Object.values(bySac).map(x => ({ ...x, taxable: r2(x.taxable), tax: r2(x.tax) })) };
+}
+const invOverdue = inv => ["Issued", "Sent"].includes(inv.status) && inv.due_date && inv.due_date < today();
+function invStatus(inv){
+  if (invOverdue(inv)) return h("span", { class: "pill", style: "background:#FDE7EA;color:#B3243A" }, "Overdue");
+  const tone = { Draft: "background:#EEE;color:#555", Issued: "background:#EFEDF3;color:#4A3AA8", Sent: "background:#E8F0FE;color:#1A56C4", Paid: "background:#E4F4EA;color:#1D7748", Cancelled: "background:#F3F3F3;color:#888;text-decoration:line-through" };
+  return h("span", { class: "pill", style: tone[inv.status] || "" }, inv.status);
+}
+const fmtLong = d => d ? new Date(d + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "";
+// the terms printed on the invoice: the tax reason first, then the invoice's own notes (one per line)
+function invoiceTerms(inv, acc, t){
+  const out = [];
+  if (inv.kind === "GST" && inv.place_of_supply && acc.state) out.push(t.intra ? "Intrastate supply (" + acc.state + "), so CGST and SGST are charged." : "Interstate supply (" + acc.state + " to " + inv.place_of_supply + "), so IGST is charged in place of CGST and SGST.");
+  if (inv.kind === "Export" && acc.lut_number) out.push("Supply meant for export under LUT No. " + acc.lut_number + " without payment of integrated tax (IGST).");
+  for (const l of String(inv.notes || "").split(/\n+/)) if (l.trim()) out.push(l.trim().replace(/^[-•*]\s*/, ""));
+  return out;
+}
+function invoicePages(inv){
+  const acc = byId("finance_accounts", inv.account_id) || {}, b = inv.bill_to || {}, cur = inv.currency || "INR", gst = inv.kind === "GST";
+  const t = invoiceTotals(inv, acc), num = inv.number || "DRAFT", sym = curSym(cur);
+  const hasPeriod = (inv.items || []).some(i => i.period || i.period_note);
+  const info = (l, v) => h("div", { style: "flex:1;padding:14px 16px;border-left:1px solid " + LINE }, capLabel(l), h("div", { style: "font-weight:600;font-size:14px;margin-top:3px" }, v || "–"));
+  const infoRow = h("div", { style: "display:flex;border:1px solid " + LINE + ";border-radius:12px;overflow:hidden" },
+    gst ? [info("Invoice no.", num), info("Invoice date", fmtLong(inv.issue_date)), info("Place of supply", withCode(inv.place_of_supply)), info("Reverse charge", "No")]
+        : [info("Invoice no.", num), info("Invoice date", fmtLong(inv.issue_date)), info("Currency", cur), info("Due date", fmtLong(inv.due_date))]);
+  infoRow.firstChild.style.borderLeft = "0";
+  const party = (label, name, lines, foot) => card([capLabel(label), h("div", { style: "font-size:16px;font-weight:700;margin:6px 0 4px" }, name || "–"),
+    h("div", { style: "color:#3D3A52;white-space:pre-line" }, lines.filter(Boolean).join("\n")), foot ? h("div", { style: "margin-top:8px" }, foot) : null], "flex:1");
+  const gstLine = (g, st) => (g || st) ? [g ? h("b", {}, "GSTIN: ") : null, g || "", g && st ? " · " : "", st ? h("b", {}, "State: ") : null, st ? withCode(st) : ""] : null;
+  const th = (txt, st) => h("th", { style: "padding:12px 10px;font-size:10.5px;letter-spacing:1.2px;color:" + VIO + ";text-align:left;font-weight:700;text-transform:uppercase;" + (st || "") }, txt);
+  const td = (kids, st) => h("td", { style: "padding:11px 10px;vertical-align:top;border-bottom:1px solid " + LINE + ";" + (st || "") }, kids);
+  const items = (inv.items || []).map((it, i) => {
+    const [head, ...rest] = String(it.description || "").split("\n");
+    return h("tr", {}, td(String(i + 1)), td([h("div", { style: "font-weight:700;font-size:14px" }, head), rest.length ? h("div", { style: "color:" + MUTE + ";font-size:12px;margin-top:4px;white-space:pre-line" }, rest.join("\n")) : null]),
+      hasPeriod ? td([h("div", { style: "font-weight:700" }, it.period || ""), it.period_note ? h("div", { style: "color:" + MUTE + ";font-size:12px" }, it.period_note) : null]) : null,
+      td(it.sac || ""), td(String(+it.qty || 0), "text-align:center"), td(num2(it.rate), "text-align:right"), td(h("b", {}, num2(r2((+it.qty || 0) * (+it.rate || 0)))), "text-align:right"));
+  });
+  const totRow = (l, v) => h("div", { style: "display:flex;justify-content:space-between;padding:7px 0" }, h("span", { style: "color:#3D3A52" }, l), h("b", {}, v));
+  const rate1 = t.bySac.length === 1 ? t.bySac[0].rate : null;
+  const totals = h("div", { style: "width:338px" },
+    totRow("Taxable value", sym + num2(t.subtotal)),
+    gst && t.intra ? totRow("CGST" + (rate1 != null ? " @ " + rate1 / 2 + "%" : ""), sym + num2(t.cgst)) : null,
+    gst && t.intra ? totRow("SGST" + (rate1 != null ? " @ " + rate1 / 2 + "%" : ""), sym + num2(t.sgst)) : null,
+    gst && !t.intra ? totRow("IGST" + (rate1 != null ? " @ " + rate1 + "%" : ""), sym + num2(t.igst)) : null,
+    h("div", { style: "margin-top:8px;background:" + INK + ";color:#fff;border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;font-size:17px;font-weight:700" }, h("span", {}, "Total"), h("span", {}, sym + num2(t.total))));
+  const taxTable = gst && t.bySac.length ? h("table", { style: "width:100%;border-collapse:collapse;margin-top:16px" },
+    h("thead", { style: "background:" + SOFT }, h("tr", {}, th("SAC"), th("Taxable value (₹)", "text-align:right"), ...(t.intra ? [th("CGST", "text-align:right"), th("SGST", "text-align:right")] : [th("IGST rate", "text-align:right"), th("IGST amount (₹)", "text-align:right")]), th("Total tax (₹)", "text-align:right"))),
+    h("tbody", {}, t.bySac.map(x => h("tr", {}, td(x.sac), td(num2(x.taxable), "text-align:right"),
+      ...(t.intra ? [td(x.rate / 2 + "% · " + num2(x.tax / 2), "text-align:right"), td(x.rate / 2 + "% · " + num2(x.tax / 2), "text-align:right")] : [td(x.rate + "%", "text-align:right"), td(num2(x.tax), "text-align:right")]),
+      td(num2(x.tax), "text-align:right"))))) : null;
+  const terms = invoiceTerms(inv, acc, t);
+  const sign = h("div", { style: "width:250px;text-align:center" }, h("div", { style: "font-weight:700;text-align:right" }, "For " + (acc.legal_name || acc.name || "")),
+    h("div", { style: "height:78px;display:flex;align-items:flex-end;justify-content:center;border-bottom:1.5px solid " + INK + ";margin-top:4px" }, acc.signature ? h("img", { src: acc.signature, alt: "", style: "max-height:74px;max-width:230px" }) : null),
+    h("div", { style: "margin-top:8px;color:#3D3A52" }, [acc.signatory, acc.signatory_title ? "(" + acc.signatory_title + ")" : ""].filter(Boolean).join(" ")), h("div", { style: "color:#3D3A52" }, "Authorised Signatory"));
+  const pages = gst || acc.account_number || acc.upi_id ? 2 : 1;
+  const p1 = docPage({ acc, title: gst ? "Tax Invoice" : "Invoice", sub: (gst ? "Original for recipient" : "Export invoice") + " · Page 1 of " + pages, foot: "This is a computer-generated invoice.", body: [
+    infoRow,
+    h("div", { style: "display:flex;gap:16px;margin-top:14px" },
+      party("Billed by", acc.legal_name || acc.name, [acc.owner_line, acc.address], gstLine(acc.gstin, acc.state)),
+      party("Billed to", b.name, [b.contact ? "Attn: " + b.contact : "", b.address, b.state === "Outside India" ? b.country : ""], gstLine(b.gstin, b.state && b.state !== "Outside India" ? b.state : ""))),
+    h("table", { style: "width:100%;border-collapse:collapse;margin-top:18px" },
+      h("thead", { style: "background:" + SOFT }, h("tr", {}, th("#", "width:22px"), th("Description"), hasPeriod ? th("Billing month", "width:120px") : null, th("SAC", "width:70px"), th("Qty", "text-align:center;width:44px"), th("Rate (" + sym.trim() + ")", "text-align:right;width:96px"), th("Amount (" + sym.trim() + ")", "text-align:right;width:104px"))),
+      h("tbody", {}, items)),
+    h("div", { style: "display:flex;justify-content:space-between;gap:24px;margin-top:14px" },
+      h("div", {}, capLabel("Amount in words"), h("div", { style: "font-weight:700;margin-top:6px;max-width:330px" }, (cur === "INR" ? "Indian " : "") + amountWords(t.total, cur))), totals),
+    taxTable,
+    h("div", { style: "display:flex;justify-content:space-between;gap:30px;margin-top:18px" },
+      h("div", { style: "flex:1" }, terms.length ? capLabel("Terms") : null, h("ul", { style: "margin:8px 0 0;padding-left:18px;color:#3D3A52;font-size:12.5px" }, terms.map(x => h("li", { style: "margin-bottom:5px" }, x)))), sign)
+  ] });
+  if (pages === 1) return [p1];
+  const first = (inv.items || [])[0] || {};
+  const prow = (l, v) => v ? h("tr", {}, h("td", { style: "width:210px;padding:18px 20px;background:" + SOFT + ";border-bottom:1px solid " + LINE }, capLabel(l)), h("td", { style: "padding:18px 20px;font-size:15px;font-weight:700;border-bottom:1px solid " + LINE }, v)) : null;
+  const p2 = docPage({ acc, title: "Payment Details", sub: "Invoice " + num + " · Page 2 of 2", foot: "This is a computer-generated invoice.", body: [
+    h("div", { style: "border:1px solid " + LINE + ";border-radius:12px;overflow:hidden" }, h("table", { style: "width:100%;border-collapse:collapse" }, h("tbody", {},
+      prow("Account name", (acc.account_name || "").toUpperCase()), prow("Account number", acc.account_number), prow("IFSC code", acc.ifsc), prow("Bank", acc.bank_name),
+      prow("SWIFT code", inv.kind === "Export" ? acc.swift : ""), prow("UPI ID", acc.upi_id)))),
+    h("div", { style: "margin-top:20px;background:" + INK + ";color:#fff;border-radius:12px;padding:20px 22px;display:flex;justify-content:space-between;align-items:center" },
+      h("span", {}, "Amount payable" + (first.period ? " for " + first.period + (first.period_note ? " (" + first.period_note + ")" : "") : "") + (inv.due_date ? " · due " + fmtLong(inv.due_date) : "")),
+      h("span", { style: "font-size:22px;font-weight:800" }, sym + num2(t.total))),
+    h("p", { style: "margin-top:16px;color:#3D3A52" }, "Please mention invoice number ", h("b", {}, num), " in the payment reference and share the transaction ID once paid.")
+  ] });
+  return [p1, p2];
+}
+async function invoicePdf(inv){ return docToPdf(invoicePages(inv)); }
+
+const invFileName = inv => pdfName("Invoice " + (inv.number || "draft") + " " + ((inv.bill_to || {}).name || ""));
+// keep one PDF per invoice in Supabase storage (emails attach it, WhatsApp links to it)
+async function storeInvoicePdf(inv){
+  const blob = await invoicePdf(inv), name = invFileName(inv);
+  const old = (await sb.from("files").select("*").eq("tbl", "invoices").eq("entity_id", inv.id)).data || [];
+  const path = "invoices/" + inv.id + "/" + Date.now() + "-" + uid() + ".pdf";
+  ok(await sb.storage.from(FILE_BUCKET).upload(path, blob, { contentType: "application/pdf", upsert: false }));
+  const f = ok(await sb.from("files").insert({ tbl: "invoices", entity_id: inv.id, name, path, size: blob.size, mime: "application/pdf", uploaded_by: S.me.id }).select().single());
+  for (const o of old) { try { await storeDelete(o); } catch (e) {} }
+  return f;
+}
+async function downloadInvoice(inv){
+  try { toast("Making the PDF…"); saveBlob(await invoicePdf(inv), invFileName(inv)); } catch (e) { fail(e, "PDF not made"); }
+}
+async function ensureIssued(inv){
+  if (inv.number) return inv;
+  if (!confirm("Issue this invoice? It gets its number now (numbers are never reused).")) return null;
+  ok(await sb.rpc("issue_invoice", { p_invoice: inv.id }));
+  await load("invoices", true); await load("finance_accounts", true);
+  return byId("invoices", inv.id);
+}
+async function emailInvoice(inv){
+  try {
+    inv = await ensureIssued(inv); if (!inv) return;
+    toast("Attaching the PDF…");
+    const f = await storeInvoicePdf(inv), b = inv.bill_to || {}, acc = byId("finance_accounts", inv.account_id) || {};
+    const t = invoiceTotals(inv, acc);
+    openComposer({ to: b.email || "", name: b.contact || b.name, tbl: "invoices", entity_id: inv.id, preselectFiles: x => x.id === f.id,
+      subject: "Invoice " + inv.number + " from " + (acc.legal_name || acc.name || "Tcipher Technologies"),
+      body: "Hi " + ((b.contact || b.name || "").split(" ")[0] || "there") + ",\n\nPlease find attached invoice " + inv.number + " for " + money2(t.total, inv.currency)
+        + (inv.due_date ? ", due on " + fmtDate(inv.due_date, true) : "") + ".\n\n" + (acc.account_number ? "Bank: " + acc.bank_name + ", A/c " + acc.account_number + (acc.ifsc ? ", IFSC " + acc.ifsc : "") + (acc.upi_id ? "\nUPI: " + acc.upi_id : "") + "\n\n" : "")
+        + "Thank you,\n" + S.me.full_name,
+      after: async () => { if (["Issued", "Draft"].includes(inv.status)) await updateRow("invoices", inv.id, { status: "Sent", sent_at: new Date().toISOString() }); rerender(); } });
+  } catch (e) { fail(e, "Couldn’t prepare the email"); }
+}
+// (2026-11ek) WhatsApp from your own WhatsApp with a 30-day download link. When the WhatsApp Business number is set up,
+// this is the one place to switch to sending the PDF through it.
+async function whatsappInvoice(inv){
+  const tab = window.open("", "_blank");
+  try {
+    inv = await ensureIssued(inv); if (!inv) { if (tab) tab.close(); return; }
+    toast("Preparing the link…");
+    const f = await storeInvoicePdf(inv);
+    const link = ok(await sb.storage.from(FILE_BUCKET).createSignedUrl(f.path, 30 * 86400, { download: f.name })).signedUrl;
+    const b = inv.bill_to || {}, acc = byId("finance_accounts", inv.account_id) || {}, t = invoiceTotals(inv, acc);
+    const text = "Hi " + ((b.contact || b.name || "").split(" ")[0] || "") + ", here is invoice " + inv.number + " from " + (acc.legal_name || acc.name || "Tcipher Technologies")
+      + " for " + money2(t.total, inv.currency) + (inv.due_date ? ", due " + fmtDate(inv.due_date, true) : "") + ".\nDownload: " + link
+      + (acc.upi_id ? "\nUPI: " + acc.upi_id : "") + "\nThank you!";
+    const url = "https://wa.me/" + (b.phone ? waNumber(b.phone) : "") + "?text=" + encodeURIComponent(text);
+    if (tab) tab.location.href = url; else window.open(url, "_blank", "noopener");
+    if (["Issued", "Draft"].includes(inv.status)) await updateRow("invoices", inv.id, { status: "Sent", sent_at: new Date().toISOString() });
+    rerender();
+  } catch (e) { if (tab) tab.close(); fail(e, "Couldn’t prepare WhatsApp"); }
+}
+function markInvoicePaid(inv){
+  const date = h("input", { class: "in", type: "date", value: today() });
+  const inr = h("input", { class: "in", type: "number", step: "any", min: "0", placeholder: "Amount that reached your bank, in ₹" });
+  const err = h("p", { class: "err", hidden: true });
+  const save = h("button", { type: "button", class: "btn pri" }, "Mark paid");
+  save.addEventListener("click", async () => {
+    const patch = { status: "Paid", paid_on: date.value || today() };
+    if (inv.currency !== "INR") { if (!(+inr.value > 0)) { err.textContent = "Enter the amount received in rupees."; err.hidden = false; return; } patch.amount_received_inr = +inr.value; }
+    save.disabled = true;
+    try { await updateRow("invoices", inv.id, patch); await load("finance_entries", true).catch(() => {}); toast("Marked paid. It’s in Revenue on the balance sheet."); closeDlg(); rerender(); }
+    catch (e) { err.textContent = friendly(e); err.hidden = false; save.disabled = false; }
+  });
+  openDialog("Payment received: " + (inv.number || "invoice"), [h("div", { class: "form" }, h("label", { class: "fl" }, "Paid on", date),
+    inv.currency !== "INR" ? h("label", { class: "fl" }, "Received in ₹ (for the balance sheet) *", inr) : null), err],
+    [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), save], true);
+}
+function billToFromClient(c){
+  if (!c) return {};
+  return { name: c.name || "", contact: c.contact_name || "", email: c.email || "", phone: c.phone || "",
+    address: [c.city, c.pincode].filter(Boolean).join(" "), state: c.state || "", country: c.country || "India", gstin: c.tax_id || "" };
+}
+function defaultAccount(){ const a = rows("finance_accounts"); return a.find(x => x.is_default) || a[0] || null; }
+// the editor: which account it's from, the client, lines, tax, dates
+async function openInvoice(id, preset){
+  await ensure(["invoices", "finance_accounts", "clients", "client_billing"]);
+  if (!finReady("invoices")) { toast("Finance isn’t set up yet: run upgrade-2026-11ek.sql."); return; }
+  if (!rows("finance_accounts").length) {
+    if (confirm("Add your company’s billing account first (name, GSTIN, bank details). Add it now?")) openRecord("finance_accounts", null, { is_default: true });
+    return;
+  }
+  const inv = id ? JSON.parse(JSON.stringify(byId("invoices", id))) : Object.assign({ kind: "GST", currency: "INR", issue_date: today(), due_date: addDays(today(), 7),
+    status: "Draft", items: [{ description: "", sac: "998314", qty: 1, rate: 0, gst: 18 }], bill_to: {}, notes: "" }, preset || {});
+  if (!inv.account_id) inv.account_id = (defaultAccount() || {}).id;
+  const locked = inv.status === "Paid" || inv.status === "Cancelled";
+  const accSel = h("select", { class: "in" }, rows("finance_accounts").map(a => h("option", { value: a.id }, a.name + (a.gstin ? " · " + a.gstin : ""))));
+  accSel.value = inv.account_id || "";
+  const cliSel = h("select", { class: "in" }, h("option", { value: "" }, "Choose a client…"), rows("clients").slice().sort((a, b) => a.name.localeCompare(b.name)).map(c => h("option", { value: c.id }, c.name)));
+  cliSel.value = inv.client_id || "";
+  const kindSel = h("select", { class: "in" }, h("option", { value: "GST" }, "GST tax invoice (India)"), h("option", { value: "Export" }, "Export invoice (outside India, no GST)"));
+  kindSel.value = inv.kind;
+  const curSel = h("select", { class: "in" }, FIN_CURRENCIES.map(c => h("option", { value: c }, c))); curSel.value = inv.currency || "INR";
+  const posSel = h("select", { class: "in" }, h("option", { value: "" }, "–"), INDIAN_STATES.map(s => h("option", { value: s }, s))); posSel.value = inv.place_of_supply || "";
+  const issue = h("input", { class: "in", type: "date", value: inv.issue_date || today() });
+  const due = h("input", { class: "in", type: "date", value: inv.due_date || "" });  // (Tcipher's terms: 7 days)
+  const bt = {}, BT_LABEL = { name: "Client name *", contact: "Contact person", email: "Email", phone: "Phone (WhatsApp)", gstin: "Client GSTIN", country: "Country" };
+  for (const k of Object.keys(BT_LABEL)) bt[k] = h("input", { class: "in", value: (inv.bill_to || {})[k] || "" });
+  bt.address = h("textarea", { class: "in", rows: "2" }, (inv.bill_to || {}).address || "");
+  bt.state = h("select", { class: "in" }, h("option", { value: "" }, "–"), INDIAN_STATES.map(s => h("option", { value: s }, s)), h("option", { value: "Outside India" }, "Outside India"));
+  bt.state.value = (inv.bill_to || {}).state || "";
+  const notes = h("textarea", { class: "in", rows: "2" }, inv.notes || (byId("finance_accounts", inv.account_id) || {}).terms || "");
+  const lines = h("tbody");
+  const totalsBox = h("div", { style: "text-align:right;font-size:14px;margin-top:8px" });
+  const gstOn = () => kindSel.value === "GST";
+  const readItems = () => [...lines.querySelectorAll("tr")].map(tr => { const q = n => tr.querySelector("[data-f=" + n + "]"); return { description: q("description").value.trim(), period: q("period").value.trim(), period_note: q("period_note").value.trim(), sac: q("sac").value.trim(), qty: +q("qty").value || 0, rate: +q("rate").value || 0, gst: gstOn() ? (+q("gst").value || 0) : 0 }; });
+  const current = () => ({ ...inv, account_id: accSel.value, kind: kindSel.value, currency: gstOn() ? "INR" : curSel.value, place_of_supply: gstOn() ? posSel.value : "", items: readItems() });
+  const refresh = () => {
+    const c = current(), t = invoiceTotals(c, byId("finance_accounts", c.account_id));
+    lines.querySelectorAll(".gstc").forEach(x => { x.hidden = !gstOn(); });
+    curWrap.hidden = gstOn(); posWrap.hidden = !gstOn();
+    lines.querySelectorAll("tr").forEach((tr, i) => { const it = c.items[i]; tr.querySelector(".amt").textContent = money2(r2(it.qty * it.rate), c.currency); });
+    totalsBox.replaceChildren(h("div", {}, "Subtotal " + money2(t.subtotal, c.currency)),
+      gstOn() ? h("div", { class: "muted" }, t.intra ? "CGST " + money2(t.cgst) + " + SGST " + money2(t.sgst) : "IGST " + money2(t.igst)) : null,
+      h("div", { style: "font-weight:700;font-size:16px" }, "Total " + money2(t.total, c.currency)));
+  };
+  const addLine = it => {
+    it = it || { description: "", sac: "998314", qty: 1, rate: 0, gst: 18 };
+    const tr = h("tr", {},
+      h("td", {}, h("textarea", { class: "in", rows: "2", "data-f": "description", placeholder: "First line: the item (bold). Next lines: details" }, it.description || ""),
+        h("div", { style: "display:flex;gap:6px;margin-top:4px" }, h("input", { class: "in", "data-f": "period", placeholder: "Billing month, e.g. Month 1 of 6", value: it.period || "" }),
+          h("input", { class: "in", "data-f": "period_note", placeholder: "e.g. 1 Dec to 31 Dec 2026", value: it.period_note || "" }))),
+      h("td", { style: "width:90px" }, h("input", { class: "in", "data-f": "sac", value: it.sac || "" })),
+      h("td", { style: "width:70px" }, h("input", { class: "in", type: "number", step: "any", min: "0", "data-f": "qty", value: String(it.qty ?? 1) })),
+      h("td", { style: "width:120px" }, h("input", { class: "in", type: "number", step: "any", min: "0", "data-f": "rate", value: String(it.rate ?? 0) })),
+      h("td", { style: "width:80px", class: "gstc" }, h("select", { class: "in", "data-f": "gst" }, [0, 5, 12, 18, 28].map(g => h("option", { value: String(g) }, g + "%")))),
+      h("td", { class: "amt", style: "white-space:nowrap;text-align:right;width:110px" }),
+      h("td", { style: "width:36px" }, h("button", { type: "button", class: "btn sm ghost", title: "Remove this line", onclick: () => { tr.remove(); refresh(); } }, ic("x"))));
+    tr.querySelector("[data-f=gst]").value = String(it.gst ?? 18);
+    tr.addEventListener("input", refresh); tr.addEventListener("change", refresh);
+    lines.append(tr);
+  };
+  (inv.items && inv.items.length ? inv.items : [null]).forEach(addLine);
+  const curWrap = h("label", { class: "fl" }, "Currency", curSel), posWrap = h("label", { class: "fl" }, "Place of supply (client’s state)", posSel);
+  cliSel.addEventListener("change", () => {
+    const c = byId("clients", cliSel.value); if (!c) return;
+    const b = billToFromClient(c); for (const k of Object.keys(bt)) if (k in b) bt[k].value = b[k];
+    const abroad = b.country && !/^india$/i.test(b.country.trim());
+    kindSel.value = abroad ? "Export" : "GST"; if (abroad) bt.state.value = "Outside India"; else posSel.value = b.state || posSel.value;
+    const plan = rows("client_billing").find(p => p.client_id === c.id);
+    if (plan && !id) { if (plan.account_id) accSel.value = plan.account_id; if (abroad) curSel.value = plan.currency !== "INR" ? plan.currency : "USD"; }
+    refresh();
+  });
+  bt.state.addEventListener("change", () => { if (gstOn() && bt.state.value && bt.state.value !== "Outside India") posSel.value = bt.state.value; refresh(); });
+  [accSel, kindSel, curSel, posSel].forEach(x => x.addEventListener("change", refresh));
+  accSel.addEventListener("change", () => { const a = byId("finance_accounts", accSel.value); if (a && !notes.value.trim()) notes.value = a.terms || ""; });
+  const err = h("p", { class: "err", hidden: true });
+  const save = h("button", { type: "button", class: "btn pri" }, id ? "Save" : "Save invoice");
+  save.addEventListener("click", async () => {
+    err.hidden = true;
+    const c = current(), b = {}; for (const k of Object.keys(bt)) b[k] = bt[k].value.trim();
+    if (!c.account_id) { err.textContent = "Choose which account this invoice is from."; err.hidden = false; return; }
+    if (!b.name) { err.textContent = "Add the client’s name."; err.hidden = false; return; }
+    c.items = c.items.filter(i => i.description || i.rate);
+    if (!c.items.length) { err.textContent = "Add at least one line."; err.hidden = false; return; }
+    if (gstOn() && !c.place_of_supply) { err.textContent = "Choose the place of supply (the client’s state): it decides CGST+SGST or IGST."; err.hidden = false; return; }
+    const t = invoiceTotals(c, byId("finance_accounts", c.account_id));
+    const data = { account_id: c.account_id, client_id: cliSel.value || null, bill_to: b, kind: c.kind, currency: c.currency, issue_date: issue.value || today(), due_date: due.value || null,
+      items: c.items, place_of_supply: c.place_of_supply, subtotal: t.subtotal, cgst: t.cgst, sgst: t.sgst, igst: t.igst, total: t.total, notes: notes.value.trim() };
+    save.disabled = true;
+    try {
+      const row = id ? await updateRow("invoices", id, data) : await insertRow("invoices", data);
+      if (preset && preset._plan) await advanceBilling(preset._plan);
+      toast(id ? "Invoice saved." : "Invoice saved as a draft. Issue it to give it a number.");
+      closeDlg(); await rerender(); viewInvoice(row.id);
+    } catch (e) { err.textContent = friendly(e); err.hidden = false; save.disabled = false; }
+  });
+  openDialog(id ? "Edit invoice " + (inv.number || "(draft)") : "New invoice", [
+    locked ? h("p", { class: "muted" }, "This invoice is " + inv.status.toLowerCase() + ", so it can’t be changed.") : null,
+    h("div", { class: "form" },
+      rows("finance_accounts").length > 1 ? h("label", { class: "fl full" }, "From account *", accSel) : h("label", { class: "fl" }, "From", accSel),
+      h("label", { class: "fl" }, "Client", cliSel), h("label", { class: "fl" }, "Invoice type", kindSel),
+      curWrap, posWrap, h("label", { class: "fl" }, "Invoice date", issue), h("label", { class: "fl" }, "Due date", due)),
+    h("h3", { style: "margin:14px 0 6px;font-size:14px" }, "Bill to"),
+    h("div", { class: "form" }, ...Object.keys(BT_LABEL).map(k => h("label", { class: "fl" }, BT_LABEL[k], bt[k])),
+      h("label", { class: "fl" }, "State", bt.state), h("label", { class: "fl full" }, "Address", bt.address)),
+    h("h3", { style: "margin:14px 0 6px;font-size:14px" }, "Lines"),
+    h("div", { class: "tablewrap" }, h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Description"), h("th", {}, "SAC"), h("th", {}, "Qty"), h("th", {}, "Rate"), h("th", { class: "gstc" }, "GST"), h("th", { style: "text-align:right" }, "Amount"), h("th"))), lines)),
+    h("button", { type: "button", class: "btn sm", style: "margin-top:6px", onclick: () => { addLine(); refresh(); } }, "+ Add line"),
+    totalsBox,
+    h("label", { class: "fl full", style: "margin-top:10px" }, "Notes / terms (printed on the invoice)", notes), err
+  ], [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), locked ? null : save]);
+  refresh();
+}
+function viewInvoice(id){
+  const inv = byId("invoices", id); if (!inv) return;
+  const A = access(MOD.invoices);
+  const scale = Math.min(1, (Math.min(window.innerWidth || 900, 760) - 96) / 794);
+  const prev = h("div", { style: "overflow:auto;max-height:62vh;background:#E9E9F2;padding:12px;border-radius:10px" },
+    invoicePages(inv).map(pg => h("div", { style: "width:" + Math.round(794 * scale) + "px;height:" + Math.round(1123 * scale) + "px;margin:0 auto 12px;box-shadow:0 1px 4px rgba(0,0,0,.12);overflow:hidden" },
+      h("div", { style: "transform:scale(" + scale + ");transform-origin:top left;width:794px" }, pg))));
+  const btn = (label, fn, cls) => h("button", { type: "button", class: "btn " + (cls || ""), onclick: fn }, label);
+  const acts = [];
+  if (A.canEdit && !["Paid", "Cancelled"].includes(inv.status)) acts.push(btn("Edit", () => { closeDlg(); openInvoice(inv.id); }));
+  if (A.canEdit && !inv.number && inv.status !== "Cancelled") acts.push(btn("Issue", async () => { const r = await ensureIssued(inv).catch(e => { fail(e, "Not issued"); return null; }); if (r) { toast("Issued as " + r.number + "."); closeDlg(); viewInvoice(r.id); rerender(); } }, "pri"));
+  acts.push(btn("Download PDF", () => downloadInvoice(inv)));
+  if (A.canEdit && inv.status !== "Cancelled") {
+    acts.push(btn("Email", () => { closeDlg(); emailInvoice(inv); }));
+    acts.push(btn("WhatsApp", () => whatsappInvoice(inv)));
+    if (inv.status !== "Paid") acts.push(btn("Mark paid", () => { closeDlg(); markInvoicePaid(inv); }, "ok"));
+    else acts.push(btn("Mark unpaid", async () => { if (!confirm("Mark this invoice unpaid? Its payment comes off the balance sheet.")) return; try { await updateRow("invoices", inv.id, { status: inv.sent_at ? "Sent" : "Issued", paid_on: null, amount_received_inr: null }); closeDlg(); rerender(); } catch (e) { fail(e); } }));
+    if (inv.number && inv.status !== "Paid") acts.push(btn("Cancel invoice", async () => { if (!confirm("Cancel " + inv.number + "? It stays on record as cancelled; its number isn’t reused.")) return; try { await updateRow("invoices", inv.id, { status: "Cancelled" }); closeDlg(); rerender(); } catch (e) { fail(e); } }, "danger"));
+  }
+  if (A.canDelete && !inv.number) acts.push(btn("Delete draft", async () => { if (!confirm("Delete this draft?")) return; try { await deleteRow("invoices", inv.id); closeDlg(); rerender(); } catch (e) { fail(e); } }, "danger"));
+  openDialog((inv.number || "Draft invoice") + " · " + ((inv.bill_to || {}).name || ""), [
+    h("div", { style: "display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap" }, invStatus(inv),
+      h("span", { class: "muted" }, money2(inv.total, inv.currency) + (inv.due_date ? " · due " + fmtDate(inv.due_date, true) : "") + (inv.sent_at ? " · sent " + fmtAgo(inv.sent_at) : "") + (inv.paid_on ? " · paid " + fmtDate(inv.paid_on, true) : ""))),
+    prev], [h("div", { style: "display:flex;gap:8px;flex-wrap:wrap;width:100%" }, acts)]);
+}
+function renderInvoices(el, A){
+  if (!finReady("invoices")) { finMissing(el); return; }
+  const u = uiFor("invoices"); u.st = u.st || "all";
+  const all = rows("invoices");
+  const unpaid = all.filter(i => ["Issued", "Sent"].includes(i.status));
+  const sumBy = list => { const m = {}; for (const i of list) m[i.currency] = (m[i.currency] || 0) + (+i.total || 0); return Object.entries(m).map(([c, v]) => money2(v, c).replace(/\.00$/, "")).join(" + ") || money(0); };
+  const month = today().slice(0, 7);
+  el.append(statStrip([["Outstanding", sumBy(unpaid)], ["Overdue", String(unpaid.filter(invOverdue).length), unpaid.some(invOverdue) ? "var(--bad)" : null],
+    ["Paid this month", sumBy(all.filter(i => i.status === "Paid" && String(i.paid_on || "").startsWith(month)))], ["Drafts", String(all.filter(i => i.status === "Draft").length)]]));
+  const tb = h("div", { class: "tb" });
+  if (A.canCreate || access(MOD.invoices).L >= 2) tb.append(h("button", { type: "button", class: "btn pri", onclick: () => openInvoice(null) }, "+ New invoice"));
+  tb.append(segmented([["all", "All"], ["Draft", "Drafts"], ["unpaid", "Unpaid"], ["overdue", "Overdue"], ["Paid", "Paid"], ["Cancelled", "Cancelled"]], u.st, v => { u.st = v; rerender(); }));
+  const q = h("input", { class: "in search", type: "search", placeholder: "Search invoices", value: u.q || "" });
+  tb.append(q);
+  const accF = h("select", { class: "in" }, h("option", { value: "" }, "All accounts"), rows("finance_accounts").map(a => h("option", { value: a.id }, a.name))); accF.value = u.acc || "";
+  if (rows("finance_accounts").length > 1) tb.append(accF);
+  el.append(tb);
+  const body = h("div");
+  const draw = () => {
+    const s = (q.value || "").trim().toLowerCase();
+    let list = all.filter(i => u.st === "all" || (u.st === "unpaid" ? ["Issued", "Sent"].includes(i.status) : u.st === "overdue" ? invOverdue(i) : i.status === u.st));
+    if (accF.value) list = list.filter(i => i.account_id === accF.value);
+    if (s) list = list.filter(i => ((i.number || "") + " " + ((i.bill_to || {}).name || "")).toLowerCase().includes(s));
+    list.sort((a, b) => String(b.issue_date).localeCompare(String(a.issue_date)) || String(b.number || "").localeCompare(String(a.number || "")));
+    const tbody = h("tbody");
+    for (const i of list) tbody.append(h("tr", { class: "click", onclick: () => viewInvoice(i.id) },
+      h("td", {}, h("b", {}, i.number || "Draft")), h("td", {}, (i.bill_to || {}).name || refLabel("clients", i.client_id) || "–"),
+      h("td", {}, fmtDate(i.issue_date)), h("td", {}, i.due_date ? dueTag(i.due_date, !["Issued", "Sent"].includes(i.status)) : "–"),
+      h("td", { style: "text-align:right;white-space:nowrap" }, money2(i.total, i.currency)), h("td", {}, invStatus(i)),
+      rows("finance_accounts").length > 1 ? h("td", { class: "muted", style: "font-size:13px" }, refLabel("finance_accounts", i.account_id)) : null));
+    body.replaceChildren(list.length ? h("div", { class: "tablewrap" }, h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Number"), h("th", {}, "Client"), h("th", {}, "Date"), h("th", {}, "Due"), h("th", { style: "text-align:right" }, "Amount"), h("th", {}, "Status"), rows("finance_accounts").length > 1 ? h("th", {}, "Account") : null)), tbody))
+      : h("div", { class: "panel empty" }, all.length ? "No invoices match." : "No invoices yet. Click “+ New invoice” to make the first one."));
+  };
+  let qt; q.addEventListener("input", () => { u.q = q.value; clearTimeout(qt); qt = setTimeout(draw, 150); });
+  accF.addEventListener("change", () => { u.acc = accF.value; draw(); });
+  el.append(body); draw();
+}
+
+/* ---------- clients and what they owe ---------- */
+function nextDue(d, cycle){
+  if (!d) return null;
+  const m = { Monthly: 1, Quarterly: 3, "Half-yearly": 6, Yearly: 12 }[cycle];
+  if (!m) return null;
+  const x = new Date(d + "T12:00:00"); const day = x.getDate(); x.setDate(1); x.setMonth(x.getMonth() + m);
+  const last = new Date(x.getFullYear(), x.getMonth() + 1, 0).getDate(); x.setDate(Math.min(day, last));
+  return ymd(x);
+}
+async function advanceBilling(planId){
+  const p = byId("client_billing", planId); if (!p) return;
+  const billed = (+p.billed_count || 0) + 1, done = p.cycle === "One-off" || (p.term_count && billed >= +p.term_count);
+  const patch = { billed_count: billed };
+  if (done) Object.assign(patch, { next_due: null, active: false });
+  else Object.assign(patch, { next_due: nextDue(p.next_due || today(), p.cycle), period_start: p.period_start ? nextDue(p.period_start, p.cycle) : null });
+  await updateRow("client_billing", p.id, patch);
+}
+// "Month 2 of 6" and "1 Jan to 31 Jan 2027" for the next invoice of a plan
+function planPeriod(p){
+  const unit = { Monthly: "Month", Quarterly: "Quarter", "Half-yearly": "Half-year", Yearly: "Year" }[p.cycle];
+  if (!unit) return { period: "", note: "" };
+  const n = (+p.billed_count || 0) + 1;
+  let note = "";
+  if (p.period_start) { const end = addDays(nextDue(p.period_start, p.cycle), -1), a = new Date(p.period_start + "T12:00:00"), b = new Date(end + "T12:00:00");
+    note = a.getDate() + " " + a.toLocaleDateString("en-GB", { month: "short" }) + (a.getFullYear() !== b.getFullYear() ? " " + a.getFullYear() : "") + " to " + fmtLong(end); }
+  return { period: unit + " " + n + (p.term_count ? " of " + p.term_count : ""), note };
+}
+function invoiceFromPlan(c, p){
+  const abroad = c.country && !/^india$/i.test(String(c.country).trim());
+  const preset = { client_id: c.id, bill_to: billToFromClient(c), kind: abroad ? "Export" : "GST", currency: abroad ? (p && p.currency !== "INR" ? p.currency : "USD") : "INR",
+    place_of_supply: abroad ? "" : (c.state || ""), due_date: addDays(today(), 7) };
+  if (p) { preset.account_id = p.account_id || undefined; preset._plan = p.id;
+    const pp = planPeriod(p);
+    preset.items = [{ description: p.description || ("Services" + (p.cycle !== "One-off" ? " (" + p.cycle.toLowerCase() + ")" : "")), period: pp.period, period_note: pp.note, sac: p.sac || "998314", qty: 1, rate: +p.amount || 0, gst: abroad ? 0 : (+p.gst_rate || 18) }]; }
+  if (abroad) preset.bill_to.state = "Outside India";
+  openInvoice(null, preset);
+}
+function editBillingPlan(c){
+  const p = rows("client_billing").find(x => x.client_id === c.id);
+  const f = {
+    cycle: h("select", { class: "in" }, BILL_CYCLES.map(x => h("option", { value: x }, x))),
+    amount: h("input", { class: "in", type: "number", step: "any", min: "0", value: p ? String(p.amount) : "" }),
+    currency: h("select", { class: "in" }, FIN_CURRENCIES.map(x => h("option", { value: x }, x))),
+    next_due: h("input", { class: "in", type: "date", value: p && p.next_due ? p.next_due : "" }),
+    description: h("textarea", { class: "in", rows: "3", placeholder: "First line: the item, e.g. White-label Logistics App: SaaS Subscription. Next lines: details (plan, term)" }, p ? p.description : ""),
+    term_count: h("input", { class: "in", type: "number", min: "1", step: "1", value: p && p.term_count ? String(p.term_count) : "", placeholder: "e.g. 6 (empty: no end)" }),
+    billed_count: h("input", { class: "in", type: "number", min: "0", step: "1", value: p ? String(p.billed_count || 0) : "0" }),
+    period_start: h("input", { class: "in", type: "date", value: p && p.period_start ? p.period_start : "" }),
+    sac: h("input", { class: "in", value: p ? p.sac : "998314" }),
+    gst_rate: h("select", { class: "in" }, [0, 5, 12, 18, 28].map(g => h("option", { value: String(g) }, g + "%"))),
+    account_id: h("select", { class: "in" }, h("option", { value: "" }, "Default account"), rows("finance_accounts").map(a => h("option", { value: a.id }, a.name))),
+    active: h("input", { type: "checkbox", checked: p ? p.active : true })
+  };
+  f.cycle.value = p ? p.cycle : "Monthly"; f.currency.value = p ? p.currency : (c.country && !/^india$/i.test(c.country) ? "USD" : "INR");
+  f.gst_rate.value = String(p ? +p.gst_rate : 18); f.account_id.value = p && p.account_id ? p.account_id : "";
+  const err = h("p", { class: "err", hidden: true });
+  const save = h("button", { type: "button", class: "btn pri" }, "Save");
+  save.addEventListener("click", async () => {
+    const data = { client_id: c.id, cycle: f.cycle.value, amount: +f.amount.value || 0, currency: f.currency.value, next_due: f.next_due.value || null, description: f.description.value.trim(),
+      sac: f.sac.value.trim(), gst_rate: +f.gst_rate.value, account_id: f.account_id.value || null, active: f.active.checked,
+      term_count: +f.term_count.value || null, billed_count: +f.billed_count.value || 0, period_start: f.period_start.value || null };
+    save.disabled = true;
+    try { if (p) await updateRow("client_billing", p.id, data); else await insertRow("client_billing", data); toast("Billing saved for " + c.name + "."); closeDlg(); rerender(); }
+    catch (e) { err.textContent = friendly(e); err.hidden = false; save.disabled = false; }
+  });
+  openDialog("Billing for " + c.name, [h("div", { class: "form" },
+    h("label", { class: "fl" }, "Bills", f.cycle), h("label", { class: "fl" }, "Amount (before GST)", f.amount), h("label", { class: "fl" }, "Currency", f.currency),
+    h("label", { class: "fl" }, "Next invoice due", f.next_due), h("label", { class: "fl" }, "Next period starts", f.period_start),
+    h("label", { class: "fl" }, "Number of periods (term)", f.term_count), h("label", { class: "fl" }, "Already invoiced", f.billed_count),
+    h("label", { class: "fl full" }, "What it’s for (the invoice line)", f.description),
+    h("label", { class: "fl" }, "SAC code", f.sac), h("label", { class: "fl" }, "GST rate", f.gst_rate), h("label", { class: "fl" }, "From account", f.account_id),
+    h("label", { class: "chk" }, f.active, "Active (shows on Clients & dues)")), err],
+    [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), save]);
+}
+function renderDues(el, A){
+  if (!finReady("client_billing")) { finMissing(el); return; }
+  const plans = new Map(rows("client_billing").map(p => [p.client_id, p]));
+  const inv = rows("invoices").filter(i => ["Issued", "Sent"].includes(i.status));
+  const list = rows("clients").filter(c => plans.has(c.id) || inv.some(i => i.client_id === c.id) || (c.status || "Active") === "Active").map(c => {
+    const p = plans.get(c.id), open = inv.filter(i => i.client_id === c.id);
+    const dueDates = [p && p.active && p.next_due, ...open.map(i => i.due_date)].filter(Boolean).sort();
+    return { c, p, open, next: dueDates[0] || null };
+  });
+  list.sort((a, b) => (a.next ? 0 : 1) - (b.next ? 0 : 1) || String(a.next || "").localeCompare(String(b.next || "")) || a.c.name.localeCompare(b.c.name));
+  const overdue = list.filter(x => x.next && x.next < today()).length, week = list.filter(x => x.next && x.next >= today() && x.next <= addDays(today(), 7)).length;
+  el.append(statStrip([["Overdue", String(overdue), overdue ? "var(--bad)" : null], ["Due in 7 days", String(week)], ["Clients billed regularly", String(rows("client_billing").filter(p => p.active).length)]]));
+  const tbody = h("tbody");
+  for (const x of list) {
+    const owed = {}; for (const i of x.open) owed[i.currency] = (owed[i.currency] || 0) + (+i.total || 0);
+    tbody.append(h("tr", {},
+      h("td", {}, h("b", {}, x.c.name), x.c.contact_name ? h("div", { class: "muted", style: "font-size:12.5px" }, x.c.contact_name) : null),
+      h("td", {}, x.p && x.p.active ? (x.p.cycle + " · " + money2(x.p.amount, x.p.currency).replace(/\.00$/, "")) : h("span", { class: "muted" }, "No plan")),
+      h("td", {}, x.next ? dueTag(x.next, false) : h("span", { class: "muted" }, "–")),
+      h("td", {}, x.open.length ? h("span", {}, x.open.length + " unpaid · " + Object.entries(owed).map(([c, v]) => money2(v, c).replace(/\.00$/, "")).join(" + ")) : h("span", { class: "muted" }, "Nothing owed")),
+      h("td", { style: "white-space:nowrap" },
+        A.L >= 2 ? h("button", { type: "button", class: "btn sm pri", onclick: () => invoiceFromPlan(x.c, x.p && x.p.active ? x.p : null) }, "Create invoice") : null, " ",
+        A.L >= 2 ? h("button", { type: "button", class: "btn sm", onclick: () => editBillingPlan(x.c) }, "Billing") : null, " ",
+        x.open.length ? h("button", { type: "button", class: "btn sm ghost", onclick: () => { uiFor("invoices").q = x.c.name; uiFor("invoices").st = "unpaid"; go("invoices"); } }, "Invoices") : null)));
+  }
+  el.append(list.length ? h("div", { class: "tablewrap" }, h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Client"), h("th", {}, "Billing"), h("th", {}, "Next due"), h("th", {}, "Owes"), h("th"))), tbody))
+    : h("div", { class: "panel empty" }, "No clients yet. Add them under Clients."));
+}
+
+/* ---------- balance sheet ---------- */
+function finPeriod(key){
+  const t = today(), y = +t.slice(0, 4), m = +t.slice(5, 7);
+  const fyStart = m >= 4 ? y : y - 1;
+  const lastMonth = ymd(new Date(y, m - 2, 1));
+  return ({
+    month: [t.slice(0, 7) + "-01", t], last: [lastMonth, ymd(new Date(y, m - 1, 0))],
+    fy: [fyStart + "-04-01", (fyStart + 1) + "-03-31"], lastfy: [(fyStart - 1) + "-04-01", fyStart + "-03-31"], all: ["0000-01-01", "9999-12-31"]
+  })[key] || ["0000-01-01", "9999-12-31"];
+}
+const inPeriod = (d, key) => { const [a, b] = finPeriod(key); return !!d && d >= a && d <= b; };
+function ledgerTop(el){
+  if (!finReady("finance_entries")) { finMissing(el); return; }
+  const u = uiFor("finance_entries"); u.period = u.period || "fy";
+  el.append(h("div", { class: "tb" }, segmented([["month", "This month"], ["last", "Last month"], ["fy", "This financial year"], ["lastfy", "Last financial year"], ["all", "All time"]], u.period, v => { u.period = v; rerender(); })));
+  const es = rows("finance_entries").filter(e => inPeriod(e.entry_date, u.period));
+  const sum = (k, f) => es.filter(e => e.kind === k && (!f || f(e))).reduce((s, e) => s + (+e.amount || 0), 0);
+  const rev = sum("Revenue"), exp = sum("Expense");
+  const openLiab = rows("finance_entries").filter(e => e.kind === "Liability" && e.status !== "Settled").reduce((s, e) => s + (+e.amount || 0), 0);
+  const recv = rows("invoices").filter(i => ["Issued", "Sent"].includes(i.status) && i.currency === "INR").reduce((s, i) => s + (+i.total || 0), 0);
+  const gst = rows("invoices").filter(i => i.number && i.status !== "Cancelled" && inPeriod(i.issue_date, u.period)).reduce((s, i) => s + (+i.cgst || 0) + (+i.sgst || 0) + (+i.igst || 0), 0);
+  el.append(statStrip([["Revenue", money(rev)], ["Expenses", money(exp)], ["Net profit", money(rev - exp), rev - exp < 0 ? "var(--bad)" : "var(--ok)"],
+    ["Clients owe you (₹ invoices)", money(recv)], ["You owe (open liabilities)", money(openLiab), openLiab ? "var(--warn)" : null], ["GST on invoices", money(gst)]]));
+  // month by month, and where the money went
+  const months = [...new Set(es.map(e => e.entry_date.slice(0, 7)))].sort();
+  const cats = {}; for (const e of es.filter(e => e.kind === "Expense")) cats[e.category || "Other expense"] = (cats[e.category || "Other expense"] || 0) + (+e.amount || 0);
+  const wrap = h("div", { style: "display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-bottom:16px" });
+  if (months.length) wrap.append(h("div", { class: "panel" }, h("b", {}, "Month by month"), h("div", { class: "tablewrap", style: "margin-top:8px" }, h("table", {},
+    h("thead", {}, h("tr", {}, h("th", {}, "Month"), h("th", { style: "text-align:right" }, "Revenue"), h("th", { style: "text-align:right" }, "Expenses"), h("th", { style: "text-align:right" }, "Net"))),
+    h("tbody", {}, months.map(mo => { const r = es.filter(e => e.entry_date.startsWith(mo) && e.kind === "Revenue").reduce((s, e) => s + +e.amount, 0), x = es.filter(e => e.entry_date.startsWith(mo) && e.kind === "Expense").reduce((s, e) => s + +e.amount, 0);
+      return h("tr", {}, h("td", {}, new Date(mo + "-15").toLocaleDateString("en-IN", { month: "short", year: "numeric" })), h("td", { style: "text-align:right" }, money(r)), h("td", { style: "text-align:right" }, money(x)), h("td", { style: "text-align:right;font-weight:600;color:" + (r - x < 0 ? "var(--bad)" : "inherit") }, money(r - x))); }))))));
+  const catList = Object.entries(cats).sort((a, b) => b[1] - a[1]);
+  if (catList.length) wrap.append(h("div", { class: "panel" }, h("b", {}, "Where the money went"),
+    h("div", { style: "margin-top:8px" }, catList.map(([c, v]) => h("div", { style: "display:flex;gap:10px;align-items:center;margin:6px 0" },
+      h("span", { style: "flex:0 0 170px;font-size:13.5px" }, c),
+      h("div", { class: "meter", style: "flex:1" }, h("span", { style: "width:" + Math.max(2, Math.round(v / exp * 100)) + "%;background:var(--p)" })),
+      h("span", { style: "flex:0 0 100px;text-align:right;font-size:13.5px" }, money(v)))))));
+  if (wrap.childNodes.length) el.append(wrap);
+  el.append(h("p", { class: "muted", style: "font-size:13px;margin:0 0 8px" }, "Paid invoices and paid salaries are added here by themselves (marked “auto”). Add everything else: rent, software, loans, bills to pay."));
+}
+
+/* ---------- salaries ---------- */
+const slipLines = s => ({ earn: [["Monthly salary", +s.salary || 0], ...(s.earnings || []).map(x => [x.label, +x.amount || 0])], ded: (s.deductions || []).map(x => [x.label, +x.amount || 0]) });
+const slipNet = s => { const l = slipLines(s); return r2(l.earn.reduce((a, x) => a + x[1], 0) - l.ded.reduce((a, x) => a + x[1], 0)); };
+const monthLabel = d => new Date(String(d).slice(0, 7) + "-15").toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+function slipDoc(s, setup){
+  const p = person(s.user_id) || {}, acc = (typeof defaultAccount === "function" && rows("finance_accounts").length ? defaultAccount() : null) || {}, l = slipLines(s);
+  const gross = l.earn.reduce((a, x) => a + x[1], 0), ded = l.ded.reduce((a, x) => a + x[1], 0);
+  const mask = n => n ? "XXXX" + String(n).slice(-4) : "";
+  const th = (txt, st) => h("th", { style: "padding:12px 12px;font-size:10.5px;letter-spacing:1.2px;color:" + VIO + ";text-align:left;font-weight:700;text-transform:uppercase;" + (st || "") }, txt);
+  const td = (kids, st) => h("td", { style: "padding:12px 12px;border-bottom:1px solid " + LINE + ";" + (st || "") }, kids);
+  const n = Math.max(l.earn.length, l.ded.length, 1), body = [];
+  for (let i = 0; i < n; i++) body.push(h("tr", {}, td(l.earn[i] ? l.earn[i][0] : ""), td(l.earn[i] ? "₹" + num2(l.earn[i][1]) : "", "text-align:right"),
+    td(l.ded[i] ? l.ded[i][0] : "", "border-left:1px solid " + LINE), td(l.ded[i] ? "₹" + num2(l.ded[i][1]) : "", "text-align:right")));
+  const info = (k, v) => h("div", { style: "flex:1 0 30%;padding:12px 14px" }, capLabel(k), h("div", { style: "font-weight:600;margin-top:2px" }, v || "–"));
+  return docPage({ acc, title: "Salary Slip", sub: monthLabel(s.month), foot: "This is a computer-generated salary slip and needs no signature.", body: [
+    h("div", { style: "display:flex;flex-wrap:wrap;border:1px solid " + LINE + ";border-radius:12px" },
+      info("Employee", p.full_name), info("Designation", p.title), info("Department", p.vertical), info("Joined", p.joined_on ? fmtLong(p.joined_on) : ""),
+      info("PAN", (setup || {}).pan), info("Bank account", [((setup || {}).bank_name || ""), mask((setup || {}).account_number)].filter(Boolean).join(" · "))),
+    h("table", { style: "width:100%;border-collapse:collapse;margin-top:22px" },
+      h("thead", { style: "background:" + SOFT }, h("tr", {}, th("Earnings"), th("Amount", "text-align:right"), th("Deductions", "border-left:1px solid " + LINE), th("Amount", "text-align:right"))),
+      h("tbody", {}, body, h("tr", {}, td(h("b", {}, "Gross earnings")), td(h("b", {}, "₹" + num2(gross)), "text-align:right"), td(h("b", {}, "Total deductions"), "border-left:1px solid " + LINE), td(h("b", {}, "₹" + num2(ded)), "text-align:right")))),
+    h("div", { style: "margin-top:20px;background:" + INK + ";color:#fff;border-radius:12px;padding:18px 22px;display:flex;justify-content:space-between;align-items:center" },
+      h("div", {}, h("div", { style: "font-size:11px;letter-spacing:1.4px;font-weight:700;opacity:.75" }, "NET PAY"), h("div", { style: "font-size:12.5px;opacity:.9;margin-top:2px" }, amountWords(s.net))),
+      h("div", { style: "font-size:24px;font-weight:800" }, "₹" + num2(s.net))),
+    h("p", { style: "margin-top:14px;color:#3D3A52" }, s.status === "Paid" ? "Paid" + (s.paid_on ? " on " + fmtLong(s.paid_on) : "") + "." : "Issued, not paid yet."),
+    s.notes ? h("p", { style: "margin-top:6px;white-space:pre-line;color:#3D3A52" }, s.notes) : null
+  ] });
+}
+async function downloadSlip(s){
+  try {
+    toast("Making the PDF…");
+    const setup = rows("salary_setup").find(x => x.user_id === s.user_id) || (await sb.from("salary_setup").select("*").eq("user_id", s.user_id).maybeSingle()).data;
+    saveBlob(await docToPdf(slipDoc(s, setup)), pdfName("Salary slip " + (pname(s.user_id) || "") + " " + monthLabel(s.month)));
+  } catch (e) { fail(e, "PDF not made"); }
+}
+function editSalarySetup(p){
+  const cur = rows("salary_setup").find(x => x.user_id === p.id) || {};
+  const f = { monthly_salary: h("input", { class: "in", type: "number", step: "any", min: "0", value: cur.monthly_salary != null ? String(cur.monthly_salary) : "" }),
+    pan: h("input", { class: "in", value: cur.pan || "", maxlength: "10" }), bank_name: h("input", { class: "in", value: cur.bank_name || "" }),
+    account_number: h("input", { class: "in", value: cur.account_number || "", inputmode: "numeric" }), ifsc: h("input", { class: "in", value: cur.ifsc || "", maxlength: "11" }) };
+  const err = h("p", { class: "err", hidden: true });
+  const save = h("button", { type: "button", class: "btn pri" }, "Save");
+  save.addEventListener("click", async () => {
+    const data = { user_id: p.id, monthly_salary: +f.monthly_salary.value || 0, pan: f.pan.value.trim().toUpperCase(), bank_name: f.bank_name.value.trim(), account_number: f.account_number.value.trim(), ifsc: f.ifsc.value.trim().toUpperCase() };
+    save.disabled = true;
+    try { ok(await sb.from("salary_setup").upsert(data, { onConflict: "user_id" })); await load("salary_setup", true); toast("Saved for " + p.full_name + "."); closeDlg(); rerender(); }
+    catch (e) { err.textContent = friendly(e); err.hidden = false; save.disabled = false; }
+  });
+  openDialog("Salary details: " + p.full_name, [h("div", { class: "form" }, h("label", { class: "fl" }, "Monthly salary (₹)", f.monthly_salary), h("label", { class: "fl" }, "PAN", f.pan),
+    h("label", { class: "fl" }, "Bank", f.bank_name), h("label", { class: "fl" }, "Account number", f.account_number), h("label", { class: "fl" }, "IFSC", f.ifsc)),
+    h("p", { class: "muted", style: "font-size:13px" }, "Only Finance and " + p.full_name.split(" ")[0] + " can see these."), err],
+    [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), save], true);
+}
+function editSlip(s){
+  const lineBox = (list, label) => {
+    const box = h("div");
+    const add = x => { const row = h("div", { style: "display:flex;gap:8px;margin:4px 0" }, h("input", { class: "in", placeholder: label, value: (x && x.label) || "", "data-l": "1" }),
+      h("input", { class: "in", type: "number", step: "any", min: "0", style: "max-width:140px", value: x ? String(x.amount) : "", "data-a": "1" }),
+      h("button", { type: "button", class: "btn sm ghost", onclick: () => { row.remove(); upd(); } }, ic("x"))); row.addEventListener("input", upd); box.append(row); };
+    (list || []).forEach(add);
+    box.read = () => [...box.children].map(r => ({ label: r.querySelector("[data-l]").value.trim(), amount: +r.querySelector("[data-a]").value || 0 })).filter(x => x.label || x.amount);
+    box.addLine = () => { add(null); };
+    return box;
+  };
+  const sal = h("input", { class: "in", type: "number", step: "any", min: "0", value: String(s.salary || 0) });
+  const earn = lineBox(s.earnings, "e.g. Bonus, overtime"), ded = lineBox(s.deductions, "e.g. Unpaid leave, advance");
+  const notes = h("textarea", { class: "in", rows: "2" }, s.notes || "");
+  const netEl = h("b");
+  const cur = () => ({ ...s, salary: +sal.value || 0, earnings: earn.read(), deductions: ded.read(), notes: notes.value.trim() });
+  const upd = () => { netEl.textContent = money2(slipNet(cur())); };
+  sal.addEventListener("input", upd);
+  const err = h("p", { class: "err", hidden: true });
+  const save = h("button", { type: "button", class: "btn pri" }, "Save");
+  save.addEventListener("click", async () => {
+    const c = cur(); save.disabled = true;
+    try { await updateRow("salary_slips", s.id, { salary: c.salary, earnings: c.earnings, deductions: c.deductions, notes: c.notes, net: slipNet(c) }); toast("Slip saved."); closeDlg(); rerender(); }
+    catch (e) { err.textContent = friendly(e); err.hidden = false; save.disabled = false; }
+  });
+  openDialog("Salary slip: " + pname(s.user_id) + " · " + monthLabel(s.month), [
+    h("label", { class: "fl" }, "Monthly salary (₹)", sal),
+    h("h3", { style: "margin:12px 0 4px;font-size:14px" }, "Extra earnings"), earn, h("button", { type: "button", class: "btn sm", onclick: () => earn.addLine() }, "+ Add earning"),
+    h("h3", { style: "margin:12px 0 4px;font-size:14px" }, "Deductions"), ded, h("button", { type: "button", class: "btn sm", onclick: () => ded.addLine() }, "+ Add deduction"),
+    h("label", { class: "fl full", style: "margin-top:12px" }, "Note on the slip (optional)", notes),
+    h("p", { style: "font-size:16px;margin-top:10px" }, "Net pay: ", netEl), err],
+    [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), s.status === "Paid" ? null : save]);
+  upd();
+}
+async function createMonthSlips(month){
+  const have = new Set(rows("salary_slips").filter(s => s.month === month).map(s => s.user_id));
+  const todo = rows("salary_setup").filter(x => +x.monthly_salary > 0 && !have.has(x.user_id) && (person(x.user_id) || {}).is_active);
+  if (!todo.length) { toast("Everyone with a monthly salary already has a slip for " + monthLabel(month) + "."); return; }
+  ok(await sb.from("salary_slips").insert(todo.map(x => ({ user_id: x.user_id, month, salary: +x.monthly_salary, net: +x.monthly_salary }))));
+  await load("salary_slips", true); toast(todo.length + " draft slip" + (todo.length === 1 ? "" : "s") + " made. Add any extras, then Issue."); rerender();
+}
+function renderSalaries(el, A){
+  if (!finReady("salary_slips")) { finMissing(el); return; }
+  const u = uiFor("salary_slips"); u.month = u.month || monthStart();
+  const month = u.month;
+  const mIn = h("input", { class: "in", type: "month", value: month.slice(0, 7), "aria-label": "Month" });
+  mIn.addEventListener("change", () => { if (mIn.value) { u.month = mIn.value + "-01"; rerender(); } });
+  const slips = rows("salary_slips").filter(s => s.month === month), setup = new Map(rows("salary_setup").map(x => [x.user_id, x]));
+  const staff = activePeople().filter(p => !p.client_id).sort((a, b) => a.full_name.localeCompare(b.full_name));
+  const tb = h("div", { class: "tb" }, mIn);
+  if (A.L >= 2) {
+    tb.append(h("button", { type: "button", class: "btn pri", onclick: () => createMonthSlips(month).catch(e => fail(e)) }, "Make " + monthLabel(month) + " slips"));
+    const drafts = slips.filter(s => s.status === "Draft");
+    if (drafts.length) tb.append(h("button", { type: "button", class: "btn", onclick: async () => {
+      if (!confirm("Issue " + drafts.length + " draft slip(s)? Each person can then see and download theirs.")) return;
+      try { ok(await sb.from("salary_slips").update({ status: "Issued" }).in("id", drafts.map(s => s.id))); await load("salary_slips", true); toast("Issued."); rerender(); } catch (e) { fail(e); } } }, "Issue all drafts (" + drafts.length + ")"));
+  }
+  tb.append(h("button", { type: "button", class: "btn", onclick: () => {
+    const lines = [["Name", "Month", "Monthly salary", "Extra earnings", "Deductions", "Net pay", "Status", "Paid on"]];
+    for (const s of slips) { const l = slipLines(s); lines.push([pname(s.user_id), monthLabel(s.month), s.salary, l.earn.slice(1).reduce((a, x) => a + x[1], 0), l.ded.reduce((a, x) => a + x[1], 0), s.net, s.status, s.paid_on || ""]); }
+    const csv = lines.map(r => r.map(v => '"' + String(v ?? "").replace(/"/g, '""') + '"').join(",")).join("\n");
+    saveBlob(new Blob(["﻿" + csv], { type: "text/csv" }), "Salaries " + monthLabel(month) + ".csv"); } }, "Export CSV"));
+  el.append(tb);
+  const tot = slips.reduce((a, s) => a + (+s.net || 0), 0);
+  el.append(statStrip([["Payroll " + monthLabel(month), money(tot)], ["Paid", String(slips.filter(s => s.status === "Paid").length) + " of " + slips.length], ["Not set up", String(staff.filter(p => !setup.has(p.id) || !(+setup.get(p.id).monthly_salary > 0)).length)]]));
+  const tbody = h("tbody");
+  for (const p of staff) {
+    const st = setup.get(p.id), s = slips.find(x => x.user_id === p.id);
+    const acts = [];
+    if (s) {
+      if (A.L >= 2 && s.status !== "Paid") acts.push(h("button", { type: "button", class: "btn sm", onclick: () => editSlip(s) }, "Edit"));
+      if (A.L >= 2 && s.status === "Draft") acts.push(h("button", { type: "button", class: "btn sm", onclick: async () => { try { await updateRow("salary_slips", s.id, { status: "Issued" }); rerender(); } catch (e) { fail(e); } } }, "Issue"));
+      if (A.L >= 2 && s.status !== "Paid") acts.push(h("button", { type: "button", class: "btn sm ok", onclick: async () => { try { await updateRow("salary_slips", s.id, { status: "Paid", paid_on: today() }); await load("finance_entries", true).catch(() => {}); toast("Paid: added to Expenses."); rerender(); } catch (e) { fail(e); } } }, "Mark paid"));
+      if (A.L >= 2 && s.status === "Paid") acts.push(h("button", { type: "button", class: "btn sm ghost", onclick: async () => { if (!confirm("Mark unpaid? It comes off Expenses.")) return; try { await updateRow("salary_slips", s.id, { status: "Issued", paid_on: null }); rerender(); } catch (e) { fail(e); } } }, "Unpaid"));
+      acts.push(h("button", { type: "button", class: "btn sm", onclick: () => downloadSlip(s) }, ic("download"), "PDF"));
+      if (A.L >= 3 && s.status === "Draft") acts.push(h("button", { type: "button", class: "btn sm ghost", title: "Delete this draft", onclick: async () => { try { await deleteRow("salary_slips", s.id); rerender(); } catch (e) { fail(e); } } }, ic("trash")));
+    }
+    tbody.append(h("tr", {},
+      h("td", {}, personChip(p.id)),
+      h("td", {}, A.L >= 2 ? h("button", { type: "button", class: "btn sm ghost", onclick: () => editSalarySetup(p) }, st && +st.monthly_salary > 0 ? money(st.monthly_salary) : "Set salary") : (st ? money(st.monthly_salary) : "–")),
+      h("td", { style: "text-align:right" }, s ? money2(s.net) : h("span", { class: "muted" }, "–")),
+      h("td", {}, s ? h("span", { class: "pill", style: s.status === "Paid" ? "background:#E4F4EA;color:#1D7748" : s.status === "Issued" ? "background:#EFEDF3;color:#4A3AA8" : "background:#EEE;color:#555" }, s.status) : h("span", { class: "muted" }, "No slip")),
+      h("td", { style: "white-space:nowrap" }, h("div", { style: "display:flex;gap:6px;flex-wrap:wrap" }, acts))));
+  }
+  el.append(h("div", { class: "tablewrap" }, h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Person"), h("th", {}, "Monthly salary"), h("th", { style: "text-align:right" }, "Net pay"), h("th", {}, "Slip"), h("th"))), tbody)));
+  el.append(h("p", { class: "muted", style: "font-size:13px;margin-top:8px" }, "Draft slips are only visible here. Issued and paid slips appear in each person’s My salary page, where they can download them."));
+}
+// everyone: their own salary and slips
+async function renderMySalary(el){
+  el.append(h("div", { class: "ph" }, h("div", {}, h("h1", {}, "My salary"), h("p", {}, "Your monthly salary and your salary slips. Only you and Finance can see this."))));
+  const [st, sl] = await Promise.all([sb.from("salary_setup").select("*").eq("user_id", S.me.id).maybeSingle(), sb.from("salary_slips").select("*").eq("user_id", S.me.id).neq("status", "Draft").order("month", { ascending: false })]);
+  if (S.route !== "my-salary") return;
+  if (st.error && sl.error) { el.append(h("div", { class: "panel empty" }, "Salaries aren’t set up yet.")); return; }
+  const setup = st.data, slips = sl.data || [];
+  el.append(statStrip([["Monthly salary", setup && +setup.monthly_salary > 0 ? money(setup.monthly_salary) : "Not set"], ["Slips", String(slips.length)], ["Last paid", (slips.find(s => s.status === "Paid") || {}).paid_on ? fmtDate(slips.find(s => s.status === "Paid").paid_on, true) : "–"]]));
+  if (!slips.length) { el.append(h("div", { class: "panel empty" }, "No salary slips yet. They appear here once Finance issues them.")); return; }
+  const tbody = h("tbody");
+  for (const s of slips) tbody.append(h("tr", {}, h("td", {}, h("b", {}, monthLabel(s.month))), h("td", { style: "text-align:right" }, money2(s.net)),
+    h("td", {}, h("span", { class: "pill", style: s.status === "Paid" ? "background:#E4F4EA;color:#1D7748" : "background:#EFEDF3;color:#4A3AA8" }, s.status === "Paid" ? "Paid" + (s.paid_on ? " " + fmtDate(s.paid_on) : "") : "Issued")),
+    h("td", {}, h("button", { type: "button", class: "btn sm", onclick: async () => { try { toast("Making the PDF…"); saveBlob(await docToPdf(slipDoc(s, setup)), pdfName("Salary slip " + S.me.full_name + " " + monthLabel(s.month))); } catch (e) { fail(e, "PDF not made"); } } }, ic("download"), "Download slip"))));
+  el.append(h("div", { class: "tablewrap" }, h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Month"), h("th", { style: "text-align:right" }, "Net pay"), h("th", {}, "Status"), h("th"))), tbody)));
+}
+// the signature printed on invoices: an image, shrunk and kept with the account
+function uploadSignature(acc){
+  const inp = h("input", { type: "file", accept: "image/*" });
+  inp.addEventListener("change", () => {
+    const f = inp.files && inp.files[0]; if (!f) return;
+    const img = new Image(); const url = URL.createObjectURL(f);
+    img.onload = async () => {
+      const sc = Math.min(1, 600 / img.width, 220 / img.height), c = document.createElement("canvas");
+      c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc); c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      try { await updateRow("finance_accounts", acc.id, { signature: c.toDataURL("image/png") }); toast("Signature saved. It prints on this account’s invoices."); closeDlg(); rerender(); } catch (e) { fail(e, "Not saved"); }
+    };
+    img.src = url;
+  });
+  inp.click();
+}
+
 const NAV = [
   ["", [["dashboard","Home"], ["overview","Company overview"], ["tasks","Tasks"], ["notes","Notes"], ["calendar","Calendar"], ["team-calendar","Team calendar"]]],
   // Development and QA work on one simple board (2026-11ad); the older pages are hidden, their data is kept
@@ -14502,7 +15360,9 @@ const NAV = [
   // clients and everything they send through the client portal (2026-11bu)
   ["Clients", [["clients","Clients"], ["tickets","Requests & bugs"], ["contacts","Contacts"]]],
   ["Marketing", [["marketing","Marketing dashboard"], ["leads","Leads"], ["ig_leads","Instagram leads"], ["campaigns","Campaigns"], ["content","Content calendar"], ["seo_keywords","SEO keywords"], ["social_stats","Social media"], ["crm-analytics","Analytics"]]],
-  ["Company", [["people","People"], ["leave_requests","Leave"], ["holidays","Holidays"], ["attendance","Attendance"], ["meetings","Meetings"], ["documents","Documents"]]],
+  ["Company", [["people","People"], ["leave_requests","Leave"], ["holidays","Holidays"], ["attendance","Attendance"], ["meetings","Meetings"], ["documents","Documents"], ["my-salary","My salary"]]],
+  // (2026-11ek) Finance: super admins and people ticked for Finance
+  ["Finance", [["invoices","Invoices"], ["client_billing","Clients & dues"], ["finance_entries","Balance sheet"], ["salary_slips","Salaries"], ["finance_accounts","Billing accounts"]]],
   ["Admin", [["admin-users","Admin panel"]]]
 ];
 function canSee(route){
@@ -14515,6 +15375,7 @@ function canSee(route){
   if (route.startsWith("admin-")) return !!S.me.is_admin;
   if (route === "crm-analytics") return lvl("sales") >= 1 || lvl("leads") >= 1 || lvl("marketing") >= 1;
   if (route === "emails") return true;
+  if (route === "my-salary") return !S.me.client_id;   // (2026-11ek) everyone on the team: their own salary
   if (["qa", "qa-import", "bugs"].includes(route)) return lvl("qa") >= 1;
   const M = MOD[route]; if (!M) return false;
   return access(M).canView;
@@ -14532,10 +15393,11 @@ const ROUTE_ICON = { tickets: "bug", dashboard: "home", overview: "layoutGrid", 
   "dev-board": "kanban", chat: "message", emails: "mail", announcements: "megaphone", sales: "trendingUp", deals: "kanban", leads: "userPlus", ig_leads: "atSign",
   clients: "briefcase", contacts: "contact", activities: "activity", proposals: "fileText", targets: "target", "crm-analytics": "barChart", marketing: "megaphone",
   campaigns: "send", content: "calendarDays", seo_keywords: "search", social_stats: "share", people: "users", leave_requests: "sun", holidays: "gift",
-  attendance: "clock", meetings: "video", documents: "folder", "admin-users": "shield" };
+  attendance: "clock", meetings: "video", documents: "folder", "admin-users": "shield",
+  invoices: "fileText", client_billing: "briefcase", finance_entries: "sheet", salary_slips: "users", finance_accounts: "building", "my-salary": "fileText" };
 // pages kept (and still reachable by link) but not listed in the sidebar (2026-11bv)
 const SIDE_HIDDEN = new Set(["calendar", "team-calendar"]);
-const GROUP_ICON = { "Development & QA": "code", Communication: "message", Sales: "trendingUp", Clients: "briefcase", Marketing: "megaphone", Company: "building", Admin: "shield" };
+const GROUP_ICON = { "Development & QA": "code", Communication: "message", Sales: "trendingUp", Clients: "briefcase", Marketing: "megaphone", Company: "building", Finance: "barChart", Admin: "shield" };
 let sideQuery = "";
 function recentRoutes(){ try { return JSON.parse(localStorage.getItem("tc_recent_" + S.me.id) || "[]"); } catch (e) { return []; } }
 function rememberRecent(route){
@@ -14729,6 +15591,7 @@ async function rerender(){
     else if (route === "chat") await renderChat(page);
     else if (route === "qa") await renderQA(page);
     else if (route === "qa-import") await renderQAImport(page);
+    else if (route === "my-salary") await renderMySalary(page);
     else if (MOD[route]) await renderModule(route, page);
     else page.append(h("div", { class: "panel empty" }, h("b", {}, "Page not found"), h("a", { href: "#dashboard" }, "Go to the dashboard")));
   } catch (e) {
