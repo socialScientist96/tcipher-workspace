@@ -759,7 +759,7 @@ dialog[open]::backdrop{animation:fadeIn .16s ease-out}
 .dv-fpanel{display:flex;align-items:center;gap:16px;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:-4px 0 14px;background:var(--white)}
 .dv-sprintinfo{display:flex;align-items:center;gap:12px;font-size:13.5px;color:var(--ink2)}
 .dv-boardwrap{overflow-x:auto;padding-bottom:6px}
-.dv-board{display:grid;grid-template-columns:repeat(4,minmax(250px,1fr));gap:14px;min-width:1040px;align-items:start}
+.dv-board{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(230px,1fr);gap:14px;min-width:1040px;align-items:start}   /* (2026-11eo) as many columns as the board has (In Progress splits into Backend / Frontend) */
 .dv-col{background:#F4F5F7;border-radius:10px;padding:8px}
 .dv-col.drop{outline:2px solid var(--p);outline-offset:-2px;background:#EEF0FF}
 .dv-colh{display:flex;gap:8px;align-items:center;font-size:13px;font-weight:600;color:#44546F;padding:6px 6px 10px}
@@ -894,7 +894,7 @@ dialog.dv-wide .dh{align-items:center;gap:6px}
 .dv-velbar{display:block;width:100%;background:#0C66E4;border-radius:4px 4px 0 0}
 .dv-velv{font-size:13px;font-weight:600}
 .dv-vell{font-size:12px;color:#626F86;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px}
-@media (max-width:820px){.dv-view{grid-template-columns:1fr}.dv-right{position:static}.dv-board{min-width:0;grid-template-columns:1fr}}
+@media (max-width:820px){.dv-view{grid-template-columns:1fr}.dv-right{position:static}.dv-board{min-width:0;grid-template-columns:1fr;grid-auto-flow:row}}
 .dv-card>*{max-width:100%;min-width:0}
 .dv-foot{width:100%}
 .dv-parent{display:block}
@@ -5186,6 +5186,23 @@ function commentsSection(tbl, id){
   const ta = h("textarea", { class: "in", rows: 2, placeholder: "Write a comment… type @ to tag someone", maxlength: "4000" });
   attachMentions(ta);
   const post = h("button", { type: "button", class: "btn pri sm" }, "Post comment");
+  // (2026-11eo) attach files to a comment: they go into the item's files and show under the comment
+  let pending = [];
+  const pendBox = h("div", { style: "display:flex;gap:6px;flex-wrap:wrap;width:100%" });
+  const drawPend = () => pendBox.replaceChildren(...pending.map(x => h("span", { class: "pill", style: "display:inline-flex;gap:4px;align-items:center" }, x.row ? "" : "⏳ ", x.name,
+    h("button", { type: "button", class: "linkbtn", title: "Remove", onclick: () => { pending = pending.filter(y => y !== x); drawPend(); } }, "×"))));
+  const pick = h("input", { type: "file", multiple: true, hidden: true });
+  const clip = h("button", { type: "button", class: "btn sm ghost", title: "Attach files to this comment", onclick: () => pick.click() }, ic("paperclip", 16), "Attach");
+  pick.addEventListener("change", async () => {
+    const files = [...(pick.files || [])]; pick.value = "";
+    for (const file of files) {
+      if (file.size > 100 * 1048576 || (!driveReady() && file.size > 20 * 1048576)) { toast(file.name + " is too big to attach."); continue; }
+      const x = { name: file.name, row: null }; pending.push(x); drawPend();
+      try { x.row = driveReady() ? await uploadDirect(tbl, id, file, () => {}, () => {}, () => false) : await storeUpload(tbl, id, file); if (!x.row) throw new Error("Upload cancelled"); }
+      catch (e) { pending = pending.filter(y => y !== x); fail(e, file.name + " wasn’t attached"); }
+      drawPend();
+    }
+  });
   const withKinds = ["leads","deals"].includes(tbl);
   const tk = tbl === "tickets" ? byId("tickets", id) : null;
   const toClient = !!(tk && tk.client_id && tk.client_visible !== false && ticketsHavePortal());
@@ -5194,7 +5211,7 @@ function commentsSection(tbl, id){
   let kind = "Info";
   const kindSeg = withKinds ? segmented([["Info","Info"], ["Action","Action needed"], ["Escalation","Escalation"]], kind, v => { kind = v; }) : null;
   if (toClient) ta.placeholder = "Internal note: only the team sees this";
-  sec.append(list, h("div", { style: "display:flex;flex-direction:column;gap:8px;margin-top:8px;align-items:flex-end" }, ta, h("div", { style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end" }, audSeg, kindSeg, post)));
+  sec.append(list, h("div", { style: "display:flex;flex-direction:column;gap:8px;margin-top:8px;align-items:flex-end" }, ta, pendBox, pick, h("div", { style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end" }, audSeg, kindSeg, clip, post)));
   async function refresh(){
     try {
       const cs = ok(await sb.from("comments").select("*").eq("tbl", tbl).eq("entity_id", id).order("created_at")) || [];
@@ -5207,16 +5224,23 @@ function commentsSection(tbl, id){
           c.edited_at ? h("span", { class: "muted cmt-ed", title: "Edited " + new Date(c.edited_at).toLocaleString("en-IN") }, " · edited") : null,
           // (2026-11dx) the person who wrote a comment can change its text
           c.author_id === S.me.id && "edited_at" in c ? h("button", { type: "button", class: "del cmt-edit", onclick: e => editComment(c, e.currentTarget.closest(".cmt")) }, " · Edit") : null,
-          ((c.author_id === S.me.id && tbl !== "tasks") || S.me.is_admin) ? h("button", { type: "button", class: "del", onclick: async () => { try { ok(await sb.from("comments").delete().eq("id", c.id)); refresh(); } catch (e) { fail(e); } } }, " · Delete") : null),
-          h("p", { class: "cmt-body" }, renderRich(c.body)))));
+          // (2026-11eo) your own comments can be deleted anywhere; a task's History keeps a permanent copy
+          (c.author_id === S.me.id || S.me.is_admin) ? h("button", { type: "button", class: "del", onclick: async () => { if (!confirm("Delete this comment?" + (tbl === "tasks" ? " The task’s History keeps a copy." : ""))) return; try { ok(await sb.from("comments").delete().eq("id", c.id)); refresh(); } catch (e) { fail(e); } } }, " · Delete") : null),
+          h("p", { class: "cmt-body" }, renderRich(c.body)),
+          (c.attachments || []).length ? h("div", { class: "cmt-atts", style: "display:flex;gap:6px;flex-wrap:wrap;margin-top:4px" }, c.attachments.map(a => h("button", { type: "button", class: "btn sm ghost", title: "Open " + a.name,
+            onclick: async () => { try { const f = ok(await sb.from("files").select("*").eq("id", a.id).maybeSingle()); if (!f) { toast("That file was deleted."); return; } openStored(f); } catch (e) { fail(e, "Couldn’t open it"); } } },
+            fileIcon(a.mime || "", a.name), a.name))) : null)));
     } catch (e) { list.replaceChildren(h("p", { class: "nothing" }, "Comments couldn’t be loaded.")); }
   }
   post.addEventListener("click", async () => {
-    const body = ta.value.trim(); if (!body) return;
+    if (pending.some(x => !x.row)) { toast("Wait for the files to finish uploading."); return; }
+    const atts = pending.map(x => ({ id: x.row.id, name: x.row.name, mime: x.row.mime || "", size: x.row.size || 0 }));
+    const body = ta.value.trim() || (atts.length ? "📎 " + atts.map(a => a.name).join(", ") : ""); if (!body) return;
     post.disabled = true;
     try {
       const mentioned = mentionIds(body, { tbl, rec: byId(tbl, id) || {} });
-      ok(await sb.from("comments").insert({ tbl, entity_id: id, body, author_id: S.me.id, mentions: mentioned, ...(withKinds ? { kind } : {}), ...(toClient && audience === "client" ? { client_visible: true } : {}) }));
+      ok(await sb.from("comments").insert({ tbl, entity_id: id, body, author_id: S.me.id, mentions: mentioned, ...(withKinds ? { kind } : {}), ...(toClient && audience === "client" ? { client_visible: true } : {}), ...(atts.length ? { attachments: atts } : {}) }));
+      pending = []; drawPend();
       if (withKinds && kind === "Escalation"){ const rec0 = byId(tbl, id) || {}; notify(peopleWith(tbl === "deals" ? "sales" : "leads", 3).map(p => p.id).filter(x => x !== S.me.id), "Escalation on " + (rec0.lead_number ? rec0.lead_number + " " : "") + (rec0.name || rec0.title || ""), body.slice(0, 140), tbl, id); }
       ta.value = "";
       const M = Object.values(MOD).find(m => m.table === tbl);
@@ -11483,6 +11507,9 @@ const tabPage = (title, body) => '<!doctype html><html><head><meta charset="utf-
   + '.box{background:#fff;border:1px solid #E4E4F2;border-radius:12px;padding:28px;text-align:center}</style></head><body>' + body + '</body></html>';
 const escHtml = t => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 async function openFileInTab(getUrl, a){
+  // (2026-11eo) text files (.md, .txt, .csv, .json, code) open in a viewer inside the app: Markdown shows formatted.
+  // The Android app couldn't open them at all (it has no second window and no app for them).
+  if (textLike(a) && (+a.size || 0) <= 2 * 1048576) { await openTextViewer(getUrl, a); return; }
   // (2026-11dy) the Android app has one window: a "new tab" replaced the workspace itself. Save the file instead.
   if (IN_ANDROID_APP()) {
     try { const url = await getUrl(); if (!/^https:\/\//i.test(String(url || ""))) throw new Error("The file link isn’t a secure web address."); await saveFetched(url, a.name, a.mime); }
@@ -11518,6 +11545,46 @@ async function openFileInTab(getUrl, a){
 // (2026-11dl) pictures open in a viewer inside the workspace: fitted to the screen, pinch or double-tap to zoom, drag
 // to move, Download, and ✕ / Back / Esc to close. They used to open as a bare file in a new tab — in the Android app
 // that replaced the workspace with a zoomed-in picture and no way back.
+// Markdown for the viewer: tables and code blocks here, everything else (headings, lists, bold, links) as in summaries
+function mdView(text){
+  const out = [], lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
+  let buf = [];
+  const flush = () => { if (buf.length) { out.push(workMd(buf.join("\n"))); buf = []; } };
+  const cells = l => l.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map(c => c.trim());
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    if (/^\s*```/.test(l)) {   // a code block
+      flush(); const code = []; i++;
+      while (i < lines.length && !/^\s*```/.test(lines[i])) code.push(lines[i++]);
+      out.push(h("pre", { style: "white-space:pre-wrap;font:12.5px/1.5 ui-monospace,Menlo,Consolas,monospace;background:var(--tint);padding:12px;border-radius:8px" }, code.join("\n")));
+      continue;
+    }
+    if (/^\s*\|.*\|\s*$/.test(l) && i + 1 < lines.length && /^\s*\|?\s*:?-{2,}/.test(lines[i + 1])) {   // a table
+      flush(); const head = cells(l); i += 2; const body = [];
+      while (i < lines.length && /^\s*\|/.test(lines[i])) body.push(cells(lines[i++]));
+      i--;
+      out.push(h("div", { class: "tablewrap", style: "margin:8px 0" }, h("table", {}, h("thead", {}, h("tr", {}, head.map(c => h("th", {}, renderRich(c))))),
+        h("tbody", {}, body.map(r => h("tr", {}, r.map(c => h("td", {}, renderRich(c)))))))));
+      continue;
+    }
+    buf.push(l);
+  }
+  flush();
+  return out;
+}
+async function openTextViewer(getUrl, a){
+  const box = h("div", { style: "max-height:65vh;overflow:auto" }, h("p", { class: "muted" }, "Opening " + (a.name || "the file") + "…"));
+  let text = "";
+  const dl = h("button", { type: "button", class: "btn", onclick: () => saveBlob(new Blob([text], { type: a.mime || "text/plain" }), a.name || "file.txt") }, ic("download", 16), "Download");
+  openDialog(a.name || "File", [box], [h("span", { class: "sp" }), dl, h("button", { type: "button", class: "btn pri", onclick: closeDlg }, "Close")]);
+  try {
+    const blob = a.id && typeof caches !== "undefined" ? await cachedFileBlob(a, getUrl) : await fetch(await getUrl()).then(r => { if (!r.ok) throw new Error("The file didn’t load (" + r.status + ")."); return r.blob(); });
+    text = await blob.text();
+    const md = /\.(md|markdown)$/i.test(a.name || "") || /markdown/.test(a.mime || "");
+    box.replaceChildren(md ? h("div", { class: "ws-body md-view" }, mdView(text))
+      : h("pre", { style: "white-space:pre-wrap;word-break:break-word;font:13px/1.55 ui-monospace,Menlo,Consolas,monospace;background:var(--tint);padding:14px;border-radius:10px;margin:0" }, text));
+  } catch (e) { box.replaceChildren(h("p", { class: "err" }, friendly(e))); }
+}
 async function openImageViewer(name, getUrl, download){
   let url; try { url = typeof getUrl === "function" ? await getUrl() : getUrl; } catch (e) { fail(e, "Couldn’t open the picture"); return; }
   const old = document.getElementById("imgView"); if (old) { try { old.close(); } catch (e) {} old.remove(); }
@@ -12468,7 +12535,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11en";
+const APP_VERSION = "2026-11eo";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -13616,7 +13683,47 @@ async function renderDevBoard(el){
     [["", "Any due date"], ["now", "Due today or overdue"], ["today", "Due today"], ["overdue", "Overdue"], ["week", "Due in the next 7 days"], ["later", "Due later"], ["none", "No due date"]]
       .map(([v, l]) => h("option", { value: v, selected: (u.due || "") === v }, l)));
   el.append(h("div", { class: "dv-toolbar" }, q, whoSel, projSel, dueSel,
+    h("button", { type: "button", class: "dv-chip", title: "What you finished on a day: for the evening scrum", onclick: () => openDoneBy() }, ic("checkSquare", 14), " Done by me"),
     chip("mine", "Only my work"), unChip("undev", "Unassigned Dev", nDev), unChip("unqa", "Unassigned QA", nQA), chip("archived", "Archived")), body);
+  draw();
+}
+// (2026-11eo) what someone finished on a day, from the tasks' permanent history: moved to QA, backend handed to frontend,
+// approved in QA. For the evening scrum.
+async function openDoneBy(){
+  let day = today(), who = S.me.id;
+  const dateIn = h("input", { class: "in", type: "date", value: day, max: today() });
+  const quick = segmented([["0", "Today"], ["1", "Yesterday"]], "0", v => { dateIn.value = addDays(today(), -+v); day = dateIn.value; draw(); });
+  const whoSel = isAdmin() || isTaskHandler("Development") ? h("select", { class: "in" }, activePeople().filter(p => p.vertical === "Development" || isTesterId(p.id)).sort((a, b) => a.full_name.localeCompare(b.full_name))
+    .map(p => h("option", { value: p.id, selected: p.id === who }, p.full_name + (p.id === S.me.id ? " (you)" : "")))) : null;
+  const out = h("div", { style: "margin-top:10px" });
+  let lines = [];
+  const draw = async () => {
+    out.replaceChildren(h("p", { class: "muted" }, "Loading…"));
+    const from = new Date(day + "T00:00:00+05:30").toISOString(), to = new Date(addDays(day, 1) + "T00:00:00+05:30").toISOString();
+    let evs = [];
+    try { evs = ok(await sb.from("task_events").select("task_id,field,old_value,new_value,at").eq("actor_id", who).in("field", ["status", "flow_step"]).gte("at", from).lt("at", to).order("at")) || []; }
+    catch (e) { out.replaceChildren(h("p", { class: "err" }, friendly(e))); return; }
+    const forward = e => { const f = flowOf(byId("tasks", e.task_id) || {}); return f.indexOf(e.new_value) > f.indexOf(e.old_value) || !f.length; };
+    const what = e => e.field === "flow_step" ? (e.old_value && e.new_value && forward(e) ? e.old_value + " done" : null)
+      : e.old_value === "In progress" && e.new_value === "In review" ? "Moved to QA"
+      : e.old_value === "In progress" && e.new_value === "Done" ? "Finished"
+      : e.old_value === "In review" && e.new_value === "Done" ? "Approved in QA" : null;
+    const seen = new Set(), done = [];
+    for (const e of evs) { const w = what(e); if (!w || seen.has(e.task_id + w)) continue; seen.add(e.task_id + w); done.push({ e, w, t: byId("tasks", e.task_id) }); }
+    lines = done.map(x => "• " + (x.t ? taskKey(x.t) + " " + x.t.title : "A task") + " (" + x.w.toLowerCase() + ")");
+    out.replaceChildren(done.length ? h("div", {}, h("p", { class: "muted", style: "margin:0 0 6px" }, done.length + " task" + (done.length === 1 ? "" : "s") + " on " + fmtDate(day, true) + ":"),
+      ...done.map(x => h("button", { type: "button", class: "dv-done-row", style: "display:flex;gap:10px;align-items:center;width:100%;text-align:left;padding:8px 6px;border:0;border-bottom:1px solid var(--line);background:none;cursor:pointer",
+        onclick: () => { if (x.t) { closeDlg(); openDevTask(x.t.id); } } },
+        h("span", { class: "muted", style: "width:62px;font-size:12.5px" }, new Date(x.e.at).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })),
+        h("span", { style: "flex:1" }, x.t ? h("span", {}, h("span", { class: "tkey" }, taskKey(x.t)), " ", x.t.title) : h("span", { class: "muted" }, "A task you can’t see any more")),
+        h("span", { class: "pill" }, x.w))))
+      : h("p", { class: "nothing" }, "Nothing moved on " + fmtDate(day, true) + "."));
+  };
+  dateIn.addEventListener("change", () => { day = dateIn.value || today(); draw(); });
+  if (whoSel) whoSel.addEventListener("change", () => { who = whoSel.value; draw(); });
+  const copy = h("button", { type: "button", class: "btn", onclick: () => copyText(lines.length ? lines.join("\n") : "Nothing finished.", "Copied for the scrum") }, "Copy list");
+  openDialog("Done on a day", [h("div", { style: "display:flex;gap:8px;flex-wrap:wrap;align-items:center" }, quick, dateIn, whoSel), out],
+    [h("span", { class: "sp" }), copy, h("button", { type: "button", class: "btn pri", onclick: closeDlg }, "Close")]);
   draw();
 }
 // the board's due-date filter (2026-11eg)
@@ -13643,9 +13750,11 @@ function devBoard(u){
     && dueMatch(t, u.due))
     .sort(boardOrder);
   const board = h("div", { class: "dv-board" });
-  for (const [st, label] of FLOW){
-    const items = newsFirst(list.filter(t => t.status === st));
-    const col = h("section", { class: "dv-col", "aria-label": label, "data-status": st },
+  for (const c of devColumns()){
+    const st = c.st, label = c.label;
+    const items = newsFirst(list.filter(c.match));
+    if (c.optional && !items.length) continue;
+    const col = h("section", { class: "dv-col", "aria-label": label, "data-status": st, "data-stage": c.stage || "" },
       h("div", { class: "dv-colh" }, h("span", {}, label), h("span", { class: "dv-n" }, String(items.length)), st === "Done" ? h("span", { class: "muted", style: "font-weight:400" }, "last 2 weeks") : null),
       h("div", { class: "dv-cards" }, items.slice(0, 200).map(devCard)));
     if (st === "To do" && access(MOD.tasks).canCreate) col.append(inlineCreate());
@@ -13653,6 +13762,7 @@ function devBoard(u){
     col.addEventListener("dragleave", e => { if (!col.contains(e.relatedTarget)) col.classList.remove("drop"); });
     col.addEventListener("drop", e => { e.preventDefault(); col.classList.remove("drop"); const t = devDrag && byId("tasks", devDrag); devDrag = null; if (!t) return;
       if (t.status !== st) { dropTo(t, st); return; }
+      if (c.stage && devStageOf(t) !== c.stage) { const j = flowOf(t).indexOf(c.stage); if (j < 0) { toast("This task’s flow has no " + c.stage + " stage."); return; } devSave(t, { flow_step: j }, "Moved to " + c.stage + "."); return; }
       // the same column: it goes where it was dropped (2026-11cy)
       const others = items.filter(x => x.id !== t.id), cards = [...col.querySelectorAll(".dv-card")].filter(c => c.dataset.id !== t.id);
       let at = cards.findIndex(c => { const r = c.getBoundingClientRect(); return e.clientY < r.top + r.height / 2; }); if (at < 0) at = others.length;
@@ -13662,6 +13772,56 @@ function devBoard(u){
   const wrap = h("div", { class: "dv-boardwrap" }, board);
   requestAnimationFrame(() => { const top = wrap.getBoundingClientRect().top + (window.scrollY || 0); if (top > 0) wrap.style.setProperty("--dv-top", Math.round(top + 16) + "px"); });
   return wrap;
+}
+/* (2026-11eo) Task flows: the stages a task goes through while In progress (e.g. Backend → Frontend → App), one developer
+   per stage. Admins keep the list in Admin › Task rules; a task keeps its own copy of the stages it was given. The database
+   refuses QA before the last stage and logs every handover (it counts in "Done by me"). */
+const DEFAULT_FLOWS = [["Backend"], ["Frontend"], ["App"], ["Backend", "Frontend"], ["Frontend", "Backend"], ["Backend", "App"], ["Backend", "Frontend", "App"], ["Frontend", "App"]];
+const taskFlows = () => { const f = S.settings && Array.isArray(S.settings.task_flows) ? S.settings.task_flows : null; return (f && f.length ? f : DEFAULT_FLOWS).filter(x => Array.isArray(x) && x.length); };
+const flowName = stages => stages.length === 1 ? stages[0] + " only" : stages.join(" → ");
+const flowOf = t => Array.isArray(t.flow) ? t.flow : [];
+const devStageOf = t => { const f = flowOf(t); return t.status === "In progress" && f.length ? f[Math.min(+t.flow_step || 0, f.length - 1)] : ""; };
+function devColumns(){
+  const out = [];
+  // the stage columns, in the order they appear in the flows (then any others tasks still carry)
+  const order = []; for (const f of [...taskFlows(), ...devTasks().map(flowOf)]) for (const x of f) if (!order.includes(x)) order.push(x);
+  for (const [st, label] of FLOW) {
+    if (st !== "In progress") { out.push({ st, label, match: t => t.status === st }); continue; }
+    out.push({ st, label: "In Progress", stage: "", optional: true, match: t => t.status === st && !devStageOf(t) });   // no flow chosen
+    for (const g of order) out.push({ st, label: "In Progress · " + g, stage: g, optional: true, match: t => t.status === st && devStageOf(t) === g });
+  }
+  return out;
+}
+// the one whose turn it is: the developer of the stage the task is at
+const turnOf = t => { const g = devStageOf(t); return g ? (t.stage_devs || {})[g] || null : null; };
+function devPartBox(t, canEdit){
+  const people = activePeople().filter(p => p.vertical === "Development" || ownersOf(t).includes(p.id)).sort((a, b) => a.full_name.localeCompare(b.full_name));
+  const cur = flowOf(t), curKey = cur.join("|");
+  const flows = taskFlows(); if (cur.length && !flows.some(f => f.join("|") === curKey)) flows.push(cur);
+  const sel = h("select", { class: "in sm", disabled: !canEdit, "aria-label": "Flow" }, h("option", { value: "" }, "No flow"), flows.map(f => h("option", { value: f.join("|"), selected: f.join("|") === curKey }, flowName(f))));
+  sel.addEventListener("change", () => devSave(t, { flow: sel.value ? sel.value.split("|") : [], flow_step: 0 }, sel.value ? "Flow set." : "Flow removed."));
+  const pickDev = g => {
+    const s2 = h("select", { class: "in sm", disabled: !canEdit, "aria-label": g + " developer" }, h("option", { value: "" }, "Choose…"), people.map(p => h("option", { value: p.id, selected: (t.stage_devs || {})[g] === p.id }, p.full_name)));
+    s2.addEventListener("change", () => {
+      const id = s2.value || null, devs = { ...(t.stage_devs || {}) };
+      if (id) devs[g] = id; else delete devs[g];
+      const patch = { stage_devs: devs };
+      if (id && !ownersOf(t).includes(id)) patch.collaborators = [...new Set([...(t.collaborators || []), id])];   // they can then move the task along
+      devSave(t, patch, "Saved.");
+      if (id && id !== S.me.id) notify([id], "You’re on " + g + " for " + taskKey(t) + " " + t.title, "Flow: " + flowName(flowOf(t)), "tasks", t.id);
+    });
+    return h("label", { class: "fl", style: "flex:1;min-width:150px" }, g + " developer", s2);
+  };
+  return h("div", { class: "dv-part", style: "display:flex;gap:10px;flex-wrap:wrap;margin:8px 0" },
+    h("label", { class: "fl", style: "flex:1 1 100%" }, "Flow", sel), ...cur.map(pickDev));
+}
+// hand the task to the next stage (or back to the one before)
+async function stageMove(t, dir){
+  const f = flowOf(t), i = Math.min(+t.flow_step || 0, f.length - 1), j = i + dir;
+  if (j < 0 || j >= f.length) return;
+  await devSave(t, { flow_step: j }, dir > 0 ? f[i] + " done. Over to " + f[j] + "." : "Back to " + f[j] + ".");
+  if (dir > 0) { const next = (t.stage_devs || {})[f[j]]; const to = (next ? [next] : ownersOf(t)).filter(x => x !== S.me.id);
+    if (to.length) notify(to, f[i] + " done: " + taskKey(t) + " " + t.title, "It’s your turn for " + f[j] + ".", "tasks", t.id); }
 }
 // dragging follows the same steps as the buttons
 function dropTo(t, st){
@@ -13684,7 +13844,7 @@ function devCard(t){
     t.project_id && byId("projects", t.project_id) ? h("span", { class: "dv-proj", title: "Project" }, byId("projects", t.project_id).name) : null,
     h("span", { class: "dv-foot" }, h("span", { class: "dv-key" }, taskKey(t)), t.due_date && t.status !== "Done" ? h("span", { class: "dv-due", title: "Due " + fmtDate(t.due_date) }, ic("calendar", 12), dueTag(t.due_date, false)) : null, h("span", { class: "grow" }),
       t.status === "In review" ? (t.tester_id ? h("span", { class: "dv-qa", title: "Tester: " + pname(t.tester_id) }, "QA ", avatar(t.tester_id, "sm")) : h("span", { class: "dv-needqa" }, "Needs a tester")) : null,
-      ownersOf(t).length ? faces(ownersOf(t)) : noone()));
+      turnOf(t) ? faces([turnOf(t)]) : ownersOf(t).length ? faces(ownersOf(t)) : noone()));
   card.addEventListener("dragstart", e => { devDrag = t.id; card.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", t.id); });
   card.addEventListener("dragend", () => { devDrag = null; card.classList.remove("dragging"); });
   return card;
@@ -13880,6 +14040,7 @@ function flowBox(t){
   const btn = (label, cls, id, fn) => { const b = h("button", { type: "button", class: "btn " + cls, id, onclick: fn }, label); b.__tcLast = born + 300; return b; };
   const steps = h("div", { class: "dv-steps" }, FLOW.map(([st, label]) => h("span", { class: "dv-step" + (st === t.status ? " on" : "") + (FLOW.findIndex(x => x[0] === st) < FLOW.findIndex(x => x[0] === t.status) ? " past" : "") }, label)));
   box.append(steps);
+  if (["To do", "In progress"].includes(t.status) && t.vertical === "Development" && "flow" in t) box.append(devPartBox(t, owner || isTaskHandler(t.vertical) || t.created_by === S.me.id));
   const row = h("div", { class: "dv-flowbtns" });
   let note = "";
   if (t.status === "To do") {
@@ -13887,8 +14048,11 @@ function flowBox(t){
     else note = "Waiting for " + (ownersOf(t).map(pname).join(", ") || "an owner") + " to start.";
   } else if (t.status === "In progress") {
     if (t.qa_state === "Failed") box.append(h("p", { class: "dv-backnote" }, "↩ Sent back by QA. See the reason in Comments."));
-    if (owner) row.append(btn("Move to QA", "pri", "devToQA", () => flowStep(t, "to_qa", null, "Moved to QA.")));
-    else note = "Being built by " + (ownersOf(t).map(pname).join(", ") || "its owners") + ".";
+    const stg = devStageOf(t), fl = flowOf(t), at = Math.min(+t.flow_step || 0, Math.max(fl.length - 1, 0));
+    if (owner && at > 0) row.append(btn("Back to " + fl[at - 1], "ghost", "devStageBack", () => stageMove(t, -1)));
+    if (owner && fl.length > 1 && at < fl.length - 1) row.append(btn(stg + " done → " + fl[at + 1], "pri", "devStageNext", () => stageMove(t, 1)));
+    else if (owner) row.append(btn("Move to QA", "pri", "devToQA", () => flowStep(t, "to_qa", null, "Moved to QA.")));
+    else note = "Being built by " + ((turnOf(t) ? [turnOf(t)] : ownersOf(t)).map(pname).join(", ") || "its owners") + (stg ? " (" + stg + ")" : "") + ".";
   } else if (t.status === "In review") {
     // an admin can always decide (the database allows it), even before a tester has picked it up
     if (!t.tester_id && isAdmin()) note = "No tester has picked this up yet. As an admin you can approve it or send it back yourself.";
@@ -14564,11 +14728,36 @@ function renderAdminTaskRules(el){
     h("div", { class: "related" },
       h("div", { class: "ri" }, h("span", {}, "Create tasks in their own vertical, view them, comment and attach files"), pill("Always", "ok")),
       h("div", { class: "ri" }, h("span", {}, "Delete tasks"), pill("Nobody: tasks are archived instead", "grey")),
-      h("div", { class: "ri" }, h("span", {}, "Remove comments on tasks"), pill("Admins only, and it’s recorded", "grey")),
+      h("div", { class: "ri" }, h("span", {}, "Remove comments on tasks"), pill("Their own; admins any. History keeps a copy", "grey")),
       h("div", { class: "ri" }, h("span", {}, "Edit or delete task history"), pill("Nobody", "grey"))),
     h("label", { class: "chk", style: "margin-top:10px" }, workers, "People on a task (owner, collaborators, reviewer) can update its status, checklist, blocked flag and code links"),
     h("p", { class: "muted", style: "font-size:13px;margin:4px 0 0" }, "Turn this off if only handlers should move tasks. Reviewers can still approve or send back.")));
   el.append(err, h("div", { style: "margin-top:14px" }, save));
+  el.append(taskFlowsPanel());
+}
+// (2026-11eo) the flows a Development task can follow (stages before QA, in order)
+function taskFlowsPanel(){
+  let list = taskFlows().map(f => f.slice());
+  const box = h("div");
+  const parse = v => String(v || "").split(/\s*(?:→|->|>|,)\s*/).map(x => x.trim()).filter(Boolean).slice(0, 6);
+  const draw = () => box.replaceChildren(...list.map((f, i) => {
+    const inp = h("input", { class: "in", value: f.join(" → "), placeholder: "e.g. Backend → Frontend → App", "aria-label": "Flow " + (i + 1) });
+    inp.addEventListener("input", () => { list[i] = parse(inp.value); });
+    return h("div", { style: "display:flex;gap:8px;margin:6px 0" }, inp, h("button", { type: "button", class: "btn sm ghost", title: "Remove this flow", onclick: () => { list.splice(i, 1); draw(); } }, ic("x")));
+  }));
+  draw();
+  const err = h("p", { class: "err", hidden: true });
+  const save = h("button", { type: "button", class: "btn pri" }, "Save flows");
+  save.addEventListener("click", async () => {
+    const clean = []; for (const f of list.map(f => f.filter(Boolean))) if (f.length && !clean.some(c => c.join("|") === f.join("|"))) clean.push(f);
+    save.disabled = true; err.hidden = true;
+    try { const data = { ...(await latestSettings()), task_flows: clean }; ok(await sb.from("settings").upsert({ id: 1, data, updated_at: new Date().toISOString() })); S.settings = data; toast("Flows saved."); rerender(); }
+    catch (e) { err.textContent = friendly(e); err.hidden = false; }
+    save.disabled = false;
+  });
+  return h("div", { class: "panel", style: "margin-top:16px" }, h("h2", {}, "Task flows (Development)"),
+    h("p", { class: "muted", style: "font-size:13px;margin:-4px 0 8px" }, "The stages a task goes through while In progress, in order, before QA. Each task picks one and gets a developer per stage; the board shows a column for each stage. Separate stages with →. Changing a flow here doesn’t change tasks that already use it."),
+    box, h("button", { type: "button", class: "btn sm", onclick: () => { list.push([]); draw(); } }, "+ Add flow"), err, h("div", { style: "margin-top:10px" }, save));
 }
 
 function renderAdminSettings(el){
