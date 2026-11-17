@@ -5328,7 +5328,7 @@ function filesSection(tbl, id, canUpload){
 }
 // open a stored file in a new tab (images and PDFs show in the browser)
 async function openStored(f){
-  try { await openFileInTab(() => mediaLink(f, true), { mime: f.mime || f.mime_type || "", name: f.name || f.file_name || "", size: f.size || 0 }); } catch (e) { fail(e, "Couldn’t open the file"); }
+  try { await openFileInTab(() => mediaLink(f, true), { id: f.id, mime: f.mime || f.mime_type || "", name: f.name || f.file_name || "", size: f.size || 0 }); } catch (e) { fail(e, "Couldn’t open the file"); }
 }
 async function downloadFile(f){
   try {
@@ -11359,6 +11359,50 @@ const fileIcon = (mime, name) => ic(/^image\//.test(mime) ? "image" : /^video\//
 
 /* ---------- showing files in a conversation ---------- */
 const LINKS = new Map();   // file id → { url, until }
+/* (2026-11em) Files kept on this device. Each link to a file is new (it expires), so the browser never reused what it had
+   already downloaded: a bug video watched three times was downloaded three times. Now a file opened once (video, picture,
+   voice note, PDF; up to 80 MB) is kept in this browser by its id, and opening it again needs no download at all.
+   At most 400 MB per device, oldest dropped first; cleared on sign-out. */
+const FCACHE = "tc-files-v1", FCACHE_MAX = 400 * 1048576, FCACHE_ITEM_MAX = 80 * 1048576;
+const fcKey = id => location.origin + "/__file/" + encodeURIComponent(id);
+const FC_URLS = new Map();   // file id → a blob: address made this session
+async function cachedFileBlob(meta, getUrl){
+  const c = await caches.open(FCACHE);
+  const hit = await c.match(fcKey(meta.id));
+  if (hit) return hit.blob();
+  const url = await getUrl();
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("The file didn’t load (" + r.status + ").");
+  const raw = await r.blob(), blob = raw.type ? raw : new Blob([raw], { type: meta.mime || "application/octet-stream" });
+  if (blob.size <= FCACHE_ITEM_MAX) {
+    await c.put(fcKey(meta.id), new Response(blob, { headers: { "Content-Type": blob.type || meta.mime || "application/octet-stream", "X-Size": String(blob.size), "X-At": String(Date.now()) } })).catch(() => {});
+    fcTrim(c).catch(() => {});
+  }
+  return blob;
+}
+async function cachedFileUrl(meta, getUrl){
+  if (!meta || !meta.id || typeof caches === "undefined" || (+meta.size || 0) > FCACHE_ITEM_MAX) return getUrl();
+  if (FC_URLS.has(meta.id)) return FC_URLS.get(meta.id);
+  try {
+    const u = URL.createObjectURL(await cachedFileBlob(meta, getUrl));
+    FC_URLS.set(meta.id, u);
+    if (FC_URLS.size > 40) { const [k, v] = FC_URLS.entries().next().value; FC_URLS.delete(k); setTimeout(() => URL.revokeObjectURL(v), 120000); }
+    return u;
+  } catch (e) { return getUrl(); }   // the browser can't keep it: open it the usual way
+}
+let fcTrimming = false;
+async function fcTrim(c){
+  if (fcTrimming) return; fcTrimming = true;
+  try {
+    const items = [];
+    for (const k of await c.keys()) { const r = await c.match(k); if (r) items.push({ k, size: +r.headers.get("X-Size") || 0, at: +r.headers.get("X-At") || 0 }); }
+    let total = items.reduce((a, x) => a + x.size, 0);
+    items.sort((a, b) => a.at - b.at);
+    while (total > FCACHE_MAX && items.length) { const x = items.shift(); await c.delete(x.k); total -= x.size; }
+  } finally { fcTrimming = false; }
+}
+function fcClear(){ try { FC_URLS.forEach(u => URL.revokeObjectURL(u)); FC_URLS.clear(); if (typeof caches !== "undefined") caches.delete(FCACHE).catch(() => {}); } catch (e) {} }
+
 async function fileLink(id, long){
   const k = id + (long ? ":long" : ""), c = LINKS.get(k);
   if (c && c.until > Date.now() + 30000) return c.url;
@@ -11373,7 +11417,7 @@ function chatAttachments(m){
     if (/^audio\//.test(a.mime || "")) return voicePlayer(a);
     if (isImg) {
       const img = h("img", { class: "cimg", alt: a.name, loading: "lazy", width: "280", height: "200" });   // a fixed box, so the chat doesn't jump when the picture arrives
-      imgWithRetry(img, long => { if (long) LINKS.delete(a.id + ":long"); return fileLink(a.id, long); }, () => { if (img.isConnected) img.replaceWith(fileCard(a)); });
+      imgWithRetry(img, long => long ? (LINKS.delete(a.id + ":long"), fileLink(a.id, long)) : cachedFileUrl(a, () => fileLink(a.id, false)), () => { if (img.isConnected) img.replaceWith(fileCard(a)); });
       return h("button", { type: "button", class: "cimgbtn", title: "Open " + a.name, onclick: () => openChatFile(a, false) }, img);
     }
     return fileCard(a);
@@ -11418,6 +11462,9 @@ async function openFileInTab(getUrl, a){
   if (tab) try { tab.opener = null; } catch (e) {}
   const write = html => { try { tab.document.open(); tab.document.write(html); tab.document.close(); } catch (e) {} };
   if (tab) write(tabPage(a.name || "File", '<main><div class="box">Opening ' + escHtml(a.name || "the file") + '…</div></main>'));
+  if (tab && a.id && viewable(a) && (+a.size || 0) <= FCACHE_ITEM_MAX) {   // (2026-11em) kept on this device after the first time
+    try { const local = await cachedFileUrl(a, getUrl); if (String(local).startsWith("blob:")) { tab.location.href = local; return; } } catch (e) {}
+  }
   try {
     const url = await getUrl();
     if (!/^https:\/\//i.test(String(url || ""))) throw new Error("The file link isn’t a secure web address.");
@@ -11472,7 +11519,7 @@ async function openImageViewer(name, getUrl, download){
 }
 async function openChatFile(a, download){
   try {
-    if (!download && /^image\//.test(a.mime || "")) { await openImageViewer(a.name, () => fileLink(a.id, true), () => openChatFile(a, true)); return; }
+    if (!download && /^image\//.test(a.mime || "")) { await openImageViewer(a.name, () => cachedFileUrl(a, () => fileLink(a.id, true)), () => openChatFile(a, true)); return; }
     if (!download) { await openFileInTab(() => fileLink(a.id, true), a); return; }
     if (a.size <= 20 * 1048576) { toast("Downloading " + a.name + "…"); await saveFetched(await fileLink(a.id, true), a.name, a.mime); return; }
     const url = await fileLink(a.id, true), piece = 8 * 1048576, parts = [];
@@ -11569,8 +11616,7 @@ function voicePlayer0(a){
       // best: turn it into a plain WAV on this device (exact length, skippable, plays everywhere);
       // if that isn't possible, play the recording as it is
       try {
-        const r = await fetch(url); if (!r.ok) throw new Error(String(r.status));
-        const buf = await r.arrayBuffer();
+        const buf = await (typeof caches !== "undefined" ? (await cachedFileBlob(a, () => Promise.resolve(url))).arrayBuffer() : fetch(url).then(r => { if (!r.ok) throw new Error(String(r.status)); return r.arrayBuffer(); }));
         let wav = null; try { wav = await toWav(buf.slice(0)); } catch (e) { wav = null; }
         au.src = URL.createObjectURL(wav || new Blob([buf], { type: a.mime }));
       }
@@ -12391,7 +12437,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11el";
+const APP_VERSION = "2026-11em";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -16485,6 +16531,7 @@ async function prefetch(){
 }
 function endSession(){
   if (typeof stopActivity === "function") stopActivity();
+  fcClear();   // (2026-11em) files kept on this device go with the sign-out
   stopChatPolling(); stopChatLive();
   { const b = document.getElementById("bugBtn"); if (b) b.hidden = true; }
   shellKey = ""; resetSeenCache(); stopPresence(); Object.assign(C, { ready: false, channels: [], reads: {}, msgs: {}, more: {}, unread: {}, mentions: {}, last: {}, active: null, drafts: {}, hidden: null, reacts: {}, replyTo: {}, uploads: {} }); chatEls = null;
