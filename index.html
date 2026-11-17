@@ -3405,14 +3405,20 @@ const PERM_AREAS = [
 ];
 const LEVELS = [["none","No access"], ["view","View"], ["edit","View & edit"], ["manage","Full, incl. delete"]];
 const LVL = { none: 0, view: 1, edit: 2, manage: 3 };
+// (2026-11ej, upgrade-2026-11ej.sql) each person has their own ticks (profiles.permissions); without them, their role's
+function permsOf(p){
+  if (!p) return {};
+  if (p.permissions && typeof p.permissions === "object") return p.permissions;
+  const role = byId("roles", p.role_id);
+  return (role && role.permissions) || {};
+}
 function lvl(area){
   const me = S.me; if (!me || !me.is_active) return 0;
   if (me.is_admin) return 3;
-  const role = byId("roles", me.role_id);
-  return LVL[(role && role.permissions && role.permissions[area]) || "none"] || 0;
+  return LVL[permsOf(me)[area] || "none"] || 0;
 }
 function peopleWith(area, min){
-  return rows("profiles").filter(p => p.is_active && (p.is_admin || (LVL[((byId("roles", p.role_id) || {}).permissions || {})[area]] || 0) >= min));
+  return rows("profiles").filter(p => p.is_active && (p.is_admin || (LVL[permsOf(p)[area]] || 0) >= min));
 }
 const activePeople = () => rows("profiles").filter(p => p.is_active);
 const person = id => byId("profiles", id);
@@ -12310,7 +12316,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11eh";
+const APP_VERSION = "2026-11ej";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -12877,7 +12883,7 @@ async function sendToQA(rec, tester){
   if (open && !confirm(open + " checklist item" + (open === 1 ? " isn’t" : "s aren’t") + " ticked yet. Send to QA anyway?")) return;
   if (!tester) {
     // nobody set to test this feature or project: ask who
-    const testers = activePeople().filter(p => { const r = byId("roles", p.role_id); return p.is_admin || (r && r.permissions && r.permissions.qa === "manage"); });
+    const testers = activePeople().filter(p => p.is_admin || permsOf(p).qa === "manage");
     const sel = h("select", { class: "in" }, h("option", { value: "" }, "Choose a tester…"), testers.map(p => h("option", { value: p.id }, p.full_name)));
     const remember = h("input", { type: "checkbox", checked: !!rec.project_id });
     const go2 = h("button", { type: "button", class: "btn pri" }, "Send to QA");
@@ -13394,8 +13400,7 @@ const isOwner = t => ownersOf(t).includes(S.me.id);
 // testers: people whose role can manage QA
 function isTesterId(id){
   const p = person(id); if (!p || p.is_active === false) return false;
-  const r = rows("roles").find(x => x.id === p.role_id);
-  return !!(r && r.permissions && r.permissions.qa === "manage");
+  return permsOf(p).qa === "manage";
 }
 const testers = () => activePeople().filter(p => isTesterId(p.id));
 const iAmTester = () => isTesterId(S.me.id) || (typeof isTester === "function" && isTester() && !isAdmin());
@@ -14168,6 +14173,7 @@ function openUserEditor(id){
           const r = await callAdmin({ action: "set_email", id: p.id, email: newEmail }); if (r && r.warning) toast(r.warning);
           notify([p.id], "Your work email is now " + newEmail, "Changed by " + S.me.full_name + ". Sign in with " + newEmail + " from now on.", "profiles", p.id);
         }
+        if ((prof.role_id || null) !== (p.role_id || null) && "permissions" in p) prof.permissions = { ...((byId("roles", prof.role_id) || {}).permissions || {}) };   // (2026-11ej) a new role brings its ticks
         await updateRow("profiles", p.id, prof);
         if (personalWas !== null && pe !== personalWas) await savePersonalEmail(p.id, pe);
         if (pw) await callAdmin({ action: "set_password", id: p.id, password: pw });
@@ -14224,9 +14230,101 @@ function showCredentials(name, email, pw){
     [h("span", { class: "sp" }), h("button", { type: "button", class: "btn soft", onclick: async () => { try { await navigator.clipboard.writeText(text); toast("Copied."); } catch (e) { ta.select(); } } }, "Copy"), h("button", { type: "button", class: "btn pri", onclick: closeDlg }, "Done")], true);
 }
 
+/* (2026-11ej) who can see what: a tick per person per section. Super admins see everything. People start with their role's
+   ticks (a role is the template); ticking here changes only that person. The database enforces the same ticks. */
+const ACCESS_COLS = [
+  ["Development", ["projects", "tasks", "releases", "support", "timesheets"]], ["QA & testing", ["qa"]],
+  ["Sales", ["sales"]], ["Clients", ["clients"]], ["Leads", ["leads"]], ["Marketing", ["marketing"]],
+  ["Meetings", ["meetings"]], ["Leave approvals", ["leave"]], ["Everyone’s attendance", ["attendance"]],
+  ["Announcements", ["announcements"]], ["Documents", ["documents"]]
+];
+const ACCESS_HELP = { "Development": "Everyone’s projects, sprints, tasks, releases, support tickets and timesheets", "QA & testing": "Test cases and QA. Full access makes them a tester",
+  "Leave approvals": "Approve or decline everyone’s leave", "Everyone’s attendance": "See and correct everyone’s attendance", "Announcements": "Post and change announcements", "Documents": "Add and change company documents" };
+async function savePerms(p, perms){
+  try { await updateRow("profiles", p.id, { permissions: perms }); }
+  catch (e) {
+    if (/permissions/i.test(String(e && e.message || e))) throw new Error("Run upgrade-2026-11ej.sql in Supabase first: the database doesn’t have per-person access yet.");
+    throw e;
+  }
+  if (p.id === S.me.id) S.me = person(S.me.id);
+}
+function renderAccessGrid(el){
+  const ppl = activePeople().filter(p => !p.client_id).sort((a, b) => (b.is_admin - a.is_admin) || a.full_name.localeCompare(b.full_name));
+  const admins = ppl.filter(p => p.is_admin), others = ppl.filter(p => !p.is_admin);
+  el.append(h("h2", { style: "margin:4px 0 6px" }, "Who can see what"),
+    h("p", { class: "muted", style: "margin:0 0 10px;font-size:14px" }, "Tick a section to let that person see and work in it; untick to hide it. Click a name for finer control (view only, or delete and approve). ",
+      "Everyone always keeps their own things: tasks they’re on, their leave and attendance, meetings they’re invited to, chat."),
+    h("div", { class: "panel", style: "margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap" },
+      h("b", {}, "Super admins (see everything): "), admins.length ? admins.map(p => personChip(p.id)) : h("span", { class: "muted" }, "none")));
+  const head = h("tr", {}, h("th", { style: "min-width:170px" }, "Person"), ACCESS_COLS.map(([l]) => h("th", { title: ACCESS_HELP[l] || "", style: "font-size:12px;white-space:normal;min-width:76px;text-align:center" }, l)));
+  const tb = h("tbody");
+  for (const p of others){
+    const tr = h("tr");
+    tr.append(h("td", {}, h("button", { type: "button", style: "background:none;border:0;padding:0;font:inherit;font-weight:600;color:var(--p);cursor:pointer;text-align:left", title: "Finer control", onclick: () => editPersonAccess(p.id) }, p.full_name),
+      h("div", { class: "muted", style: "font-size:12px" }, [p.vertical, refLabel("roles", p.role_id)].filter(Boolean).join(" · ") || "No role")));
+    for (const [l, areas] of ACCESS_COLS){
+      const cur = permsOf(p), on = areas.filter(a => (LVL[cur[a]] || 0) >= 1).length;
+      const cb = h("input", { type: "checkbox", "aria-label": l + " for " + p.full_name });
+      cb.checked = on === areas.length; cb.indeterminate = on > 0 && on < areas.length;
+      cb.addEventListener("change", async () => {
+        const next = { ...permsOf(person(p.id)) };
+        for (const a of areas) next[a] = cb.checked ? ((LVL[next[a]] || 0) >= 2 ? next[a] : "edit") : "none";
+        cb.disabled = true;
+        try { await savePerms(p, next); toast((cb.checked ? "Turned on " : "Turned off ") + l + " for " + p.full_name + "."); }
+        catch (e) { cb.checked = !cb.checked; fail(e, "Not saved"); }
+        cb.disabled = false; cb.indeterminate = false;
+      });
+      tr.append(h("td", { style: "text-align:center" }, cb));
+    }
+    tb.append(tr);
+  }
+  if (!others.length) tb.append(h("tr", {}, h("td", { colspan: String(ACCESS_COLS.length + 1), class: "muted" }, "Everyone active is a super admin.")));
+  el.append(h("div", { class: "tablewrap perm", style: "margin-bottom:22px" }, h("table", {}, h("thead", {}, head), tb)));
+}
+// finer control for one person: view / change / delete & approve, per area
+function editPersonAccess(id){
+  const p = person(id); if (!p) return;
+  const cur = { ...permsOf(p) }, boxes = {};
+  const tb = h("tbody");
+  const LBL = [["view", "See"], ["edit", "Add & change"], ["manage", "Delete & approve"]];
+  for (const [k, l] of PERM_AREAS){
+    const n = LVL[cur[k]] || 0, row = boxes[k] = [];
+    const tr = h("tr", {}, h("td", {}, l));
+    LBL.forEach(([, t], i) => {
+      const cb = h("input", { type: "checkbox", "aria-label": t + ": " + l }); cb.checked = n >= i + 1; row.push(cb);
+      cb.addEventListener("change", () => { row.forEach((b, j) => { if (cb.checked && j < i) b.checked = true; if (!cb.checked && j > i) b.checked = false; }); });
+      tr.append(h("td", { style: "text-align:center" }, cb));
+    });
+    tb.append(tr);
+  }
+  const tpl = h("select", { class: "in sm" }, h("option", { value: "" }, "Copy ticks from a role…"), rows("roles").map(r => h("option", { value: r.id }, r.name)));
+  tpl.addEventListener("change", () => {
+    const r = byId("roles", tpl.value); if (!r) return;
+    for (const [k] of PERM_AREAS) { const n = LVL[(r.permissions || {})[k]] || 0; boxes[k].forEach((b, j) => { b.checked = n >= j + 1; }); }
+    tpl.value = "";
+  });
+  const err = h("p", { class: "err", hidden: true });
+  const save = h("button", { type: "button", class: "btn pri" }, "Save");
+  save.addEventListener("click", async () => {
+    const next = {};
+    for (const [k] of PERM_AREAS) { const n = boxes[k].filter(b => b.checked).length; next[k] = ["none", "view", "edit", "manage"][n]; }
+    save.disabled = true;
+    try { await savePerms(p, next); toast("Access saved for " + p.full_name + "."); closeDlg(); rerender(); }
+    catch (e) { err.textContent = friendly(e); err.hidden = false; }
+    save.disabled = false;
+  });
+  openDialog("What " + p.full_name + " can see and do", [
+    h("p", { class: "muted", style: "font-size:13px;margin:0 0 10px" }, "See: everyone’s items in that area. Add & change: create and edit them. Delete & approve: also delete, and approve (leave, QA)."),
+    h("div", { style: "margin-bottom:10px" }, tpl),
+    h("div", { class: "tablewrap perm" }, h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Area"), LBL.map(([, t]) => h("th", { style: "text-align:center;font-size:12px" }, t)))), tb)), err
+  ], [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), save]);
+}
+
 function renderAdminRoles(el){
-  adminHeader(el, "Roles & permissions", "Each role decides what its people can see and change. Admins always have full access.",
+  adminHeader(el, "Roles & permissions", "Tick what each person can see. Super admins always see everything. Roles are templates: a new person starts with their role’s ticks.",
     [h("button", { type: "button", class: "btn pri", onclick: () => editRole(null) }, "+ New role")]);
+  renderAccessGrid(el);
+  el.append(h("h2", { style: "margin:4px 0 6px" }, "Roles (templates)"));
   el.append(h("div", { class: "panel", style: "margin-bottom:14px;background:var(--tint);border-color:transparent" },
     h("b", {}, "Everyone always has their own things: "), "tasks they own, help on or review, their leave and attendance, meetings they’re invited to, company announcements and documents, and the people directory. A role adds access to the rest of their own vertical’s work. Each vertical only ever sees its own tasks and documents."));
   const tb = h("tbody");
@@ -14250,12 +14348,20 @@ function editRole(id){
     tb.append(h("tr", {}, h("td", {}, l), h("td", {}, s)));
   }
   const err = h("p", { class: "err", hidden: true });
+  const holders = r ? rows("profiles").filter(p => p.role_id === r.id && p.is_active && !p.is_admin) : [];
+  const applyAll = h("input", { type: "checkbox", checked: true });
+  const applyRow = holders.length ? h("label", { class: "chk", style: "margin-top:12px;display:flex;gap:8px;align-items:center;font-size:14px" }, applyAll,
+    "Also give these ticks to the " + holders.length + " " + (holders.length === 1 ? "person" : "people") + " with this role (replaces their own ticks): " + holders.map(p => p.full_name).join(", ")) : null;
   const save = h("button", { type: "button", class: "btn pri" }, r ? "Save role" : "Create role");
   save.addEventListener("click", async () => {
     if (!name.value.trim()) { err.textContent = "Give the role a name."; err.hidden = false; return; }
     const permissions = {}; for (const [k] of PERM_AREAS) permissions[k] = sels[k].value;
     save.disabled = true;
-    try { if (r) await updateRow("roles", r.id, { name: name.value.trim(), description: desc.value.trim(), permissions }); else await insertRow("roles", { name: name.value.trim(), description: desc.value.trim(), permissions }); toast("Role saved."); closeDlg(); renderShell(); }
+    try {
+      if (r) await updateRow("roles", r.id, { name: name.value.trim(), description: desc.value.trim(), permissions }); else await insertRow("roles", { name: name.value.trim(), description: desc.value.trim(), permissions });
+      if (r && holders.length && applyAll.checked && holders.some(p => "permissions" in p)) { ok(await sb.from("profiles").update({ permissions }).eq("role_id", r.id).eq("is_admin", false)); await load("profiles", true); if (S.me) S.me = person(S.me.id); }
+      toast("Role saved."); closeDlg(); renderShell();
+    }
     catch (e) { err.textContent = friendly(e); err.hidden = false; }
     save.disabled = false;
   });
@@ -14267,7 +14373,7 @@ function editRole(id){
   openDialog(r ? "Edit role: " + r.name : "New role", [
     h("div", { class: "form" }, h("label", { class: "fl" }, "Role name *", name), h("label", { class: "fl" }, "Description", desc)),
     h("p", { class: "muted", style: "font-size:13px;margin:14px 0 8px" }, "View: can see everyone’s items. View & edit: can also add and change them. Full: can also delete, and approve where relevant."),
-    h("div", { class: "tablewrap perm" }, h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Area"), h("th", {}, "Access"))), tb)), err
+    h("div", { class: "tablewrap perm" }, h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Area"), h("th", {}, "Access"))), tb)), applyRow, err
   ], [del, h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), save]);
 }
 async function deleteRoleRow(id){ ok(await sb.from("roles").delete().eq("id", id)); S.cache.roles = rows("roles").filter(r => r.id !== id); await load("profiles", true); }
@@ -14492,7 +14598,7 @@ function renderShell(){
   dot0.hidden = !unread0; dot0.textContent = unread0 > 9 ? "9+" : String(unread0);
   // rebuild the sidebar only when something in it actually changed
   const role = byId("roles", S.me.role_id);
-  const key = JSON.stringify([S.route, S.me.full_name, S.me.vertical, S.me.is_admin, role && role.permissions, S.settings.company,
+  const key = JSON.stringify([S.route, S.me.full_name, S.me.vertical, S.me.is_admin, role && role.permissions, S.me.permissions, S.settings.company,
     NAV.flatMap(([, i]) => i).map(([r]) => { const b = badgeInfo(r); return [b.due, b.fresh, b.bang ? 1 : 0]; }), JSON.stringify(navState()),
     notesTreeOpen() && S.loaded.has("notes") ? rows("notes").map(n => n.id + (n.title || "") + (n.parent_id || "")).join("|") + [...notesTreeSet()].join(",") : ""]);
   if (key === shellKey && side.children.length) return;
