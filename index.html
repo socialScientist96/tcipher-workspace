@@ -663,6 +663,7 @@ select.in.sm{padding:4px 6px;font-size:13px;min-width:120px}
 
 /* dialog */
 dialog{border:0;border-radius:14px;padding:0;background:var(--white);color:var(--ink);width:min(760px,calc(100vw - 20px));max-height:calc(100dvh - 30px);box-shadow:0 24px 70px rgba(15,12,45,.3)}
+dialog.wide{width:min(980px,calc(100vw - 20px))}
 dialog.narrow{width:min(480px,calc(100vw - 20px))}
 dialog::backdrop{background:rgba(15,12,45,.45)}
 .dh{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:18px 22px 0}
@@ -12390,7 +12391,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ek";
+const APP_VERSION = "2026-11el";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -14900,20 +14901,20 @@ async function openInvoice(id, preset){
     lines.querySelectorAll(".gstc").forEach(x => { x.hidden = !gstOn(); });
     curWrap.hidden = gstOn(); posWrap.hidden = !gstOn();
     lines.querySelectorAll("tr").forEach((tr, i) => { const it = c.items[i]; tr.querySelector(".amt").textContent = money2(r2(it.qty * it.rate), c.currency); });
-    totalsBox.replaceChildren(h("div", {}, "Subtotal " + money2(t.subtotal, c.currency)),
+    totalsBox.replaceChildren(...[h("div", {}, "Subtotal " + money2(t.subtotal, c.currency)),
       gstOn() ? h("div", { class: "muted" }, t.intra ? "CGST " + money2(t.cgst) + " + SGST " + money2(t.sgst) : "IGST " + money2(t.igst)) : null,
-      h("div", { style: "font-weight:700;font-size:16px" }, "Total " + money2(t.total, c.currency)));
+      h("div", { style: "font-weight:700;font-size:16px" }, "Total " + money2(t.total, c.currency))].filter(Boolean));   // (2026-11el) an empty slot printed "null"
   };
   const addLine = it => {
     it = it || { description: "", sac: "998314", qty: 1, rate: 0, gst: 18 };
     const tr = h("tr", {},
-      h("td", {}, h("textarea", { class: "in", rows: "2", "data-f": "description", placeholder: "First line: the item (bold). Next lines: details" }, it.description || ""),
-        h("div", { style: "display:flex;gap:6px;margin-top:4px" }, h("input", { class: "in", "data-f": "period", placeholder: "Billing month, e.g. Month 1 of 6", value: it.period || "" }),
+      h("td", { style: "min-width:280px" }, h("textarea", { class: "in", rows: "3", style: "width:100%", "data-f": "description", placeholder: "First line: the item (bold). Next lines: details" }, it.description || ""),
+        h("div", { style: "display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px" }, h("input", { class: "in", "data-f": "period", placeholder: "Billing month, e.g. Month 1 of 6", value: it.period || "" }),
           h("input", { class: "in", "data-f": "period_note", placeholder: "e.g. 1 Dec to 31 Dec 2026", value: it.period_note || "" }))),
-      h("td", { style: "width:90px" }, h("input", { class: "in", "data-f": "sac", value: it.sac || "" })),
-      h("td", { style: "width:70px" }, h("input", { class: "in", type: "number", step: "any", min: "0", "data-f": "qty", value: String(it.qty ?? 1) })),
-      h("td", { style: "width:120px" }, h("input", { class: "in", type: "number", step: "any", min: "0", "data-f": "rate", value: String(it.rate ?? 0) })),
-      h("td", { style: "width:80px", class: "gstc" }, h("select", { class: "in", "data-f": "gst" }, [0, 5, 12, 18, 28].map(g => h("option", { value: String(g) }, g + "%")))),
+      h("td", {}, h("input", { class: "in", style: "min-width:86px", "data-f": "sac", value: it.sac || "" })),
+      h("td", {}, h("input", { class: "in", style: "min-width:56px", type: "number", step: "any", min: "0", "data-f": "qty", value: String(it.qty ?? 1) })),
+      h("td", {}, h("input", { class: "in", style: "min-width:100px", type: "number", step: "any", min: "0", "data-f": "rate", value: String(it.rate ?? 0) })),
+      h("td", { class: "gstc" }, h("select", { class: "in", style: "min-width:84px", "data-f": "gst" }, [0, 5, 12, 18, 28].map(g => h("option", { value: String(g) }, g + "%")))),
       h("td", { class: "amt", style: "white-space:nowrap;text-align:right;width:110px" }),
       h("td", { style: "width:36px" }, h("button", { type: "button", class: "btn sm ghost", title: "Remove this line", onclick: () => { tr.remove(); refresh(); } }, ic("x"))));
     tr.querySelector("[data-f=gst]").value = String(it.gst ?? 18);
@@ -14935,8 +14936,10 @@ async function openInvoice(id, preset){
   [accSel, kindSel, curSel, posSel].forEach(x => x.addEventListener("change", refresh));
   accSel.addEventListener("change", () => { const a = byId("finance_accounts", accSel.value); if (a && !notes.value.trim()) notes.value = a.terms || ""; });
   const err = h("p", { class: "err", hidden: true });
-  const save = h("button", { type: "button", class: "btn pri" }, id ? "Save" : "Save invoice");
-  save.addEventListener("click", async () => {
+  const save = h("button", { type: "button", class: "btn" + (inv.number ? " pri" : "") }, inv.number ? "Save" : "Save draft");
+  // (2026-11el) save and give it its number in one go; "Save draft" keeps it unnumbered
+  const saveIssue = inv.number ? null : h("button", { type: "button", class: "btn pri" }, "Save & issue");
+  const doSave = async issueIt => {
     err.hidden = true;
     const c = current(), b = {}; for (const k of Object.keys(bt)) b[k] = bt[k].value.trim();
     if (!c.account_id) { err.textContent = "Choose which account this invoice is from."; err.hidden = false; return; }
@@ -14947,14 +14950,18 @@ async function openInvoice(id, preset){
     const t = invoiceTotals(c, byId("finance_accounts", c.account_id));
     const data = { account_id: c.account_id, client_id: cliSel.value || null, bill_to: b, kind: c.kind, currency: c.currency, issue_date: issue.value || today(), due_date: due.value || null,
       items: c.items, place_of_supply: c.place_of_supply, subtotal: t.subtotal, cgst: t.cgst, sgst: t.sgst, igst: t.igst, total: t.total, notes: notes.value.trim() };
-    save.disabled = true;
+    save.disabled = true; if (saveIssue) saveIssue.disabled = true;
     try {
       const row = id ? await updateRow("invoices", id, data) : await insertRow("invoices", data);
-      if (preset && preset._plan) await advanceBilling(preset._plan);
-      toast(id ? "Invoice saved." : "Invoice saved as a draft. Issue it to give it a number.");
+      if (preset && preset._plan && !id) await advanceBilling(preset._plan);
+      let num = row.number;
+      if (issueIt && !num) { num = ok(await sb.rpc("issue_invoice", { p_invoice: row.id })); await load("invoices", true); await load("finance_accounts", true); }
+      toast(issueIt ? "Issued as " + num + "." : id ? "Invoice saved." : "Saved as a draft. Issue it when it’s ready to get its number.");
       closeDlg(); await rerender(); viewInvoice(row.id);
-    } catch (e) { err.textContent = friendly(e); err.hidden = false; save.disabled = false; }
-  });
+    } catch (e) { err.textContent = friendly(e); err.hidden = false; save.disabled = false; if (saveIssue) saveIssue.disabled = false; }
+  };
+  save.addEventListener("click", () => doSave(false));
+  if (saveIssue) saveIssue.addEventListener("click", () => doSave(true));
   openDialog(id ? "Edit invoice " + (inv.number || "(draft)") : "New invoice", [
     locked ? h("p", { class: "muted" }, "This invoice is " + inv.status.toLowerCase() + ", so it can’t be changed.") : null,
     h("div", { class: "form" },
@@ -14969,7 +14976,8 @@ async function openInvoice(id, preset){
     h("button", { type: "button", class: "btn sm", style: "margin-top:6px", onclick: () => { addLine(); refresh(); } }, "+ Add line"),
     totalsBox,
     h("label", { class: "fl full", style: "margin-top:10px" }, "Notes / terms (printed on the invoice)", notes), err
-  ], [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), locked ? null : save]);
+  ], [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), locked ? null : save, locked ? null : saveIssue]);
+  dlg().classList.add("wide");   // (2026-11el) room for the invoice lines
   refresh();
 }
 function viewInvoice(id){
