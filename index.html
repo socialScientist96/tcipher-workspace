@@ -12535,7 +12535,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11eo";
+const APP_VERSION = "2026-11ep";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -13894,14 +13894,29 @@ function taskCreate(preset){
     const back = { title: title.value, notes: notes.value };
     openRecord("projects", null, {}, { onSaved: row => { taskCreate(Object.assign({}, preset, { title: back.title, description: back.notes, project_id: row && row.id })); } }); });
   const projRow = h("label", { class: "fl", id: "taskNewProjectRow" }, h("span", {}, "Project ", h("span", { class: "muted", style: "font-weight:400" }, "(optional)")), proj);
-  const showProj = () => { projRow.hidden = (vertical ? vertical.value : startV) !== "Development"; };
+  // (2026-11ep) the flow and a developer per stage, right when the task is made (Development)
+  const flowSel = h("select", { class: "in", id: "taskNewFlow" }, h("option", { value: "" }, "No flow"), taskFlows().map(f => h("option", { value: f.join("|"), selected: (preset.flow || []).join("|") === f.join("|") }, flowName(f))));
+  const stageBox = h("div", { style: "display:flex;gap:10px;flex-wrap:wrap;width:100%" }), stageSel = {};
+  const devPeople = activePeople().filter(p => p.vertical === "Development").sort((a, b) => a.full_name.localeCompare(b.full_name));
+  const drawStages = () => stageBox.replaceChildren(...(flowSel.value ? flowSel.value.split("|") : []).map(g => {
+    const sel = stageSel[g] || (stageSel[g] = h("select", { class: "in", "aria-label": g + " developer" }, h("option", { value: "" }, "Choose…"), devPeople.map(p => h("option", { value: p.id, selected: ((preset.stage_devs || {})[g]) === p.id }, p.full_name))));
+    return h("label", { class: "fl", style: "flex:1;min-width:150px" }, g + " developer", sel); }));
+  flowSel.addEventListener("change", drawStages); drawStages();
+  const flowRow = h("div", { class: "fl full", id: "taskNewFlowRow" }, h("label", { class: "fl" }, h("span", {}, "Flow ", h("span", { class: "muted", style: "font-weight:400" }, "(optional: the stages before QA)")), flowSel), stageBox);
+  const showProj = () => { projRow.hidden = flowRow.hidden = (vertical ? vertical.value : startV) !== "Development"; };
   if (vertical) vertical.addEventListener("change", showProj); showProj();
   const err = h("p", { class: "err", hidden: true });
   const go2 = h("button", { type: "button", class: "btn pri", id: "devNewGo" }, "Create");
   const values = () => { const ids = owners.value(), vv = vertical ? vertical.value : startV;
     return Object.assign({}, preset, { vertical: vv, type: preset.type || ({ Sales: "Follow-up", Marketing: "Content" })[vv] || "Feature", title: title.value.trim(), description: notes.value.trim(),
     assignee_id: ids[0] || null, collaborators: ids.slice(1), due_date: due.value || null,
-    project_id: vv === "Development" && proj.value && proj.value !== "__new" ? proj.value : null }); };
+    project_id: vv === "Development" && proj.value && proj.value !== "__new" ? proj.value : null },
+    vv === "Development" && flowSel.value ? (() => {   // the flow, its developers, and those developers as owners (so they can move it along)
+      const flow = flowSel.value.split("|"), devs = {};
+      for (const g of flow) { const id = stageSel[g] && stageSel[g].value; if (id) devs[g] = id; }
+      const extra = Object.values(devs).filter(id => !ids.includes(id));
+      return { flow, flow_step: 0, stage_devs: devs, assignee_id: ids[0] || Object.values(devs)[0] || null, collaborators: [...new Set([...ids.slice(1), ...extra])].filter(x => x !== (ids[0] || Object.values(devs)[0])) };
+    })() : {}); };
   const submit = async () => {
     if (go2.disabled) return;
     err.hidden = true;
@@ -13923,7 +13938,7 @@ function taskCreate(preset){
       vertical ? h("label", { class: "fl" }, "Vertical", vertical) : null,
       h("label", { class: "fl full" }, "Title", title), h("label", { class: "fl full" }, "Notes", notes),
       h("div", { class: "fl full" }, h("span", {}, "Owners"), owners.el),
-      h("label", { class: "fl" }, h("span", {}, "Due date ", h("span", { class: "muted", style: "font-weight:400" }, "(optional)")), due), projRow), err],
+      h("label", { class: "fl" }, h("span", {}, "Due date ", h("span", { class: "muted", style: "font-weight:400" }, "(optional)")), due), projRow, flowRow), err],
     [more, h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), go2], true);
   setTimeout(() => title.focus(), 30);
 }
