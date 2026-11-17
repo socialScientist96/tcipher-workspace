@@ -13683,46 +13683,93 @@ async function renderDevBoard(el){
     [["", "Any due date"], ["now", "Due today or overdue"], ["today", "Due today"], ["overdue", "Overdue"], ["week", "Due in the next 7 days"], ["later", "Due later"], ["none", "No due date"]]
       .map(([v, l]) => h("option", { value: v, selected: (u.due || "") === v }, l)));
   el.append(h("div", { class: "dv-toolbar" }, q, whoSel, projSel, dueSel,
-    h("button", { type: "button", class: "dv-chip", title: "What you finished on a day: for the evening scrum", onclick: () => openDoneBy() }, ic("checkSquare", 14), " Done by me"),
-    chip("mine", "Only my work"), unChip("undev", "Unassigned Dev", nDev), unChip("unqa", "Unassigned QA", nQA), chip("archived", "Archived")), body);
+    h("button", { type: "button", class: "dv-chip" + (u.done ? " on" : ""), "aria-pressed": String(!!u.done), title: "Show only what you finished on a day or in a date range: for the scrum",
+      onclick: () => { if (u.done) { u.done = null; u.doneIds = null; u.doneKey = null; } else { const [f, t] = doneRange("today"); u.done = { from: f, to: t, k: "today" }; } rerender(); } }, ic("checkSquare", 14), " Done by me"),
+    chip("mine", "Only my work"), unChip("undev", "Unassigned Dev", nDev), unChip("unqa", "Unassigned QA", nQA), chip("archived", "Archived")), ...(u.done ? [doneBar(u)] : []), body);
   draw();
+  if (u.done) loadDoneFilter(u);
 }
-// (2026-11eo) what someone finished on a day, from the tasks' permanent history: moved to QA, backend handed to frontend,
-// approved in QA. For the evening scrum.
-async function openDoneBy(){
-  let day = today(), who = S.me.id;
-  const dateIn = h("input", { class: "in", type: "date", value: day, max: today() });
-  const quick = segmented([["0", "Today"], ["1", "Yesterday"]], "0", v => { dateIn.value = addDays(today(), -+v); day = dateIn.value; draw(); });
+// (2026-11eo, 2026-11ep) what someone finished in a date range, from the tasks' permanent history: moved to QA, stage
+// handovers, approved in QA. Shown as a board filter (the tasks in their columns) and as a copyable list for the scrum.
+const DONE_RANGES = [["today", "Today"], ["yesterday", "Yesterday"], ["week", "This week"], ["7d", "Last 7 days"]];
+function doneRange(k){
+  const t = today(), dow = (new Date(t + "T12:00:00").getDay() + 6) % 7;   // Monday = 0
+  return ({ today: [t, t], yesterday: [addDays(t, -1), addDays(t, -1)], week: [addDays(t, -dow), t], "7d": [addDays(t, -6), t] })[k] || [t, t];
+}
+async function doneEvents(who, from, to){
+  const a = new Date(from + "T00:00:00+05:30").toISOString(), b = new Date(addDays(to, 1) + "T00:00:00+05:30").toISOString();
+  const evs = ok(await sb.from("task_events").select("task_id,field,old_value,new_value,at").eq("actor_id", who).in("field", ["status", "flow_step"]).gte("at", a).lt("at", b).order("at").limit(2000)) || [];
+  const forward = e => { const f = flowOf(byId("tasks", e.task_id) || {}); return !f.length || f.indexOf(e.new_value) > f.indexOf(e.old_value); };
+  const what = e => e.field === "flow_step" ? (e.old_value && e.new_value && forward(e) ? e.old_value + " done" : null)
+    : e.old_value === "In progress" && e.new_value === "In review" ? "Moved to QA"
+    : e.old_value === "In progress" && e.new_value === "Done" ? "Finished"
+    : e.old_value === "In review" && e.new_value === "Done" ? "Approved in QA" : null;
+  const seen = new Set(), out = [];
+  for (const e of evs) { const w = what(e); if (!w || seen.has(e.task_id + w)) continue; seen.add(e.task_id + w); out.push({ e, w, t: byId("tasks", e.task_id), day: localDay(e.at) }); }
+  return out;
+}
+const rangeLabel = (f, t) => f === t ? fmtDate(f, true) : fmtDate(f) + " – " + fmtDate(t, true);
+// the board filter: only the tasks finished in the range, where they are now
+async function loadDoneFilter(u){
+  const key = [u.who || S.me.id, u.done.from, u.done.to].join("|");
+  if (u.doneKey === key && u.doneIds) return;
+  u.doneKey = key; u.doneIds = null;
+  try { const list = await doneEvents(u.who || S.me.id, u.done.from, u.done.to); if (u.doneKey === key) { u.doneIds = new Set(list.map(x => x.e.task_id)); u.doneCount = u.doneIds.size; } }
+  catch (e) { u.doneIds = new Set(); fail(e, "Couldn’t load what was finished"); }
+  if (S.route === "dev-board") rerender();
+}
+function doneBar(u){
+  const from = h("input", { class: "in sm", type: "date", value: u.done.from, max: today(), "aria-label": "From", style: "width:auto;max-width:160px;flex:0 0 auto" });
+  const to = h("input", { class: "in sm", type: "date", value: u.done.to, max: today(), "aria-label": "To", style: "width:auto;max-width:160px;flex:0 0 auto" });
+  const set = (f, t) => { if (t < f) [f, t] = [t, f]; u.done = { from: f, to: t, k: "" }; u.doneKey = null; rerender(); };
+  from.addEventListener("change", () => from.value && set(from.value, to.value || from.value));
+  to.addEventListener("change", () => to.value && set(from.value || to.value, to.value));
+  const who = u.who && u.who !== S.me.id ? pname(u.who) : "you";
+  return h("div", { class: "dv-donebar", style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0 10px;padding:8px 10px;background:var(--tint);border-radius:10px" },
+    h("b", { style: "font-size:13px" }, ic("checkSquare", 14), " Done by " + who + ":"),
+    segmented(DONE_RANGES, u.done.k || "", k => { const [f, t] = doneRange(k); u.done = { from: f, to: t, k }; u.doneKey = null; rerender(); }),
+    from, h("span", { class: "muted" }, "to"), to,
+    h("span", { class: "muted", style: "font-size:13px" }, u.doneIds ? u.doneCount + " task" + (u.doneCount === 1 ? "" : "s") : "Loading…"),
+    h("span", { style: "flex:1" }),
+    h("button", { type: "button", class: "btn sm", onclick: () => openDoneBy(u.done.from, u.done.to, u.who || S.me.id) }, "List for the scrum"),
+    h("button", { type: "button", class: "btn sm ghost", title: "Show the whole board again", onclick: () => { u.done = null; u.doneIds = null; u.doneKey = null; rerender(); } }, ic("x", 14), "Clear"));
+}
+// the list (grouped by day), to copy into the scrum
+async function openDoneBy(from, to, who){
+  from = from || today(); to = to || from; who = who || S.me.id;
+  const fIn = h("input", { class: "in", type: "date", value: from, max: today() }), tIn = h("input", { class: "in", type: "date", value: to, max: today() });
   const whoSel = isAdmin() || isTaskHandler("Development") ? h("select", { class: "in" }, activePeople().filter(p => p.vertical === "Development" || isTesterId(p.id)).sort((a, b) => a.full_name.localeCompare(b.full_name))
     .map(p => h("option", { value: p.id, selected: p.id === who }, p.full_name + (p.id === S.me.id ? " (you)" : "")))) : null;
-  const out = h("div", { style: "margin-top:10px" });
+  const out = h("div", { style: "margin-top:10px;max-height:55vh;overflow:auto" });
   let lines = [];
   const draw = async () => {
     out.replaceChildren(h("p", { class: "muted" }, "Loading…"));
-    const from = new Date(day + "T00:00:00+05:30").toISOString(), to = new Date(addDays(day, 1) + "T00:00:00+05:30").toISOString();
-    let evs = [];
-    try { evs = ok(await sb.from("task_events").select("task_id,field,old_value,new_value,at").eq("actor_id", who).in("field", ["status", "flow_step"]).gte("at", from).lt("at", to).order("at")) || []; }
-    catch (e) { out.replaceChildren(h("p", { class: "err" }, friendly(e))); return; }
-    const forward = e => { const f = flowOf(byId("tasks", e.task_id) || {}); return f.indexOf(e.new_value) > f.indexOf(e.old_value) || !f.length; };
-    const what = e => e.field === "flow_step" ? (e.old_value && e.new_value && forward(e) ? e.old_value + " done" : null)
-      : e.old_value === "In progress" && e.new_value === "In review" ? "Moved to QA"
-      : e.old_value === "In progress" && e.new_value === "Done" ? "Finished"
-      : e.old_value === "In review" && e.new_value === "Done" ? "Approved in QA" : null;
-    const seen = new Set(), done = [];
-    for (const e of evs) { const w = what(e); if (!w || seen.has(e.task_id + w)) continue; seen.add(e.task_id + w); done.push({ e, w, t: byId("tasks", e.task_id) }); }
-    lines = done.map(x => "• " + (x.t ? taskKey(x.t) + " " + x.t.title : "A task") + " (" + x.w.toLowerCase() + ")");
-    out.replaceChildren(done.length ? h("div", {}, h("p", { class: "muted", style: "margin:0 0 6px" }, done.length + " task" + (done.length === 1 ? "" : "s") + " on " + fmtDate(day, true) + ":"),
-      ...done.map(x => h("button", { type: "button", class: "dv-done-row", style: "display:flex;gap:10px;align-items:center;width:100%;text-align:left;padding:8px 6px;border:0;border-bottom:1px solid var(--line);background:none;cursor:pointer",
-        onclick: () => { if (x.t) { closeDlg(); openDevTask(x.t.id); } } },
-        h("span", { class: "muted", style: "width:62px;font-size:12.5px" }, new Date(x.e.at).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })),
-        h("span", { style: "flex:1" }, x.t ? h("span", {}, h("span", { class: "tkey" }, taskKey(x.t)), " ", x.t.title) : h("span", { class: "muted" }, "A task you can’t see any more")),
-        h("span", { class: "pill" }, x.w))))
-      : h("p", { class: "nothing" }, "Nothing moved on " + fmtDate(day, true) + "."));
+    let done = [];
+    try { done = await doneEvents(who, from, to); } catch (e) { out.replaceChildren(h("p", { class: "err" }, friendly(e))); return; }
+    const days = [...new Set(done.map(x => x.day))];
+    lines = []; const nodes = [];
+    for (const d of days) {
+      const ofDay = done.filter(x => x.day === d);
+      if (days.length > 1 || from !== to) { nodes.push(h("h3", { style: "font-size:13px;margin:12px 0 4px" }, fmtDate(d, true))); lines.push(fmtDate(d, true) + ":"); }
+      for (const x of ofDay) {
+        lines.push("• " + (x.t ? taskKey(x.t) + " " + x.t.title : "A task") + " (" + x.w.toLowerCase() + ")");
+        nodes.push(h("button", { type: "button", style: "display:flex;gap:10px;align-items:center;width:100%;text-align:left;padding:8px 6px;border:0;border-bottom:1px solid var(--line);background:none;cursor:pointer",
+          onclick: () => { if (x.t) { closeDlg(); openDevTask(x.t.id); } } },
+          h("span", { class: "muted", style: "width:62px;font-size:12.5px" }, new Date(x.e.at).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })),
+          h("span", { style: "flex:1" }, x.t ? h("span", {}, h("span", { class: "tkey" }, taskKey(x.t)), " ", x.t.title) : h("span", { class: "muted" }, "A task you can’t see any more")),
+          h("span", { class: "pill" }, x.w)));
+      }
+    }
+    out.replaceChildren(done.length ? h("div", {}, h("p", { class: "muted", style: "margin:0 0 6px" }, done.length + " finished · " + rangeLabel(from, to)), ...nodes)
+      : h("p", { class: "nothing" }, "Nothing finished · " + rangeLabel(from, to) + "."));
   };
-  dateIn.addEventListener("change", () => { day = dateIn.value || today(); draw(); });
+  const setRange = (f, t) => { if (t < f) [f, t] = [t, f]; from = f; to = t; fIn.value = f; tIn.value = t; draw(); };
+  fIn.addEventListener("change", () => fIn.value && setRange(fIn.value, tIn.value || fIn.value));
+  tIn.addEventListener("change", () => tIn.value && setRange(fIn.value || tIn.value, tIn.value));
   if (whoSel) whoSel.addEventListener("change", () => { who = whoSel.value; draw(); });
+  const quick = segmented(DONE_RANGES, "", k => { const [f, t] = doneRange(k); setRange(f, t); });
   const copy = h("button", { type: "button", class: "btn", onclick: () => copyText(lines.length ? lines.join("\n") : "Nothing finished.", "Copied for the scrum") }, "Copy list");
-  openDialog("Done on a day", [h("div", { style: "display:flex;gap:8px;flex-wrap:wrap;align-items:center" }, quick, dateIn, whoSel), out],
+  openDialog("What was finished", [h("div", { style: "display:flex;gap:8px;flex-wrap:wrap;align-items:center" }, quick, fIn, h("span", { class: "muted" }, "to"), tIn, whoSel), out],
     [h("span", { class: "sp" }), copy, h("button", { type: "button", class: "btn pri", onclick: closeDlg }, "Close")]);
   draw();
 }
@@ -13739,7 +13786,7 @@ function devBoard(u){
   const s = (u.q || "").toLowerCase(), since = Date.now() - DONE_DAYS * 864e5;
   // "Archived" shows only archived work (all of it, however long ago it was done); otherwise archived work stays hidden
   const pool = u.archived ? (S.cache.tasks || []).filter(t => t.archived && t.vertical === "Development" && t.type !== "Epic") : devTasks();
-  const list = pool.filter(t => (u.archived || t.status !== "Done" || +new Date(t.completed_at || t.updated_at || 0) >= since)
+  const list = pool.filter(t => (u.archived || u.done || t.status !== "Done" || +new Date(t.completed_at || t.updated_at || 0) >= since)
     && (!s || (taskKey(t) + " " + t.title).toLowerCase().includes(s))
     && (!u.who || ownersOf(t).includes(u.who) || t.tester_id === u.who)
     && (!u.mine || isOwner(t) || t.tester_id === S.me.id)
@@ -13747,7 +13794,8 @@ function devBoard(u){
     && (!u.undev || (t.status !== "Done" && t.status !== "In review" && !ownersOf(t).length))
     && (!u.unqa || (t.status === "In review" && !t.tester_id))
     && (!u.project || (u.project === "none" ? !t.project_id : t.project_id === u.project))
-    && dueMatch(t, u.due))
+    && dueMatch(t, u.due)
+    && (!u.done || (u.doneIds && u.doneIds.has(t.id))))   // (2026-11ep) "Done by me": what was finished in the range
     .sort(boardOrder);
   const board = h("div", { class: "dv-board" });
   for (const c of devColumns()){
