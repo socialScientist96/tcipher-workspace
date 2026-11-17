@@ -748,9 +748,9 @@ dialog[open]::backdrop{animation:fadeIn .16s ease-out}
 .dv-tabsbar{display:flex;gap:22px;border-bottom:1px solid var(--line);margin:0 0 16px}
 .dv-tabsbar a{padding:10px 0;color:var(--ink2);text-decoration:none;font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px}
 .dv-tabsbar a.on{color:var(--p);border-bottom-color:var(--p)}
-.dv-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.dv-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
 .dv-toolbar .grow,.dv-foot .grow,.dv-brow .grow,.dv-bh .grow,.dv-crow .grow{flex:1}
-.dv-search{max-width:220px}
+.dv-search{max-width:160px}
 .dv-faces{display:flex}
 .dv-face{border:2px solid var(--white);border-radius:50%;padding:0;background:var(--white);cursor:pointer;line-height:0;margin-left:-4px}
 .dv-face:first-child{margin-left:0}
@@ -2373,7 +2373,7 @@ dialog:has(.ai-imp) {width:min(1100px,calc(100vw - 24px))}
 .dv-empty{font-size:13px;color:var(--ink3);margin:6px 6px 10px}
 
 /* board toolbar: person dropdown and unassigned filters (2026-11cs) */
-.dv-who{width:auto;min-width:170px;max-width:240px}
+.dv-who{width:auto;min-width:118px;max-width:150px}   /* (2026-11eq) the toolbar fits on one row on a laptop */
 .dv-chipn{display:inline-block;margin-left:6px;min-width:18px;padding:0 6px;border-radius:999px;background:var(--tint2);font-size:12px;line-height:18px;text-align:center}
 .dv-chipn.warn{background:#FFEDD5;color:#9A3412}
 .dv-chip.on .dv-chipn{background:rgba(255,255,255,.25);color:inherit}
@@ -12535,7 +12535,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ep";
+const APP_VERSION = "2026-11eq";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -13682,10 +13682,15 @@ async function renderDevBoard(el){
   const dueSel = h("select", { class: "in dv-who", "aria-label": "Show tasks by due date", onchange: e => { u.due = e.target.value; rerender(); } },
     [["", "Any due date"], ["now", "Due today or overdue"], ["today", "Due today"], ["overdue", "Overdue"], ["week", "Due in the next 7 days"], ["later", "Due later"], ["none", "No due date"]]
       .map(([v, l]) => h("option", { value: v, selected: (u.due || "") === v }, l)));
+  // (2026-11eq) unassigned and archived work: one dropdown instead of three chips, so the toolbar fits one row
+  const showNow = u.undev ? "undev" : u.unqa ? "unqa" : u.archived ? "archived" : "";
+  const showSel = h("select", { class: "in dv-who" + (showNow ? " on" : ""), "aria-label": "Show", title: "Unfinished tasks with no owner, tasks in QA with no tester, or archived work",
+    onchange: e => { const v = e.target.value; u.undev = v === "undev"; u.unqa = v === "unqa"; u.archived = v === "archived"; rerender(); } },
+    [["", "All work"], ["undev", "Unassigned Dev (" + nDev + ")"], ["unqa", "Unassigned QA (" + nQA + ")"], ["archived", "Archived"]].map(([v, l]) => h("option", { value: v, selected: showNow === v }, l)));
   el.append(h("div", { class: "dv-toolbar" }, q, whoSel, projSel, dueSel,
     h("button", { type: "button", class: "dv-chip" + (u.done ? " on" : ""), "aria-pressed": String(!!u.done), title: "Show only what you finished on a day or in a date range: for the scrum",
       onclick: () => { if (u.done) { u.done = null; u.doneIds = null; u.doneKey = null; } else { const [f, t] = doneRange("today"); u.done = { from: f, to: t, k: "today" }; } rerender(); } }, ic("checkSquare", 14), " Done by me"),
-    chip("mine", "Only my work"), unChip("undev", "Unassigned Dev", nDev), unChip("unqa", "Unassigned QA", nQA), chip("archived", "Archived")), ...(u.done ? [doneBar(u)] : []), body);
+    chip("mine", "Only my work"), showSel), ...(u.done ? [doneBar(u)] : []), body);
   draw();
   if (u.done) loadDoneFilter(u);
 }
