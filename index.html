@@ -3768,6 +3768,16 @@ async function renderAdminStorage(el){
       !(f1.shared_drive && f2.shared_drive) ? h("p", { class: "tipline" }, "Recommended: in Google Drive, create a Shared drive called “Tcipher Workspace”, add only admins, and drag both folders into it. The company then owns the files, not one person’s account. The workspace keeps working; nothing needs changing here.") : null,
       h("p", { class: "muted", style: "font-size:12.5px;margin:8px 0 0" }, "Keep these folders private. Anyone who can open them can open every proposal and offer letter in them."),
       h("label", { class: "chk", style: "margin-top:10px" }, toggle, "Store new uploads in Google Drive"),
+      // (2026-11en) task videos play in Google Drive's player: each one is shared with tcipher.com as it's added
+      h("div", { class: "panel", style: "margin-top:12px;background:var(--tint);border-color:transparent" },
+        h("b", {}, "Task videos play in Google Drive"), h("p", { class: "muted", style: "font-size:13px;margin:4px 0 8px" },
+          "Each video added to a task is shared on its own with tcipher.com (anyone signed in with a tcipher.com Google account who has its link can view it). Google streams it, so it uses none of the workspace’s data. Everything else in the folder stays private."),
+        h("button", { type: "button", class: "btn sm", onclick: async e => {
+          if (!confirm("Share the task videos uploaded before this change with tcipher.com, the same way?")) return;
+          e.currentTarget.disabled = true;
+          try { const r = await filesFn("share_videos", ""); toast(r.shared + " video" + (r.shared === 1 ? "" : "s") + " shared" + (r.failed ? ", " + r.failed + " couldn’t be (Google refused)" : "") + "."); }
+          catch (err) { fail(err, "Not shared"); }
+        } }, "Share older task videos")),
       h("div", { style: "margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap" }, moveBtn,
         h("span", { class: "muted", style: "font-size:12.5px" }, u.supabase_files > 0 ? u.supabase_files + " file" + (u.supabase_files === 1 ? "" : "s") + " still in Supabase" : "Nothing left in Supabase."), connectBtn),
       progress].filter(Boolean));
@@ -5287,6 +5297,10 @@ function filesSection(tbl, id, canUpload){
             () => img.replaceWith(h("span", { class: "fthumb-none" }, ic("file", 22), h("span", {}, "Preview unavailable"))));
           gal.append(h("figure", { class: "ftile" }, h("button", { type: "button", class: "fthumb", title: "Open " + f.name, onclick: () => openStored(f) }, img),
             h("figcaption", {}, h("span", { class: "fn", title: f.name }, f.name), h("span", { class: "fs" }, who), h("span", { class: "fact" }, h("button", { type: "button", class: "btn sm ghost", onclick: () => downloadFile(f) }, "Download"), delBtn(f)))));
+        } else if (k === "video" && driveVideo(f)) {
+          // (2026-11en) a task video shared with tcipher.com plays in Google Drive's own player: Google streams it, no workspace data used
+          gal.append(h("figure", { class: "ftile video" }, driveVideoPlayer(f),
+            h("figcaption", {}, h("span", { class: "fn", title: f.name }, f.name), h("span", { class: "fs" }, who), h("span", { class: "fact" }, h("button", { type: "button", class: "btn sm ghost", onclick: () => downloadFile(f) }, "Download"), delBtn(f)))));
         } else if (k === "video" || k === "audio") {
           const media = h(k, { controls: true, preload: "metadata", playsinline: true, class: k === "video" ? "fvideo" : "faudio" });
           mediaLink(f, true).then(u => { media.src = u; }, () => { media.replaceWith(h("p", { class: "err" }, "This " + k + " couldn’t be loaded.")); });
@@ -5325,6 +5339,23 @@ function filesSection(tbl, id, canUpload){
   sec._refresh = refresh; sec.dataset.live = "files";
   refresh();
   return sec;
+}
+/* (2026-11en) Task videos shared with tcipher.com (files.drive_shared, set by the files function when a video is added to a task)
+   play in Google Drive's player. Needs the viewer signed in to Google with a tcipher.com account in this browser; if Google says
+   no, "Play here instead" loads the workspace's own player. Portal clients always use the workspace's player. */
+const driveVideo = f => !!(f && f.storage === "drive" && f.drive_shared && f.path && /^[\w-]{20,}$/.test(f.path) && S.me && !S.me.client_id);
+function driveVideoPlayer(f){
+  const box = h("div", { class: "fvideo", style: "position:relative;aspect-ratio:16/9;background:#000;border-radius:8px;overflow:hidden" },
+    h("iframe", { src: "https://drive.google.com/file/d/" + encodeURIComponent(f.path) + "/preview", allow: "autoplay; fullscreen", allowfullscreen: "", loading: "lazy", title: f.name,
+      style: "position:absolute;inset:0;width:100%;height:100%;border:0" }));
+  const own = h("button", { type: "button", class: "btn sm ghost", title: "If Google asks you to sign in or request access", onclick: () => {
+    const media = h("video", { controls: true, preload: "metadata", playsinline: true, class: "fvideo" });
+    mediaLink(f, true).then(u => { media.src = u; }, () => media.replaceWith(h("p", { class: "err" }, "This video couldn’t be loaded.")));
+    wrap.replaceWith(media);
+  } }, "Play here instead");
+  const wrap = h("div", {}, box, h("div", { style: "display:flex;gap:8px;margin-top:4px;font-size:12px" },
+    h("a", { href: "https://drive.google.com/file/d/" + encodeURIComponent(f.path) + "/view", target: "_blank", rel: "noopener", class: "btn sm ghost" }, "Open in Google Drive"), own));
+  return wrap;
 }
 // open a stored file in a new tab (images and PDFs show in the browser)
 async function openStored(f){
@@ -12437,7 +12468,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11em";
+const APP_VERSION = "2026-11en";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
