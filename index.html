@@ -952,6 +952,13 @@ dialog.dv-wide .dh .iconbtn{flex:none}
 .dv-step.on{background:#0C66E4;color:#fff}
 .dv-flowbtns{display:flex;gap:8px;flex-wrap:wrap}
 .dv-flowhead{display:none}   /* phones only (2026-11et) */
+/* (2026-11ev) who has it now, the handover confirmation, and QA's reason on top */
+.dv-now{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink)}
+.dv-handed{font-size:13px;font-weight:600;color:var(--ok);background:var(--ok-t);border-radius:6px;padding:6px 10px}
+.dv-qaback{border:1px solid var(--bad);background:var(--bad-t);border-radius:8px;padding:10px 12px;margin-bottom:12px;display:flex;flex-direction:column;gap:4px}
+.dv-qaback > b{color:var(--bad);font-size:13.5px}
+.dv-qaback-why{display:flex;flex-direction:column;gap:2px;white-space:pre-wrap;font-size:14px;color:var(--ink)}
+.dv-qaback-by{font-size:12px}
 .dv-backbox{display:flex;flex-direction:column;gap:8px}
 .dv-backnote{margin:0;font-size:13px;color:#AE2E24;font-weight:600}
 .dv-owners{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
@@ -12830,7 +12837,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11eu";
+const APP_VERSION = "2026-11ev";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -14110,7 +14117,7 @@ function devBoard(u){
     col.addEventListener("dragleave", e => { if (!col.contains(e.relatedTarget)) col.classList.remove("drop"); });
     col.addEventListener("drop", e => { e.preventDefault(); col.classList.remove("drop"); const t = devDrag && byId("tasks", devDrag); devDrag = null; if (!t) return;
       if (t.status !== st) { dropTo(t, st); return; }
-      if (c.stage && devStageOf(t) !== c.stage) { const j = flowOf(t).indexOf(c.stage); if (j < 0) { toast("This task’s flow has no " + c.stage + " stage."); return; } devSave(t, { flow_step: j }, "Moved to " + c.stage + "."); return; }
+      if (c.stage && devStageOf(t) !== c.stage) { const j = flowOf(t).indexOf(c.stage); if (j < 0) { toast("This task’s stages don’t include " + c.stage + "."); return; } devSave(t, { flow_step: j }, "Moved to " + c.stage + "."); return; }
       // the same column: it goes where it was dropped (2026-11cy)
       const others = items.filter(x => x.id !== t.id), cards = [...col.querySelectorAll(".dv-card")].filter(c => c.dataset.id !== t.id);
       let at = cards.findIndex(c => { const r = c.getBoundingClientRect(); return e.clientY < r.top + r.height / 2; }); if (at < 0) at = others.length;
@@ -14146,8 +14153,8 @@ function devPartBox(t, canEdit){
   const people = activePeople().filter(p => p.vertical === "Development" || ownersOf(t).includes(p.id)).sort((a, b) => a.full_name.localeCompare(b.full_name));
   const cur = flowOf(t), curKey = cur.join("|");
   const flows = taskFlows(); if (cur.length && !flows.some(f => f.join("|") === curKey)) flows.push(cur);
-  const sel = h("select", { class: "in sm", disabled: !canEdit, "aria-label": "Flow" }, h("option", { value: "" }, "No flow"), flows.map(f => h("option", { value: f.join("|"), selected: f.join("|") === curKey }, flowName(f))));
-  sel.addEventListener("change", () => devSave(t, { flow: sel.value ? sel.value.split("|") : [], flow_step: 0 }, sel.value ? "Flow set." : "Flow removed."));
+  const sel = h("select", { class: "in sm", disabled: !canEdit, "aria-label": "Stages" }, h("option", { value: "" }, "No stages"), flows.map(f => h("option", { value: f.join("|"), selected: f.join("|") === curKey }, flowName(f))));
+  sel.addEventListener("change", () => devSave(t, { flow: sel.value ? sel.value.split("|") : [], flow_step: 0 }, sel.value ? "Stages set." : "Stages removed."));
   const pickDev = g => {
     const s2 = h("select", { class: "in sm", disabled: !canEdit, "aria-label": g + " developer" }, h("option", { value: "" }, "Choose…"), people.map(p => h("option", { value: p.id, selected: (t.stage_devs || {})[g] === p.id }, p.full_name)));
     s2.addEventListener("change", () => {
@@ -14156,18 +14163,43 @@ function devPartBox(t, canEdit){
       const patch = { stage_devs: devs };
       if (id && !ownersOf(t).includes(id)) patch.collaborators = [...new Set([...(t.collaborators || []), id])];   // they can then move the task along
       devSave(t, patch, "Saved.");
-      if (id && id !== S.me.id) notify([id], "You’re on " + g + " for " + taskKey(t) + " " + t.title, "Flow: " + flowName(flowOf(t)), "tasks", t.id);
+      if (id && id !== S.me.id) notify([id], "You’re on " + g + " for " + taskKey(t) + " " + t.title, "Stages: " + flowName(flowOf(t)), "tasks", t.id);
     });
     return h("label", { class: "fl", style: "flex:1;min-width:150px" }, g + " developer", s2);
   };
   return h("div", { class: "dv-part", style: "display:flex;gap:10px;flex-wrap:wrap;margin:8px 0" },
-    h("label", { class: "fl", style: "flex:1 1 100%" }, "Flow", sel), ...cur.map(pickDev));
+    h("label", { class: "fl", style: "flex:1 1 100%" }, h("span", {}, "Stages ", h("span", { class: "muted", style: "font-weight:400" }, "(the steps before QA, one developer each)")), sel), ...cur.map(pickDev));
+}
+// (2026-11ev) who has the task right now: the stage's developer, the tester, or the owners
+function devNowWith(t){
+  const fl = flowOf(t), at = Math.min(+t.flow_step || 0, Math.max(fl.length - 1, 0)), stg = devStageOf(t);
+  if (t.status === "To do") { const o = ownersOf(t); return { ids: o, text: o.length ? "Not started yet · " + o.map(pname).join(", ") : "Not started yet · no owner" }; }
+  if (t.status === "In progress") { const turn = turnOf(t), ids = turn ? [turn] : ownersOf(t);
+    return { ids, text: (ids.length ? "Now with " + ids.map(pname).join(", ") : "No one is on it") + (stg ? " · " + stg + (fl.length > 1 ? " (stage " + (at + 1) + " of " + fl.length + ")" : "") : "") }; }
+  if (t.status === "In review") return t.tester_id ? { ids: [t.tester_id], text: "Now with " + pname(t.tester_id) + " · testing" } : { ids: [], text: "In QA · waiting for a tester" };
+  return { ids: [], text: "" };
+}
+// (2026-11ev) QA's reason for sending it back, at the top of the task until it goes to QA again
+function qaBackBox(t){
+  const why = h("div", { class: "dv-qaback-why" }, "Loading the reason…");
+  (async () => {
+    try {
+      const c = ok(await sb.from("comments").select("body,author_id,created_at").eq("tbl", "tasks").eq("entity_id", t.id).like("body", "Sent back to development:%").order("created_at", { ascending: false }).limit(1).maybeSingle());
+      why.replaceChildren(...[c ? h("span", {}, String(c.body).replace(/^Sent back to development:\s*/, "")) : h("span", { class: "muted" }, "No reason was written."),
+        c ? h("span", { class: "muted dv-qaback-by" }, (pname(c.author_id) || "QA") + " · " + fmtAgo(c.created_at)) : null].filter(Boolean));
+    } catch (e) { why.textContent = "See Comments for the reason."; }
+  })();
+  return h("div", { class: "dv-qaback", role: "note" }, h("b", {}, "↩ Sent back by QA" + (t.reopen_count > 1 ? " (" + t.reopen_count + " times)" : "")), why);
 }
 // hand the task to the next stage (or back to the one before)
 async function stageMove(t, dir){
   const f = flowOf(t), i = Math.min(+t.flow_step || 0, f.length - 1), j = i + dir;
   if (j < 0 || j >= f.length) return;
-  await devSave(t, { flow_step: j }, dir > 0 ? f[i] + " done. Over to " + f[j] + "." : "Back to " + f[j] + ".");
+  const nextDev = (t.stage_devs || {})[f[j]], who = nextDev ? " (" + pname(nextDev).split(" ")[0] + ")" : "";
+  const said = dir > 0 ? "Handed to " + f[j] + who + "." : "Back to " + f[j] + who + ".";
+  S.stageJust = { id: t.id, until: Date.now() + 2500, text: said };   // (2026-11ev) shown on the task; the next buttons wait 2.5 s
+  setTimeout(() => { if (S.stageJust && S.stageJust.id === t.id && Date.now() >= S.stageJust.until) { S.stageJust = null; if (S.devOpen === t.id && dlg().open) drawDevTask(t.id); } }, 2600);
+  await devSave(t, { flow_step: j }, said);
   if (dir > 0) { const next = (t.stage_devs || {})[f[j]]; const to = (next ? [next] : ownersOf(t)).filter(x => x !== S.me.id);
     if (to.length) notify(to, f[i] + " done: " + taskKey(t) + " " + t.title, "It’s your turn for " + f[j] + ".", "tasks", t.id); }
 }
@@ -14243,14 +14275,14 @@ function taskCreate(preset){
     openRecord("projects", null, {}, { onSaved: row => { taskCreate(Object.assign({}, preset, { title: back.title, description: back.notes, project_id: row && row.id })); } }); });
   const projRow = h("label", { class: "fl", id: "taskNewProjectRow" }, h("span", {}, "Project ", h("span", { class: "muted", style: "font-weight:400" }, "(optional)")), proj);
   // (2026-11ep) the flow and a developer per stage, right when the task is made (Development)
-  const flowSel = h("select", { class: "in", id: "taskNewFlow" }, h("option", { value: "" }, "No flow"), taskFlows().map(f => h("option", { value: f.join("|"), selected: (preset.flow || []).join("|") === f.join("|") }, flowName(f))));
+  const flowSel = h("select", { class: "in", id: "taskNewFlow" }, h("option", { value: "" }, "No stages"), taskFlows().map(f => h("option", { value: f.join("|"), selected: (preset.flow || []).join("|") === f.join("|") }, flowName(f))));
   const stageBox = h("div", { style: "display:flex;gap:10px;flex-wrap:wrap;width:100%" }), stageSel = {};
   const devPeople = activePeople().filter(p => p.vertical === "Development").sort((a, b) => a.full_name.localeCompare(b.full_name));
   const drawStages = () => stageBox.replaceChildren(...(flowSel.value ? flowSel.value.split("|") : []).map(g => {
     const sel = stageSel[g] || (stageSel[g] = h("select", { class: "in", "aria-label": g + " developer" }, h("option", { value: "" }, "Choose…"), devPeople.map(p => h("option", { value: p.id, selected: ((preset.stage_devs || {})[g]) === p.id }, p.full_name))));
     return h("label", { class: "fl", style: "flex:1;min-width:150px" }, g + " developer", sel); }));
   flowSel.addEventListener("change", drawStages); drawStages();
-  const flowRow = h("div", { class: "fl full", id: "taskNewFlowRow" }, h("label", { class: "fl" }, h("span", {}, "Flow ", h("span", { class: "muted", style: "font-weight:400" }, "(optional: the stages before QA)")), flowSel), stageBox);
+  const flowRow = h("div", { class: "fl full", id: "taskNewFlowRow" }, h("label", { class: "fl" }, h("span", {}, "Stages ", h("span", { class: "muted", style: "font-weight:400" }, "(optional: the steps before QA)")), flowSel), stageBox);
   const showProj = () => { projRow.hidden = flowRow.hidden = (vertical ? vertical.value : startV) !== "Development"; };
   if (vertical) vertical.addEventListener("change", showProj); showProj();
   const err = h("p", { class: "err", hidden: true });
@@ -14363,7 +14395,7 @@ function drawDevTask(id){
   const right = h("div", { class: "dv-right" }, aiTaskButtons(t, devCanEdit(t, "title")), flowBox(t), devPeople(t), projBox,
     h("div", { class: "dv-stamp" }, h("span", {}, "Created " + fmtAgo(t.created_at) + (t.created_by ? " by " + pname(t.created_by) : "")), t.updated_at ? h("span", {}, "Updated " + fmtAgo(t.updated_at)) : null,
       devCanEdit(t, "title") ? h("button", { type: "button", class: "linkbtn", id: "devMore", onclick: () => openRecord("tasks", t.id, null, { form: true }) }, "Edit all fields") : null));
-  openDialog("", [devTitle(t), h("div", { class: "dv-view" }, left, right)], null);
+  openDialog("", [devTitle(t), t.status === "In progress" && t.qa_state === "Failed" ? qaBackBox(t) : null, h("div", { class: "dv-view" }, left, right)].filter(Boolean), null);   // (2026-11ev) QA's reason above both columns
   const d = dlg(); d.classList.add("dv-wide");
   const crumbs = h("div", { class: "dv-crumbs" }, h("span", { class: "dv-key" }, taskKey(t)), flowLoz(t.status));
   const dh = d.querySelector(".dh"), h2 = dh && dh.querySelector("h2"); if (h2) h2.replaceWith(crumbs);
@@ -14377,6 +14409,7 @@ function drawDevTask(id){
     const PRI = ["Critical", "High", "Medium", "Low"];
     const mb = h("button", { type: "button", class: "iconbtn", "aria-label": "More actions", id: "devMenuBtn", onclick: e => { e.stopPropagation(); nbMenu(mb, [
       devCanEdit(t, "priority") ? [h("span", {}, ic("flag", 16), "Priority"), null, { sub: () => PRI.map(p => [h("span", {}, p, t.priority === p ? h("span", { class: "nb-tick" }, "✓") : null), () => devSave(t, { priority: p }, "Priority: " + p + ".")]), subHeading: "Priority" }] : null,
+      t.status === "To do" && (isOwner(t) || isAdmin()) ? [h("span", {}, ic("send", 16), "Skip straight to QA"), () => { if (confirm("Move " + taskKey(t) + " straight to QA without starting it?")) flowStep(t, "to_qa", null, "Moved to QA."); }] : null,
       [h("span", {}, ic("copy", 16), "Copy ID and title"), () => copyText(taskKey(t) + " " + t.title, "Copied")],
       [h("span", {}, ic("share", 16), "Copy link"), () => copyText(location.origin + location.pathname + "#open/tasks/" + t.id, "Link copied")],
       [h("span", {}, ic("sparkle", 16), "Summarize"), () => taskSummary(t)],
@@ -14405,25 +14438,31 @@ function flowBox(t){
   box.append(steps);
   // (2026-11et) on phones the panel is pinned at the bottom of the task: it folds down to one "Flow" bar (remembered on this device)
   { const stg = t.status === "In progress" && typeof devStageOf === "function" ? devStageOf(t) : "";
+    const nowWho = devNowWith(t);
     const shut = () => { try { return localStorage.getItem("tc_flow_open") !== "1"; } catch (e) { return true; } };
     const tog = h("button", { type: "button", class: "btn sm dv-flowtog", "aria-expanded": "false" });
     const set = closed => { box.classList.toggle("folded", closed); tog.setAttribute("aria-expanded", String(!closed)); tog.replaceChildren(ic(closed ? "arrowUp" : "arrowDown", 14), closed ? "Expand" : "Collapse"); };
     tog.onclick = () => { const closed = !box.classList.contains("folded"); try { localStorage.setItem("tc_flow_open", closed ? "0" : "1"); } catch (e) {} set(closed); };
-    box.prepend(h("div", { class: "dv-flowhead" }, h("b", {}, "Flow"), h("span", { class: "muted" }, t.status + (stg ? " · " + stg : "")), tog));
+    const sum = t.status === "In progress" && t.qa_state === "Failed" ? "Sent back by QA" : [FLOW_LABEL[t.status] || t.status, stg, nowWho.ids.length ? nowWho.ids.map(id => pname(id).split(" ")[0]).join(", ") : ""].filter(Boolean).join(" · ");
+    box.prepend(h("div", { class: "dv-flowhead" }, h("b", {}, "Flow"), h("span", { class: "muted" }, sum), tog));
     set(shut()); }
+  // (2026-11ev) who has it right now, in one line (the Owners list below can be long)
+  { const nw = devNowWith(t); if (nw.text) box.append(h("div", { class: "dv-now" }, nw.ids.length ? faces(nw.ids) : null, h("span", {}, nw.text))); }
+  // (2026-11ev) just handed over: say so, and the next stage's buttons wait a moment (a second press skipped a stage)
+  const just = S.stageJust && S.stageJust.id === t.id && Date.now() < S.stageJust.until ? S.stageJust : null;
+  if (just) box.append(h("div", { class: "dv-handed", role: "status" }, "✓ " + just.text));
   if (["To do", "In progress"].includes(t.status) && t.vertical === "Development" && "flow" in t) box.append(devPartBox(t, owner || isTaskHandler(t.vertical) || t.created_by === S.me.id));
   const row = h("div", { class: "dv-flowbtns" });
   let note = "";
   if (t.status === "To do") {
-    if (owner) row.append(btn("Start", "pri", "devStart", () => flowStep(t, "start", null, "Started.")), btn("Move to QA", "", "devToQA", () => flowStep(t, "to_qa", null, "Moved to QA.")));
-    else note = "Waiting for " + (ownersOf(t).map(pname).join(", ") || "an owner") + " to start.";
+    if (owner) row.append(btn("Start", "pri", "devStart", () => flowStep(t, "start", null, "Started.")));   // (2026-11ev) skipping straight to QA is in the … menu
   } else if (t.status === "In progress") {
-    if (t.qa_state === "Failed") box.append(h("p", { class: "dv-backnote" }, "↩ Sent back by QA. See the reason in Comments."));
+    if (t.qa_state === "Failed") box.append(h("p", { class: "dv-backnote" }, "↩ Sent back by QA. The reason is at the top of the task."));
     const stg = devStageOf(t), fl = flowOf(t), at = Math.min(+t.flow_step || 0, Math.max(fl.length - 1, 0));
-    if (owner && at > 0) row.append(btn("Back to " + fl[at - 1], "ghost", "devStageBack", () => stageMove(t, -1)));
-    if (owner && fl.length > 1 && at < fl.length - 1) row.append(btn(stg + " done → " + fl[at + 1], "pri", "devStageNext", () => stageMove(t, 1)));
-    else if (owner) row.append(btn("Move to QA", "pri", "devToQA", () => flowStep(t, "to_qa", null, "Moved to QA.")));
-    else note = "Being built by " + ((turnOf(t) ? [turnOf(t)] : ownersOf(t)).map(pname).join(", ") || "its owners") + (stg ? " (" + stg + ")" : "") + ".";
+    const wait = b => { if (just) { b.disabled = true; b.__tcLast = just.until; setTimeout(() => { b.disabled = false; }, Math.max(0, just.until - Date.now())); } return b; };
+    if (owner && at > 0) row.append(wait(btn("Back to " + fl[at - 1], "ghost", "devStageBack", () => stageMove(t, -1))));
+    if (owner && fl.length > 1 && at < fl.length - 1) row.append(wait(btn(stg + " done → " + fl[at + 1], "pri", "devStageNext", () => stageMove(t, 1))));
+    else if (owner) row.append(wait(btn("Move to QA", "pri", "devToQA", () => flowStep(t, "to_qa", null, "Moved to QA."))));
   } else if (t.status === "In review") {
     // an admin can always decide (the database allows it), even before a tester has picked it up
     if (!t.tester_id && isAdmin()) note = "No tester has picked this up yet. As an admin you can approve it or send it back yourself.";
@@ -15120,23 +15159,23 @@ function taskFlowsPanel(){
   const box = h("div");
   const parse = v => String(v || "").split(/\s*(?:→|->|>|,)\s*/).map(x => x.trim()).filter(Boolean).slice(0, 6);
   const draw = () => box.replaceChildren(...list.map((f, i) => {
-    const inp = h("input", { class: "in", value: f.join(" → "), placeholder: "e.g. Backend → Frontend → App", "aria-label": "Flow " + (i + 1) });
+    const inp = h("input", { class: "in", value: f.join(" → "), placeholder: "e.g. Backend → Frontend → App", "aria-label": "Stages " + (i + 1) });
     inp.addEventListener("input", () => { list[i] = parse(inp.value); });
-    return h("div", { style: "display:flex;gap:8px;margin:6px 0" }, inp, h("button", { type: "button", class: "btn sm ghost", title: "Remove this flow", onclick: () => { list.splice(i, 1); draw(); } }, ic("x")));
+    return h("div", { style: "display:flex;gap:8px;margin:6px 0" }, inp, h("button", { type: "button", class: "btn sm ghost", title: "Remove these stages", onclick: () => { list.splice(i, 1); draw(); } }, ic("x")));
   }));
   draw();
   const err = h("p", { class: "err", hidden: true });
-  const save = h("button", { type: "button", class: "btn pri" }, "Save flows");
+  const save = h("button", { type: "button", class: "btn pri" }, "Save stages");
   save.addEventListener("click", async () => {
     const clean = []; for (const f of list.map(f => f.filter(Boolean))) if (f.length && !clean.some(c => c.join("|") === f.join("|"))) clean.push(f);
     save.disabled = true; err.hidden = true;
-    try { const data = { ...(await latestSettings()), task_flows: clean }; ok(await sb.from("settings").upsert({ id: 1, data, updated_at: new Date().toISOString() })); S.settings = data; toast("Flows saved."); rerender(); }
+    try { const data = { ...(await latestSettings()), task_flows: clean }; ok(await sb.from("settings").upsert({ id: 1, data, updated_at: new Date().toISOString() })); S.settings = data; toast("Stages saved."); rerender(); }
     catch (e) { err.textContent = friendly(e); err.hidden = false; }
     save.disabled = false;
   });
-  return h("div", { class: "panel", style: "margin-top:16px" }, h("h2", {}, "Task flows (Development)"),
-    h("p", { class: "muted", style: "font-size:13px;margin:-4px 0 8px" }, "The stages a task goes through while In progress, in order, before QA. Each task picks one and gets a developer per stage; the board shows a column for each stage. Separate stages with →. Changing a flow here doesn’t change tasks that already use it."),
-    box, h("button", { type: "button", class: "btn sm", onclick: () => { list.push([]); draw(); } }, "+ Add flow"), err, h("div", { style: "margin-top:10px" }, save));
+  return h("div", { class: "panel", style: "margin-top:16px" }, h("h2", {}, "Task stages (Development)"),
+    h("p", { class: "muted", style: "font-size:13px;margin:-4px 0 8px" }, "The steps a task goes through while In progress, in order, before QA. Each task picks one set and gets a developer per stage; the board shows a column for each stage. Separate stages with →. Changing a set here doesn’t change tasks that already use it."),
+    box, h("button", { type: "button", class: "btn sm", onclick: () => { list.push([]); draw(); } }, "+ Add a set of stages"), err, h("div", { style: "margin-top:10px" }, save));
 }
 
 function renderAdminSettings(el){
