@@ -400,7 +400,7 @@ tr.unread-row td{background:#F5FBF7;font-weight:600}
 .bugbtn .bi{transform:rotate(90deg);font-size:14px}
 .bugbtn[hidden]{display:none}
 @media (max-width:760px){.bugbtn{display:none}}
-.side .bugnav{display:none}
+.side .bugnav{display:flex}   /* (2026-11fa) on laptops too, under Install the app */
 /* (2026-11ew) installing the app */
 .inst-tip{display:flex;align-items:center;gap:10px;padding:8px 10px 8px 12px;margin:0 0 14px;border:1px solid var(--line);border-radius:10px;background:var(--white);font-size:13.5px}
 .inst-tip img{border-radius:8px;flex:none}
@@ -1099,7 +1099,13 @@ dialog.lightbox::backdrop{background:#0B0A10}
 dialog.lightbox > .lb-stage{flex:1 1 auto!important;min-height:0!important;width:100%!important;max-height:none!important;display:grid;place-items:center;overflow:hidden;touch-action:none;padding-bottom:env(safe-area-inset-bottom,0px)}
 .lb-stage.zoomed{display:block;overflow:auto;touch-action:pan-x pan-y}
 .lb-img{max-width:100%;max-height:100%;object-fit:contain;user-select:none;-webkit-user-select:none}
-.lb-stage.zoomed .lb-img{max-width:none;max-height:none;height:auto;display:block}
+.lb-stage.zoomed .lb-img{max-width:none;max-height:none;height:auto;display:block;margin:0 auto}
+.lb-stage.zoomed{cursor:grab} .lb-stage.dragging{cursor:grabbing}
+/* (2026-11fa) zoom controls */
+.lb-tools{display:flex;align-items:center;gap:4px;flex:none}
+.lb-z{min-width:36px;padding:0 10px;font-size:13.5px}
+.lb-pct{min-width:46px;text-align:center;font-size:13px;color:rgba(255,255,255,.8);font-variant-numeric:tabular-nums}
+@media (max-width:760px){.lb-tools{display:none}.lb-dl{display:none}}
 .pwwrap{position:relative;display:block;width:100%}
 .pwwrap .in{padding-right:40px}
 .pweye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:32px;height:32px;display:grid;place-items:center;border:0;background:transparent;color:var(--ink3);border-radius:6px;cursor:pointer;padding:0}
@@ -11970,6 +11976,11 @@ async function openFileInTab(getUrl, a){
   // (2026-11eo) text files (.md, .txt, .csv, .json, code) open in a viewer inside the app: Markdown shows formatted.
   // The Android app couldn't open them at all (it has no second window and no app for them).
   if (textLike(a) && (+a.size || 0) <= 2 * 1048576) { await openTextViewer(getUrl, a); return; }
+  // (2026-11fa) pictures open in the in-app viewer (zoom, fit width, scroll), the same as in chat
+  if (/^image\/(png|jpe?g|gif|webp|avif|bmp)/i.test(a.mime || "") || (!a.mime && /\.(png|jpe?g|gif|webp|avif|bmp)$/i.test(a.name || ""))) {
+    await openImageViewer(a.name, () => (a.id && typeof cachedFileUrl === "function" ? cachedFileUrl(a, getUrl) : getUrl()), async () => { try { await saveFetched(await getUrl(), a.name, a.mime); } catch (e) { fail(e, "Download failed"); } });
+    return;
+  }
   // (2026-11dy) the Android app has one window: a "new tab" replaced the workspace itself. Save the file instead.
   if (IN_ANDROID_APP()) {
     try { const url = await getUrl(); if (!/^https:\/\//i.test(String(url || ""))) throw new Error("The file link isn’t a secure web address."); await saveFetched(url, a.name, a.mime); }
@@ -12045,35 +12056,67 @@ async function openTextViewer(getUrl, a){
       : h("pre", { style: "white-space:pre-wrap;word-break:break-word;font:13px/1.55 ui-monospace,Menlo,Consolas,monospace;background:var(--tint);padding:14px;border-radius:10px;margin:0" }, text));
   } catch (e) { box.replaceChildren(h("p", { class: "err" }, friendly(e))); }
 }
+// (2026-11fa) zoom that works on a laptop: buttons (−, Fit, Fit width, 100%, +), ⌘/Ctrl + scroll or a trackpad pinch to
+// zoom where the pointer is, normal scrolling when zoomed in, and the + − 0 keys. A tall screenshot opens at full width so
+// it can be scrolled. z = the picture's width as a share of the window's width; null = the whole picture fits.
 async function openImageViewer(name, getUrl, download){
   let url; try { url = typeof getUrl === "function" ? await getUrl() : getUrl; } catch (e) { fail(e, "Couldn’t open the picture"); return; }
   const old = document.getElementById("imgView"); if (old) { try { old.close(); } catch (e) {} old.remove(); }
   const img = h("img", { class: "lb-img", src: url, alt: name || "Picture", draggable: "false" });
   const stage = h("div", { class: "lb-stage" }, img);
-  let scale = 1;
-  const apply = (cx, cy) => {
-    const before = { x: stage.scrollLeft, y: stage.scrollTop, w: stage.scrollWidth || 1, h: stage.scrollHeight || 1 };
-    stage.classList.toggle("zoomed", scale > 1.01);
-    img.style.width = scale > 1.01 ? (scale * 100) + "%" : "";
-    if (scale > 1.01 && cx != null) {   // keep the point under the finger where it was
-      const r = stage.getBoundingClientRect(), fx = (before.x + cx - r.left) / before.w, fy = (before.y + cy - r.top) / before.h;
-      requestAnimationFrame(() => { stage.scrollLeft = fx * stage.scrollWidth - (cx - r.left); stage.scrollTop = fy * stage.scrollHeight - (cy - r.top); });
-    }
+  const pct = h("span", { class: "lb-pct", "aria-live": "polite" }, "");
+  let z = null;
+  const fitZ = () => { const W = stage.clientWidth || 1, H = stage.clientHeight || 1, nw = img.naturalWidth || W, nh = img.naturalHeight || H; return Math.min(nw, W, H * nw / nh) / W; };
+  const showPct = () => { const nw = img.naturalWidth; pct.textContent = nw ? Math.round(((z == null ? fitZ() : z) * stage.clientWidth / nw) * 100) + "%" : ""; };
+  const set = (nz, cx, cy) => {
+    const f = fitZ();
+    if (nz != null) nz = Math.min(Math.max(nz, f), Math.max(8 * f, 4));
+    if (nz != null && nz <= f * 1.01) nz = null;
+    const r = stage.getBoundingClientRect(), before = { x: stage.scrollLeft, y: stage.scrollTop, w: stage.scrollWidth || 1, h: stage.scrollHeight || 1 };
+    if (cx == null) { cx = r.left + r.width / 2; cy = r.top + r.height / 2; }
+    const fx = z == null ? 0.5 : (before.x + cx - r.left) / before.w, fy = z == null ? (cy - r.top) / (r.height || 1) : (before.y + cy - r.top) / before.h;
+    z = nz;
+    stage.classList.toggle("zoomed", z != null);
+    img.style.width = z != null ? (z * 100) + "%" : "";
+    if (z != null) requestAnimationFrame(() => { stage.scrollLeft = fx * stage.scrollWidth - (cx - r.left); stage.scrollTop = fy * stage.scrollHeight - (cy - r.top); });
+    showPct();
   };
-  stage.addEventListener("dblclick", e => { scale = scale > 1.01 ? 1 : 2.5; apply(e.clientX, e.clientY); });
-  // pinch with two fingers
-  const pts = new Map(); let pinch0 = 0, scale0 = 1;
-  stage.addEventListener("pointerdown", e => { pts.set(e.pointerId, e); if (pts.size === 2) { const [p1, p2] = [...pts.values()]; pinch0 = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY); scale0 = scale; } });
-  stage.addEventListener("pointermove", e => { if (!pts.has(e.pointerId)) return; pts.set(e.pointerId, e); if (pts.size === 2 && pinch0) { const [p1, p2] = [...pts.values()]; const d = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY); scale = Math.max(1, Math.min(5, scale0 * d / pinch0)); apply((p1.clientX + p2.clientX) / 2, (p1.clientY + p2.clientY) / 2); } });
+  const cur = () => z == null ? fitZ() : z;
+  const zoomBy = (k, cx, cy) => set(cur() * k, cx, cy);
+  stage.addEventListener("dblclick", e => set(z == null ? fitZ() * 2.5 : null, e.clientX, e.clientY));
+  // ⌘/Ctrl + scroll, and a trackpad pinch (which arrives as Ctrl + scroll), zoom where the pointer is; plain scrolling scrolls
+  stage.addEventListener("wheel", e => { if (!e.ctrlKey && !e.metaKey) return; e.preventDefault(); zoomBy(Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0025)), e.clientX, e.clientY); }, { passive: false });
+  // pinch with two fingers (touch screens)
+  const pts = new Map(); let pinch0 = 0, z0 = 1;
+  stage.addEventListener("pointerdown", e => { pts.set(e.pointerId, e); if (pts.size === 2) { const [p1, p2] = [...pts.values()]; pinch0 = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY); z0 = cur(); } });
+  stage.addEventListener("pointermove", e => { if (!pts.has(e.pointerId)) return; pts.set(e.pointerId, e); if (pts.size === 2 && pinch0) { const [p1, p2] = [...pts.values()]; const d = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY); set(z0 * d / pinch0, (p1.clientX + p2.clientX) / 2, (p1.clientY + p2.clientY) / 2); } });
   const up = e => { pts.delete(e.pointerId); if (pts.size < 2) pinch0 = 0; };
   stage.addEventListener("pointerup", up); stage.addEventListener("pointercancel", up);
+  // drag to move around a zoomed picture with the mouse
+  let drag = null;
+  stage.addEventListener("mousedown", e => { if (z == null || e.button !== 0) return; drag = { x: e.clientX, y: e.clientY, l: stage.scrollLeft, t: stage.scrollTop }; stage.classList.add("dragging"); e.preventDefault(); });
+  window.addEventListener("mousemove", e => { if (!drag) return; stage.scrollLeft = drag.l - (e.clientX - drag.x); stage.scrollTop = drag.t - (e.clientY - drag.y); });
+  window.addEventListener("mouseup", () => { drag = null; stage.classList.remove("dragging"); });
+  const b = (label, title, fn, icon) => h("button", { type: "button", class: "lb-btn lb-z", title, "aria-label": title, "data-multi": "1", onclick: fn }, icon ? ic(icon, 16) : null, label ? h("span", {}, label) : null);
+  const tools = h("div", { class: "lb-tools" },
+    b("−", "Zoom out (−)", () => zoomBy(1 / 1.25)), pct, b("+", "Zoom in (+)", () => zoomBy(1.25)),
+    b("Fit", "Show the whole picture (0)", () => set(null)), b("Fit width", "As wide as the window: scroll down to read", () => set(1)),
+    b("100%", "Actual size", () => set((img.naturalWidth || stage.clientWidth) / stage.clientWidth)));
   const v = h("dialog", { id: "imgView", class: "lightbox", "aria-label": name || "Picture" },
-    h("div", { class: "lb-bar" }, h("span", { class: "lb-name" }, name || ""),
-      download ? h("button", { type: "button", class: "lb-btn", onclick: download }, ic("download", 18), h("span", {}, "Download")) : null,
+    h("div", { class: "lb-bar" }, h("span", { class: "lb-name" }, name || ""), tools,
+      download ? h("button", { type: "button", class: "lb-btn", onclick: download }, ic("download", 18), h("span", { class: "lb-dl" }, "Download")) : null,
       h("button", { type: "button", class: "lb-btn lb-x", "aria-label": "Close", onclick: () => v.close() }, ic("x", 20))),
     stage);
-  v.addEventListener("close", () => v.remove());
+  const keys = e => { if (e.key === "+" || e.key === "=") { e.preventDefault(); zoomBy(1.25); } else if (e.key === "-" || e.key === "_") { e.preventDefault(); zoomBy(1 / 1.25); } else if (e.key === "0") { e.preventDefault(); set(null); } };
+  v.addEventListener("keydown", keys);
+  const onResize = () => { if (z != null && z < fitZ()) set(null); showPct(); };
+  window.addEventListener("resize", onResize);
+  v.addEventListener("close", () => { window.removeEventListener("resize", onResize); v.remove(); });
   document.body.append(v); v.showModal();
+  // a tall screenshot (much taller than the window) opens at full width, so it can be read by scrolling
+  const ready = () => { const W = stage.clientWidth, H = stage.clientHeight, nw = img.naturalWidth, nh = img.naturalHeight;
+    if (nw && nh && W && H && nh / nw > (H / W) * 1.6 && nw >= W * 0.6) { set(Math.min(1, nw / W)); requestAnimationFrame(() => { stage.scrollTop = 0; }); } else showPct(); };
+  if (img.complete && img.naturalWidth) ready(); else img.addEventListener("load", ready, { once: true });
 }
 async function openChatFile(a, download){
   try {
@@ -12995,7 +13038,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ez";
+const APP_VERSION = "2026-11fa";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
