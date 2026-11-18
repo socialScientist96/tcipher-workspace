@@ -9,6 +9,11 @@
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#6450F5">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Tcipher">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="application-name" content="Tcipher">
 <!-- Browser security policy: the only sites this page may load code from or send data to (blocks a stolen
      session being sent elsewhere). Add a site here before using it in the code. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://pfdnziybqaumnofjknsj.supabase.co https://*.googleusercontent.com https://www.googleapis.com https://drive.google.com https://accounts.google.com; media-src 'self' data: blob: https://pfdnziybqaumnofjknsj.supabase.co https://*.googleusercontent.com https://www.googleapis.com https://drive.google.com; connect-src 'self' https://challenges.cloudflare.com https://pfdnziybqaumnofjknsj.supabase.co wss://pfdnziybqaumnofjknsj.supabase.co https://accounts.google.com https://www.googleapis.com https://*.googleusercontent.com https://drive.google.com https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://fonts.googleapis.com https://fonts.gstatic.com; frame-src https://challenges.cloudflare.com https://accounts.google.com https://docs.google.com https://drive.google.com https://www.youtube-nocookie.com https://www.youtube.com; worker-src 'self' blob:; child-src 'self' blob: https://accounts.google.com; object-src 'none'; base-uri 'none'; form-action 'self'">
@@ -396,6 +401,12 @@ tr.unread-row td{background:#F5FBF7;font-weight:600}
 .bugbtn[hidden]{display:none}
 @media (max-width:760px){.bugbtn{display:none}}
 .side .bugnav{display:none}
+/* (2026-11ew) installing the app */
+.inst-tip{display:flex;align-items:center;gap:10px;padding:8px 10px 8px 12px;margin:0 0 14px;border:1px solid var(--line);border-radius:10px;background:var(--white);font-size:13.5px}
+.inst-tip img{border-radius:8px;flex:none}
+.inst-tip > span{flex:1;min-width:0}
+.inst-tip .iconbtn{width:30px;height:30px;border:0}
+.inst-steps{margin:0 0 6px;padding-left:20px;display:flex;flex-direction:column;gap:8px;line-height:1.5}
 @media (max-width:760px){.side .bugnav{display:flex}}
 @media print{.bugbtn{display:none}}
 .shotprev{display:flex;align-items:flex-end;gap:8px;margin-top:6px}
@@ -6224,6 +6235,7 @@ async function renderDashboard(el){
   // the page is titled by the day; check-in sits in a quiet card beside it
   const scope = S.me.vertical || (isAdmin() ? "All verticals" : "");
   el.append(h("div", { class: "hello has-hero" }, homeHero(t0, me, scope), attendanceWidget(true)));
+  { const tip = installTip(); if (tip) el.append(tip); }   // (2026-11ew)
 
   // everything on my plate, from every module
   const items = [];
@@ -10485,6 +10497,100 @@ if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("mess
   const d = e.data || {}; if (d.type !== "open" || !d.url) return;
   try { const u = new URL(d.url, location.href); if (u.origin === location.origin) { if (u.hash && u.hash !== location.hash) location.hash = u.hash; window.focus(); } } catch (err) {}
 });
+
+/* ---------- Install the app (2026-11ew) ----------
+   The workspace installs as an app on computers and phones: its own icon (Dock, Start menu, Home Screen), its own
+   window, and notifications even when the browser is closed. Chrome and Edge (Windows, Mac, Android) install it with
+   one click; Safari on the Mac uses File › Add to Dock, and iPhones use Share › Add to Home Screen (needed there for
+   notifications). It's the same workspace, so every update reaches it by itself. */
+let installEvt = null;
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; try { if (S.me) renderShell(); } catch (err) {} });
+window.addEventListener("appinstalled", () => { installEvt = null; try { localStorage.setItem("tc_install_tip", "done"); } catch (e) {} try { toast("Installed. Open Tcipher from your apps."); renderShell(); } catch (e) {} });
+const isStandalone = () => { try { return matchMedia("(display-mode: standalone)").matches || matchMedia("(display-mode: window-controls-overlay)").matches || navigator.standalone === true; } catch (e) { return false; } };
+// how this device installs it (null: it already is an app here, or it's one of our phone apps)
+function installKind(){
+  if (IN_IOS_APP() || IN_ANDROID_APP() || isStandalone()) return null;
+  const ua = navigator.userAgent;
+  if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return "ios";
+  if (installEvt) return "prompt";
+  if (/Android/.test(ua)) return "android";
+  if (/Firefox\//.test(ua)) return "firefox";
+  if (/Macintosh/.test(ua) && /Safari\//.test(ua) && !/Chrome|Chromium|Edg\//.test(ua)) return "mac-safari";
+  if (/Edg\//.test(ua)) return "edge";
+  return "chrome";
+}
+function openInstallDialog(){
+  const k = installKind();
+  if (!k) { toast(isStandalone() ? "You’re already using the app." : "This is already the Tcipher app."); return; }
+  const step = (n, ...txt) => h("li", {}, ...txt);
+  const icon = h("img", { src: "icons/icon-192.png?v=midnight", alt: "", width: 64, height: 64, style: "border-radius:15px;flex:none" });
+  const intro = h("div", { style: "display:flex;gap:14px;align-items:center;margin-bottom:12px" }, icon,
+    h("p", { style: "margin:0" }, "Get Tcipher as an app on this " + (k === "ios" ? (/iPad/.test(navigator.userAgent) ? "iPad" : "iPhone") : k === "android" ? "phone" : "computer") + ": its own icon, its own window, and notifications even when the browser is closed. It’s the same workspace and updates by itself."));
+  let body = [], foot = [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Close")];
+  if (k === "prompt") {
+    const go = h("button", { type: "button", class: "btn pri" }, ic("download", 15), "Install");
+    go.onclick = async () => { const e = installEvt; if (!e) { toast("Use the install button in the browser’s address bar."); return; } closeDlg(); try { await e.prompt(); const c = await e.userChoice; if (c && c.outcome === "accepted") { installEvt = null; renderShell(); } } catch (err) {} };
+    foot = [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Not now"), go];
+    body = [h("p", { class: "muted" }, "Your browser asks once. After that, open Tcipher from the Start menu, the Dock or Launchpad like any other app.")];
+  } else if (k === "ios") body = [h("ol", { class: "inst-steps" },
+      step(1, "Open this page in ", h("b", {}, "Safari"), " (it works from Chrome too, with its Share button)."),
+      step(2, "Tap the ", h("b", {}, "Share"), " button (the square with an arrow, at the bottom or top of the screen)."),
+      step(3, "Scroll down and tap ", h("b", {}, "Add to Home Screen"), ", then ", h("b", {}, "Add"), "."),
+      step(4, "Open ", h("b", {}, "Tcipher"), " from your Home Screen and tap ", h("b", {}, "Turn on notifications"), " when it asks. On iPhone, notifications only work from the Home Screen app."))];
+  else if (k === "mac-safari") body = [h("ol", { class: "inst-steps" },
+      step(1, "In the menu bar choose ", h("b", {}, "File › Add to Dock…"), " (or press the Share button › ", h("b", {}, "Add to Dock"), ")."),
+      step(2, "Click ", h("b", {}, "Add"), ". Tcipher appears in the Dock, Launchpad and the Applications folder."),
+      step(3, "Open it from the Dock and turn on notifications when it asks.")),
+    h("p", { class: "muted", style: "font-size:12.5px" }, "Needs macOS Sonoma or newer. On an older Mac, use Chrome or Edge, which install it with one click.")];
+  else if (k === "edge") body = [h("ol", { class: "inst-steps" },
+      step(1, "Click the ", h("b", {}, "App available"), " icon at the right of the address bar, or open the ", h("b", {}, "··· menu › Apps › Install this site as an app"), "."),
+      step(2, "Click ", h("b", {}, "Install"), ". Tcipher opens in its own window and is added to the Start menu (Windows) or Launchpad (Mac)."),
+      step(3, "Pin it to the taskbar or Dock if you like."))];
+  else if (k === "chrome") body = [h("ol", { class: "inst-steps" },
+      step(1, "Click the ", h("b", {}, "install"), " icon at the right of the address bar, or open the ", h("b", {}, "⋮ menu › Cast, save and share › Install page as app"), "."),
+      step(2, "Click ", h("b", {}, "Install"), ". Tcipher opens in its own window and is added to the Start menu (Windows) or Launchpad and Applications (Mac)."),
+      step(3, "Pin it to the taskbar or keep it in the Dock if you like."))];
+  else if (k === "android") body = [h("ol", { class: "inst-steps" },
+      step(1, "Open the browser’s ", h("b", {}, "⋮ menu"), " and choose ", h("b", {}, "Install app"), " (or ", h("b", {}, "Add to Home screen"), ")."),
+      step(2, "Or ask your admin for the Tcipher Android app, which does the same with phone notifications built in."))];
+  else body = [h("p", {}, "Firefox can’t install websites as apps. Open ", h("b", {}, "internal.tcipher.com"), " in Chrome or Edge (on a Mac, Safari works too) and install it from there.")];
+  openDialog("Install the Tcipher app", [intro, ...body], foot, true);
+}
+// a slim card on Home: install the app, or (inside the installed app) turn on notifications. Each can be dismissed.
+function installTip(){
+  const seen = k => { try { return localStorage.getItem(k); } catch (e) { return "x"; } };
+  const hide = (k, el) => { try { localStorage.setItem(k, "x"); } catch (e) {} el.remove(); };
+  if (isStandalone() && pushSupported() && !IN_IOS_APP() && notifPerm() === "default" && !seen("tc_app_push_tip")) {
+    const el = h("div", { class: "inst-tip" });
+    el.append(h("img", { src: "icons/icon-192.png?v=midnight", alt: "", width: 32, height: 32 }), h("span", {}, h("b", {}, "Turn on notifications "), "so messages, tags and tasks reach this app even when it’s closed."),
+      h("button", { type: "button", class: "btn sm pri", onclick: async () => { try { await enablePush(); toast("Notifications on. A test one is on its way."); hide("tc_app_push_tip", el); } catch (e) { toast(friendly(e)); } } }, "Turn on"),
+      h("button", { type: "button", class: "iconbtn", "aria-label": "Not now", onclick: () => hide("tc_app_push_tip", el) }, ic("x", 14)));
+    return el;
+  }
+  const k = installKind();
+  if (!k || k === "firefox" || k === "android" || seen("tc_install_tip")) return null;
+  const el = h("div", { class: "inst-tip" });
+  el.append(h("img", { src: "icons/icon-192.png?v=midnight", alt: "", width: 32, height: 32 }), h("span", {}, h("b", {}, "Get the Tcipher app. "), "Its own icon and window" + (k === "ios" ? ", and notifications on your iPhone." : ", and notifications even when the browser is closed.")),
+    h("button", { type: "button", class: "btn sm pri", onclick: () => openInstallDialog() }, k === "prompt" ? "Install" : "How"),
+    h("button", { type: "button", class: "iconbtn", "aria-label": "Not now", onclick: () => hide("tc_install_tip", el) }, ic("x", 14)));
+  return el;
+}
+
+// (2026-11ew) a test to all my devices, and what happened on each (Android app = Firebase, iPhone app = Apple, others = web push)
+async function pushTestReport(){
+  let data;
+  try { const r = await sb.functions.invoke("push", { body: { action: "test" } }); if (r.error) throw r.error; data = r.data || {}; }
+  catch (e) { toast("The push function isn’t set up yet."); return; }
+  if (!Array.isArray(data.devices)) { toast(data.sent ? "Test sent to " + data.sent + " device" + (data.sent === 1 ? "" : "s") + "." : "Nothing was sent. Turn notifications off and on again."); return; }
+  const via = k => k === "fcm" ? "Android app · Firebase" : String(k || "").startsWith("apns") ? "iPhone app · Apple" : "Web push";
+  const rowsEl = data.devices.length ? data.devices.map(d => h("div", { class: "row", style: "align-items:flex-start;cursor:default" },
+      pill(d.ok ? "Delivered" : d.gone ? "Removed" : "Failed", d.ok ? "ok" : "bad"),
+      h("span", { class: "x", style: "white-space:normal" }, h("b", {}, d.device || "Device"), h("br"), h("span", { class: "muted", style: "font-size:12.5px" }, via(d.kind) + (d.error ? " · " + d.error : d.gone ? " · this device no longer accepts notifications, so it was removed" : ""))))) 
+    : [h("p", { class: "nothing" }, "No devices have notifications turned on for your account.")];
+  openDialog("Test notification", [h("p", { class: "muted" }, "Sent to every device where you turned notifications on. Delivered means the notification service accepted it; it should appear within seconds."), ...rowsEl],
+    [h("span", { class: "sp" }), h("button", { type: "button", class: "btn", onclick: closeDlg }, "Close")], true);
+}
+
 function pushCard(){
   const box = h("div", { style: "display:flex;flex-direction:column;gap:8px" });
   const draw = async () => {
@@ -10496,7 +10602,7 @@ function pushCard(){
       try { if (on) { await disablePush(); toast("Notifications off on this device."); } else { await enablePush(); toast("Notifications on. A test one is on its way."); } }
       catch (e) { toast(friendly(e)); }
       draw(); });
-    const test = on ? h("button", { type: "button", class: "btn sm soft", onclick: async () => { try { const { data, error } = await sb.functions.invoke("push", { body: { action: "test" } }); if (error) throw error; toast(data && data.sent ? "Test sent." : "Nothing was sent. Turn notifications off and on again."); } catch (e) { toast("The push function isn’t set up yet."); } } }, "Send a test") : null;
+    const test = on ? h("button", { type: "button", class: "btn sm soft", onclick: () => pushTestReport() }, "Send a test") : null;
     box.replaceChildren(
       h("div", { style: "display:flex;align-items:center;gap:10px;flex-wrap:wrap" }, pill(on ? "On for this device" : blocked ? "Blocked in this browser" : "Off", on ? "ok" : blocked ? "bad" : ""), blocked ? null : btn, test),
       h("p", { class: "muted", style: "font-size:12.5px;margin:0" }, blocked ? "Allow notifications for this site in the browser’s settings (the icon left of the address), then come back here." : "Messages, tags, tasks and approvals pop up on this phone or computer, even when the workspace is closed. Muted chats stay quiet. Turn it on separately on each device."));
@@ -12837,7 +12943,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ev";
+const APP_VERSION = "2026-11ew";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -16216,6 +16322,7 @@ function renderShell(){
       h("span", { class: "chev", title: open ? "Close section" : "Open section", "aria-hidden": "true" }, ic("chevronRight", 16)));
     nav.append(h("div", { class: "nav-group coll" + (open ? " open" : "") }, head, body));
   }
+  if (installKind()) nav.append(h("div", { class: "nav-group instnav" }, h("a", { href: "#" + S.route, onclick: e => { e.preventDefault(); side.classList.remove("open"); openInstallDialog(); } }, h("span", { class: "nic" }, ic("download", 18)), h("span", { class: "nl" }, "Install the app"))));   // (2026-11ew)
   nav.append(h("div", { class: "nav-group bugnav" }, h("a", { href: "#" + S.route, onclick: e => { e.preventDefault(); side.classList.remove("open"); openReportDialog(); } }, h("span", { class: "nic" }, ic("bug", 18)), h("span", { class: "nl" }, "Report a problem"))));
   side.append(nav, h("div", { class: "foot" }, avatar(S.me.id),
     h("button", { type: "button", class: "who", style: "background:none;border:0;text-align:left;padding:0;cursor:pointer", onclick: openMyProfile, title: "My profile" },

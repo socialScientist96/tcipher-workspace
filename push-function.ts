@@ -106,31 +106,33 @@ async function sendFcm(s: Any, payload: Any): Promise<"ok" | "gone" | string> {
 const db = createClient(Deno.env.get("SUPABASE_URL")!, secretKey(), { auth: { persistSession: false, autoRefreshToken: false } });
 
 // send one message to every device of one person; devices that are gone (uninstalled, notifications blocked) are removed
-async function sendTo(userId: string, payload: Any) {
+// (2026-11ew) also returns what happened on each device, for the app's "Send a test" report
+async function sendTo(userId: string, payload: Any): Promise<{ sent: number; devices: Any[] }> {
   const { data: subs } = await db.from("push_subscriptions").select("*").eq("user_id", userId);
-  let sent = 0;
+  let sent = 0; const devices: Any[] = [];
+  const note = (s: Any, ok: boolean, error = "", gone = false) => devices.push({ kind: s.kind || "web", device: s.device || "", ok, error: String(error || "").slice(0, 200), gone });
   for (const s of subs ?? []) {
     if (String(s.kind || "web").startsWith("apns") || s.kind === "fcm") {
       try {
         const r = s.kind === "fcm" ? await sendFcm(s, payload) : await sendApns(s, payload);
-        if (r === "ok") { sent++; await db.from("push_subscriptions").update({ last_ok_at: new Date().toISOString(), last_error: "" }).eq("id", s.id); }
-        else if (r === "gone") await db.from("push_subscriptions").delete().eq("id", s.id);
-        else await db.from("push_subscriptions").update({ last_error: r.slice(0, 300) }).eq("id", s.id);
-      } catch (e) { await db.from("push_subscriptions").update({ last_error: String(e).slice(0, 300) }).eq("id", s.id); }
+        if (r === "ok") { sent++; note(s, true); await db.from("push_subscriptions").update({ last_ok_at: new Date().toISOString(), last_error: "" }).eq("id", s.id); }
+        else if (r === "gone") { note(s, false, "", true); await db.from("push_subscriptions").delete().eq("id", s.id); }
+        else { note(s, false, r); await db.from("push_subscriptions").update({ last_error: r.slice(0, 300) }).eq("id", s.id); }
+      } catch (e) { note(s, false, String(e)); await db.from("push_subscriptions").update({ last_error: String(e).slice(0, 300) }).eq("id", s.id); }
       continue;
     }
     try {
       await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(payload),
         { TTL: 6 * 3600, urgency: payload.urgent ? "high" : "normal", topic: String(payload.tag || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 32) || undefined });
-      sent++;
+      sent++; note(s, true);
       await db.from("push_subscriptions").update({ last_ok_at: new Date().toISOString(), last_error: "" }).eq("id", s.id);
     } catch (e: Any) {
-      const code = e && e.statusCode;
-      if (code === 404 || code === 410) await db.from("push_subscriptions").delete().eq("id", s.id);
-      else await db.from("push_subscriptions").update({ last_error: String((e && (e.body || e.message)) || e).slice(0, 300) }).eq("id", s.id);
+      const code = e && e.statusCode, msg = String((e && (e.body || e.message)) || e);
+      if (code === 404 || code === 410) { note(s, false, "", true); await db.from("push_subscriptions").delete().eq("id", s.id); }
+      else { note(s, false, msg); await db.from("push_subscriptions").update({ last_error: msg.slice(0, 300) }).eq("id", s.id); }
     }
   }
-  return sent;
+  return { sent, devices };
 }
 
 Deno.serve(async (req) => {
@@ -145,8 +147,10 @@ Deno.serve(async (req) => {
     const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
     const { data: who } = token ? await db.auth.getUser(token) : { data: null };
     if (!who?.user) return json({ error: "Sign in again." }, 401);
-    const n = await sendTo(who.user.id, { title: "Notifications are on", body: "This is how messages and updates from the Tcipher workspace will look.", url: APP_URL, tag: "test", urgent: true });
-    return json({ sent: n });
+    const r = await sendTo(who.user.id, { title: "Notifications are on", body: "This is how messages and updates from the Tcipher workspace will look.", url: APP_URL, tag: "test", urgent: true });
+    // without the Firebase key, Android phones are skipped: say so in the report
+    if (!Deno.env.get("FCM_SERVICE_ACCOUNT")) for (const d of r.devices) if (d.kind === "fcm" && !d.ok) d.error = "Firebase isn’t set up on the server (FCM_SERVICE_ACCOUNT secret missing)";
+    return json({ sent: r.sent, devices: r.devices });
   }
 
   if (!PUSH_SECRET || req.headers.get("x-push-secret") !== PUSH_SECRET) return json({ error: "Not allowed." }, 403);
@@ -163,7 +167,7 @@ Deno.serve(async (req) => {
   }
   const portal = !!(p.client_id && p.portal_active);
   const url = APP_URL + (n.tbl && n.entity_id ? (portal ? "#p/home" : "#open/" + encodeURIComponent(n.tbl) + "/" + encodeURIComponent(n.entity_id)) : "");
-  const sent = await sendTo(n.user_id, {
+  const { sent } = await sendTo(n.user_id, {
     title: String(n.title || "Tcipher workspace").slice(0, 120), body: String(n.body || "").slice(0, 240), url,
     // one notification per conversation (a newer message replaces the older one); one per item otherwise
     tag: n.tbl === "chat" ? "chat-" + n.entity_id : "n-" + (n.entity_id || n.id), urgent: n.tbl === "chat" || direct, id: n.id,
