@@ -10554,16 +10554,58 @@ function openInstallDialog(){
       step(1, "Open the browser’s ", h("b", {}, "⋮ menu"), " and choose ", h("b", {}, "Install app"), " (or ", h("b", {}, "Add to Home screen"), ")."),
       step(2, "Or ask your admin for the Tcipher Android app, which does the same with phone notifications built in."))];
   else body = [h("p", {}, "Firefox can’t install websites as apps. Open ", h("b", {}, "internal.tcipher.com"), " in Chrome or Edge (on a Mac, Safari works too) and install it from there.")];
-  openDialog("Install the Tcipher app", [intro, ...body], foot, true);
+  const notif = k === "firefox" ? null : h("div", { style: "margin-top:14px;padding-top:12px;border-top:1px solid var(--line)" }, h("b", {}, "Then turn on notifications"),
+    h("p", { class: "muted", style: "margin:4px 0 8px;font-size:13px" }, "Open Tcipher from your " + (k === "ios" ? "Home Screen" : k === "android" ? "home screen" : deviceOS() === "mac" ? "Dock or Launchpad" : "Start menu or taskbar") + " (not the browser tab):"),
+    h("ol", { class: "inst-steps" }, notifSteps()));
+  openDialog("Install the Tcipher app", [intro, ...body, notif].filter(Boolean), foot, true);
+}
+// (2026-11ez) notifications on this device: the steps people need, in their system's words
+function deviceOS(){
+  const ua = navigator.userAgent;
+  if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return "ios";
+  if (/Android/.test(ua)) return "android";
+  if (/Macintosh|Mac OS X/.test(ua)) return "mac";
+  if (/Windows/.test(ua)) return "windows";
+  return "other";
+}
+function browserName(){ const ua = navigator.userAgent; return /Edg\//.test(ua) ? "Microsoft Edge" : /Chrome\//.test(ua) ? "Google Chrome" : /Firefox\//.test(ua) ? "Firefox" : /Safari\//.test(ua) ? "Safari" : "your browser"; }
+function notifSteps(){
+  const os = deviceOS(), br = browserName(), li = (...x) => h("li", {}, ...x);
+  const first = li("In the app, tap ", h("b", {}, "Turn on notifications"), " (or your name at the bottom left › ", h("b", {}, "Phone and desktop notifications › Turn on"), "), then choose ", h("b", {}, "Allow"), ". A test notification arrives within seconds.");
+  if (os === "ios") return [first, li("If nothing arrives: iPhone ", h("b", {}, "Settings › Notifications › Tcipher"), " › turn on ", h("b", {}, "Allow Notifications"), ". Focus and Do Not Disturb hold them back.")];
+  if (os === "mac") return [first, li("If nothing arrives: ", h("b", {}, "System Settings › Notifications › " + (br === "Safari" ? "Tcipher Workspace" : br)), " › turn on ", h("b", {}, "Allow notifications"), " and pick ", h("b", {}, "Alerts"), " or ", h("b", {}, "Banners"), ". Focus holds them back."),
+    br !== "Safari" ? li("Keep " + br + " running: the Tcipher window can be closed, but if " + br + " is fully quit (⌘Q), notifications wait until it opens again.") : null].filter(Boolean);
+  if (os === "windows") return [first, li("If nothing arrives: ", h("b", {}, "Settings › System › Notifications"), " › turn on ", h("b", {}, br), " (and Notifications at the top). Do not disturb holds them back."),
+    li("So they come when the window is closed: in " + br + ", ", h("b", {}, br === "Microsoft Edge" ? "Settings › System and performance › Continue running background extensions and apps when Microsoft Edge is closed" : "Settings › System › Continue running background apps when Google Chrome is closed"), ".")];
+  if (os === "android") return [first, li("If nothing arrives: phone ", h("b", {}, "Settings › Apps › " + br + " (or Tcipher) › Notifications"), " › allow.")];
+  return [first];
+}
+// in the installed app: what to do, with the button right here
+function openNotifGuide(){
+  const on = notifPerm() === "granted", blocked = notifPerm() === "denied";
+  const go = h("button", { type: "button", class: "btn pri" }, on ? "Send a test" : "Turn on notifications");
+  go.onclick = async () => { go.disabled = true; try { if (on) await pushTestReport(); else { await enablePush(); toast("Notifications on. A test one is on its way."); closeDlg(); } } catch (e) { toast(friendly(e)); } go.disabled = false; };
+  openDialog("Turn on notifications", [
+    h("p", {}, "Messages, tags, tasks and approvals pop up on this " + (["ios", "android"].includes(deviceOS()) ? "phone" : "computer") + ", even when Tcipher is closed."),
+    blocked ? h("p", { class: "err" }, "Notifications are blocked for Tcipher here. Allow them with the steps below, then press the button.") : null,
+    h("ol", { class: "inst-steps" }, notifSteps())].filter(Boolean),
+    [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Later"), go], true);
 }
 // (2026-11ex) people who haven't installed it: every 5th time the workspace opens on this device, the install popup
 // comes up once (a few seconds after it loads, never over another window). Stops for good once it's installed here.
 function countOpenForInstall(){
+  // (2026-11ez) the installed app's first open: how to turn notifications on (once per device)
+  if (isStandalone() && !IN_IOS_APP() && pushSupported() && notifPerm() !== "granted") {
+    let seen = "x"; try { seen = localStorage.getItem("tc_app_notif_guide") || ""; localStorage.setItem("tc_app_notif_guide", "1"); } catch (e) {}
+    if (!seen) setTimeout(() => { if (S.me && !S.portal && !dlg().open) openNotifGuide(); }, 4000);
+    return;
+  }
   const k = installKind();
   if (!k || k === "firefox") return;
   let n = 0, done = "";
   try { done = localStorage.getItem("tc_install_tip") === "done" ? "done" : ""; n = (+localStorage.getItem("tc_opens") || 0) + 1; localStorage.setItem("tc_opens", String(n)); } catch (e) { return; }
-  if (done || n % 5) return;
+  // (2026-11ez) on a new device: at the first reload (its 2nd open), then every 5th open, until it's installed here
+  if (done || !(n === 2 || n % 5 === 0)) return;
   setTimeout(() => { if (!S.me || S.portal || dlg().open || !installKind()) return; openInstallDialog(); }, 4000);
 }
 // a slim card on Home: install the app, or (inside the installed app) turn on notifications. Each can be dismissed.
@@ -10573,7 +10615,7 @@ function installTip(){
   if (isStandalone() && pushSupported() && !IN_IOS_APP() && notifPerm() === "default" && !seen("tc_app_push_tip")) {
     const el = h("div", { class: "inst-tip" });
     el.append(h("img", { src: "icons/icon-192.png?v=midnight", alt: "", width: 32, height: 32 }), h("span", {}, h("b", {}, "Turn on notifications "), "so messages, tags and tasks reach this app even when it’s closed."),
-      h("button", { type: "button", class: "btn sm pri", onclick: async () => { try { await enablePush(); toast("Notifications on. A test one is on its way."); hide("tc_app_push_tip", el); } catch (e) { toast(friendly(e)); } } }, "Turn on"),
+      h("button", { type: "button", class: "btn sm pri", onclick: () => openNotifGuide() }, "Turn on"),
       h("button", { type: "button", class: "iconbtn", "aria-label": "Not now", onclick: () => hide("tc_app_push_tip", el) }, ic("x", 14)));
     return el;
   }
@@ -12953,7 +12995,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ey";
+const APP_VERSION = "2026-11ez";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
