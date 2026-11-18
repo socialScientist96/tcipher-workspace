@@ -10556,6 +10556,16 @@ function openInstallDialog(){
   else body = [h("p", {}, "Firefox can’t install websites as apps. Open ", h("b", {}, "internal.tcipher.com"), " in Chrome or Edge (on a Mac, Safari works too) and install it from there.")];
   openDialog("Install the Tcipher app", [intro, ...body], foot, true);
 }
+// (2026-11ex) people who haven't installed it: every 5th time the workspace opens on this device, the install popup
+// comes up once (a few seconds after it loads, never over another window). Stops for good once it's installed here.
+function countOpenForInstall(){
+  const k = installKind();
+  if (!k || k === "firefox") return;
+  let n = 0, done = "";
+  try { done = localStorage.getItem("tc_install_tip") === "done" ? "done" : ""; n = (+localStorage.getItem("tc_opens") || 0) + 1; localStorage.setItem("tc_opens", String(n)); } catch (e) { return; }
+  if (done || n % 5) return;
+  setTimeout(() => { if (!S.me || S.portal || dlg().open || !installKind()) return; openInstallDialog(); }, 4000);
+}
 // a slim card on Home: install the app, or (inside the installed app) turn on notifications. Each can be dismissed.
 function installTip(){
   const seen = k => { try { return localStorage.getItem(k); } catch (e) { return "x"; } };
@@ -12943,7 +12953,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ew";
+const APP_VERSION = "2026-11ex";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -17184,6 +17194,7 @@ async function startSession(session){
     if (typeof loadMyToday === "function") loadMyToday().then(() => renderShell());
     setTimeout(() => { if (typeof loadShotLib === "function") loadShotLib().catch(() => {}); }, 3000);   // so 🐞 can attach a screenshot instantly
     if (isAdmin()) load("problem_reports").then(() => renderShell());   // Google ready before anyone clicks; calendar synced if it's been a while
+    countOpenForInstall();   // (2026-11ex)
     if (waCan() && waOn()) load("whatsapp_messages").then(() => renderShell(), () => {});   // (2026-11es; 2026-11eu: only once it is switched on)
     startLive();
     rerender();
