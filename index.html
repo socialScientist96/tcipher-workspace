@@ -458,12 +458,23 @@ button.busy:not(.btn):not(.iconbtn):not(.linkbtn):not(.link){opacity:.6;cursor:p
 .netbar.off{background:var(--bad)}
 .netbar .nb-dot{width:8px;height:8px;border-radius:50%;background:#F5B544;flex:none}
 .netbar.off .nb-dot{background:#fff}
-#boot{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);z-index:5;text-align:center;padding:16px;color:var(--ink2);font-weight:600;font-size:15px}
+#boot{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);z-index:90;text-align:center;padding:16px;color:var(--ink2);font-weight:600;font-size:15px}
 #boot[hidden]{display:none}
-#boot .spin{width:28px;height:28px;border:3px solid var(--tint2);border-top-color:var(--p);border-radius:50%;animation:bootspin .9s linear infinite;margin:0 auto 14px}
 #boot .btn{margin-top:14px}
-@keyframes bootspin{to{transform:rotate(360deg)}}
-@media (prefers-reduced-motion:reduce){#boot .spin{animation:none}}
+/* (2026-11et) welcome: the app icon pops in, a sheen crosses it and a glow pulses out (2 s); a thin bar keeps moving after that while it loads */
+#boot{transition:opacity .25s ease}
+#boot.leaving{opacity:0;pointer-events:none}
+#boot .boot-mark{position:relative;width:96px;height:96px;margin:0 auto 18px;border-radius:22px;overflow:hidden;opacity:0;animation:bootpop .7s cubic-bezier(.2,.9,.25,1.25) forwards,bootglow 1s ease-out 1s forwards}
+#boot .boot-mark img{display:block;width:100%;height:100%}
+#boot .boot-mark::after{content:"";position:absolute;inset:-20%;background:linear-gradient(115deg,transparent 38%,rgba(255,255,255,.55) 50%,transparent 62%);transform:translateX(-120%);animation:bootsheen .8s ease-in-out .6s forwards}
+#boot #bootMsg{opacity:0;animation:bootfade .5s ease .4s forwards}
+#boot #bootMsg::after{content:"";display:block;width:56px;height:3px;margin:12px auto 0;border-radius:3px;background:linear-gradient(90deg,var(--tint2) 0%,var(--p) 50%,var(--tint2) 100%);background-size:200% 100%;opacity:0;animation:bootfade .3s ease 2s forwards,bootbar 1.2s linear 2s infinite}
+@keyframes bootpop{0%{opacity:0;transform:translateY(10px) scale(.72)}100%{opacity:1;transform:none}}
+@keyframes bootsheen{to{transform:translateX(120%)}}
+@keyframes bootglow{0%{box-shadow:0 0 0 0 rgba(107,82,255,.45)}100%{box-shadow:0 0 0 22px rgba(107,82,255,0)}}
+@keyframes bootfade{to{opacity:1}}
+@keyframes bootbar{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){#boot .boot-mark,#boot #bootMsg{animation:none;opacity:1}#boot .boot-mark::after{display:none}#boot #bootMsg::after{animation:none;opacity:1}}
 .chat-msgwrap{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}
 .chat-msgwrap .chat-msgs{flex:1}
 .chat-unread{display:flex;align-items:center;gap:10px;margin:12px 0 6px;color:#E5484D;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
@@ -940,6 +951,7 @@ dialog.dv-wide .dh .iconbtn{flex:none}
 .dv-step.past{background:#DCFFF1;color:#216E4E}
 .dv-step.on{background:#0C66E4;color:#fff}
 .dv-flowbtns{display:flex;gap:8px;flex-wrap:wrap}
+.dv-flowhead{display:none}   /* phones only (2026-11et) */
 .dv-backbox{display:flex;flex-direction:column;gap:8px}
 .dv-backnote{margin:0;font-size:13px;color:#AE2E24;font-weight:600}
 .dv-owners{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
@@ -1460,6 +1472,10 @@ html,body{overflow-x:clip}
   .tb > span{flex-basis:100%;flex-wrap:wrap}
   .tb > .seg{flex-basis:100%;display:flex}
   .tb > .seg button{flex:1 1 0}
+  /* (2026-11et) the admin panel's ten tabs don't fit: one row you swipe sideways */
+  .tb > .seg.adm-tabs{overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .tb > .seg.adm-tabs::-webkit-scrollbar{display:none}
+  .tb > .seg.adm-tabs button{flex:0 0 auto;white-space:nowrap}
   .ph .acts{flex-wrap:wrap}
 }
 
@@ -2736,6 +2752,12 @@ html:has(#content .chat),html:has(#content .chat) body{overscroll-behavior-y:non
   dialog.dv-wide .dv-flow{order:2;position:sticky;bottom:-12px;z-index:3;margin:0 -16px -12px;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));border:0;border-top:1px solid var(--line);border-radius:0;background:var(--white);box-shadow:0 -6px 16px rgba(0,0,0,.06)}
   dialog.dv-wide .dv-flow .dv-steps{display:none}   /* the status is in the window's header already */
   dialog.dv-wide .dv-flowbtns > .btn{flex:1 1 auto;justify-content:center;min-height:44px}
+  /* (2026-11et) the pinned panel folds down to a "Flow" bar with an Expand button */
+  dialog.dv-wide .dv-flowhead{display:flex;align-items:center;gap:8px;min-height:44px}
+  dialog.dv-wide .dv-flowhead .muted{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px}
+  dialog.dv-wide .dv-flowtog{min-height:40px;gap:4px}
+  dialog.dv-wide .dv-flow.folded{gap:0}
+  dialog.dv-wide .dv-flow.folded > :not(.dv-flowhead){display:none !important}
   /* ===== Redesign batch 5 — notes on phones: the ⋮⋮ handles stay quiet until you're working on that block ===== */
   .nb-gutter{opacity:.32;transition:opacity .15s var(--ease)}
   .nb-block:focus-within > .nb-gutter,.nb-block:active > .nb-gutter,.nb-gutter:focus-within{opacity:1}
@@ -2811,7 +2833,7 @@ html:has(#content .chat),html:has(#content .chat) body{overscroll-behavior-y:non
 <body>
 
 <!-- Starting up (shown until the app knows who's signed in) -->
-<div id="boot" role="status" aria-live="polite"><div><div class="spin" aria-hidden="true"></div><div id="bootMsg">Loading the workspace…</div><button class="btn" id="bootRetry" type="button" hidden>Try again</button></div></div>
+<div id="boot" role="status" aria-live="polite"><div><div class="boot-mark" aria-hidden="true"><img src="icons/icon-192.png?v=midnight" alt="" width="96" height="96" decoding="async" fetchpriority="high"></div><div id="bootMsg">Loading the workspace…</div><button class="btn" id="bootRetry" type="button" hidden>Try again</button></div></div>
 
 <!-- Not configured yet -->
 <section class="auth" id="setup" hidden>
@@ -12802,7 +12824,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11es";
+const APP_VERSION = "2026-11et";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -14375,6 +14397,14 @@ function flowBox(t){
   const btn = (label, cls, id, fn) => { const b = h("button", { type: "button", class: "btn " + cls, id, onclick: fn }, label); b.__tcLast = born + 300; return b; };
   const steps = h("div", { class: "dv-steps" }, FLOW.map(([st, label]) => h("span", { class: "dv-step" + (st === t.status ? " on" : "") + (FLOW.findIndex(x => x[0] === st) < FLOW.findIndex(x => x[0] === t.status) ? " past" : "") }, label)));
   box.append(steps);
+  // (2026-11et) on phones the panel is pinned at the bottom of the task: it folds down to one "Flow" bar (remembered on this device)
+  { const stg = t.status === "In progress" && typeof devStageOf === "function" ? devStageOf(t) : "";
+    const shut = () => { try { return localStorage.getItem("tc_flow_open") !== "1"; } catch (e) { return true; } };
+    const tog = h("button", { type: "button", class: "btn sm dv-flowtog", "aria-expanded": "false" });
+    const set = closed => { box.classList.toggle("folded", closed); tog.setAttribute("aria-expanded", String(!closed)); tog.replaceChildren(ic(closed ? "arrowUp" : "arrowDown", 14), closed ? "Expand" : "Collapse"); };
+    tog.onclick = () => { const closed = !box.classList.contains("folded"); try { localStorage.setItem("tc_flow_open", closed ? "0" : "1"); } catch (e) {} set(closed); };
+    box.prepend(h("div", { class: "dv-flowhead" }, h("b", {}, "Flow"), h("span", { class: "muted" }, t.status + (stg ? " · " + stg : "")), tog));
+    set(shut()); }
   if (["To do", "In progress"].includes(t.status) && t.vertical === "Development" && "flow" in t) box.append(devPartBox(t, owner || isTaskHandler(t.vertical) || t.created_by === S.me.id));
   const row = h("div", { class: "dv-flowbtns" });
   let note = "";
@@ -14725,8 +14755,16 @@ function adminHeader(el, title, desc, actions){
   el.append(h("div", { class: "ph" }, h("div", {}, h("h1", {}, title), h("p", {}, desc)), actions ? h("div", { class: "acts" }, actions) : null));
   // the Admin panel's number is the sum of these, so each tab shows its own part
   const n = adminCounts();
-  el.append(h("div", { class: "tb" }, h("div", { class: "seg", role: "tablist" }, tabs.map(([r, l]) => h("button", { type: "button", "aria-pressed": String(S.route === r), onclick: () => go(r) }, l,
-    n[r] ? h("span", { class: "badge", style: "margin-left:6px", title: n[r] + " to look at" }, String(n[r])) : null)))));
+  const strip = h("div", { class: "seg adm-tabs", role: "tablist" }, tabs.map(([r, l]) => h("button", { type: "button", "aria-pressed": String(S.route === r), onclick: () => go(r) }, l,
+    n[r] ? h("span", { class: "badge", style: "margin-left:6px", title: n[r] + " to look at" }, String(n[r])) : null)));
+  el.append(h("div", { class: "tb" }, strip));
+  // (2026-11et) on a phone the tabs scroll sideways: start with the open one in view
+  const showOn = (tries) => {
+    const on = strip.querySelector("[aria-pressed='true']");
+    if (!strip.isConnected) { if (tries < 20) setTimeout(() => showOn(tries + 1), 50); return; }
+    if (on && strip.scrollWidth > strip.clientWidth) strip.scrollLeft += on.getBoundingClientRect().left - strip.getBoundingClientRect().left - 16;
+  };
+  setTimeout(() => showOn(0), 0);
   if (S.me && S.me.is_admin && S.mfaOn === false) el.append(h("div", { class: "panel", id: "mfaNudge", style: "display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-color:var(--warn)" },
     h("span", { style: "flex:1;min-width:200px" }, h("b", {}, "Protect your admin account. "), "Turn on two-step sign-in, so a stolen password alone can’t get into the admin panel."),
     h("button", { type: "button", class: "btn sm pri", onclick: () => mfaSetup() }, "Set it up")));
@@ -16949,7 +16987,16 @@ function portalPanel(rec){
 /* ---------------------------------------------------------------------
    Sign-in and startup
    --------------------------------------------------------------------- */
-function showScreen(which){ for (const id of ["boot","setup","login","inactive","mfa","app","portal"]) $(id).hidden = id !== which; if (which === "login") showCaptcha();
+// (2026-11et) the welcome screen stays until its 2-second animation has played, then fades out over the screen that's ready
+const BOOT_T0 = performance.now();
+function bootShow(){ const b = $("boot"); clearTimeout(b._leave); b._leave = null; b.classList.remove("leaving"); b.hidden = false; }
+function bootHide(){
+  const b = $("boot"); if (b.hidden || b._leave) return;
+  const still = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  b._leave = setTimeout(() => { b.classList.add("leaving"); b._leave = setTimeout(() => { b.hidden = true; b.classList.remove("leaving"); b._leave = null; }, 260); },
+    still ? 0 : Math.max(0, 2000 - (performance.now() - BOOT_T0)));
+}
+function showScreen(which){ for (const id of ["boot","setup","login","inactive","mfa","app","portal"]) { if (id === "boot") { if (which === "boot") bootShow(); else bootHide(); continue; } $(id).hidden = id !== which; } if (which === "login") showCaptcha();
   // (2026-11dk) the sign-in screen never keeps the last person's password or code: after "Sign out" on a shared
   // laptop or phone, pressing Enter used to sign the previous person straight back in
   if (which === "login") { for (const id of ["loginPass", "mfaCode"]) { const f = document.getElementById(id); if (f) f.value = ""; } }
