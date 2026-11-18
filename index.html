@@ -3273,6 +3273,8 @@ async function load(t, force){
       S.cache[t] = all;
       S.loaded.add(t);
     } catch (e) {
+      // (2026-11eu) WhatsApp before its database upgrade is run: nothing to show yet, and nothing has gone wrong
+      if (t === "whatsapp_messages" && /could not find the table|PGRST205|does not exist/i.test(String((e && (e.message || e.code)) || e))) { S.cache[t] = []; S.loaded.add(t); delete S.loading[t]; return rows(t); }
       // not marked loaded, so the next visit tries again instead of showing an empty list as if there were nothing
       console.warn("load " + t, e);
       if (!S.cache[t]) S.cache[t] = [];
@@ -10106,7 +10108,11 @@ function waAdminPanel(){
       const s = WA.status || (WA.status = await waCall({ action: "status" }));
       line.replaceChildren(s.connected ? h("span", {}, h("b", {}, "Connected: "), (s.name || "") + " " + (s.number || ""), s.quality ? h("span", { class: "pill " + (s.quality === "GREEN" ? "ok" : s.quality === "YELLOW" ? "warn" : "bad"), style: "margin-left:8px" }, "Quality " + s.quality.toLowerCase()) : null)
         : h("span", {}, h("b", {}, "Not connected yet. "), s.problem || "Add the Meta secrets in Supabase and deploy the two functions (see the setup guide)."));
-    } catch (e) { line.replaceChildren(h("span", {}, h("b", {}, "Not connected yet. "), friendly(e))); }
+    } catch (e) {
+      const m = friendly(e);
+      line.replaceChildren(h("span", {}, h("b", {}, "Not set up yet. "), /non-2xx|isn’t set up|not found|Failed to send|FunctionsFetchError/i.test(m)
+        ? "Run upgrade-2026-11es.sql in Supabase, deploy the meta-webhook and whatsapp-send functions, and add the Meta secrets. Then switch this on." : m));
+    }
   })();
   return p;
 }
@@ -12824,7 +12830,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11et";
+const APP_VERSION = "2026-11eu";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -16022,7 +16028,7 @@ function canSee(route){
   if (route.startsWith("admin-")) return !!S.me.is_admin;
   if (route === "crm-analytics") return lvl("sales") >= 1 || lvl("leads") >= 1 || lvl("marketing") >= 1;
   if (route === "emails") return true;
-  if (route === "whatsapp") return waCan();   // (2026-11es)
+  if (route === "whatsapp") return waCan() && (waOn() || isAdmin());   // (2026-11es; 2026-11eu: others once it is switched on)
   if (route === "my-salary") return !S.me.client_id;   // (2026-11ek) everyone on the team: their own salary
   if (["qa", "qa-import", "bugs"].includes(route)) return lvl("qa") >= 1;
   const M = MOD[route]; if (!M) return false;
@@ -17032,7 +17038,7 @@ async function startSession(session){
     if (typeof loadMyToday === "function") loadMyToday().then(() => renderShell());
     setTimeout(() => { if (typeof loadShotLib === "function") loadShotLib().catch(() => {}); }, 3000);   // so 🐞 can attach a screenshot instantly
     if (isAdmin()) load("problem_reports").then(() => renderShell());   // Google ready before anyone clicks; calendar synced if it's been a while
-    if (waCan()) load("whatsapp_messages").then(() => renderShell(), () => {});   // (2026-11es)
+    if (waCan() && waOn()) load("whatsapp_messages").then(() => renderShell(), () => {});   // (2026-11es; 2026-11eu: only once it is switched on)
     startLive();
     rerender();
   } catch (e) {
