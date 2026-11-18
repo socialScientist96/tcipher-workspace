@@ -13038,7 +13038,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11fa";
+const APP_VERSION = "2026-11fb";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -17650,7 +17650,16 @@ async function init(){
   if (!/^https:\/\/.+/.test(SUPABASE_URL) || /^PASTE/.test(SUPABASE_KEY)) { showScreen("setup"); return; }
   if (!window.supabase) await loadScript("https://unpkg.com/@supabase/supabase-js@2.117.3/dist/umd/supabase.js", 45000, "sha384-BWcjm9OdFth9TbhCxZPdm+gAOUMAzQy9nmTs12ioXdCcbVnJaPMn+fMUoQCLt60R");
   if (!window.supabase) { showScreen("setup"); $("setupMsg").textContent = "The workspace couldn’t load over this connection. Check your internet connection and reload the page."; return; }
-  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { realtime: { worker: true }, global: { fetch: netFetch } });   // keep-alive runs in a worker, so background tabs aren’t disconnected
+  // (2026-11fb) in the Android app (1.9+), the sign-in keys are kept by the app itself, written to disk at once: the web
+  // view's own storage reaches the disk seconds later, and switching apps just after the sign-in renewed itself lost the new
+  // key (the next renewal used the retired one, the server refused it, and the person was signed out). Older apps: as before.
+  const A = window.TcipherAndroid, appAuth = !!(window.TcipherApp && window.TcipherApp.platform === "android" && A && typeof A.authSet === "function");
+  const authStorage = appAuth ? {
+    getItem: k => { let v = null; try { v = A.authGet(k); } catch (e) {} if (v == null) { try { v = localStorage.getItem(k); if (v != null) A.authSet(k, v); } catch (e) {} } return v; },   // the first time: carry the existing sign-in over
+    setItem: (k, v) => { try { A.authSet(k, v); } catch (e) {} try { localStorage.setItem(k, v); } catch (e) {} },
+    removeItem: k => { try { A.authRemove(k); } catch (e) {} try { localStorage.removeItem(k); } catch (e) {} }
+  } : undefined;
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, Object.assign({ realtime: { worker: true }, global: { fetch: netFetch } }, authStorage ? { auth: { storage: authStorage } } : {}));   // keep-alive runs in a worker, so background tabs aren’t disconnected
   let started = null;
   sb.auth.onAuthStateChange((evt, session) => {
     if (session && session.access_token) UT.token = session.access_token;   // for the time-tracking send as a page closes
