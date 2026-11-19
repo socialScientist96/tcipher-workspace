@@ -10719,7 +10719,9 @@ function deviceOS(){
 function browserName(){ const ua = navigator.userAgent; return /Edg\//.test(ua) ? "Microsoft Edge" : /Chrome\//.test(ua) ? "Google Chrome" : /Firefox\//.test(ua) ? "Firefox" : /Safari\//.test(ua) ? "Safari" : "your browser"; }
 function notifSteps(){
   const os = deviceOS(), br = browserName(), li = (...x) => h("li", {}, ...x);
-  const first = li("In the app, tap ", h("b", {}, "Turn on notifications"), " (or your name at the bottom left › ", h("b", {}, "Phone and desktop notifications › Turn on"), "), then choose ", h("b", {}, "Allow"), ". A test notification arrives within seconds.");
+  // (2026-11fd) where My profile is: the photo at the top of Home on phones, the name at the bottom left of the menu on computers
+  const prof = ["ios", "android"].includes(os) ? "your photo at the top of Home" : "your name at the bottom left";
+  const first = li("In the app, tap ", h("b", {}, "Turn on notifications"), " (or " + prof + " › ", h("b", {}, "Phone and desktop notifications › Turn on"), "), then choose ", h("b", {}, "Allow"), ". A test notification arrives within seconds.");
   if (os === "ios") return [first, li("If nothing arrives: iPhone ", h("b", {}, "Settings › Notifications › Tcipher"), " › turn on ", h("b", {}, "Allow Notifications"), ". Focus and Do Not Disturb hold them back.")];
   if (os === "mac") return [first, li("If nothing arrives: ", h("b", {}, "System Settings › Notifications › " + (br === "Safari" ? "Tcipher Workspace" : br)), " › turn on ", h("b", {}, "Allow notifications"), " and pick ", h("b", {}, "Alerts"), " or ", h("b", {}, "Banners"), ". Focus holds them back."),
     br !== "Safari" ? li("Keep " + br + " running: the Tcipher window can be closed, but if " + br + " is fully quit (⌘Q), notifications wait until it opens again.") : null].filter(Boolean);
@@ -13180,7 +13182,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11fc";
+const APP_VERSION = "2026-11fd";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
