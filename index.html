@@ -2852,6 +2852,71 @@ html:has(#content .chat),html:has(#content .chat) body{overscroll-behavior-y:non
   .chat-head .chat-acts{flex-wrap:nowrap;flex:none}
   .chat-head .chat-acts .btn{width:40px;min-height:40px}
 }
+
+/* ===== (2026-11fc) Home on phones: Midnight header, a sheet with shortcut cards, Start your day and the next meeting ===== */
+@media (max-width:760px){
+  .home > .hello{display:none!important}
+  .home > .mh{order:-1;margin:-16px -16px 0!important;display:block}
+  .home [data-sec=stats]{display:none}
+  .mh-hero{position:relative;overflow:hidden;color:#fff;padding:calc(18px + env(safe-area-inset-top,0px)) 18px 62px;background:radial-gradient(120% 90% at 15% 0%,#6A50FF 0%,#3B25B8 38%,#160E45 78%,#120B38 100%)}
+  .mh-pat{position:absolute;inset:0;opacity:.09;pointer-events:none} .mh-pat svg{width:100%;height:100%}
+  .mh-top{position:relative;display:flex;align-items:center;gap:12px}
+  .mh-av{width:48px;height:48px;border-radius:15px;background:#fff;padding:3px;border:0;box-shadow:0 6px 16px rgba(0,0,0,.28);flex:none;cursor:pointer}
+  .mh-av .av{width:100%!important;height:100%!important;border-radius:12px!important;font-size:16px!important;margin:0!important;box-shadow:none!important}
+  .mh-av .av img{border-radius:12px!important}
+  .mh-av .av::after,.mh-av .av.on::after{display:none!important}
+  .mh-who{flex:1;min-width:0}
+  .mh-who small{display:block;font-size:12.5px;color:rgba(255,255,255,.72)}
+  .mh-who b{display:block;font-family:var(--font-main);font-weight:600;font-size:21px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mh-c{position:relative;width:42px;height:42px;border-radius:50%;border:0;background:rgba(255,255,255,.14);color:#fff;display:grid;place-items:center;flex:none;cursor:pointer;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+  .mh-c:active{background:rgba(255,255,255,.24)}
+  .mh-svg{display:inline-grid;place-items:center} .mh-svg svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .mh-badge{position:absolute;top:-3px;right:-3px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#FF5A6E;color:#fff;font:700 10.5px/18px var(--font-text);font-style:normal;text-align:center;border:2px solid #2B1C88}
+  .mh-kpi{position:relative;display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-top:24px}
+  .mh-big{border:0;background:none;color:#fff;padding:0;text-align:left;cursor:pointer;font:inherit;min-width:0}
+  .mh-l{display:block;font-size:14px;color:rgba(255,255,255,.78)}
+  .mh-n{display:flex;align-items:baseline;gap:8px;margin-top:6px;font-family:var(--font-main);font-weight:600;font-size:56px;line-height:1;letter-spacing:-.02em}
+  .mh-n span{font-size:19px;font-weight:500;letter-spacing:0;color:rgba(255,255,255,.86)}
+  .mh-pill{border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.15);color:#fff;font:500 13.5px var(--font-text);padding:7px 13px;border-radius:999px;white-space:nowrap;margin-bottom:6px;cursor:pointer;flex:none}
+  .mh-sheet{position:relative;margin-top:-34px;background:var(--bg);border-radius:28px 28px 0 0;padding:18px 14px 4px}
+  .mh-quick{display:grid;grid-template-columns:repeat(var(--n,4),minmax(0,1fr));gap:8px}
+  .mh-q{position:relative;border:0;background:var(--white);border-radius:18px;padding:12px 4px 11px;text-align:center;cursor:pointer;font:inherit;color:var(--ink);box-shadow:0 1px 0 rgba(20,16,60,.04),0 6px 18px rgba(20,16,60,.06)}
+  .mh-q:active{transform:scale(.97)}
+  .mh-qi{width:40px;height:40px;border-radius:50%;margin:0 auto 7px;display:grid;place-items:center;background:var(--tint);color:#5B44F0}
+  .mh-qi .mh-svg svg{width:19px;height:19px}
+  .mh-q b{display:block;font-size:13px;font-weight:600;white-space:nowrap}
+  .mh-q small{display:block;font-size:11.5px;color:var(--ink3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mh-q .mh-badge{top:7px;right:10px;border:0;background:var(--p)}
+  .mh-card{background:var(--white);border-radius:22px;padding:16px 16px 14px;margin-top:12px;box-shadow:0 1px 0 rgba(20,16,60,.04),0 8px 22px rgba(20,16,60,.06)}
+  .mh-ch{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+  .mh-ch h3{margin:0;font-family:var(--font-main);font-weight:600;font-size:18px;line-height:1.25}
+  .mh-ch p{margin:3px 0 0;font-size:13.5px;color:var(--ink2)}
+  .mh-st{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:5px 11px;border-radius:999px;white-space:nowrap;flex:none}
+  .mh-st::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+  .mh-st.off{background:var(--tint);color:var(--ink2)} .mh-st.on{background:var(--ok-t);color:var(--ok)} .mh-st.done{background:var(--info-t);color:var(--info)}
+  .mh-st.soon{background:var(--warn-t);color:var(--warn)} .mh-st.live{background:var(--bad-t);color:var(--bad)}
+  .mh-seg{display:flex;gap:6px;margin-top:12px}
+  .mh-seg button{flex:1;min-height:36px;border:0;border-radius:10px;background:var(--tint);color:var(--ink2);font:inherit;font-size:13px;cursor:pointer;padding:0 4px;white-space:nowrap}
+  .mh-seg button.on{background:var(--tint2);color:#4A2FE0;font-weight:600}
+  .mh-go{width:100%;margin-top:13px;display:flex;align-items:center;gap:12px;padding:11px 14px 11px 11px;border:0;border-radius:16px;color:#fff;cursor:pointer;text-align:left;font:inherit;background:linear-gradient(135deg,#6E57FF,#4A2FE0);box-shadow:0 6px 16px rgba(74,47,224,.28)}
+  .mh-go:active{transform:scale(.985)}
+  .mh-go.amber{background:linear-gradient(135deg,#F2994A,#D9761E);box-shadow:0 6px 16px rgba(217,118,30,.28)}
+  .mh-go.dark{background:linear-gradient(135deg,#3A3360,#1D1B2E);box-shadow:0 6px 16px rgba(29,27,46,.25)}
+  .mh-go.soft{background:var(--tint);color:#4A2FE0;box-shadow:none} .mh-go.soft .mh-goi{background:var(--white)}
+  .mh-goi{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.18);display:grid;place-items:center;flex:none}
+  .mh-goi .mh-svg svg{width:19px;height:19px;stroke-width:2.2}
+  .mh-got{flex:1;min-width:0} .mh-got b{display:block;font-family:var(--font-main);font-weight:600;font-size:16px}
+  .mh-got small{display:block;font-size:12.5px;opacity:.85;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mh-ar{font-size:22px;opacity:.75;flex:none}
+  /* the cards below share the sheet's look */
+  .home > .panel,.home [data-sec].panel{border-radius:22px;border-color:transparent;box-shadow:0 1px 0 rgba(20,16,60,.04),0 8px 22px rgba(20,16,60,.06)}
+  .home .needs-you{background:var(--white)}
+  .home > .mh + *{margin-top:12px}
+  /* the bar with the menu and notifications floats as a rounded card */
+  .topbar{left:10px!important;right:10px!important;bottom:calc(8px + env(safe-area-inset-bottom,0px))!important;border-radius:22px;border:0!important;box-shadow:0 10px 30px rgba(20,16,60,.16);padding:6px 10px!important}
+  .content{padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))!important}
+}
+@media (max-width:350px){ .mh-n{font-size:46px} .mh-q b{font-size:12px} .mh-seg button{font-size:12px} }
 </style>
 </head>
 <body>
@@ -6136,6 +6201,82 @@ async function renderCalendar(el){
    --------------------------------------------------------------------- */
 // Home banner (2026-11dg): greeting, what today holds, and five live shortcuts. Flat and quiet on purpose: one accent,
 // no glow or gradient; every number on it is real and every tile goes somewhere.
+// (2026-11fc) Home on phones: a full-width Midnight header (your photo, greeting, search and notifications, today's big
+// number), then a sheet with shortcut cards, "Start your day" (check in / out) and the next meeting. Laptops keep their Home.
+function mhIcon(name){
+  const P = { search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>', bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>',
+    tasks: '<path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/>', board: '<rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/><rect x="17" y="4" width="4" height="13" rx="1.5"/>',
+    chat: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>', cal: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+    power: '<path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.8 0"/>', video: '<path d="M15 10l5-3v10l-5-3"/><rect x="3" y="6" width="12" height="12" rx="2"/>', check: '<path d="M5 12l5 5L20 7"/>' };
+  const sp = h("span", { class: "mh-svg", "aria-hidden": "true" }); sp.innerHTML = '<svg viewBox="0 0 24 24">' + (P[name] || "") + "</svg>"; return sp;
+}
+function phoneHome(t0, me){
+  const hr = new Date().getHours();
+  const greet = hr < 5 ? "Working late" : hr < 12 ? "Good morning" : hr < 17 ? "Good afternoon" : "Good evening";
+  const nNeed = rows("tasks").filter(taskNeedsMe).length;
+  const nDev = rows("tasks").filter(t => t.vertical === "Development" && t.status !== "Done" && (t.assignee_id === me || (t.collaborators || []).includes(me))).length;
+  let left = []; try { left = agenda(t0, t0).filter(it => !it.allDay && it.start && !(it.end && new Date(it.end) < Date.now())); } catch (e) {}
+  const chatN = (() => { try { const t = chatTotals(); return t.due + t.fresh; } catch (e) { return 0; } })();
+  const unread = (S.notifications || []).filter(n => !n.is_read).length;
+  const dateShort = new Date().toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
+  const badge = n => n ? h("i", { class: "mh-badge" }, n > 99 ? "99+" : String(n)) : null;
+  // the faint line drawings in the background
+  const pat = h("span", { class: "mh-pat", "aria-hidden": "true" });
+  pat.innerHTML = '<svg viewBox="0 0 375 300" preserveAspectRatio="xMidYMid slice" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    + '<g transform="translate(300 34)"><rect width="34" height="30" rx="5"/><path d="M0 9h34M9-4v8M25-4v8"/></g><g transform="translate(205 128)"><path d="M0 18 8 8l8 6 14-14"/><path d="M22 0h8v8"/></g>'
+    + '<g transform="translate(36 214)"><path d="M0 8a8 8 0 0 1 8-8h18a8 8 0 0 1 8 8v12a8 8 0 0 1-8 8H12l-8 7v-7a8 8 0 0 1-4-7z"/></g><g transform="translate(318 196)"><path d="m6 0-6 8 6 8M20 0l6 8-6 8"/></g>'
+    + '<g transform="translate(160 18)"><rect width="26" height="30" rx="4"/><path d="M6 10h14M6 16h14M6 22h8"/></g><g transform="translate(250 252)"><circle cx="10" cy="10" r="10"/><path d="M10 4v6l4 3"/></g>'
+    + '<g transform="translate(112 256)"><path d="M0 12 6 18 18 4"/></g></svg>';
+  const search = h("button", { type: "button", class: "mh-c", "aria-label": "Search", onclick: e => { e.stopPropagation(); $("side").classList.add("open"); setTimeout(() => { const i = $("sideSearch"); if (i) { i.focus(); i.select(); } }, 60); } }, mhIcon("search"));
+  const bell = h("button", { type: "button", class: "mh-c", "aria-label": "Notifications" + (unread ? ", " + unread + " unread" : ""), onclick: e => { e.stopPropagation(); $("bell").click(); } }, mhIcon("bell"), badge(unread));
+  const hero = h("section", { class: "mh-hero", "aria-label": "Welcome" }, pat,
+    h("div", { class: "mh-top" },
+      h("button", { type: "button", class: "mh-av", "aria-label": "My profile", onclick: () => openMyProfile() }, avatar(me, "lg")),
+      h("div", { class: "mh-who" }, h("small", {}, greet + " · " + dateShort), h("b", {}, S.me.full_name || "")),
+      search, bell),
+    h("div", { class: "mh-kpi" },
+      h("button", { type: "button", class: "mh-big", onclick: () => go("tasks") }, h("span", { class: "mh-l" }, "Today"),
+        h("span", { class: "mh-n" }, String(nNeed), h("span", {}, nNeed === 1 ? "task needs you" : nNeed ? "tasks need you" : "nothing needs you"))),
+      canSee("calendar") ? h("button", { type: "button", class: "mh-pill", onclick: () => go("calendar") }, left.length ? left.length + (left.length === 1 ? " meeting" : " meetings") : "No meetings") : null));
+  // shortcut cards
+  const q = (route, icon, label, n, sub) => canSee(route) ? h("button", { type: "button", class: "mh-q", onclick: () => go(route) }, badge(n), h("span", { class: "mh-qi" }, mhIcon(icon)), h("b", {}, label), h("small", {}, sub)) : null;
+  const quick = [q("tasks", "tasks", "Tasks", nNeed, nNeed ? nNeed + " due" : "All done"), q("dev-board", "board", "Board", nDev, nDev ? nDev + " open" : "Nothing open"),
+    q("chat", "chat", "Chat", chatN, chatN ? chatN + " unread" : "Caught up"), q("calendar", "cal", "Calendar", left.length, left.length ? left.length + " today" : "Nothing today")].filter(Boolean);
+  const sheet = h("div", { class: "mh-sheet" }, h("div", { class: "mh-quick", style: "--n:" + quick.length }, quick));
+  // start your day: check in or out
+  const bigBtn = (icon, title, sub, fn, tone) => h("button", { type: "button", class: "mh-go" + (tone ? " " + tone : ""), onclick: fn }, h("span", { class: "mh-goi" }, mhIcon(icon)), h("span", { class: "mh-got" }, h("b", {}, title), h("small", {}, sub)), h("span", { class: "mh-ar", "aria-hidden": "true" }, "›"));
+  const card = (title, sub, pillText, pillTone, ...body) => h("section", { class: "mh-card" }, h("div", { class: "mh-ch" }, h("div", {}, h("h3", {}, title), sub ? h("p", {}, sub) : null), pillText ? h("span", { class: "mh-st " + pillTone }, pillText) : null), ...body.filter(Boolean));
+  const r = myToday(), late = lateShift();
+  let day = null;
+  if (r && r.status === "Absent") day = card("Today", "Marked absent" + (r.marked_by ? " by " + (pname(r.marked_by) || "an admin") : ""), "Absent", "off");
+  else if (late) day = card("Still working", "Since " + fmtDate(late.day) + ", " + fmtTime(late.check_in) + (late.mode ? " · " + late.mode : ""), "Checked in", "on", bigBtn("power", "Check out", "End yesterday’s shift", () => checkOut(late), "dark"));
+  else if (!r) {
+    let mode = WORK_MODES[0];
+    const say = m => ({ "Remote": "Working remotely today", "Client site": "At the client’s site today", "On-site": "On-site today" })[m] || m + " today";
+    const sub = h("small", {}, say(mode));
+    const segs = h("div", { class: "mh-seg", role: "radiogroup", "aria-label": "Working from" }, WORK_MODES.map((m, i) => h("button", { type: "button", role: "radio", "aria-checked": String(i === 0), class: i === 0 ? "on" : "", onclick: e => {
+      mode = m; segs.querySelectorAll("button").forEach(b => { b.classList.toggle("on", b === e.currentTarget); b.setAttribute("aria-checked", String(b === e.currentTarget)); }); sub.textContent = say(m); } }, m)));
+    const go1 = bigBtn("power", "Check in", "", () => checkIn(mode)); go1.querySelector(".mh-got small").replaceWith(sub);
+    day = card("Start your day", "Not checked in yet", "Off", "off", segs, go1);
+  } else if (!r.check_out) day = card("You’re checked in", r.check_in ? "Since " + fmtTime(r.check_in) + (r.mode ? " · " + r.mode : "") : "Marked " + (r.status || "present") + " today", "On", "on",
+      r.marked_by || !r.check_in ? null : bigBtn("power", "Check out", "Finish for the day", () => checkOut(), "dark"));
+  else day = card("Day done", r.check_in ? "Worked " + hoursOf(r).toFixed(1) + " h · " + fmtTime(r.check_in) + " – " + outTime(r) : "Checked out at " + fmtTime(r.check_out), "Done", "done",
+      r.marked_by ? null : bigBtn("power", "Check in again", "Back to work", () => checkIn(r.mode), "soft"));
+  if (canSee("attendance") && day) sheet.append(day);
+  // the next meeting (the morning scrum counts as joined once you've joined it)
+  const scrum = todaysScrum(), joinedScrum = scrum ? myJoin(scrum.id, t0) : null;
+  const upcoming = left.filter(it => it.link && !(it.scrum && joinedScrum));
+  const nm = upcoming[0];
+  if (nm) {
+    const mins = Math.round((new Date(nm.start) - Date.now()) / 60000), now = mins <= 0;
+    const when = fmtTimeIso(nm.start) + (nm.end ? " – " + fmtTimeIso(nm.end) : "");
+    const others = left.length - 1;
+    sheet.append(card(nm.title || "Meeting", "Today · " + when, now ? "Now" : mins <= 60 ? "In " + mins + " min" : "Later today", now ? "live" : mins <= 60 ? "soon" : "off",
+      bigBtn("video", "Join now", others > 0 ? others + (others === 1 ? " more meeting today" : " more meetings today") : "Your last meeting today", () => joinAgendaItem(nm), "amber")));
+  }
+  return h("div", { class: "mh m-only", "data-sec": "mh" }, hero, sheet);
+}
+const fmtTimeIso = iso => { try { return new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }); } catch (e) { return ""; } };
 function homeHero(t0, me, scope){
   const hr = new Date().getHours();
   const greet = hr < 5 ? "Working late" : hr < 12 ? "Good morning" : hr < 17 ? "Good afternoon" : "Good evening";
@@ -6241,6 +6382,7 @@ async function renderDashboard(el){
   // the page is titled by the day; check-in sits in a quiet card beside it
   const scope = S.me.vertical || (isAdmin() ? "All verticals" : "");
   el.append(h("div", { class: "hello has-hero" }, homeHero(t0, me, scope), attendanceWidget(true)));
+  try { el.prepend(phoneHome(t0, me)); } catch (e) { console.warn("phone home", e); }   // (2026-11fc) phones
   { const tip = installTip(); if (tip) el.append(tip); }   // (2026-11ew)
 
   // everything on my plate, from every module
@@ -13038,7 +13180,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11fb";
+const APP_VERSION = "2026-11fc";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
