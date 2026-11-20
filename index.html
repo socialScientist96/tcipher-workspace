@@ -2931,6 +2931,7 @@ html:has(#content .chat),html:has(#content .chat) body{overscroll-behavior-y:non
 .it-desc summary{cursor:pointer;color:var(--p-ink);font-size:13px}
 .it-body{font-size:13px;margin-top:6px;white-space:pre-wrap}
 .it-skip{margin-top:10px;font-size:13px} .it-skip summary{cursor:pointer;color:var(--ink2)} .it-skip ul{margin:6px 0 0;padding-left:18px}
+.seg.need{box-shadow:0 0 0 2px var(--tint3)}
 .it-sum{margin:0 0 6px;padding:10px 12px;border-radius:10px;background:var(--tint);font-size:13.5px}
 @media (max-width:760px){ .dv-topacts #devImportTests span{display:none} }
 </style>
@@ -14635,13 +14636,18 @@ async function devImportTests(){
   const tester = h("select", { class: "in", "aria-label": "Tester" }, h("option", { value: "" }, "No tester yet"), testers().map(p => h("option", { value: p.id, selected: p.id === S.me.id }, p.full_name)));
   const go1 = h("button", { type: "button", class: "btn pri", disabled: true }, ic("sparkle", 15), "Analyse with Claude");
   // (2026-11fg) one task per test case (default), or grouped by problem
-  let mode = "per_case";
-  const modeSeg = segmented([["per_case", "One task per test case"], ["grouped", "Group by problem"]], mode, v => { mode = v; modeNote.textContent = v === "per_case" ? "Every test case becomes its own task: Testing if not run yet, Bug if it failed." : "Failed and blocked cases become tasks, with cases that share a cause grouped into one; passed cases are left out."; });
-  const modeNote = h("p", { class: "muted", style: "font-size:12.5px;margin:6px 0 0" }, "Every test case becomes its own task: Testing if not run yet, Bug if it failed.");
+  // (2026-11fg) asked every time: nothing is pre-chosen, and Analyse waits for the choice
+  let mode = "";
+  const ready = () => { const sh = st.sheets[st.tab]; go1.disabled = !(sh && sh.rows.length && mode); };
+  const modeSeg = segmented([["per_case", "One task per test case"], ["grouped", "Group them"]], mode, v => { mode = v; modeSeg.classList.remove("need");
+    modeNote.textContent = v === "per_case" ? "Every test case becomes its own task: Testing if not run yet, Bug if it failed."
+      : "Fewer tasks: a sheet not run yet gets one Testing task per feature; a sheet with results gets a Bug per problem (cases with the same cause together); passed cases are left out."; ready(); });
+  modeSeg.classList.add("need");
+  const modeNote = h("p", { class: "muted", style: "font-size:12.5px;margin:6px 0 0" }, "Choose one: one task for every test case, or grouped into fewer tasks.");
   const showSheet = () => {
     const sh = st.sheets[st.tab]; if (!sh) return;
     status.replaceChildren(h("p", { class: "muted", style: "margin:8px 0 0" }, h("b", {}, String(sh.rows.length)), " rows" + (sh.header.length ? " · columns: " + sh.header.filter(Boolean).slice(0, 8).join(", ") + (sh.header.length > 8 ? "…" : "") : " · no header row found")));
-    go1.disabled = !sh.rows.length;
+    ready();
   };
   fileIn.onchange = async () => {
     const f = fileIn.files && fileIn.files[0]; if (!f) return;

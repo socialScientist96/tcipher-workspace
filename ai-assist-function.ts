@@ -154,7 +154,7 @@ Deno.serve(async (req) => {
           "Rules:\n" +
           "- Make a task for every test case that failed or is blocked, or whose actual result or notes show something broken or missing. Use type Bug for broken behaviour, Feature for something that doesn't exist yet, Improvement for a change to something that works.\n" +
           "- One task per problem: when several rows fail for the same reason (same screen, same root cause), make one task and list all their row numbers.\n" +
-          "- If the sheet has no results yet (a plan of tests to run), make one Testing task per module or feature instead, listing the test cases to run.\n" +
+          "- If the sheet has no results yet (a plan of tests to run), make one Testing task per feature (the feature column, or the module when there is none) instead, listing the test cases to run.\n" +
           "- Rows that passed, aren't applicable, are duplicates or are blank go in skipped with a short reason. Every row number appears in exactly one task's rows or in skipped.\n" +
           "- Don't make a task that matches one already on the board (listed as existing); put those rows in skipped as 'Already on the board: <title>'.\n" +
           "")) +
