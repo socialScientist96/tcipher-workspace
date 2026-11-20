@@ -4,6 +4,7 @@
 //                        Nothing is saved here: the app shows the result side by side and saves only if you press Replace.
 //   action "summarize" — a short summary of a task (its details, comments and history) or of a dashboard page.
 //   action "improve"   — tidies one note into clear headings, lists and paragraphs, keeping every fact and link.
+//   action "testcase_tasks" — reads a QA test-case sheet (from the Development board) and proposes the tasks it calls for.
 //                        Nothing is saved here: the app shows Before / After and saves only if you press Replace.
 // The app sends only what the person can already see on their screen.
 //
@@ -123,6 +124,52 @@ Deno.serve(async (req) => {
         }
         for (const id of keepIds) if (!seen.has(id)) result.push({ type: "keep", keep_id: id });
         return json({ blocks: result });
+      }
+
+      if (action === "testcase_tasks") {
+        // (2026-11fe) a test-case sheet (CSV or one spreadsheet tab) uploaded on the Development board: Claude reads every
+        // row and proposes the development tasks it calls for. Nothing is saved here: the app shows the list and creates
+        // only the tasks the person keeps.
+        const file = String(body.file ?? "").slice(0, 200);
+        const project = String(body.project ?? "").slice(0, 200);
+        const header = (Array.isArray(body.header) ? body.header : []).slice(0, 60).map((c: unknown) => String(c ?? "").slice(0, 200));
+        const rows = (Array.isArray(body.rows) ? body.rows : []).slice(0, 2000).map((r: unknown) => (Array.isArray(r) ? r : []).slice(0, 60).map((c: unknown) => String(c ?? "").slice(0, 2000)));
+        const existing = (Array.isArray(body.existing) ? body.existing : []).slice(0, 400).map((t: unknown) => String(t ?? "").slice(0, 200));
+        if (!rows.length) return json({ error: "The sheet has no rows to read." }, 400);
+        // the rows go in numbered, so every task can say which test cases it came from
+        const sheet = rows.map((r: string[], i: number) => (i + 1) + "\t" + r.join("\t")).join("\n");
+        if (sheet.length > 400000) return json({ error: "That sheet is too big to read in one go (about " + Math.round(sheet.length / 1000) + "k characters). Split it into smaller files." }, 413);
+        const out = await ask(
+          "You turn a QA test-case sheet into development tasks for Tcipher Technologies' Development board.\n" +
+          "The input is the sheet's column names and its rows, each numbered (row number, then the cells, tab-separated). Typical columns: test case ID, module or screen, scenario, steps, expected result, actual result, status (Pass / Fail / Blocked / Not run), priority, notes, tester. Column names vary; read them by meaning.\n" +
+          "Rules:\n" +
+          "- Make a task for every test case that failed or is blocked, or whose actual result or notes show something broken or missing. Use type Bug for broken behaviour, Feature for something that doesn't exist yet, Improvement for a change to something that works.\n" +
+          "- One task per problem: when several rows fail for the same reason (same screen, same root cause), make one task and list all their row numbers.\n" +
+          "- If the sheet has no results yet (a plan of tests to run), make one Testing task per module or feature instead, listing the test cases to run.\n" +
+          "- Rows that passed, aren't applicable, are duplicates or are blank go in skipped with a short reason. Every row number appears in exactly one task's rows or in skipped.\n" +
+          "- Don't make a task that matches one already on the board (listed as existing); put those rows in skipped as 'Already on the board: <title>'.\n" +
+          "- title: short and specific, under 90 characters, starting with the module or screen, e.g. 'Checkout: coupon discount not applied to the total'. No IDs or row numbers in the title.\n" +
+          "- description: plain text with these sections, each on its own line starting with '## ': What's wrong (or What to build / What to test), Steps (numbered lines '1. '), Expected, Actual (only if given), Test cases (their IDs from the sheet and the row numbers). Use only what the sheet says; write in clear English even if the sheet mixes in Hindi.\n" +
+          "- priority: Critical for crashes, data loss, payments or login broken; High for a main flow broken; Medium for a side flow or wrong text that matters; Low for cosmetics. Use the sheet's own priority or severity when it has one.\n" +
+          "- summary: one or two sentences on what the sheet covers and what you found.",
+          JSON.stringify({ file, project, columns: header, existing_tasks_on_board: existing }) + "\n\nRows:\n" + sheet,
+          { type: "object", additionalProperties: false, required: ["summary", "tasks", "skipped"], properties: {
+            summary: { type: "string" },
+            tasks: { type: "array", items: { type: "object", additionalProperties: false, required: ["title", "description", "type", "priority", "module", "rows"], properties: {
+              title: { type: "string" }, description: { type: "string" },
+              type: { type: "string", enum: ["Bug", "Feature", "Improvement", "Testing"] },
+              priority: { type: "string", enum: ["Critical", "High", "Medium", "Low"] },
+              module: { type: "string" }, rows: { type: "array", items: { type: "integer" } } } } },
+            skipped: { type: "array", items: { type: "object", additionalProperties: false, required: ["rows", "why"], properties: {
+              rows: { type: "array", items: { type: "integer" } }, why: { type: "string" } } } } } },
+          "medium");
+        const parsed = JSON.parse(out);
+        const n = rows.length, ok = (r: unknown) => Number.isInteger(r) && (r as number) >= 1 && (r as number) <= n;
+        const tasks = (parsed.tasks ?? []).filter((t: { title?: string }) => String(t.title ?? "").trim()).slice(0, 300).map((t: Record<string, unknown>) => ({
+          title: String(t.title).slice(0, 200), description: String(t.description ?? "").slice(0, 8000), type: String(t.type), priority: String(t.priority),
+          module: String(t.module ?? "").slice(0, 120), rows: (Array.isArray(t.rows) ? t.rows : []).filter(ok) }));
+        const skipped = (parsed.skipped ?? []).map((s: Record<string, unknown>) => ({ rows: (Array.isArray(s.rows) ? s.rows : []).filter(ok), why: String(s.why ?? "").slice(0, 300) }));
+        return json({ summary: String(parsed.summary ?? ""), tasks, skipped, rows: n });
       }
 
       if (action === "summarize") {

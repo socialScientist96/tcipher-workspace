@@ -7,7 +7,7 @@
 // 4 seconds or fails (the fresh copy still replaces it in the background, and the app shows its
 // "new version available" bar when that happens).
 // To switch this off for everyone: delete this file from the site. Browsers drop the cache on their next visit.
-const CACHE = "tc-shell-v120";
+const CACHE = "tc-shell-v121";
 const PAGE_WAIT_MS = 4000;
 
 self.addEventListener("install", () => self.skipWaiting());
@@ -77,7 +77,7 @@ self.addEventListener("push", (e) => {
     const ua = (self.navigator && self.navigator.userAgent) || "";
     const phone = (self.navigator && self.navigator.userAgentData && self.navigator.userAgentData.mobile) || /Android|iPhone|iPad|Mobile/i.test(ua);
     await self.registration.showNotification(d.title || "Tcipher workspace", {
-      body: d.body || "", tag: d.tag || undefined, renotify: phone && !!d.tag, silent: !phone && d.tag !== "test", data: { url: d.url || "/" },
+      body: d.body || "", tag: d.tag || undefined, renotify: phone && !!d.tag, silent: !phone,   // (2026-11fe) the test too: computers stay quiet; the open workspace plays its own soft chime data: { url: d.url || "/" },
       icon: "/icons/icon-192.png", badge: "/icons/badge-96.png", timestamp: Date.now(),
     });
   })());

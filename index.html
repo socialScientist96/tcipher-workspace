@@ -2917,6 +2917,22 @@ html:has(#content .chat),html:has(#content .chat) body{overscroll-behavior-y:non
   .content{padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))!important}
 }
 @media (max-width:350px){ .mh-n{font-size:46px} .mh-q b{font-size:12px} .mh-seg button{font-size:12px} }
+
+/* (2026-11fe) Import test cases */
+.dv-topacts{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.it-list{display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow:auto;padding-right:2px}
+.it-row{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--white)}
+.it-row.off{opacity:.5}
+.it-row > input{margin-top:11px;width:18px;height:18px;flex:none}
+.it-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.it-title{font-weight:600}
+.it-meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12.5px}
+.it-rows{font-family:var(--mono);font-size:11.5px}
+.it-desc summary{cursor:pointer;color:var(--p-ink);font-size:13px}
+.it-body{font-size:13px;margin-top:6px;white-space:pre-wrap}
+.it-skip{margin-top:10px;font-size:13px} .it-skip summary{cursor:pointer;color:var(--ink2)} .it-skip ul{margin:6px 0 0;padding-left:18px}
+.it-sum{margin:0 0 6px;padding:10px 12px;border-radius:10px;background:var(--tint);font-size:13.5px}
+@media (max-width:760px){ .dv-topacts #devImportTests span{display:none} }
 </style>
 </head>
 <body>
@@ -10847,7 +10863,7 @@ function playSound0(kind){
   try {
     unlockAudio(); if (!audioCtx || audioCtx.state !== "running") return;
     const t0 = audioCtx.currentTime + 0.01;
-    const notes = kind === "pop" ? [[880, 0, 0.09, 0.05]] : [[784, 0, 0.16, 0.09], [1175, 0.11, 0.26, 0.08]];   // G5 then D6, gentle
+    const notes = kind === "pop" ? [[880, 0, 0.09, 0.035]] : [[784, 0, 0.16, 0.06], [1175, 0.11, 0.24, 0.05]];   // G5 then D6, gentle (2026-11fe: about a third quieter)
     for (const [f, start, dur, vol] of notes){
       const o = audioCtx.createOscillator(), g = audioCtx.createGain();
       o.type = "sine"; o.frequency.value = f;
@@ -13182,7 +13198,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11fd";
+const APP_VERSION = "2026-11fe";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -14303,7 +14319,9 @@ async function renderDevBoard(el){
   const u = S.ui.dev = S.ui.dev || {};
   el.append(h("div", { class: "dv-top" },
     h("div", {}, h("div", { class: "dv-crumb" }, "Spaces"), h("h1", { class: "dv-space" }, "Development & QA")),
-    access(MOD.tasks).canCreate ? h("button", { type: "button", class: "btn pri", id: "devCreate", onclick: () => devCreate() }, "+ Create") : null));
+    access(MOD.tasks).canCreate ? h("div", { class: "dv-topacts" },
+      h("button", { type: "button", class: "btn", id: "devImportTests", title: "Upload a test-case sheet: Claude reads it and proposes the tasks", onclick: () => devImportTests() }, ic("sparkle", 15), h("span", {}, "Import test cases")),
+      h("button", { type: "button", class: "btn pri", id: "devCreate", onclick: () => devCreate() }, "+ Create")) : null));
   const people = activePeople().filter(p => p.vertical === "Development" || isTesterId(p.id) || devTasks().some(t => ownersOf(t).includes(p.id) && t.status !== "Done"));
   const q = h("input", { class: "in dv-search", type: "search", placeholder: "Search board", value: u.q || "", id: "devSearch", "aria-label": "Search board" });
   const body = h("div", {});
@@ -14597,6 +14615,117 @@ function inlineCreate(){
 // One simple form for every new task (Development and the rest): title, notes, owners and an optional due date.
 // "More options" opens the full form with what was typed, for bugs, projects, reviewers and the rest.
 function devCreate(){ return taskCreate({ vertical: "Development" }); }
+/* ---------- Import test cases (2026-11fe) ----------
+   Upload a QA test-case sheet (CSV or a spreadsheet tab) on the Development board. Claude reads every row and proposes
+   the tasks it calls for: failed and blocked cases become Bug / Feature / Improvement tasks (one per problem, several
+   rows grouped when they share a cause); a sheet with no results yet becomes Testing tasks per module. You review the
+   list (untick, rename) and only the tasks you keep are created in To Do, each saying which rows it came from. */
+async function devImportTests(){
+  await ensure(["projects", "profiles", "tasks"]);
+  const st = { file: "", sheets: [], tab: 0 };
+  const status = h("div", { class: "it-status" });
+  const tabSel = h("select", { class: "in", hidden: true, "aria-label": "Tab" });
+  const fileIn = h("input", { type: "file", accept: ".csv,.xlsx,.xls,.xlsm,.tsv,.txt", hidden: true });
+  const drop = h("label", { class: "dropzone", style: "display:block;cursor:pointer" }, h("b", {}, "Choose the test-case sheet"), h("span", { class: "muted" }, " · .csv, .xlsx or .xls"), fileIn);
+  const bp = (S.ui.dev || {}).project;
+  const proj = h("select", { class: "in", "aria-label": "Project" }, h("option", { value: "" }, "No project"),
+    rows("projects").filter(p => !["Completed", "Cancelled"].includes(p.status)).sort((a, b) => a.name.localeCompare(b.name)).map(p => h("option", { value: p.id, selected: bp && bp !== "none" && bp === p.id }, p.name)));
+  const devs = activePeople().filter(p => p.vertical === "Development").sort((a, b) => a.full_name.localeCompare(b.full_name));
+  const owner = h("select", { class: "in", "aria-label": "Owner" }, h("option", { value: "" }, "No owner yet"), devs.map(p => h("option", { value: p.id }, p.full_name)));
+  const tester = h("select", { class: "in", "aria-label": "Tester" }, h("option", { value: "" }, "No tester yet"), testers().map(p => h("option", { value: p.id, selected: p.id === S.me.id }, p.full_name)));
+  const go1 = h("button", { type: "button", class: "btn pri", disabled: true }, ic("sparkle", 15), "Analyse with Claude");
+  const showSheet = () => {
+    const sh = st.sheets[st.tab]; if (!sh) return;
+    status.replaceChildren(h("p", { class: "muted", style: "margin:8px 0 0" }, h("b", {}, String(sh.rows.length)), " rows" + (sh.header.length ? " · columns: " + sh.header.filter(Boolean).slice(0, 8).join(", ") + (sh.header.length > 8 ? "…" : "") : " · no header row found")));
+    go1.disabled = !sh.rows.length;
+  };
+  fileIn.onchange = async () => {
+    const f = fileIn.files && fileIn.files[0]; if (!f) return;
+    if (f.size > 20 * 1048576) { toast("That file is over 20 MB."); return; }
+    status.replaceChildren(h("p", { class: "muted" }, "Reading " + f.name + "…")); go1.disabled = true;
+    try {
+      const XLSX = await loadXLSX();
+      const wb = /\.(csv|tsv|txt)$/i.test(f.name) ? XLSX.read(await f.text(), { type: "string", raw: true }) : XLSX.read(await f.arrayBuffer(), { type: "array", cellDates: false });
+      st.file = f.name;
+      st.sheets = wb.SheetNames.map(name => {
+        const m = readSheet(XLSX, wb.Sheets[name]).filter(r => r.some(c => String(c).trim()));
+        let hi = headerRowOf(m); if (hi < 0 && m.length && m[0].filter(c => String(c).trim()).length >= 2 && !looksHeaderless(m)) hi = 0;
+        return { name, header: hi >= 0 ? m[hi].map(c => String(c).trim()) : [], rows: hi >= 0 ? m.slice(hi + 1) : m };
+      }).filter(x => x.rows.length);
+      if (!st.sheets.length) { status.replaceChildren(h("p", { class: "err" }, "That file has no rows.")); return; }
+      st.tab = 0;
+      tabSel.replaceChildren(...st.sheets.map((x, i) => h("option", { value: String(i) }, x.name + " (" + x.rows.length + " rows)")));
+      tabSel.hidden = st.sheets.length < 2;
+      drop.querySelector("b").textContent = f.name;
+      showSheet();
+    } catch (e) { status.replaceChildren(h("p", { class: "err" }, "Couldn’t read that file: " + friendly(e))); }
+  };
+  tabSel.onchange = () => { st.tab = +tabSel.value || 0; showSheet(); };
+  go1.onclick = async () => {
+    const sh = st.sheets[st.tab]; if (!sh) return;
+    if (sh.rows.length > 2000) { toast("That tab has " + sh.rows.length + " rows. Split it into files of up to 2,000 rows."); return; }
+    go1.disabled = true; go1.classList.add("busy");
+    status.replaceChildren(h("p", { class: "muted" }, h("span", { class: "spinner", style: "display:inline-block;vertical-align:-3px;margin-right:8px" }), "Claude is reading " + sh.rows.length + " test cases. This can take a minute or two for a big sheet…"));
+    const existing = devTasks().filter(t => t.status !== "Done").slice(0, 300).map(t => t.title);
+    let r;
+    try { r = await callAI({ action: "testcase_tasks", file: st.file + (st.sheets.length > 1 ? " › " + sh.name : ""), project: proj.value ? refLabel("projects", proj.value) : "", header: sh.header, rows: sh.rows, existing }); }
+    catch (e) { go1.disabled = false; go1.classList.remove("busy"); status.replaceChildren(h("p", { class: "err" }, friendly(e))); return; }
+    devImportReview(r, { file: st.file, sheet: sh, project_id: proj.value || null, assignee_id: owner.value || null, tester_id: tester.value || null });
+  };
+  const fl = (label, el) => h("label", { class: "fl", style: "flex:1;min-width:150px" }, label, el);
+  openDialog("Import test cases", [
+    h("p", { class: "muted", style: "margin-top:0" }, "Upload the QA sheet. Claude reads every row and proposes tasks: a Bug for each failed or blocked case (cases with the same cause grouped into one), or Testing tasks per module if the sheet has no results yet. You check the list before anything is created."),
+    drop, tabSel, status,
+    h("div", { style: "display:flex;gap:10px;flex-wrap:wrap;margin-top:12px" }, fl("Project", proj), fl("Owner", owner), fl("Tester", tester))],
+    [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), go1]);
+}
+function devImportReview(r, ctx){
+  const tasks = (r.tasks || []).map(t => Object.assign({ keep: true }, t));
+  const tid = sh => { const i = ctx.sheet.header.findIndex(c => /test ?case ?id|^tc ?id$|^id$|case id|test id/i.test(c)); return i; };
+  const idCol = tid();
+  const rowsLabel = list => !list || !list.length ? "" : (idCol >= 0 ? list.map(n => (ctx.sheet.rows[n - 1] || [])[idCol] || "row " + n).filter(Boolean).join(", ") : "Rows " + list.join(", "));
+  const count = h("b", {});
+  const create = h("button", { type: "button", class: "btn pri" });
+  const paint = () => { const n = tasks.filter(t => t.keep).length; count.textContent = String(n); create.textContent = n ? "Create " + n + " task" + (n === 1 ? "" : "s") : "Nothing to create"; create.disabled = !n; };
+  const TONE = { Critical: "bad", High: "warn", Medium: "info", Low: "grey" };
+  const list = h("div", { class: "it-list" }, tasks.length ? tasks.map(t => {
+    const cb = h("input", { type: "checkbox", checked: true, "aria-label": "Create this task" });
+    cb.onchange = () => { t.keep = cb.checked; row.classList.toggle("off", !cb.checked); paint(); };
+    const title = h("input", { class: "in it-title", value: t.title, "aria-label": "Task title" });
+    title.oninput = () => { t.title = title.value; };
+    const desc = h("details", { class: "it-desc" }, h("summary", {}, "Details"), h("div", { class: "it-body" }, renderRich ? renderRich(t.description) : t.description));
+    const row = h("div", { class: "it-row" }, cb, h("div", { class: "it-main" }, title,
+      h("div", { class: "it-meta" }, pill(t.type, t.type === "Bug" ? "bad" : t.type === "Testing" ? "info" : "grey"), pill(t.priority, TONE[t.priority] || "grey"),
+        t.module ? h("span", { class: "muted" }, t.module) : null, h("span", { class: "muted it-rows" }, rowsLabel(t.rows))), desc));
+    return row;
+  }) : [h("p", { class: "nothing" }, "Claude found nothing that needs a task in this sheet.")]);
+  const skipped = (r.skipped || []).filter(s => s.rows && s.rows.length);
+  const nSkip = skipped.reduce((n, s) => n + s.rows.length, 0);
+  const skipBox = nSkip ? h("details", { class: "it-skip" }, h("summary", {}, nSkip + " row" + (nSkip === 1 ? "" : "s") + " need no task"),
+    h("ul", {}, skipped.map(s => h("li", {}, h("b", {}, rowsLabel(s.rows)), " · " + s.why)))) : null;
+  const all = h("button", { type: "button", class: "linkbtn", onclick: () => { const on = !tasks.every(t => t.keep); tasks.forEach(t => t.keep = on); list.querySelectorAll(".it-row").forEach((rw, i) => { rw.querySelector("input[type=checkbox]").checked = on; rw.classList.toggle("off", !on); }); paint(); } }, "Select all / none");
+  create.onclick = async () => {
+    const keep = tasks.filter(t => t.keep && String(t.title).trim());
+    if (!keep.length) return;
+    create.disabled = true; create.classList.add("busy");
+    let made = 0, failed = 0;
+    for (const t of keep) {
+      const src = "\n\n## Source\n" + ctx.file + (ctx.sheet.name && ctx.sheet.name !== "Sheet1" ? " › " + ctx.sheet.name : "") + (t.rows && t.rows.length ? " · " + rowsLabel(t.rows) : "") + " (imported " + fmtDate(today(), true) + ")";
+      try {
+        await devInsert(Object.assign({ title: String(t.title).trim().slice(0, 200), description: String(t.description || "") + src, type: t.type, priority: t.priority },
+          ctx.project_id ? { project_id: ctx.project_id } : {}, { assignee_id: ctx.assignee_id || null }, ctx.tester_id ? { tester_id: ctx.tester_id } : {}));
+        made++; create.textContent = "Creating… " + made + " of " + keep.length;
+      } catch (e) { failed++; console.warn("import task", e); }
+    }
+    closeDlg(); toast(made + " task" + (made === 1 ? "" : "s") + " created in To Do" + (failed ? "; " + failed + " couldn’t be saved" : "") + "."); rerender();
+  };
+  paint();
+  openDialog("Tasks from " + ctx.file, [
+    r.summary ? h("p", { class: "it-sum" }, r.summary) : null,
+    h("p", { class: "muted", style: "margin:0 0 8px" }, String(r.rows || ctx.sheet.rows.length), " rows read · ", count, " tasks to create. Untick or rename any before creating. ", tasks.length > 1 ? all : null),
+    list, skipBox].filter(Boolean), [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), create]);
+}
+
 function taskCreate(preset){
   preset = preset || {};
   const verts = isAdmin() ? VERTICALS : [S.me.vertical || "Development"];
