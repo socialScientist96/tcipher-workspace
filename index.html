@@ -13198,7 +13198,7 @@ window.__statusTest = { paint: () => paintStatus(), tick: () => activityTick(), 
    Problem reporting: automatic error capture, a "Report a problem" button,
    and Admin panel › Problems (with "Copy for Claude")
    --------------------------------------------------------------------- */
-const APP_VERSION = "2026-11ff";
+const APP_VERSION = "2026-11fg";
 const CRUMBS = [];                                   // the last things this person did, sent with a report
 function crumb(t){ CRUMBS.push({ t: new Date().toISOString(), s: String(t).slice(0, 120) }); if (CRUMBS.length > 25) CRUMBS.shift(); }
 window.addEventListener("hashchange", () => crumb("opened " + (location.hash.slice(1) || "dashboard")));
@@ -14634,6 +14634,10 @@ async function devImportTests(){
   const owner = h("select", { class: "in", "aria-label": "Owner" }, h("option", { value: "" }, "No owner yet"), devs.map(p => h("option", { value: p.id }, p.full_name)));
   const tester = h("select", { class: "in", "aria-label": "Tester" }, h("option", { value: "" }, "No tester yet"), testers().map(p => h("option", { value: p.id, selected: p.id === S.me.id }, p.full_name)));
   const go1 = h("button", { type: "button", class: "btn pri", disabled: true }, ic("sparkle", 15), "Analyse with Claude");
+  // (2026-11fg) one task per test case (default), or grouped by problem
+  let mode = "per_case";
+  const modeSeg = segmented([["per_case", "One task per test case"], ["grouped", "Group by problem"]], mode, v => { mode = v; modeNote.textContent = v === "per_case" ? "Every test case becomes its own task: Testing if not run yet, Bug if it failed." : "Failed and blocked cases become tasks, with cases that share a cause grouped into one; passed cases are left out."; });
+  const modeNote = h("p", { class: "muted", style: "font-size:12.5px;margin:6px 0 0" }, "Every test case becomes its own task: Testing if not run yet, Bug if it failed.");
   const showSheet = () => {
     const sh = st.sheets[st.tab]; if (!sh) return;
     status.replaceChildren(h("p", { class: "muted", style: "margin:8px 0 0" }, h("b", {}, String(sh.rows.length)), " rows" + (sh.header.length ? " · columns: " + sh.header.filter(Boolean).slice(0, 8).join(", ") + (sh.header.length > 8 ? "…" : "") : " · no header row found")));
@@ -14671,8 +14675,8 @@ async function devImportTests(){
     // (2026-11ff) a big tab is read in parts of about 40 rows (and at most ~45,000 characters), one after another, so each
     // request stays well inside the server's time limit; later parts are told what earlier parts proposed, so nothing repeats
     const parts = []; let cur = [], size = 0;
-    sh.rows.forEach((row, i) => { const len = row.join("\t").length + 8;
-      if (cur.length && (cur.length >= 40 || size + len > 45000)) { parts.push(cur); cur = []; size = 0; }
+    sh.rows.forEach((row, i) => { const len = row.join("\t").length + 8;   // (size only)
+      if (cur.length && (cur.length >= (mode === "per_case" ? 30 : 40) || size + len > (mode === "per_case" ? 36000 : 45000))) { parts.push(cur); cur = []; size = 0; }
       cur.push(i); size += len; });
     if (cur.length) parts.push(cur);
     const say = (txt) => status.replaceChildren(h("p", { class: "muted" }, h("span", { class: "spinner", style: "display:inline-block;vertical-align:-3px;margin-right:8px" }), txt));
@@ -14687,7 +14691,7 @@ async function devImportTests(){
       let r;
       try {
         r = await callAI({ action: "testcase_tasks", file: fileLabel + (parts.length > 1 ? " (part " + (k + 1) + " of " + parts.length + ")" : ""), project: proj.value ? refLabel("projects", proj.value) : "",
-          header: sh.header, rows: idx.map(i => sh.rows[i]), existing: [...base, ...merged.tasks.map(t => t.title)].slice(-400) });
+          header: sh.header, rows: idx.map(i => sh.rows[i].map(c => String(c).replace(/\t/g, " ").replace(/\s*\r?\n\s*/g, " / ").trim())), mode, existing: mode === "per_case" ? base : [...base, ...merged.tasks.map(t => t.title)].slice(-400) });
       } catch (e) {
         console.warn("import test cases: part " + (k + 1) + " of " + parts.length + " failed: " + friendly(e));   // recorded in Admin › Problems
         go1.disabled = false; go1.classList.remove("busy");
@@ -14697,18 +14701,41 @@ async function devImportTests(){
       }
       const shift = list => (list || []).map(n => n + first);   // the part's row numbers → the sheet's
       if (r.summary) merged.summary.push(r.summary);
-      const seen = new Set(merged.tasks.map(t => qnorm(t.title)));
-      for (const t of r.tasks || []) if (!seen.has(qnorm(t.title))) { seen.add(qnorm(t.title)); merged.tasks.push(Object.assign({}, t, { rows: shift(t.rows) })); }
+      const keyOf = t => mode === "per_case" ? "r" + (t.rows || []).join(",") : qnorm(t.title);   // per case: the row is the identity
+      const seen = new Set(merged.tasks.map(keyOf));
+      for (const t0 of r.tasks || []) { const t = Object.assign({}, t0, { rows: shift(t0.rows) }); if (!seen.has(keyOf(t))) { seen.add(keyOf(t)); merged.tasks.push(t); } }
       for (const x of r.skipped || []) merged.skipped.push(Object.assign({}, x, { rows: shift(x.rows) }));
     }
+    if (mode === "per_case") {
+      // (2026-11fg) a test case Claude left out still gets its task, made from the sheet's own columns
+      const covered = new Set(); merged.tasks.forEach(t => (t.rows || []).forEach(n => covered.add(n))); merged.skipped.forEach(x => (x.rows || []).forEach(n => covered.add(n)));
+      const hd = sh.header.map(qnorm), col = re => hd.findIndex(c => re.test(c));
+      const cId = col(/^(id|test ?case ?id|tc ?id|case id)$|test case id/), cMod = col(/module|screen|area|section/), cTitle = col(/^title$|scenario|what to check|test case( name)?$|summary|description/),
+        cPre = col(/precondition/), cSteps = col(/steps/), cExp = col(/expected/), cStat = col(/^status$|^test status$|pass\/fail|^result$|^outcome$/), cPri = col(/priority|severity/);
+      const cell = (r, c) => c >= 0 ? String(r[c] || "").trim() : "";
+      let added = 0;
+      sh.rows.forEach((r, i) => {
+        const n = i + 1; if (covered.has(n) || !r.some(c => String(c).trim())) return;
+        const id = cell(r, cId), mod = cell(r, cMod), what = cell(r, cTitle) || r.find(c => String(c).trim().length > 12) || id;
+        const failed = /fail|block/i.test(cell(r, cStat)), pr = cell(r, cPri);
+        merged.tasks.push({ title: ((mod ? mod + ": " : "") + what).slice(0, 120), type: failed ? "Bug" : "Testing", module: mod,
+          priority: /p0|critical|blocker/i.test(pr) ? "Critical" : /p1|high/i.test(pr) ? "High" : /p3|low/i.test(pr) ? "Low" : "Medium", rows: [n],
+          description: ["## What to test\n" + what, cell(r, cPre) && "## Preconditions\n" + cell(r, cPre), cell(r, cSteps) && "## Steps\n" + cell(r, cSteps), cell(r, cExp) && "## Expected\n" + cell(r, cExp),
+            "## Test cases\n" + (id ? id + " (row " + n + ")" : "Row " + n) + "\n(Made from the sheet: Claude didn’t return this one.)"].filter(Boolean).join("\n") });
+        added++;
+      });
+      merged.tasks.sort((a, b) => ((a.rows || [])[0] || 1e9) - ((b.rows || [])[0] || 1e9));
+      if (added) merged.summary.push(added + " test case" + (added === 1 ? " was" : "s were") + " made from the sheet directly.");
+    }
     { const uniq = [...new Set(merged.summary.map(x => String(x).trim()).filter(Boolean))];
-      merged.summary = (parts.length > 1 ? "Read in " + parts.length + " parts of about 40 rows. " : "") + uniq.slice(0, 4).join(" ") + (uniq.length > 4 ? " …" : ""); }
+      merged.summary = (parts.length > 1 ? "Read in " + parts.length + " parts of up to " + (mode === "per_case" ? 30 : 40) + " rows. " : "") + uniq.slice(0, 4).join(" ") + (uniq.length > 4 ? " …" : ""); }
     devImportReview(merged, ctxOf());
   };
   const fl = (label, el) => h("label", { class: "fl", style: "flex:1;min-width:150px" }, label, el);
   openDialog("Import test cases", [
-    h("p", { class: "muted", style: "margin-top:0" }, "Upload the QA sheet. Claude reads every row and proposes tasks: a Bug for each failed or blocked case (cases with the same cause grouped into one), or Testing tasks per module if the sheet has no results yet. You check the list before anything is created."),
+    h("p", { class: "muted", style: "margin-top:0" }, "Upload the QA sheet. Claude reads every row and proposes the tasks; you check the list before anything is created."),
     drop, tabSel, status,
+    h("div", { style: "margin-top:12px" }, h("b", { style: "display:block;font-size:13px;margin-bottom:6px" }, "Make tasks"), modeSeg, modeNote),
     h("div", { style: "display:flex;gap:10px;flex-wrap:wrap;margin-top:12px" }, fl("Project", proj), fl("Owner", owner), fl("Tester", tester))],
     [h("span", { class: "sp" }), h("button", { type: "button", class: "btn ghost", onclick: closeDlg }, "Cancel"), go1]);
 }

@@ -43,11 +43,11 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const action = String(body.action ?? "");
     const client = new Anthropic();
-    const ask = async (system: string, user: string, schema?: Record<string, unknown>, effort: "low" | "medium" = "low") => {
+    const ask = async (system: string, user: string, schema?: Record<string, unknown>, effort: "low" | "medium" = "low", maxTokens = 16000) => {
       // fallbacks: if Claude declines, the API re-runs the request on a fallback model in the same call
       const stream = client.beta.messages.stream({
         model: "claude-opus-5-5",
-        max_tokens: 16000,
+        max_tokens: maxTokens,
         betas: ["server-side-fallback-2026-07-01"],
         fallbacks: "default",
         output_config: schema ? { effort, format: { type: "json_schema", schema } } : { effort },
@@ -135,21 +135,31 @@ Deno.serve(async (req) => {
         const header = (Array.isArray(body.header) ? body.header : []).slice(0, 60).map((c: unknown) => String(c ?? "").slice(0, 200));
         const rows = (Array.isArray(body.rows) ? body.rows : []).slice(0, 2000).map((r: unknown) => (Array.isArray(r) ? r : []).slice(0, 60).map((c: unknown) => String(c ?? "").slice(0, 2000)));
         const existing = (Array.isArray(body.existing) ? body.existing : []).slice(0, 400).map((t: unknown) => String(t ?? "").slice(0, 200));
+        // (2026-11fg) "per_case": exactly one task per test case (the default in the app); "grouped": one task per problem
+        const perCase = body.mode !== "grouped";
         if (!rows.length) return json({ error: "The sheet has no rows to read." }, 400);
         // the rows go in numbered, so every task can say which test cases it came from
-        const sheet = rows.map((r: string[], i: number) => (i + 1) + "\t" + r.join("\t")).join("\n");
+        // one line per test case: line breaks and tabs inside a cell would split a row in two (2026-11fg)
+        const sheet = rows.map((r: string[], i: number) => (i + 1) + "\t" + r.map((c) => c.replace(/\t/g, " ").replace(/\s*\r?\n\s*/g, " / ").trim()).join("\t")).join("\n");
         if (sheet.length > 400000) return json({ error: "That sheet is too big to read in one go (about " + Math.round(sheet.length / 1000) + "k characters). Split it into smaller files." }, 413);
         const out = await ask(
           "You turn a QA test-case sheet into development tasks for Tcipher Technologies' Development board.\n" +
           "The input is the sheet's column names and its rows, each numbered (row number, then the cells, tab-separated). Typical columns: test case ID, module or screen, scenario, steps, expected result, actual result, status (Pass / Fail / Blocked / Not run), priority, notes, tester. Column names vary; read them by meaning.\n" +
+(perCase ? (
+          "Rules:\n" +
+          "- Make exactly one task for every test-case row, in row order, with that row's number in rows. Never merge rows into one task and never leave a test case out.\n" +
+          "- type: Testing when the case hasn't been run yet (status empty, Not run, Pending, To do); Bug when it failed or is blocked by something broken; Feature when the expected behaviour doesn't exist yet.\n" +
+          "- Only rows that are blank, repeat the column headings, or are section titles go in skipped. A test case that already has a matching task on the board (listed as existing) goes in skipped as 'Already on the board: <title>'.\n" +
+          "") : (
           "Rules:\n" +
           "- Make a task for every test case that failed or is blocked, or whose actual result or notes show something broken or missing. Use type Bug for broken behaviour, Feature for something that doesn't exist yet, Improvement for a change to something that works.\n" +
           "- One task per problem: when several rows fail for the same reason (same screen, same root cause), make one task and list all their row numbers.\n" +
           "- If the sheet has no results yet (a plan of tests to run), make one Testing task per module or feature instead, listing the test cases to run.\n" +
           "- Rows that passed, aren't applicable, are duplicates or are blank go in skipped with a short reason. Every row number appears in exactly one task's rows or in skipped.\n" +
           "- Don't make a task that matches one already on the board (listed as existing); put those rows in skipped as 'Already on the board: <title>'.\n" +
+          "")) +
           "- title: short and specific, under 90 characters, starting with the module or screen, e.g. 'Checkout: coupon discount not applied to the total'. No IDs or row numbers in the title.\n" +
-          "- description: plain text with these sections, each on its own line starting with '## ': What's wrong (or What to build / What to test), Steps (numbered lines '1. '), Expected, Actual (only if given), Test cases (their IDs from the sheet and the row numbers). Use only what the sheet says; write in clear English even if the sheet mixes in Hindi.\n" +
+          "- description: plain text with these sections, each on its own line starting with '## ': What's wrong (or What to build / What to test), Preconditions (only if given), Steps (numbered lines '1. '), Expected, Actual (only if given), Test cases (their IDs from the sheet and the row numbers). Use only what the sheet says; keep it as short as the sheet allows; write in clear English even if the sheet mixes in Hindi.\n" +
           "- priority: Critical for crashes, data loss, payments or login broken; High for a main flow broken; Medium for a side flow or wrong text that matters; Low for cosmetics. Use the sheet's own priority or severity when it has one.\n" +
           "- summary: one or two sentences on what the sheet covers and what you found.",
           JSON.stringify({ file, project, columns: header, existing_tasks_on_board: existing }) + "\n\nRows:\n" + sheet,
@@ -162,7 +172,7 @@ Deno.serve(async (req) => {
               module: { type: "string" }, rows: { type: "array", items: { type: "integer" } } } } },
             skipped: { type: "array", items: { type: "object", additionalProperties: false, required: ["rows", "why"], properties: {
               rows: { type: "array", items: { type: "integer" } }, why: { type: "string" } } } } } },
-          "medium");
+          "medium", perCase ? 32000 : 16000);
         const parsed = JSON.parse(out);
         const n = rows.length, ok = (r: unknown) => Number.isInteger(r) && (r as number) >= 1 && (r as number) <= n;
         const tasks = (parsed.tasks ?? []).filter((t: { title?: string }) => String(t.title ?? "").trim()).slice(0, 300).map((t: Record<string, unknown>) => ({
